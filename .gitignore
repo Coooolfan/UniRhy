@@ -1,0 +1,8 @@
+.idea
+
+server/.gradle
+server/build
+server/.kotlin
+server/.env
+!server/gradle/wrapper/gradle-wrapper.jar
+

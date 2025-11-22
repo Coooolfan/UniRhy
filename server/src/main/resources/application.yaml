@@ -1,0 +1,38 @@
+server:
+  port: ${SERVER_PORT:8080}
+  tomcat:
+    max-swallow-size: -1
+spring:
+  application:
+    name: unirhy
+  servlet:
+    multipart:
+      max-file-size: -1
+      max-request-size: -1
+  threads:
+    virtual:
+      enabled: ${SPRING_THREADS_VIRTUAL_ENABLED:true}
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:db}:${DB_PORT:5432}/${POSTGRES_DB:unirhy}
+    username: ${DB_USER:postgres}
+    password: ${DB_PASSWORD}
+
+jimmer:
+  language: kotlin
+  dialect: org.babyfish.jimmer.sql.dialect.PostgresDialect
+  show-sql: ${JIMMER_SHOW_SQL:false}
+  pretty-sql: ${JIMMER_PRETTY_SQL:false}
+  inline-sql-variables: ${JIMMER_INLINE_SQL_VARIABLES:false}
+  database-validation-mode: ${JIMMER_DB_VALIDATION_MODE:ERROR}
+
+  client:
+    enable: ${JIMMER_CLIENT_ENABLE:false}
+    openapi:
+      path: ${JIMMER_OPENAPI_YML_PATH:/api/openapi.yml}
+      ui-path: ${JIMMER_OPENAPI_UI_PATH:/api/openapi.html}
+    ts:
+      path: ${JIMMER_TS_PATH:/api/openapi.zip}
+
+sa-token:
+  is-print: ${SA_TOKEN_IS_PRINT:true}
+  token-name: ${SA_TOKEN_NAME:unirhy-token}
