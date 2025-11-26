@@ -1,0 +1,45 @@
+[versions]
+kotlin = "2.2.21"
+springBoot = "4.0.0"
+dependencyManagement = "1.1.7"
+graalvm = "0.11.3"
+ksp = "2.3.0"
+jimmer = "0.9.116"
+saToken = "1.44.0"
+
+[libraries]
+
+# Spring Boot
+spring-boot-starter-webmvc = { module = "org.springframework.boot:spring-boot-starter-webmvc" }
+
+# Kotlin
+jackson-module-kotlin = { module = "com.fasterxml.jackson.module:jackson-module-kotlin" }
+kotlin-reflect = { module = "org.jetbrains.kotlin:kotlin-reflect" }
+
+# Jimmer
+jimmer-spring-boot-starter = { group = "org.babyfish.jimmer", name = "jimmer-spring-boot-starter", version.ref = "jimmer" }
+jimmer-ksp = { group = "org.babyfish.jimmer", name = "jimmer-ksp", version.ref = "jimmer" }
+
+# Sa-Token
+sa-token-starter = { group = "cn.dev33", name = "sa-token-spring-boot3-starter", version.ref = "saToken" }
+
+# PostgreSQL
+postgresql = { module = "org.postgresql:postgresql" }
+
+# Flyway
+spring-boot-starter-flyway = { module = "org.springframework.boot:spring-boot-starter-flyway" }
+postgresql-flyway = { module = "org.flywaydb:flyway-database-postgresql" }
+
+# Test
+test-spring-boot-starter-webmvc = { module = "org.springframework.boot:spring-boot-starter-webmvc-test" }
+test-spring-boot-starter-flyway = { module = "org.springframework.boot:spring-boot-starter-flyway-test" }
+test-kotlin = { module = "org.jetbrains.kotlin:kotlin-test-junit5" }
+test-launcher = { module = "org.junit.platform:junit-platform-launcher" }
+
+[plugins]
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+kotlin-spring = { id = "org.jetbrains.kotlin.plugin.spring", version.ref = "kotlin" }
+spring-boot = { id = "org.springframework.boot", version.ref = "springBoot" }
+spring-dependency-management = { id = "io.spring.dependency-management", version.ref = "dependencyManagement" }
+graalvm-native = { id = "org.graalvm.buildtools.native", version.ref = "graalvm" }
+ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }

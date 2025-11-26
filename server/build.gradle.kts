@@ -1,14 +1,16 @@
+import org.springframework.boot.gradle.tasks.bundling.BootJar
+
 plugins {
-    kotlin("jvm") version "2.2.21"
-    kotlin("plugin.spring") version "2.2.21"
-    id("org.springframework.boot") version "4.0.0"
-    id("io.spring.dependency-management") version "1.1.7"
-    id("org.graalvm.buildtools.native") version "0.11.3"
-    id("com.google.devtools.ksp") version "2.3.0"
+    alias(libs.plugins.kotlin.jvm)
+    alias(libs.plugins.kotlin.spring)
+    alias(libs.plugins.spring.boot)
+    alias(libs.plugins.spring.dependency.management)
+    alias(libs.plugins.graalvm.native)
+    alias(libs.plugins.ksp)
 }
 
-group = "com.coooolfan"
-version = "0.0.1"
+group = providers.gradleProperty("projectGroup").get()
+version = providers.gradleProperty("projectVersion").get()
 description = "just listen"
 
 java {
@@ -22,25 +24,25 @@ repositories {
     mavenCentral()
 }
 
-val jimmerVersion = "0.9.116"
-val saTokenVersion = "1.44.0"
-
 dependencies {
-    implementation("org.springframework.boot:spring-boot-starter-flyway")
-    implementation("org.springframework.boot:spring-boot-starter-webmvc")
-    implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
-    implementation("org.jetbrains.kotlin:kotlin-reflect")
-    implementation("org.babyfish.jimmer:jimmer-spring-boot-starter:${jimmerVersion}")
-    ksp("org.babyfish.jimmer:jimmer-ksp:${jimmerVersion}")
-    implementation("cn.dev33:sa-token-spring-boot3-starter:${saTokenVersion}")
+    implementation(libs.spring.boot.starter.webmvc)
+    implementation(libs.spring.boot.starter.flyway)
 
-    runtimeOnly("org.postgresql:postgresql")
-    runtimeOnly("org.flywaydb:flyway-database-postgresql")
+    implementation(libs.jackson.module.kotlin)
+    implementation(libs.kotlin.reflect)
 
-    testImplementation("org.springframework.boot:spring-boot-starter-flyway-test")
-    testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
-    testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
-    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+    implementation(libs.jimmer.spring.boot.starter)
+    ksp(libs.jimmer.ksp)
+
+    implementation(libs.sa.token.starter)
+
+    runtimeOnly(libs.postgresql)
+    runtimeOnly(libs.postgresql.flyway)
+
+    testImplementation(libs.test.spring.boot.starter.flyway)
+    testImplementation(libs.test.spring.boot.starter.webmvc)
+    testImplementation(libs.test.kotlin)
+    testRuntimeOnly(libs.test.launcher)
 }
 
 kotlin {
@@ -51,4 +53,13 @@ kotlin {
 
 tasks.withType<Test> {
     useJUnitPlatform()
+}
+
+
+tasks.withType<Jar> {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
+tasks.withType<BootJar> {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
