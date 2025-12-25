@@ -20,7 +20,7 @@ import LightPillar from './components/LightPillar.vue'
     />
     <div class="overlay">
       <h1 class="brand">UniRhy</h1>
-      <p class="subtitle">Just Listen / Coming Soon</p>
+      <p class="subtitle">Just Listen / Cooming Soon</p>
     </div>
   </div>
 </template>
