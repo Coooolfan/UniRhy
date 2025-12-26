@@ -1,5 +1,10 @@
 <script setup lang="ts">
+import { ref } from 'vue'
 import LightPillar from './components/LightPillar.vue'
+import BrandLogo from './components/BrandLogo.vue'
+import HeroSubtitle from './components/HeroSubtitle.vue'
+
+const isChinese = ref(false)
 </script>
 
 <template>
@@ -19,8 +24,19 @@ import LightPillar from './components/LightPillar.vue'
       mixBlendMode="normal"
     />
     <div class="overlay">
-      <h1 class="brand">UniRhy</h1>
-      <p class="subtitle">Just Listen / Cooming Soon</p>
+      <BrandLogo :isChinese="isChinese" />
+      <HeroSubtitle :isChinese="isChinese" />
+    </div>
+    <div class="footer">
+      <div class="lang-switch">
+        <span class="lang-opt" :class="{ active: isChinese }" @click="isChinese = true">
+          中文
+        </span>
+        <span class="separator">/</span>
+        <span class="lang-opt" :class="{ active: !isChinese }" @click="isChinese = false">
+          English
+        </span>
+      </div>
     </div>
   </div>
 </template>
@@ -85,28 +101,49 @@ body,
 }
 
 .bg {
-     /*亮度降低*/
-    filter: brightness(0.7)
+  /*亮度降低*/
+  filter: brightness(0.7);
 }
 
-.brand {
-  font-size: 8rem;
-  font-weight: 800;
-  margin: 0;
-  line-height: 1;
-  letter-spacing: 0.05em;
-  color: #ffffff;
-  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.3)) drop-shadow(0 0 30px rgba(255, 215, 0, 0.5));
+.footer {
+  position: absolute;
+  bottom: 2rem;
+  left: 0;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  z-index: 20;
 }
 
-.subtitle {
-  font-size: 1.5rem;
-  margin: 1.5rem 0 0;
-  font-weight: 300;
-  letter-spacing: 0.5em;
-  opacity: 1;
-  text-transform: uppercase;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
-  padding-bottom: 10rem;
+.lang-switch {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 1.1rem;
+  color: rgba(255, 255, 255, 0.4);
+  user-select: none;
+}
+
+.lang-opt {
+  cursor: pointer;
+  transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  position: relative;
+}
+
+.lang-opt:hover {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.lang-opt.active {
+  color: #fff;
+  font-weight: 700;
+  text-shadow: 0 0 15px rgba(255, 255, 255, 0.6);
+  transform: scale(1.1);
+}
+
+.separator {
+  cursor: default;
+  opacity: 0.3;
 }
 </style>
