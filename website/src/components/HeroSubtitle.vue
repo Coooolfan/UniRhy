@@ -7,7 +7,7 @@ defineProps<{
 <template>
   <Transition name="fade-up" mode="out-in">
     <p class="subtitle" :key="isChinese ? 'cn' : 'en'">
-      {{ isChinese ? '享受音乐 / 即将到来' : 'Just Listen / Cooming Soon' }}
+      {{ isChinese ? '享受音乐 / 即将到来' : 'Just Listen / Coming Soon' }}
     </p>
   </Transition>
 </template>
