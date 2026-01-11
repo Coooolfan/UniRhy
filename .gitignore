@@ -11,3 +11,6 @@ server/.env
 website/.vscode
 website/node_modules
 
+web/.vscode
+web/node_modules
+
