@@ -12,6 +12,9 @@ spring:
   threads:
     virtual:
       enabled: ${SPRING_THREADS_VIRTUAL_ENABLED:true}
+  http:
+    converters:
+      preferred-json-mapper: jackson2
   datasource:
     url: jdbc:postgresql://${DB_HOST:db}:${DB_PORT:5432}/${POSTGRES_DB:unirhy}
     username: ${DB_USER:postgres}
@@ -36,3 +39,7 @@ jimmer:
 sa-token:
   is-print: ${SA_TOKEN_IS_PRINT:true}
   token-name: ${SA_TOKEN_NAME:unirhy-token}
+
+logging:
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} %highlight(%-5level) %-19(%cyan(%-19.19logger{0})) : %msg%n"

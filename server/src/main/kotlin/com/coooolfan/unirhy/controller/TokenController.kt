@@ -1,7 +1,9 @@
 package com.coooolfan.unirhy.controller
 
+import cn.dev33.satoken.annotation.SaCheckLogin
 import com.coooolfan.unirhy.service.AccountService
 import org.springframework.stereotype.Controller
+import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
@@ -12,7 +14,13 @@ import org.springframework.web.bind.annotation.RestController
 class TokenController(private val service: AccountService) {
 
     @GetMapping
-    fun login(email: String, password: String): Boolean {
+    fun login(email: String, password: String) {
         return service.checkChallenge(email, password)
+    }
+
+    @SaCheckLogin
+    @DeleteMapping
+    fun logout() {
+        service.logout()
     }
 }

@@ -1,6 +1,5 @@
 package com.coooolfan.unirhy
 
-import org.junit.jupiter.api.Test
 import java.awt.Color
 import java.io.FileWriter
 import kotlin.math.max
@@ -8,7 +7,7 @@ import kotlin.math.min
 
 
 class MakeGradientBanner {
-    @Test
+    // @Test
     fun main() {
         // ================= 配置区 =================
 
@@ -38,7 +37,7 @@ class MakeGradientBanner {
         // 3. 渐变模式
         // true = 左上到右下 (对角线渐变)
         // false = 从左到右 (水平渐变)
-        val DIAGONAL_MODE = false
+        val DIAGONAL_MODE = true
 
 
         // ================= 生成逻辑 =================
