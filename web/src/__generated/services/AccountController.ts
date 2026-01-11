@@ -65,14 +65,14 @@ export class AccountController {
     readonly list: () => Promise<
         ReadonlyArray<AccountDto['AccountController/DEFAULT_ACCOUNT_FETCHER']>
     > = async() => {
-        let _uri = '/api/account';
+        const _uri = '/api/account';
         return (await this.executor({uri: _uri, method: 'GET'})) as Promise<ReadonlyArray<AccountDto['AccountController/DEFAULT_ACCOUNT_FETCHER']>>;
     }
     
     readonly me: () => Promise<
         AccountDto['AccountController/DEFAULT_ACCOUNT_FETCHER']
     > = async() => {
-        let _uri = '/api/account/me';
+        const _uri = '/api/account/me';
         return (await this.executor({uri: _uri, method: 'GET'})) as Promise<AccountDto['AccountController/DEFAULT_ACCOUNT_FETCHER']>;
     }
     

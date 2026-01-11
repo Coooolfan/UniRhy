@@ -22,8 +22,10 @@ export const api = new Api(async ({ uri, method, headers, body }) => {
   }
   const response = await fetch(`${BASE_URL}${uri}`, {
     method,
-    body: isFormData ? body : JSON.stringify(body),
     headers: fetchHeaders,
+    ...(method !== 'GET'
+      ? { body: isFormData ? body : JSON.stringify(body) }
+      : {}),
   })
 
   // 401处理：排除获取token的接口，避免循环
