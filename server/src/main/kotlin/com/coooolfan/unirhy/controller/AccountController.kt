@@ -8,12 +8,14 @@ import com.coooolfan.unirhy.model.dto.AccountUpdate
 import com.coooolfan.unirhy.service.AccountService
 import org.babyfish.jimmer.client.FetchBy
 import org.babyfish.jimmer.sql.kt.fetcher.newFetcher
+import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
 
 /**
@@ -74,6 +76,7 @@ class AccountController(private val service: AccountService) {
      */
     @SaCheckLogin
     @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
     fun delete(@PathVariable id: Long) {
         service.delete(id)
     }
@@ -93,6 +96,7 @@ class AccountController(private val service: AccountService) {
      */
     @SaCheckLogin
     @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
     fun create(create: AccountCreate): @FetchBy("DEFAULT_ACCOUNT_FETCHER") Account {
         return service.create(create, DEFAULT_ACCOUNT_FETCHER)
     }
@@ -111,6 +115,7 @@ class AccountController(private val service: AccountService) {
      * @description 调用AccountService.initFirstAccount()方法初始化管理员账户
      */
     @PostMapping("/first")
+    @ResponseStatus(HttpStatus.CREATED)
     fun createFirst(create: AccountCreate): @FetchBy("DEFAULT_ACCOUNT_FETCHER") Account {
         return service.initFirstAccount(create.toEntity { this.admin = true }, DEFAULT_ACCOUNT_FETCHER)
     }

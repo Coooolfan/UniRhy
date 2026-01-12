@@ -2,10 +2,12 @@ package com.coooolfan.unirhy.controller
 
 import cn.dev33.satoken.annotation.SaCheckLogin
 import com.coooolfan.unirhy.service.AccountService
+import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Controller
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
 
 /**
@@ -48,6 +50,7 @@ class TokenController(private val service: AccountService) {
      */
     @SaCheckLogin
     @DeleteMapping
+    @ResponseStatus(HttpStatus.NO_CONTENT)
     fun logout() {
         service.logout()
     }
