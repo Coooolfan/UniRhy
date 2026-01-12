@@ -219,6 +219,7 @@
 <script setup lang="ts">
 import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
+import { api } from '@/ApiInstance'
 
 const router = useRouter()
 const isLoginMode = ref(true)
@@ -246,17 +247,46 @@ const switchToLogin = () => {
   }
 }
 
-const handleLogin = () => {
-  console.log('Login with:', loginForm)
-  // Simulate login success
-  router.push('/dashboard')
+const handleLogin = async () => {
+  try {
+    await api.tokenController.login({
+      email: loginForm.username,
+      password: loginForm.password,
+    })
+    router.push('/dashboard')
+  } catch (e: any) {
+    let message = e.message || '登录失败'
+    if (e instanceof Promise) {
+      try {
+        const err = await e
+        message = typeof err === 'string' ? err : err.message || JSON.stringify(err)
+      } catch {}
+    }
+    alert(message)
+  }
 }
 
-const handleRegister = () => {
-  console.log('Register with:', registerForm)
-  // Simulate register success -> go to dashboard or back to login
-  alert('注册功能开发中 (模拟成功)')
-  switchToLogin()
+const handleRegister = async () => {
+  try {
+    await api.accountController.create({
+      create: {
+        name: registerForm.username,
+        email: registerForm.email,
+        password: registerForm.password,
+      },
+    })
+    alert('注册成功，请登录')
+    switchToLogin()
+  } catch (e: any) {
+    let message = e.message || '注册失败'
+    if (e instanceof Promise) {
+      try {
+        const err = await e
+        message = typeof err === 'string' ? err : err.message || JSON.stringify(err)
+      } catch {}
+    }
+    alert(message)
+  }
 }
 </script>
 
