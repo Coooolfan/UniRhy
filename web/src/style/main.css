@@ -1,1 +1,13 @@
 @import 'tailwindcss';
+
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:autofill,
+input:autofill:hover,
+input:autofill:focus {
+  transition-delay: 5000s;
+  transition: color 5000s ease-out, background-color 5000s ease-out;
+  -webkit-transition-delay: 5000s;
+  -webkit-transition: color 5000s ease-out, background-color 5000s ease-out;
+}
