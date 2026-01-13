@@ -1,6 +1,8 @@
 package com.coooolfan.unirhy.controller
 
 import cn.dev33.satoken.annotation.SaCheckLogin
+import com.coooolfan.unirhy.error.CommonException
+import com.coooolfan.unirhy.error.SystemException
 import com.coooolfan.unirhy.model.Account
 import com.coooolfan.unirhy.model.by
 import com.coooolfan.unirhy.model.dto.AccountCreate
@@ -17,6 +19,7 @@ import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
+import kotlin.jvm.Throws
 
 /**
  * 账户管理接口
@@ -40,6 +43,7 @@ class AccountController(private val service: AccountService) {
      */
     @SaCheckLogin
     @GetMapping
+    @Throws(CommonException.Forbidden::class)
     fun list(): List<@FetchBy("DEFAULT_ACCOUNT_FETCHER") Account> {
         return service.list(DEFAULT_ACCOUNT_FETCHER)
     }
@@ -77,6 +81,7 @@ class AccountController(private val service: AccountService) {
     @SaCheckLogin
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Throws(CommonException.Forbidden::class)
     fun delete(@PathVariable id: Long) {
         service.delete(id)
     }
@@ -97,6 +102,7 @@ class AccountController(private val service: AccountService) {
     @SaCheckLogin
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
+    @Throws(CommonException.Forbidden::class)
     fun create(create: AccountCreate): @FetchBy("DEFAULT_ACCOUNT_FETCHER") Account {
         return service.create(create, DEFAULT_ACCOUNT_FETCHER)
     }
@@ -116,6 +122,7 @@ class AccountController(private val service: AccountService) {
      */
     @PostMapping("/first")
     @ResponseStatus(HttpStatus.CREATED)
+    @Throws(SystemException.SystemAlreadyInitialized::class)
     fun createFirst(create: AccountCreate): @FetchBy("DEFAULT_ACCOUNT_FETCHER") Account {
         return service.initFirstAccount(create.toEntity { this.admin = true }, DEFAULT_ACCOUNT_FETCHER)
     }

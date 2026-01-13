@@ -1,6 +1,7 @@
 package com.coooolfan.unirhy.controller
 
 import cn.dev33.satoken.annotation.SaCheckLogin
+import com.coooolfan.unirhy.error.CommonException
 import com.coooolfan.unirhy.service.AccountService
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Controller
@@ -9,6 +10,7 @@ import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
+import kotlin.jvm.Throws
 
 /**
  * 登录与登出接口
@@ -34,6 +36,7 @@ class TokenController(private val service: AccountService) {
      * @description 调用AccountService.checkChallenge()方法进行登录校验
      */
     @GetMapping
+    @Throws(CommonException.AuthenticationFailed::class)
     fun login(email: String, password: String) {
         return service.checkChallenge(email, password)
     }
