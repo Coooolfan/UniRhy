@@ -16,7 +16,11 @@
                         ? 'z-0 transform -rotate-3 -translate-x-4 translate-y-2 opacity-80 scale-[0.98] cursor-pointer hover:-translate-y-1'
                         : 'z-20 transform rotate-0 translate-x-0 translate-y-0 opacity-100 scale-100'
                 "
+                :role="isLoginMode ? 'button' : undefined"
+                :tabindex="isLoginMode ? 0 : -1"
+                :aria-label="isLoginMode ? '切换到注册' : undefined"
                 @click="switchToRegister"
+                @keydown.enter.space.prevent.self="switchToRegister"
             >
                 <div v-if="!isLoginMode" class="relative h-full flex flex-col">
                     <h1
@@ -34,6 +38,10 @@
                                 id="reg-username"
                                 v-model="registerForm.username"
                                 type="text"
+                                name="username"
+                                autocomplete="username"
+                                autocapitalize="off"
+                                inputmode="text"
                                 required
                                 class="peer w-full bg-transparent border-b border-[#d6d0c4] focus:border-[#d98c28] outline-none py-2 text-[#2c2825] placeholder-transparent transition-colors"
                                 placeholder="Username"
@@ -51,6 +59,10 @@
                                 id="reg-email"
                                 v-model="registerForm.email"
                                 type="email"
+                                name="email"
+                                autocomplete="email"
+                                autocapitalize="off"
+                                inputmode="email"
                                 required
                                 class="peer w-full bg-transparent border-b border-[#d6d0c4] focus:border-[#d98c28] outline-none py-2 text-[#2c2825] placeholder-transparent transition-colors"
                                 placeholder="Email"
@@ -68,6 +80,8 @@
                                 id="reg-password"
                                 v-model="registerForm.password"
                                 type="password"
+                                name="password"
+                                autocomplete="new-password"
                                 required
                                 class="peer w-full bg-transparent border-b border-[#d6d0c4] focus:border-[#d98c28] outline-none py-2 text-[#2c2825] placeholder-transparent transition-colors"
                                 placeholder="Password"
@@ -119,7 +133,11 @@
                         ? 'z-0 transform rotate-3 translate-x-4 translate-y-2 opacity-80 scale-[0.98] cursor-pointer hover:-translate-y-1'
                         : 'z-20 transform rotate-0 translate-x-0 translate-y-0 opacity-100 scale-100'
                 "
+                :role="!isLoginMode ? 'button' : undefined"
+                :tabindex="!isLoginMode ? 0 : -1"
+                :aria-label="!isLoginMode ? '切换到登录' : undefined"
                 @click="switchToLogin"
+                @keydown.enter.space.prevent.self="switchToLogin"
             >
                 <div v-if="isLoginMode" class="relative h-full flex flex-col">
                     <h1
@@ -137,15 +155,19 @@
                                 id="login-username"
                                 v-model="loginForm.username"
                                 type="text"
+                                name="email"
+                                autocomplete="email"
+                                autocapitalize="off"
+                                inputmode="email"
                                 required
                                 class="peer w-full bg-transparent border-b border-[#d6d0c4] focus:border-[#d98c28] outline-none py-2 text-[#2c2825] placeholder-transparent transition-colors"
-                                placeholder="Username"
+                                placeholder="Email"
                             />
                             <label
                                 for="login-username"
                                 class="absolute left-0 -top-3.5 text-[#8a817c] text-sm transition-all peer-placeholder-shown:text-base peer-placeholder-shown:text-[#b0a8a0] peer-placeholder-shown:top-2 peer-focus:-top-3.5 peer-focus:text-[#2c2825] peer-focus:text-sm cursor-text"
                             >
-                                用户名 / 邮箱
+                                邮箱
                             </label>
                         </div>
 
@@ -154,6 +176,8 @@
                                 id="login-password"
                                 v-model="loginForm.password"
                                 type="password"
+                                name="password"
+                                autocomplete="current-password"
                                 required
                                 class="peer w-full bg-transparent border-b border-[#d6d0c4] focus:border-[#d98c28] outline-none py-2 text-[#2c2825] placeholder-transparent transition-colors"
                                 placeholder="Password"
