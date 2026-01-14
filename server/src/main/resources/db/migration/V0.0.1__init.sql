@@ -119,7 +119,6 @@ CREATE TABLE public.playlist
     id       BIGSERIAL PRIMARY KEY,
     owner_id BIGINT  NOT NULL REFERENCES public.account (id) ON DELETE RESTRICT, -- 创建者
     name     TEXT    NOT NULL,                                                   -- 歌单名称
-    public   BOOLEAN NOT NULL DEFAULT FALSE,                                     -- 是否公开
     comment  TEXT    NOT NULL DEFAULT ''                                         -- 歌单描述
 );
 
