@@ -17,6 +17,7 @@
     "lint:oxlint": "oxlint . --fix",
     "lint:eslint": "eslint . --fix --cache",
     "format": "prettier --write --experimental-cli src/",
+    "fix": "run-s lint:eslint format",
     "api": "node script/generate-api.js"
   },
   "dependencies": {

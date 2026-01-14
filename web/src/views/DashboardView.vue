@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import NoiseTexture from '@/components/NoiseTexture.vue'
 import {
     Play,
     SkipBack,
@@ -84,12 +85,7 @@ const playlists = ['雨天巴赫', '咖啡馆噪音', '深夜阅读']
         class="flex h-screen w-full bg-[#EBE7E0] font-sans text-[#4A4A4A] overflow-hidden relative selection:bg-[#D4C5B0] selection:text-white"
     >
         <!-- Noise Texture Overlay -->
-        <div
-            class="absolute inset-0 opacity-[0.03] pointer-events-none mix-blend-multiply"
-            :style="{
-                backgroundImage: `url(&quot;data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E&quot;)`,
-            }"
-        ></div>
+        <NoiseTexture />
 
         <!-- Sidebar -->
         <aside class="w-64 flex flex-col pt-12 pl-10 pr-6 z-10 md:flex">
