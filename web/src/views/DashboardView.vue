@@ -1,174 +1,396 @@
+<script setup lang="ts">
+import { ref } from 'vue'
+import {
+    Play,
+    SkipBack,
+    SkipForward,
+    Search,
+    Heart,
+    MoreHorizontal,
+    Volume2,
+} from 'lucide-vue-next'
+
+const activeTab = ref('发现')
+
+// Mock Data
+const featuredAlbum = {
+    title: 'Nocturnes, Op. 9',
+    artist: 'Frédéric Chopin',
+    year: '1832',
+    cover: 'https://picsum.photos/seed/chopin/600/600',
+}
+
+const recentAlbums = [
+    {
+        title: 'Kind of Blue',
+        artist: 'Miles Davis',
+        cover: 'https://picsum.photos/seed/jazz1/400/400',
+    },
+    {
+        title: 'A Love Supreme',
+        artist: 'John Coltrane',
+        cover: 'https://picsum.photos/seed/jazz2/400/400',
+    },
+    {
+        title: 'Time Out',
+        artist: 'Dave Brubeck',
+        cover: 'https://picsum.photos/seed/jazz3/400/400',
+    },
+    {
+        title: 'Blue Train',
+        artist: 'John Coltrane',
+        cover: 'https://picsum.photos/seed/jazz4/400/400',
+    },
+    {
+        title: 'Mingus Ah Um',
+        artist: 'Charles Mingus',
+        cover: 'https://picsum.photos/seed/jazz5/400/400',
+    },
+    {
+        title: "Somethin' Else",
+        artist: 'Cannonball Adderley',
+        cover: 'https://picsum.photos/seed/jazz6/400/400',
+    },
+    {
+        title: "Moanin'",
+        artist: 'Art Blakey',
+        cover: 'https://picsum.photos/seed/jazz7/400/400',
+    },
+    {
+        title: 'Saxophone Colossus',
+        artist: 'Sonny Rollins',
+        cover: 'https://picsum.photos/seed/jazz8/400/400',
+    },
+    {
+        title: 'Go',
+        artist: 'Dexter Gordon',
+        cover: 'https://picsum.photos/seed/jazz9/400/400',
+    },
+    {
+        title: 'The Sidewinder',
+        artist: 'Lee Morgan',
+        cover: 'https://picsum.photos/seed/jazz10/400/400',
+    },
+]
+
+const categories = ['古典', '爵士', '极简主义', '环境音', '器乐']
+
+const navItems = ['发现', '阅览室', '收藏', '最近播放']
+const playlists = ['雨天巴赫', '咖啡馆噪音', '深夜阅读']
+</script>
+
 <template>
     <div
-        class="min-h-screen bg-[#e6dfcc] flex flex-col font-serif text-[#4a3b2a] relative overflow-hidden"
+        class="flex h-screen w-full bg-[#EBE7E0] font-sans text-[#4A4A4A] overflow-hidden relative selection:bg-[#D4C5B0] selection:text-white"
     >
-        <!-- Texture overlay for the whole desk/surface -->
+        <!-- Noise Texture Overlay -->
         <div
-            class="absolute inset-0 opacity-40 pointer-events-none mix-blend-multiply"
-            style="
-                background-image: url(&quot;data:image/svg+xml,%3Csvg width='200' height='200' viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.15'/%3E%3C/svg%3E&quot;);
-            "
+            class="absolute inset-0 opacity-[0.03] pointer-events-none mix-blend-multiply"
+            :style="{
+                backgroundImage: `url(&quot;data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E&quot;)`,
+            }"
         ></div>
 
-        <!-- Header / Top Navigation -->
-        <header
-            class="z-10 px-8 py-6 flex justify-between items-end border-b border-[#cfc4b0] shadow-sm bg-[#f2ebd4]/80 backdrop-blur-sm"
-        >
-            <div>
-                <h1 class="text-3xl font-bold tracking-widest text-[#2c241b]">UniRhy</h1>
-                <p class="text-sm italic text-[#6b5d4d] mt-1">控制台 &bull; Dashboard</p>
+        <!-- Sidebar -->
+        <aside class="w-64 flex flex-col pt-12 pl-10 pr-6 z-10 md:flex">
+            <div class="mb-12">
+                <h1 class="text-3xl font-serif tracking-tight text-[#2C2C2C]">Melody.</h1>
             </div>
-            <div class="flex gap-6 text-sm font-medium">
-                <button
-                    class="hover:text-[#8c3b2d] transition-colors decoration-[#8c3b2d] hover:underline underline-offset-4"
-                >
-                    设置
-                </button>
-                <button
-                    @click="handleLogout"
-                    class="hover:text-[#8c3b2d] transition-colors decoration-[#8c3b2d] hover:underline underline-offset-4"
-                >
-                    登出
-                </button>
-            </div>
-        </header>
 
-        <!-- Main Content Area -->
-        <main class="flex-1 p-8 overflow-y-auto relative z-0">
-            <!-- Paper Sheet Container -->
-            <div
-                class="max-w-5xl mx-auto bg-[#fdfaf0] shadow-[0_2px_15px_-3px_rgba(60,50,40,0.15)] border border-[#e8dfc8] p-12 min-h-150 relative"
-            >
-                <!-- Paper Texture Grain (Inner) -->
+            <nav class="space-y-6 flex-1">
                 <div
-                    class="absolute inset-0 opacity-30 pointer-events-none mix-blend-multiply"
-                    style="
-                        background-image: url(&quot;data:image/svg+xml,%3Csvg width='200' height='200' viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.2' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.08'/%3E%3C/svg%3E&quot;);
+                    v-for="item in navItems"
+                    :key="item"
+                    class="text-sm cursor-pointer transition-colors duration-300"
+                    :class="
+                        activeTab === item
+                            ? 'text-[#C27E46] font-medium'
+                            : 'text-[#8A857D] hover:text-[#5E5950]'
                     "
-                ></div>
+                    @click="activeTab = item"
+                >
+                    {{ item }}
+                </div>
+            </nav>
 
-                <!-- Ruled Lines Background (Optional for notebook feel) -->
+            <div class="pb-32">
                 <div
-                    class="absolute inset-0 pointer-events-none"
-                    style="
-                        background-image: linear-gradient(#e8dfc8 1px, transparent 1px);
-                        background-size: 100% 2rem;
-                        margin-top: 4rem;
-                        opacity: 0.3;
-                    "
-                ></div>
-
-                <div class="relative z-10">
-                    <h2
-                        class="text-2xl font-bold mb-8 border-b-2 border-[#4a3b2a] pb-2 inline-block"
+                    class="text-xs text-[#9C968B] uppercase tracking-widest mb-4 border-b border-[#D6D1C7] pb-2"
+                >
+                    我的歌单
+                </div>
+                <ul class="space-y-3 text-sm text-[#6B665E]">
+                    <li
+                        v-for="playlist in playlists"
+                        :key="playlist"
+                        class="hover:text-[#C27E46] cursor-pointer transition-colors"
                     >
-                        概览
-                    </h2>
+                        {{ playlist }}
+                    </li>
+                </ul>
+            </div>
+        </aside>
 
-                    <p class="mb-6 text-lg leading-loose">欢迎回来。这是一个临时占位的开发页面。</p>
+        <!-- Main Content -->
+        <main
+            class="flex-1 flex flex-col h-full relative z-10 overflow-y-auto pt-8 px-8 pb-32 no-scrollbar"
+        >
+            <!-- Top Search Bar -->
+            <div class="flex justify-between items-center mb-10 px-2">
+                <div class="flex items-center space-x-2 border-b border-[#D6D1C7] pb-1 w-64">
+                    <Search :size="16" class="text-[#9C968B]" />
+                    <input
+                        type="text"
+                        placeholder="搜索艺术家、作品..."
+                        class="bg-transparent border-none outline-none text-sm w-full placeholder-[#9C968B] text-[#4A4A4A] focus:ring-0"
+                    />
+                </div>
+                <div
+                    class="w-8 h-8 rounded-full bg-[#D6D1C7] overflow-hidden cursor-pointer opacity-80 hover:opacity-100 transition-opacity ring-2 ring-white ring-offset-1 ring-offset-[#EBE7E0]"
+                >
+                    <img
+                        src="https://picsum.photos/seed/user/100/100"
+                        alt="User"
+                        class="w-full h-full object-cover"
+                    />
+                </div>
+            </div>
 
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mt-10">
-                        <!-- Card 1 -->
+            <!-- Hero Section -->
+            <div class="mb-14 relative px-2">
+                <h2 class="text-xl font-serif mb-6 text-[#2C2C2C]">每日精选</h2>
+
+                <div class="relative h-80 w-full">
+                    <!-- Bottom Stack Layers -->
+                    <div
+                        class="absolute top-4 left-4 -right-2.5 -bottom-2.5 bg-[#F0EBE3] shadow-sm transform rotate-1 rounded-sm border border-[#E6E1D8]"
+                    ></div>
+                    <div
+                        class="absolute top-2 left-2 -right-1.25 -bottom-1.25 bg-[#F5F2EB] shadow-md transform -rotate-1 rounded-sm border border-[#E6E1D8]"
+                    ></div>
+
+                    <!-- Top Card -->
+                    <div
+                        class="absolute inset-0 bg-[#FCFBF9] shadow-[0_10px_30px_-10px_rgba(168,160,149,0.4)] rounded-sm flex overflow-hidden border border-white"
+                    >
+                        <!-- Album Cover -->
                         <div
-                            class="border-2 border-dashed border-[#cfc4b0] p-6 hover:border-[#4a3b2a] transition-colors group cursor-pointer bg-[#f7f3e8]/50"
+                            class="h-full aspect-square bg-[#D6D2C9] relative flex items-center justify-center group cursor-pointer overflow-hidden border-r border-[#EBE7E0] shrink-0"
                         >
-                            <h3
-                                class="text-xl font-bold mb-2 group-hover:text-[#8c3b2d] transition-colors"
-                            >
-                                项目统计
-                            </h3>
-                            <p class="text-[#6b5d4d]">查看当前的活跃项目与数据流向。</p>
+                            <img
+                                :src="featuredAlbum.cover"
+                                alt="Album Cover"
+                                class="absolute inset-0 w-full h-full object-cover opacity-90 transition-transform duration-700 group-hover:scale-105"
+                            />
+
+                            <!-- Play Overlay -->
                             <div
-                                class="mt-4 text-sm font-mono text-[#8c3b2d] opacity-0 group-hover:opacity-100 transition-opacity"
+                                class="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[1px]"
                             >
-                                -> 查看详情
+                                <div
+                                    class="w-14 h-14 bg-[#F5F2EB] rounded-full flex items-center justify-center shadow-lg transform translate-y-4 group-hover:translate-y-0 transition-all duration-300"
+                                >
+                                    <Play :size="24" fill="#C27E46" class="text-[#C27E46] ml-1" />
+                                </div>
                             </div>
                         </div>
 
-                        <!-- Card 2 -->
+                        <!-- Content -->
                         <div
-                            class="border-2 border-dashed border-[#cfc4b0] p-6 hover:border-[#4a3b2a] transition-colors group cursor-pointer bg-[#f7f3e8]/50"
+                            class="flex-1 p-12 flex flex-col justify-center bg-[url('https://www.transparenttextures.com/patterns/cream-paper.png')] relative overflow-hidden"
                         >
-                            <h3
-                                class="text-xl font-bold mb-2 group-hover:text-[#8c3b2d] transition-colors"
-                            >
-                                用户管理
-                            </h3>
-                            <p class="text-[#6b5d4d]">管理注册用户权限与访问日志。</p>
+                            <!-- Background Decoration -->
                             <div
-                                class="mt-4 text-sm font-mono text-[#8c3b2d] opacity-0 group-hover:opacity-100 transition-opacity"
+                                class="absolute -right-32 top-1/2 -translate-y-1/2 w-96 h-96 opacity-[0.06] pointer-events-none select-none"
                             >
-                                -> 管理列表
+                                <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+                                    <circle
+                                        cx="100"
+                                        cy="100"
+                                        r="75"
+                                        fill="none"
+                                        stroke="#2C2C2C"
+                                        stroke-width="15"
+                                    />
+                                    <circle
+                                        cx="100"
+                                        cy="100"
+                                        r="15"
+                                        fill="none"
+                                        stroke="#2C2C2C"
+                                        stroke-width="15"
+                                    />
+                                </svg>
                             </div>
-                        </div>
 
-                        <!-- Card 3 -->
-                        <div
-                            class="border-2 border-dashed border-[#cfc4b0] p-6 hover:border-[#4a3b2a] transition-colors group cursor-pointer bg-[#f7f3e8]/50"
-                        >
-                            <h3
-                                class="text-xl font-bold mb-2 group-hover:text-[#8c3b2d] transition-colors"
-                            >
-                                系统日志
-                            </h3>
-                            <p class="text-[#6b5d4d]">检查系统运行状况与错误报告。</p>
-                            <div
-                                class="mt-4 text-sm font-mono text-[#8c3b2d] opacity-0 group-hover:opacity-100 transition-opacity"
-                            >
-                                -> 阅读日志
+                            <div class="relative z-10">
+                                <div
+                                    class="text-xs uppercase tracking-widest text-[#9C968B] mb-4 font-medium"
+                                >
+                                    Editor's Choice
+                                </div>
+                                <h3
+                                    class="text-5xl font-serif text-[#2C2C2C] mb-4 tracking-tight leading-tight"
+                                >
+                                    {{ featuredAlbum.title }}
+                                </h3>
+                                <p
+                                    class="text-[#8A857D] text-lg mb-10 font-serif italic flex items-center"
+                                >
+                                    <span class="w-8 h-px bg-[#C27E46] mr-3 inline-block"></span>
+                                    {{ featuredAlbum.artist }}
+                                </p>
+                                <div class="flex items-center space-x-6">
+                                    <button
+                                        class="px-8 py-3 border border-[#C27E46] text-[#C27E46] text-sm hover:bg-[#C27E46] hover:text-white transition-all duration-500 rounded-sm font-medium tracking-wide uppercase"
+                                    >
+                                        立即播放
+                                    </button>
+                                    <button
+                                        class="text-[#9C968B] hover:text-[#C27E46] transition-colors p-2"
+                                    >
+                                        <Heart :size="24" />
+                                    </button>
+                                </div>
                             </div>
-                        </div>
-                        <!-- Card 4 -->
-                        <div
-                            class="border-2 border-dashed border-[#cfc4b0] p-6 hover:border-[#4a3b2a] transition-colors group cursor-pointer bg-[#f7f3e8]/50"
-                        >
-                            <h3
-                                class="text-xl font-bold mb-2 group-hover:text-[#8c3b2d] transition-colors"
-                            >
-                                待办事项
-                            </h3>
-                            <ul class="list-disc list-inside text-[#6b5d4d] space-y-1 mt-2">
-                                <li>完成登录页样式调整</li>
-                                <li>实现注册接口对接</li>
-                                <li>完善 Dashboard 布局</li>
-                            </ul>
                         </div>
                     </div>
                 </div>
             </div>
+
+            <!-- Categories -->
+            <div class="flex space-x-8 mb-10 overflow-x-auto px-2 py-4 no-scrollbar items-center">
+                <span
+                    v-for="(cat, idx) in categories"
+                    :key="idx"
+                    class="text-base text-[#8A857D] hover:text-[#C27E46] cursor-pointer whitespace-nowrap transition-colors border-b-2 border-transparent hover:border-[#C27E46] pb-1 leading-relaxed"
+                >
+                    {{ cat }}
+                </span>
+            </div>
+
+            <!-- Album Grid -->
+            <div class="mb-8">
+                <div
+                    class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-8 px-2"
+                >
+                    <div
+                        v-for="(album, idx) in recentAlbums"
+                        :key="idx"
+                        class="group cursor-pointer"
+                    >
+                        <div
+                            class="aspect-square bg-gray-200 mb-4 shadow-[0_4px_12px_-4px_rgba(168,160,149,0.3)] group-hover:shadow-[0_12px_24px_-8px_rgba(168,160,149,0.5)] group-hover:-translate-y-1 transition-all duration-500 rounded-sm relative border-[5px] border-white overflow-hidden"
+                        >
+                            <img
+                                :src="album.cover"
+                                :alt="album.title"
+                                class="w-full h-full object-cover filter sepia-[0.2] group-hover:sepia-0 transition-all duration-500"
+                            />
+                            <!-- Floating Play Button -->
+                            <div
+                                class="absolute bottom-3 right-3 w-8 h-8 bg-white/90 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 shadow-sm translate-y-2 group-hover:translate-y-0"
+                            >
+                                <Play :size="12" fill="#C27E46" class="text-[#C27E46] `ml-px" />
+                            </div>
+                        </div>
+                        <h4
+                            class="font-serif text-[#2C2C2C] text-lg leading-tight group-hover:text-[#C27E46] transition-colors line-clamp-1"
+                        >
+                            {{ album.title }}
+                        </h4>
+                        <p class="text-xs text-[#9C968B] mt-1">{{ album.artist }}</p>
+                    </div>
+                </div>
+            </div>
         </main>
+
+        <!-- Bottom Player Bar -->
+        <div class="absolute bottom-6 left-6 right-6 z-50">
+            <div
+                class="bg-[#FCFBF9] h-20 rounded-sm shadow-[0_8px_30px_rgba(140,130,115,0.2)] border border-[#EBE7E0] flex items-center px-6 justify-between backdrop-blur-xl bg-opacity-95"
+            >
+                <!-- Now Playing Info -->
+                <div class="flex items-center w-1/4">
+                    <div
+                        class="w-12 h-12 bg-[#2C2C2C] shadow-md border-[3px] border-white mr-4 shrink-"
+                    >
+                        <img
+                            :src="featuredAlbum.cover"
+                            alt="Now Playing"
+                            class="w-full h-full object-cover"
+                        />
+                    </div>
+                    <div class="overflow-hidden">
+                        <div class="text-sm font-serif text-[#2C2C2C] truncate">
+                            Ballade No. 1 in G Minor
+                        </div>
+                        <div class="text-xs text-[#9C968B] truncate">Chopin</div>
+                    </div>
+                </div>
+
+                <!-- Controls -->
+                <div class="flex flex-col items-center w-2/4 px-4">
+                    <div class="flex items-center space-x-8 mb-2">
+                        <SkipBack
+                            :size="18"
+                            class="text-[#9C968B] cursor-pointer hover:text-[#4A4A4A]"
+                        />
+                        <div
+                            class="w-10 h-10 rounded-full border border-[#C27E46] flex items-center justify-center cursor-pointer hover:bg-[#C27E46] group transition-all shadow-sm"
+                        >
+                            <Play
+                                :size="16"
+                                class="text-[#C27E46] ml-1 group-hover:text-white group-hover:fill-white"
+                            />
+                        </div>
+                        <SkipForward
+                            :size="18"
+                            class="text-[#9C968B] cursor-pointer hover:text-[#4A4A4A]"
+                        />
+                    </div>
+                    <!-- Progress Bar -->
+                    <div
+                        class="w-full max-w-2xl h-0.5 relative group cursor-pointer py-2 flex items-center"
+                    >
+                        <!-- Track Background -->
+                        <div class="w-full h-0.5 bg-[#EBE7E0] absolute left-0"></div>
+                        <!-- Progress Fill -->
+                        <div class="h-0.5 w-1/3 bg-[#C27E46] absolute left-0"></div>
+                        <!-- Knob -->
+                        <div
+                            class="w-2 h-2 bg-[#C27E46] rounded-full absolute left-1/3 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm transform -translate-x-1/2"
+                        ></div>
+                    </div>
+                </div>
+
+                <!-- Volume & Extras -->
+                <div class="flex items-center justify-end w-1/4 space-x-4">
+                    <MoreHorizontal
+                        :size="18"
+                        class="text-[#9C968B] cursor-pointer hover:text-[#4A4A4A]"
+                    />
+                    <div class="flex items-center space-x-2 group cursor-pointer">
+                        <Volume2 :size="18" class="text-[#9C968B] group-hover:text-[#4A4A4A]" />
+                        <div class="w-16 h-0.5 bg-[#EBE7E0] relative">
+                            <div class="w-2/3 h-full bg-[#9C968B]"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </template>
 
-<script setup lang="ts">
-import { useRouter } from 'vue-router'
-import { api } from '@/ApiInstance'
+<style>
+/* Hide scrollbar for Chrome, Safari and Opera */
+.no-scrollbar::-webkit-scrollbar {
+    display: none;
+}
 
-const router = useRouter()
-
-const handleLogout = async () => {
-    try {
-        await api.tokenController.logout()
-    } catch (e) {
-        console.error(e)
-    }
-    router.push('/')
-}
-</script>
-
-<style scoped>
-/* Optional: Custom scrollbar to match the theme */
-::-webkit-scrollbar {
-    width: 8px;
-}
-::-webkit-scrollbar-track {
-    background: #e6dfcc;
-}
-::-webkit-scrollbar-thumb {
-    background: #cfc4b0;
-    border-radius: 4px;
-}
-::-webkit-scrollbar-thumb:hover {
-    background: #b0a490;
+/* Hide scrollbar for IE, Edge and Firefox */
+.no-scrollbar {
+    -ms-overflow-style: none; /* IE and Edge */
+    scrollbar-width: none; /* Firefox */
 }
 </style>
