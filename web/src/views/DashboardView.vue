@@ -94,7 +94,7 @@ const playlists = ['雨天巴赫', '咖啡馆噪音', '深夜阅读']
         <!-- Sidebar -->
         <aside class="w-64 flex flex-col pt-12 pl-10 pr-6 z-10 md:flex">
             <div class="mb-12">
-                <h1 class="text-3xl font-serif tracking-tight text-[#2C2C2C]">Melody.</h1>
+                <h1 class="text-3xl font-serif tracking-tight text-[#2C2C2C]">UniRhy.</h1>
             </div>
 
             <nav class="space-y-6 flex-1">
