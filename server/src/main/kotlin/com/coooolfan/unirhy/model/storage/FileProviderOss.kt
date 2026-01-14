@@ -11,6 +11,8 @@ interface FileProviderOss {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     val id: Long
 
+    val name: String
+
     val host: String
 
     val bucket: String
@@ -19,5 +21,5 @@ interface FileProviderOss {
 
     val secretKey: String
 
-    val parentPath: String
+    val parentPath: String?
 }

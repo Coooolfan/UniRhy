@@ -17,9 +17,9 @@ interface Recording {
 
     val kind: String
 
-    val label: String
+    val label: String?
 
-    val title: String
+    val title: String?
 
     val comment: String
 }

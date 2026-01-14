@@ -11,7 +11,7 @@ interface FileProviderFileSystem {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     val id: Long
 
-    val parentPath: String
+    val name: String
 
-    val mounted: Boolean
+    val parentPath: String
 }
