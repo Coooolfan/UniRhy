@@ -13,10 +13,12 @@
     "test:unit": "vitest",
     "build-only": "vite build",
     "type-check": "vue-tsc --build",
+    "typecheck": "vue-tsc --build",
     "lint": "run-s lint:*",
     "lint:oxlint": "oxlint . --fix",
     "lint:eslint": "eslint . --fix --cache",
     "format": "prettier --write --experimental-cli src/",
+    "verify": "run-s lint format typecheck",
     "fix": "run-s lint:eslint format",
     "api": "node script/generate-api.js"
   },
