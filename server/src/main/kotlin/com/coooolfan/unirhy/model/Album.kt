@@ -5,6 +5,7 @@ import org.babyfish.jimmer.sql.GeneratedValue
 import org.babyfish.jimmer.sql.GenerationType
 import org.babyfish.jimmer.sql.Id
 import org.babyfish.jimmer.sql.ManyToMany
+import org.babyfish.jimmer.sql.ManyToOne
 import java.time.LocalDate
 
 @Entity
@@ -23,4 +24,7 @@ interface Album {
     val releaseDate: LocalDate?
 
     val comment: String
+
+    @ManyToOne
+    val cover: MediaFile?
 }

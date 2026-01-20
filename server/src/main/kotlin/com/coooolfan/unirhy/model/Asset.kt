@@ -15,11 +15,8 @@ interface Asset {
     @ManyToOne
     val recording: Recording
 
-    val sha256: String
+    @ManyToOne
+    val mediaFile: MediaFile
 
-    val objectKey: String
-
-    val ossProviderId: Long?
-
-    val fsProviderId: Long?
+    val comment: String
 }

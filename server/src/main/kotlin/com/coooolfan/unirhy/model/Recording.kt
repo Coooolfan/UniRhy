@@ -22,4 +22,7 @@ interface Recording {
     val title: String?
 
     val comment: String
+
+    @ManyToOne
+    val cover: MediaFile?
 }
