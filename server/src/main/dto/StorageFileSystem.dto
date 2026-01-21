@@ -1,0 +1,13 @@
+export com.coooolfan.unirhy.model.storage.FileProviderFileSystem
+
+input FileProviderFileSystemUpdate {
+  name?
+
+  parentPath?
+}
+
+input FileProviderFileSystemCreate {
+  name
+
+  parentPath
+}
