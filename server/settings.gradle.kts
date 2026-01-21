@@ -5,3 +5,5 @@ pluginManagement {
 }
 
 rootProject.name = "unirhy"
+
+include("api-e2e")

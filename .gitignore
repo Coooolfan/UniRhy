@@ -7,7 +7,9 @@ server/.gradle
 server/build
 server/.kotlin
 server/.env
+server/api-e2e/build
 !server/gradle/wrapper/gradle-wrapper.jar
+
 
 
 website/.vscode
