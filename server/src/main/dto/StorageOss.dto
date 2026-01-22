@@ -1,29 +1,33 @@
 export com.coooolfan.unirhy.model.storage.FileProviderOss
 
 input FileProviderOssUpdate {
-  name?
+    name?
 
-  host?
+    host?
 
-  bucket?
+    bucket?
 
-  accessKey?
+    accessKey?
 
-  secretKey?
+    secretKey?
 
-  parentPath
+    parentPath
+
+    readonly
 }
 
 input FileProviderOssCreate {
-  name
+    name
 
-  host
+    host
 
-  bucket
+    bucket
 
-  accessKey
+    accessKey
 
-  secretKey
+    secretKey
 
-  parentPath
+    parentPath
+
+    readonly
 }

@@ -1,17 +1,17 @@
 export com.coooolfan.unirhy.model.Account
 
 input AccountUpdate {
-  name?
+    name?
 
-  password?
+    password?
 
-  email?
+    email?
 }
 
 input AccountCreate {
-  name
+    name
 
-  password
+    password
 
-  email
+    email
 }

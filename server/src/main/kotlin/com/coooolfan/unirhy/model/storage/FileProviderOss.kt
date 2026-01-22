@@ -22,4 +22,7 @@ interface FileProviderOss {
     val secretKey: String
 
     val parentPath: String?
+
+    val readonly: Boolean
+
 }

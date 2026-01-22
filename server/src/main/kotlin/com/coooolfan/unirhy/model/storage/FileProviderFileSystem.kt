@@ -14,4 +14,6 @@ interface FileProviderFileSystem {
     val name: String
 
     val parentPath: String
+
+    val readonly: Boolean
 }

@@ -6,20 +6,22 @@
 CREATE TABLE public.file_provider_oss
 (
     id          BIGSERIAL PRIMARY KEY,
-    name        TEXT NOT NULL, -- 配置名称
-    host        TEXT NOT NULL, -- 访问域名
-    bucket      TEXT NOT NULL, -- 桶名称
-    access_key  TEXT NOT NULL, -- 访问密钥 ID
-    secret_key  TEXT NOT NULL, -- 访问密钥 Secret
-    parent_path TEXT           -- 根路径前缀
+    name        TEXT    NOT NULL,              -- 配置名称
+    host        TEXT    NOT NULL,              -- 访问域名
+    bucket      TEXT    NOT NULL,              -- 桶名称
+    access_key  TEXT    NOT NULL,              -- 访问密钥 ID
+    secret_key  TEXT    NOT NULL,              -- 访问密钥 Secret
+    parent_path TEXT,                          -- 根路径前缀
+    readonly    BOOLEAN NOT NULL DEFAULT FALSE -- 是否只读
 );
 
 -- 本地文件系统存储提供商
 CREATE TABLE public.file_provider_file_system
 (
     id          BIGSERIAL PRIMARY KEY,
-    name        TEXT NOT NULL, -- 配置名称
-    parent_path TEXT NOT NULL  -- 物理路径
+    name        TEXT    NOT NULL,              -- 配置名称
+    parent_path TEXT    NOT NULL,              -- 物理路径
+    readonly    BOOLEAN NOT NULL DEFAULT FALSE -- 是否只读
 );
 
 -- ==========================================================
@@ -151,3 +153,20 @@ CREATE TABLE public.playlist_recording_mapping
     recording_id BIGINT NOT NULL REFERENCES public.recording (id) ON DELETE RESTRICT,
     PRIMARY KEY (playlist_id, recording_id) -- 联合主键防止重复添加
 );
+
+-- ==========================================================
+-- 7. 系统设置
+-- ==========================================================
+
+CREATE TABLE public.system_config
+(
+    id              BIGINT PRIMARY KEY DEFAULT 0,
+    oss_provider_id BIGINT REFERENCES public.file_provider_oss (id) ON DELETE RESTRICT,         -- 关联 OSS 节点
+    fs_provider_id  BIGINT REFERENCES public.file_provider_file_system (id) ON DELETE RESTRICT, -- 关联文件系统节点
+
+    CONSTRAINT ck_system_config_singleton CHECK (id = 0),
+    -- 互斥约束：确保系统资源要么存在 OSS，要么存在本地文件系统，不能同时为 NULL 或同时有值
+    -- 程序内抽象为一个 defaultStorageProviderId
+    CONSTRAINT ck_system_config_provider_xor
+        CHECK ( (oss_provider_id IS NOT NULL) <> (fs_provider_id IS NOT NULL) )
+)

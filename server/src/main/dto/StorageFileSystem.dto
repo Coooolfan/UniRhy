@@ -1,13 +1,17 @@
 export com.coooolfan.unirhy.model.storage.FileProviderFileSystem
 
 input FileProviderFileSystemUpdate {
-  name?
+    name?
 
-  parentPath?
+    parentPath?
+
+    readonly
 }
 
 input FileProviderFileSystemCreate {
-  name
+    name
 
-  parentPath
+    parentPath
+
+    readonly
 }

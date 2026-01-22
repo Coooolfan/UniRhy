@@ -1,0 +1,13 @@
+export com.coooolfan.unirhy.model.SystemConfig
+
+input SystemConfigUpdate {
+    ossProviderId
+
+    fsProviderId
+}
+
+input SystemConfigCreate {
+    ossProviderId
+
+    fsProviderId
+}
