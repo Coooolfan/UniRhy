@@ -5,6 +5,7 @@ import org.babyfish.jimmer.sql.GeneratedValue
 import org.babyfish.jimmer.sql.GenerationType
 import org.babyfish.jimmer.sql.Id
 import org.babyfish.jimmer.sql.ManyToOne
+import org.babyfish.jimmer.sql.OneToMany
 
 @Entity
 interface Recording {
@@ -25,4 +26,7 @@ interface Recording {
 
     @ManyToOne
     val cover: MediaFile?
+
+    @OneToMany(mappedBy = "recording")
+    val assets: List<Asset>
 }

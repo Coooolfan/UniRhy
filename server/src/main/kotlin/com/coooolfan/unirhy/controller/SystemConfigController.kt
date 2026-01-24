@@ -1,16 +1,15 @@
-package com.coooolfan.unirhy.controller.system
+package com.coooolfan.unirhy.controller
 
 import cn.dev33.satoken.annotation.SaCheckLogin
 import com.coooolfan.unirhy.model.SystemConfig
 import com.coooolfan.unirhy.model.by
 import com.coooolfan.unirhy.model.dto.SystemConfigCreate
 import com.coooolfan.unirhy.model.dto.SystemConfigUpdate
-import com.coooolfan.unirhy.service.system.SystemConfigService
+import com.coooolfan.unirhy.service.SystemConfigService
 import org.babyfish.jimmer.client.FetchBy
 import org.babyfish.jimmer.sql.fetcher.Fetcher
 import org.babyfish.jimmer.sql.kt.fetcher.newFetcher
 import org.springframework.http.HttpStatus
-import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.PutMapping

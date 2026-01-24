@@ -1,4 +1,4 @@
-package com.coooolfan.unirhy.service.system
+package com.coooolfan.unirhy.service
 
 import com.coooolfan.unirhy.model.SystemConfig
 import com.coooolfan.unirhy.model.dto.SystemConfigCreate
