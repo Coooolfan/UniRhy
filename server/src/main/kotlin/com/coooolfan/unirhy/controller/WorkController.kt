@@ -81,6 +81,7 @@ class WorkController(
                     allScalarFields()
                     mediaFile()
                 }
+                cover()
             }
         }
     }
