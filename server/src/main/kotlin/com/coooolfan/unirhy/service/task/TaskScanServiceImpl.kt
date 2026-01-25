@@ -2,10 +2,11 @@ package com.coooolfan.unirhy.service.task
 
 import com.coooolfan.unirhy.model.Asset
 import com.coooolfan.unirhy.model.MediaFile
-import com.coooolfan.unirhy.model.Recording
 import com.coooolfan.unirhy.model.Work
 import com.coooolfan.unirhy.model.addBy
 import com.coooolfan.unirhy.model.storage.FileProviderFileSystem
+import com.coooolfan.unirhy.model.storage.FileProviderType
+import com.coooolfan.unirhy.utils.sha256
 import org.babyfish.jimmer.sql.ast.mutation.AssociatedSaveMode
 import org.babyfish.jimmer.sql.ast.mutation.SaveMode
 import org.babyfish.jimmer.sql.kt.KSqlClient
@@ -48,7 +49,7 @@ class TaskScanServiceImpl(private val sql: KSqlClient) : TaskService<ScanTaskReq
                     assets().addBy {
                         comment = "load from local file: $relativePath"
                         mediaFile {
-                            sha256 = ""
+                            sha256 = file.sha256()
                             objectKey = relativePath
                             mimeType = "audio/${file.extension.lowercase()}"
                             size = file.length()
@@ -62,11 +63,12 @@ class TaskScanServiceImpl(private val sql: KSqlClient) : TaskService<ScanTaskReq
             })
         }
         sql.transaction {
-            sql.saveEntitiesCommand(
-                works,
-                SaveMode.INSERT_ONLY,
-                AssociatedSaveMode.VIOLENTLY_REPLACE // TODO: 这里需要重新设计一下实体建模
-            ).execute()
+            sql.saveEntities(works) {
+                setMode(SaveMode.INSERT_ONLY)
+                setAssociatedModeAll(AssociatedSaveMode.APPEND)
+                setAssociatedMode(Asset::mediaFile, AssociatedSaveMode.APPEND_IF_ABSENT)
+                setAssociatedMode(MediaFile::fsProvider, AssociatedSaveMode.APPEND_IF_ABSENT)
+            }
         }
     }
 

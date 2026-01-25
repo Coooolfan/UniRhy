@@ -12,13 +12,7 @@ import kotlin.reflect.KClass
 @JsonSubTypes(
     JsonSubTypes.Type(value = ScanTaskRequest::class, name = "SCAN"),
 )
-sealed interface TaskRequest {
-}
-
-enum class FileProviderType {
-    OSS,
-    FILE_SYSTEM,
-}
+sealed interface TaskRequest
 
 object TaskRequestTypes {
     // 咋这么复杂？

@@ -12,7 +12,10 @@ class GlobalExceptionHandler {
     @ExceptionHandler(CodeBasedRuntimeException::class)
     fun handle(ex: CodeBasedRuntimeException): ResponseEntity<Map<String, Any>> {
         val statusCode = when (ex.code) {
-            else -> 500 // Internal Server Error
+            else -> {
+                ex.printStackTrace()
+                500 // Internal Server Error
+            }
         }
         return ResponseEntity
             .status(statusCode)

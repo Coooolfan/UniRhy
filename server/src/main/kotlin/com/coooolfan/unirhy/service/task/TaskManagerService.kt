@@ -6,7 +6,7 @@ import org.springframework.stereotype.Service
 @Service
 class TaskManagerService(
     private val sql: KSqlClient,
-    private val taskServices: List<TaskService<out TaskRequest>>,
+    taskServices: List<TaskService<out TaskRequest>>,
 ) {
     private val taskServiceByType: Map<TaskType, TaskService<out TaskRequest>> =
         taskServices.associateBy { it.taskType }

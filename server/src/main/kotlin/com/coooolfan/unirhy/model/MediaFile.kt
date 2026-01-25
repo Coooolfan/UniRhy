@@ -6,6 +6,7 @@ import org.babyfish.jimmer.sql.Entity
 import org.babyfish.jimmer.sql.GeneratedValue
 import org.babyfish.jimmer.sql.GenerationType
 import org.babyfish.jimmer.sql.Id
+import org.babyfish.jimmer.sql.Key
 import org.babyfish.jimmer.sql.ManyToOne
 
 @Entity
@@ -16,6 +17,7 @@ interface MediaFile {
 
     val sha256: String
 
+    @Key
     val objectKey: String
 
     val mimeType: String
@@ -27,8 +29,10 @@ interface MediaFile {
     val height: Int?
 
     @ManyToOne
+    @Key
     val ossProvider: FileProviderOss?
 
     @ManyToOne
+    @Key
     val fsProvider: FileProviderFileSystem?
 }
