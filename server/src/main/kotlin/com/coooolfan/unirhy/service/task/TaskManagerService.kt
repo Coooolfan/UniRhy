@@ -1,11 +1,9 @@
 package com.coooolfan.unirhy.service.task
 
-import org.babyfish.jimmer.sql.kt.KSqlClient
 import org.springframework.stereotype.Service
 
 @Service
 class TaskManagerService(
-    private val sql: KSqlClient,
     taskServices: List<TaskService<out TaskRequest>>,
 ) {
     private val taskServiceByType: Map<TaskType, TaskService<out TaskRequest>> =
