@@ -1,6 +1,38 @@
 <script setup lang="ts">
 import { Heart, Play } from 'lucide-vue-next'
-import { featuredAlbum } from './data'
+import { featuredAlbum as defaultFeaturedAlbum } from './data'
+import { ref, onMounted } from 'vue'
+import { api } from '@/ApiInstance'
+
+type Album = {
+    title: string
+    artist: string
+    year: string
+    cover: string
+}
+
+const album = ref<Album>({ ...defaultFeaturedAlbum })
+
+onMounted(async () => {
+    try {
+        const work = await api.workController.randomWork({
+            offset: new Date().getTimezoneOffset() * 60000,
+        })
+
+        if (work) {
+            album.value = {
+                title: work.title,
+                artist: work.recordings[0]?.label || 'Unknown Artist',
+                year: '2024', // Fallback as Work doesn't have year
+                cover: work.recordings[0]?.cover?.id
+                    ? `/api/media/${work.recordings[0].cover.id}`
+                    : defaultFeaturedAlbum.cover,
+            }
+        }
+    } catch (e) {
+        console.error('Failed to fetch daily pick:', e)
+    }
+})
 </script>
 
 <template>
@@ -25,7 +57,7 @@ import { featuredAlbum } from './data'
                     class="h-full aspect-square bg-[#D6D2C9] relative flex items-center justify-center group cursor-pointer overflow-hidden border-r border-[#EBE7E0] shrink-0"
                 >
                     <img
-                        :src="featuredAlbum.cover"
+                        :src="album.cover"
                         alt="Album Cover"
                         class="absolute inset-0 w-full h-full object-cover opacity-90 transition-transform duration-700 group-hover:scale-105"
                     />
@@ -79,11 +111,11 @@ import { featuredAlbum } from './data'
                         <h3
                             class="text-5xl font-serif text-[#2C2C2C] mb-4 tracking-tight leading-tight"
                         >
-                            {{ featuredAlbum.title }}
+                            {{ album.title }}
                         </h3>
                         <p class="text-[#8A857D] text-lg mb-10 font-serif italic flex items-center">
                             <span class="w-8 h-px bg-[#C27E46] mr-3 inline-block"></span>
-                            {{ featuredAlbum.artist }}
+                            {{ album.artist }}
                         </p>
                         <div class="flex items-center space-x-6">
                             <button

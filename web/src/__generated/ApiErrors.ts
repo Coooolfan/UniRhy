@@ -31,11 +31,21 @@ export type ApiErrors = {
                 readonly [key:string]: any
             })
     }, 
+    'systemConfigController': {
+    }, 
+    'taskManagerController': {
+    }, 
     'tokenController': {
         'login': AllErrors & ({
                 family: 'COMMON', 
                 code: 'AUTHENTICATION_FAILED', 
                 readonly [key:string]: any
             })
+    }, 
+    'workController': {
+    }, 
+    'fileSystemStorageController': {
+    }, 
+    'ossStorageController': {
     }
 };
