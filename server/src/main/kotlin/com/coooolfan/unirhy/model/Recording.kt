@@ -5,6 +5,7 @@ import org.babyfish.jimmer.sql.Entity
 import org.babyfish.jimmer.sql.GeneratedValue
 import org.babyfish.jimmer.sql.GenerationType
 import org.babyfish.jimmer.sql.Id
+import org.babyfish.jimmer.sql.ManyToMany
 import org.babyfish.jimmer.sql.ManyToOne
 import org.babyfish.jimmer.sql.OnDissociate
 import org.babyfish.jimmer.sql.OneToMany
@@ -18,6 +19,9 @@ interface Recording {
     @ManyToOne
     @OnDissociate(DissociateAction.DELETE)
     val work: Work
+
+    @ManyToMany
+    val artists: List<Artist>
 
     val kind: String
 

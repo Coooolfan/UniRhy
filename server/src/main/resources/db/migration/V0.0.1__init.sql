@@ -81,6 +81,35 @@ CREATE TABLE public.recording
 );
 
 -- ==========================================================
+-- 3.1 艺术家 (Artist) 模块
+-- ==========================================================
+
+-- 艺术家表：用于归一化存储作者/演奏者等信息
+CREATE TABLE public.artist
+(
+    id        BIGSERIAL PRIMARY KEY,
+    name      TEXT   NOT NULL,                                            -- 艺术家名称
+    comment   TEXT   NOT NULL DEFAULT '',                                 -- 简介/备注
+    avatar_id BIGINT REFERENCES public.media_file (id) ON DELETE SET NULL -- 艺术家头像
+);
+
+-- 作品与艺术家的关联表（多对多）
+CREATE TABLE public.work_artist_mapping
+(
+    work_id   BIGINT NOT NULL REFERENCES public.work (id) ON DELETE RESTRICT,
+    artist_id BIGINT NOT NULL REFERENCES public.artist (id) ON DELETE RESTRICT,
+    PRIMARY KEY (work_id, artist_id) -- 联合主键防止重复添加
+);
+
+-- 录音与艺术家的关联表（多对多）
+CREATE TABLE public.recording_artist_mapping
+(
+    recording_id BIGINT NOT NULL REFERENCES public.recording (id) ON DELETE RESTRICT,
+    artist_id    BIGINT NOT NULL REFERENCES public.artist (id) ON DELETE RESTRICT,
+    PRIMARY KEY (recording_id, artist_id) -- 联合主键防止重复添加
+);
+
+-- ==========================================================
 -- 4. 用户与权限模块
 -- ==========================================================
 

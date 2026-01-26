@@ -4,16 +4,18 @@ import org.babyfish.jimmer.sql.Entity
 import org.babyfish.jimmer.sql.GeneratedValue
 import org.babyfish.jimmer.sql.GenerationType
 import org.babyfish.jimmer.sql.Id
-import org.babyfish.jimmer.sql.OneToMany
+import org.babyfish.jimmer.sql.ManyToOne
 
 @Entity
-interface Work {
+interface Artist {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     val id: Long
 
-    val title: String
+    val name: String
 
-    @OneToMany(mappedBy = "work")
-    val recordings: List<Recording>
+    val comment: String
+
+    @ManyToOne
+    val avatar: MediaFile?
 }
