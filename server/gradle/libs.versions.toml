@@ -6,6 +6,7 @@ graalvm = "0.11.3"
 ksp = "2.3.4"
 jimmer = "0.9.120"
 saToken = "1.44.0"
+jAudioTagger = "3.0.1"
 
 [libraries]
 
@@ -31,6 +32,9 @@ postgresql = { module = "org.postgresql:postgresql" }
 # Flyway
 spring-boot-starter-flyway = { module = "org.springframework.boot:spring-boot-starter-flyway" }
 postgresql-flyway = { module = "org.flywaydb:flyway-database-postgresql" }
+
+# Other
+jAudioTagger = { group = "net.jthink", name = "jaudiotagger", version.ref = "jAudioTagger" }
 
 # Test
 test-spring-boot-starter-webmvc = { module = "org.springframework.boot:spring-boot-starter-webmvc-test" }

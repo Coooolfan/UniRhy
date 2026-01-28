@@ -4,6 +4,7 @@ import org.babyfish.jimmer.sql.Entity
 import org.babyfish.jimmer.sql.GeneratedValue
 import org.babyfish.jimmer.sql.GenerationType
 import org.babyfish.jimmer.sql.Id
+import org.babyfish.jimmer.sql.Key
 import org.babyfish.jimmer.sql.ManyToOne
 
 @Entity
@@ -12,6 +13,7 @@ interface Artist {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     val id: Long
 
+    @Key
     val name: String
 
     val comment: String

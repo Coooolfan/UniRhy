@@ -9,6 +9,7 @@
 | @types/three | ^0.182.0 | MIT | Three.js 类型定义 |
 | three | ^0.182.0 | MIT | 3D 图形库 |
 | vue | ^3.5.25 | MIT | Vue.js 框架 |
+| vue-bits | - | MIT + Commons Clause | Vue 动画交互组件库 |
 
 ## 开发依赖 (devDependencies)
 
@@ -39,5 +40,6 @@
 ## 协议说明
 
 - **MIT**: MIT License - 允许商业使用、修改、分发，需保留版权声明
+- **MIT + Commons Clause**: MIT License 附加 Commons Clause - 允许非商业使用、修改、分发，禁止销售软件本身
 - **Apache-2.0**: Apache License 2.0 - 允许商业使用、修改、分发，需保留版权和许可声明
 - **BSD-2-Clause**: BSD 2-Clause License - 允许商业使用、修改、分发，需保留版权声明

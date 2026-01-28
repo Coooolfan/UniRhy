@@ -39,6 +39,8 @@ dependencies {
   implementation(libs.sa.token.starter)
   implementation(libs.spring.security.crypto)
 
+  implementation(libs.jAudioTagger)
+
   runtimeOnly(libs.postgresql)
   runtimeOnly(libs.postgresql.flyway)
 
