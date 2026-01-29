@@ -17,6 +17,7 @@ import org.jaudiotagger.tag.FieldKey
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import java.io.File
+import java.nio.file.Files
 import java.security.MessageDigest
 import kotlin.reflect.KClass
 
@@ -75,7 +76,7 @@ class TaskScanServiceImpl(private val sql: KSqlClient) : TaskService<ScanTaskReq
                         mediaFile {
                             sha256 = file.sha256()
                             objectKey = relativePath
-                            mimeType = "audio/${file.extension.lowercase()}"
+                            mimeType = Files.probeContentType(file.toPath())
                             size = file.length()
                             width = null
                             height = null
@@ -128,7 +129,7 @@ class TaskScanServiceImpl(private val sql: KSqlClient) : TaskService<ScanTaskReq
             return MediaFile {
                 sha256 = coverFile.sha256()
                 objectKey = coverFile.relativeTo(file.parentFile).path
-                mimeType = "image/${coverFile.extension.lowercase()}"
+                mimeType = Files.probeContentType(coverFile.toPath())
                 size = coverFile.length()
                 width = null
                 height = null
@@ -138,6 +139,7 @@ class TaskScanServiceImpl(private val sql: KSqlClient) : TaskService<ScanTaskReq
         }
 
         // 尝试从文件中解析
+        // TODO))需要验证
         val audioTag = AudioFileIO.read(file)
 
         val artwork = audioTag.tag?.firstArtwork ?: return null
@@ -174,7 +176,7 @@ class TaskScanServiceImpl(private val sql: KSqlClient) : TaskService<ScanTaskReq
         return MediaFile {
             this.sha256 = sha256
             this.objectKey = objectKey
-            this.mimeType = mimeType
+            this.mimeType = Files.probeContentType(coverFile.toPath())
             this.size = binaryData.size.toLong()
             this.width = width
             this.height = height
