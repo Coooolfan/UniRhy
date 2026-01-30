@@ -14,6 +14,11 @@ repositories {
 }
 
 dependencies {
+  testImplementation(platform("org.springframework.boot:spring-boot-dependencies:${libs.versions.springBoot.get()}"))
+  testImplementation(project(":"))
+  testImplementation("org.springframework.boot:spring-boot-starter-test")
+  testImplementation(libs.jimmer.spring.boot.starter)
+  testImplementation(libs.jAudioTagger)
   testImplementation(libs.test.kotlin)
   testRuntimeOnly(libs.test.launcher)
 }

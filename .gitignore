@@ -1,6 +1,7 @@
 .idea
 .DS_Store
 .claude
+.codex
 *.pyc
 
 node_modules/
@@ -10,6 +11,9 @@ server/build
 server/.kotlin
 server/.env
 server/api-e2e/build
+server/data/
+server/tmp/
+server/test-output/
 !server/gradle/wrapper/gradle-wrapper.jar
 
 
@@ -19,4 +23,3 @@ website/node_modules
 
 web/.vscode
 web/node_modules
-
