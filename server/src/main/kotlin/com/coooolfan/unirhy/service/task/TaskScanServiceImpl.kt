@@ -1,9 +1,6 @@
 package com.coooolfan.unirhy.service.task
 
-import com.coooolfan.unirhy.model.Asset
-import com.coooolfan.unirhy.model.MediaFile
-import com.coooolfan.unirhy.model.Work
-import com.coooolfan.unirhy.model.addBy
+import com.coooolfan.unirhy.model.*
 import com.coooolfan.unirhy.model.storage.FileProviderFileSystem
 import com.coooolfan.unirhy.model.storage.FileProviderType
 import com.coooolfan.unirhy.model.storage.readonly
@@ -39,13 +36,23 @@ class TaskScanServiceImpl(private val sql: KSqlClient) : TaskService<ScanTaskReq
             select(table)
         }.first()
 
+        // 1. 取到对应路径下的所有音频文件
         val rootDir = File(provider.parentPath)
-
         val mediaFiles = findAudioFilesRecursively(rootDir)
 
-        val works = mutableListOf<Work>()
+        // 2. 过滤掉已经存在的媒体文件
+        val existingMediaFiles = sql.executeQuery(MediaFile::class) {
+            where(table.fsProvider eq provider)
+            select(table.objectKey)
+        }
+        val newMediaFiles = mediaFiles.filter { file ->
+            val relativePath = file.relativeTo(rootDir).path
+            relativePath !in existingMediaFiles
+        }
 
-        for (file in mediaFiles) {
+        // 3. 遍历新找到的音频文件，构建作品
+        val works = mutableListOf<Work>()
+        for (file in newMediaFiles) {
             val relativePath = file.relativeTo(rootDir).path
             val audioTag = AudioFileIO.read(file)
             val tag = audioTag.tag
