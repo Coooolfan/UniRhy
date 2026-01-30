@@ -7,13 +7,14 @@ import com.coooolfan.unirhy.model.addBy
 import com.coooolfan.unirhy.model.storage.FileProviderFileSystem
 import com.coooolfan.unirhy.model.storage.FileProviderType
 import com.coooolfan.unirhy.model.storage.readonly
-import com.coooolfan.unirhy.service.task.audio.readAudioMetadata
 import com.coooolfan.unirhy.service.task.cover.fetchCover
 import com.coooolfan.unirhy.utils.sha256
 import org.babyfish.jimmer.sql.ast.mutation.AssociatedSaveMode
 import org.babyfish.jimmer.sql.ast.mutation.SaveMode
 import org.babyfish.jimmer.sql.kt.KSqlClient
 import org.babyfish.jimmer.sql.kt.ast.expression.eq
+import org.jaudiotagger.audio.AudioFileIO
+import org.jaudiotagger.tag.FieldKey
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import java.io.File
@@ -46,24 +47,25 @@ class TaskScanServiceImpl(private val sql: KSqlClient) : TaskService<ScanTaskReq
 
         for (file in mediaFiles) {
             val relativePath = file.relativeTo(rootDir).path
-            val audioMetadata = readAudioMetadata(file)
-            val audioCover = fetchCover(file, provider, writeableProvider, audioMetadata.artwork)
+            val audioTag = AudioFileIO.read(file)
+            val tag = audioTag.tag
+            val audioCover = fetchCover(file, provider, writeableProvider, tag?.firstArtwork)
 
             works.add(Work {
-                title = audioMetadata.title
+                title = tag?.getFirst(FieldKey.TITLE).orEmpty()
                 recordings().addBy {
                     kind = "CD"
                     label = "CD"
-                    title = audioMetadata.title
-                    comment = audioMetadata.comment
+                    title = tag?.getFirst(FieldKey.TITLE).orEmpty()
+                    comment = tag?.getFirst(FieldKey.COMMENT).orEmpty()
                     cover = audioCover
                     artists().addBy {
-                        name = audioMetadata.artist
+                        name = tag?.getFirst(FieldKey.ARTIST).orEmpty()
                         comment = "load from local file: $relativePath"
                         avatar = null
                     }
                     albums().addBy {
-                        title = audioMetadata.album
+                        title = tag?.getFirst(FieldKey.ALBUM).orEmpty()
                         kind = "CD"
                         releaseDate = null
                         comment = "load from local file: $relativePath"

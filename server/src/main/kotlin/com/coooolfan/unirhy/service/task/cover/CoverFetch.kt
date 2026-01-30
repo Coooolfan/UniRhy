@@ -2,9 +2,8 @@ package com.coooolfan.unirhy.service.task.cover
 
 import com.coooolfan.unirhy.model.MediaFile
 import com.coooolfan.unirhy.model.storage.FileProviderFileSystem
-import com.coooolfan.unirhy.model.storage.readonly
-import com.coooolfan.unirhy.service.task.audio.ArtworkData
 import com.coooolfan.unirhy.utils.sha256
+import org.jaudiotagger.tag.images.Artwork
 import java.io.File
 import java.nio.file.Files
 import java.security.MessageDigest
@@ -15,15 +14,21 @@ fun fetchCover(
     file: File,
     provider: FileProviderFileSystem,
     writeableProvider: FileProviderFileSystem,
-    artwork: ArtworkData?
+    artwork: Artwork?
 ): MediaFile? {
-    val sidecarFile = findSidecarCover(file, COVER_EXTENSIONS)
-    if (sidecarFile != null) {
+    for (ext in COVER_EXTENSIONS) {
+        var coverFile = File(file.parentFile, "${file.nameWithoutExtension}.$ext")
+        if (!coverFile.exists()) {
+            coverFile = File(file.parentFile, "${file.nameWithoutExtension}.${ext.uppercase()}")
+        }
+        if (!coverFile.exists()) {
+            continue
+        }
         return MediaFile {
-            sha256 = sidecarFile.sha256()
-            objectKey = sidecarFile.relativeTo(file.parentFile).path
-            mimeType = Files.probeContentType(sidecarFile.toPath())
-            size = sidecarFile.length()
+            sha256 = coverFile.sha256()
+            objectKey = coverFile.relativeTo(file.parentFile).path
+            mimeType = Files.probeContentType(coverFile.toPath())
+            size = coverFile.length()
             width = null
             height = null
             ossProvider = null
@@ -55,24 +60,11 @@ fun fetchCover(
         this.objectKey = objectKey
         this.mimeType = Files.probeContentType(coverFile.toPath()) ?: mimeType
         this.size = binaryData.size.toLong()
-        this.width = safeArtwork.width
-        this.height = safeArtwork.height
+        this.width = safeArtwork.width.takeIf { it > 0 }
+        this.height = safeArtwork.height.takeIf { it > 0 }
         this.ossProvider = null
         this.fsProvider = targetProvider
     }
-}
-
-private fun findSidecarCover(file: File, extensions: List<String>): File? {
-    for (ext in extensions) {
-        var coverFile = File(file.parentFile, "${file.nameWithoutExtension}.$ext")
-        if (!coverFile.exists()) {
-            coverFile = File(file.parentFile, "${file.nameWithoutExtension}.${ext.uppercase()}")
-        }
-        if (coverFile.exists()) {
-            return coverFile
-        }
-    }
-    return null
 }
 
 private fun extensionFromMime(mimeType: String): String =
