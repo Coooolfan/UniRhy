@@ -1,11 +1,11 @@
 package com.coooolfan.unirhy.service.task
 
+import cn.dev33.satoken.annotation.SaCheckLogin
 import com.coooolfan.unirhy.model.*
 import com.coooolfan.unirhy.model.storage.FileProviderFileSystem
 import com.coooolfan.unirhy.model.storage.FileProviderType
 import com.coooolfan.unirhy.model.storage.readonly
 import com.coooolfan.unirhy.service.task.cover.fetchCover
-import com.coooolfan.unirhy.utils.sha256
 import org.babyfish.jimmer.sql.ast.mutation.AssociatedSaveMode
 import org.babyfish.jimmer.sql.ast.mutation.SaveMode
 import org.babyfish.jimmer.sql.kt.KSqlClient
@@ -13,19 +13,34 @@ import org.babyfish.jimmer.sql.kt.ast.expression.eq
 import org.jaudiotagger.audio.AudioFileIO
 import org.jaudiotagger.tag.FieldKey
 import org.slf4j.LoggerFactory
+import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
+import org.springframework.web.bind.annotation.PostMapping
+import org.springframework.web.bind.annotation.RequestBody
+import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.ResponseStatus
+import org.springframework.web.bind.annotation.RestController
 import java.io.File
 import java.nio.file.Files
-import kotlin.reflect.KClass
+
+@SaCheckLogin
+@RestController
+@RequestMapping("/api/task")
+class TaskController(private val scanTaskService: ScanTaskService) {
+
+    @PostMapping("/scan")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    fun executeScanTask(@RequestBody request: ScanTaskRequest) {
+        scanTaskService.execute(request)
+    }
+}
 
 @Service
-class TaskScanServiceImpl(private val sql: KSqlClient) : TaskService<ScanTaskRequest> {
+class ScanTaskService(private val sql: KSqlClient) {
 
-    private val logger = LoggerFactory.getLogger(TaskScanServiceImpl::class.java)
+    private val logger = LoggerFactory.getLogger(ScanTaskService::class.java)
 
-    override val requestClass: KClass<ScanTaskRequest> = ScanTaskRequest::class
-
-    override fun executeTask(request: ScanTaskRequest) {
+    fun execute(request: ScanTaskRequest) {
         if (request.providerType != FileProviderType.FILE_SYSTEM) {
             error("Unsupported provider type: ${request.providerType}")
         }
@@ -81,7 +96,7 @@ class TaskScanServiceImpl(private val sql: KSqlClient) : TaskService<ScanTaskReq
                     assets().addBy {
                         comment = "load from local file: $relativePath"
                         mediaFile {
-                            sha256 = file.sha256()
+                            sha256 = "mocked-sha256"
                             objectKey = relativePath
                             mimeType = Files.probeContentType(file.toPath()) ?: "application/octet-stream"
                             size = file.length()
@@ -127,4 +142,4 @@ class TaskScanServiceImpl(private val sql: KSqlClient) : TaskService<ScanTaskReq
 data class ScanTaskRequest(
     val providerType: FileProviderType,
     val providerId: Long,
-) : TaskRequest
+)
