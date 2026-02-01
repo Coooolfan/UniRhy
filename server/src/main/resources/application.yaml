@@ -33,6 +33,11 @@ jimmer:
     openapi:
       path: ${JIMMER_OPENAPI_YML_PATH:/api/openapi.yml}
       ui-path: ${JIMMER_OPENAPI_UI_PATH:/api/openapi.html}
+      properties:
+        info:
+          title: UniRhy API
+          description: UniRhy API Documentation
+          version: v0.0.1
     ts:
       path: ${JIMMER_TS_PATH:/api/openapi.zip}
 

@@ -10,11 +10,28 @@ import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
 
+/**
+ * 任务管理接口
+ *
+ * 提供任务触发能力（例如扫描任务）
+ */
 @SaCheckLogin
 @RestController
 @RequestMapping("/api/task")
 class TaskController(private val scanTaskService: ScanTaskService) {
 
+    /**
+     * 触发扫描任务
+     *
+     * 此接口用于提交媒体扫描任务
+     * 需要用户登录认证才能访问
+     *
+     * @param request 扫描任务请求参数
+     *
+     * @api POST /api/task/scan
+     * @permission 需要登录认证
+     * @description 调用ScanTaskService.execute()方法执行扫描任务
+     */
     @PostMapping("/scan")
     @ResponseStatus(HttpStatus.ACCEPTED)
     fun executeScanTask(@RequestBody request: ScanTaskRequest) {

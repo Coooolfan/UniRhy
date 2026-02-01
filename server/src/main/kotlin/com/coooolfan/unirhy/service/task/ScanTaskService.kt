@@ -1,6 +1,5 @@
 package com.coooolfan.unirhy.service.task
 
-import cn.dev33.satoken.annotation.SaCheckLogin
 import com.coooolfan.unirhy.model.*
 import com.coooolfan.unirhy.model.storage.FileProviderFileSystem
 import com.coooolfan.unirhy.model.storage.FileProviderType
@@ -13,27 +12,9 @@ import org.babyfish.jimmer.sql.kt.ast.expression.eq
 import org.jaudiotagger.audio.AudioFileIO
 import org.jaudiotagger.tag.FieldKey
 import org.slf4j.LoggerFactory
-import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
-import org.springframework.web.bind.annotation.PostMapping
-import org.springframework.web.bind.annotation.RequestBody
-import org.springframework.web.bind.annotation.RequestMapping
-import org.springframework.web.bind.annotation.ResponseStatus
-import org.springframework.web.bind.annotation.RestController
 import java.io.File
 import java.nio.file.Files
-
-@SaCheckLogin
-@RestController
-@RequestMapping("/api/task")
-class TaskController(private val scanTaskService: ScanTaskService) {
-
-    @PostMapping("/scan")
-    @ResponseStatus(HttpStatus.ACCEPTED)
-    fun executeScanTask(@RequestBody request: ScanTaskRequest) {
-        scanTaskService.execute(request)
-    }
-}
 
 @Service
 class ScanTaskService(private val sql: KSqlClient) {
@@ -116,6 +97,8 @@ class ScanTaskService(private val sql: KSqlClient) {
                 setAssociatedModeAll(AssociatedSaveMode.APPEND)
                 setAssociatedMode(Asset::mediaFile, AssociatedSaveMode.APPEND_IF_ABSENT)
                 setAssociatedMode(MediaFile::fsProvider, AssociatedSaveMode.APPEND_IF_ABSENT)
+                setAssociatedMode(Album::cover, AssociatedSaveMode.APPEND_IF_ABSENT)
+                setAssociatedMode(Recording::cover, AssociatedSaveMode.APPEND_IF_ABSENT)
             }
         }
     }
