@@ -1,9 +1,13 @@
 <script setup lang="ts">
 import { Play } from 'lucide-vue-next'
 import { onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { api } from '@/ApiInstance'
 
+const router = useRouter()
+
 type AlbumCard = {
+    id: number
     title: string
     artist: string
     cover: string
@@ -18,6 +22,10 @@ const resolveCover = (coverId?: number) => {
     return ''
 }
 
+const navigateToAlbum = (id: number) => {
+    router.push({ name: 'album-detail', params: { id } })
+}
+
 onMounted(async () => {
     try {
         const list = await api.albumController.listAlbums()
@@ -25,6 +33,7 @@ onMounted(async () => {
             return
         }
         albums.value = list.map((album) => ({
+            id: album.id,
             title: album.title ?? 'Untitled Album',
             artist: album.recordings?.[0]?.label ?? 'Unknown Artist',
             cover: resolveCover(album.cover?.id),
@@ -40,7 +49,12 @@ onMounted(async () => {
         <div
             class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-8 px-2"
         >
-            <div v-for="(album, idx) in albums" :key="idx" class="group cursor-pointer">
+            <div
+                v-for="(album, idx) in albums"
+                :key="idx"
+                class="group cursor-pointer"
+                @click="navigateToAlbum(album.id)"
+            >
                 <div
                     class="aspect-square bg-gray-200 mb-4 shadow-[0_4px_12px_-4px_rgba(168,160,149,0.3)] group-hover:shadow-[0_12px_24px_-8px_rgba(168,160,149,0.5)] group-hover:-translate-y-1 transition-all duration-500 rounded-sm relative border-[5px] border-white overflow-hidden"
                 >

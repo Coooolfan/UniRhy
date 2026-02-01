@@ -1,10 +1,7 @@
 <script setup lang="ts">
+import { RouterView } from 'vue-router'
 import NoiseTexture from '@/components/NoiseTexture.vue'
 import DashboardSidebar from '@/components/dashboard/DashboardSidebar.vue'
-import DashboardTopBar from '@/components/dashboard/DashboardTopBar.vue'
-import DashboardHero from '@/components/dashboard/DashboardHero.vue'
-import DashboardCategories from '@/components/dashboard/DashboardCategories.vue'
-import DashboardAlbumGrid from '@/components/dashboard/DashboardAlbumGrid.vue'
 import DashboardPlayerBar from '@/components/dashboard/DashboardPlayerBar.vue'
 </script>
 
@@ -19,13 +16,8 @@ import DashboardPlayerBar from '@/components/dashboard/DashboardPlayerBar.vue'
         <DashboardSidebar />
 
         <!-- Main Content -->
-        <main
-            class="flex-1 flex flex-col h-full relative z-10 overflow-y-auto pt-8 px-8 pb-32 no-scrollbar"
-        >
-            <DashboardTopBar />
-            <DashboardHero />
-            <DashboardCategories />
-            <DashboardAlbumGrid />
+        <main class="flex-1 flex flex-col h-full relative z-10 overflow-y-auto no-scrollbar">
+            <RouterView />
         </main>
 
         <!-- Bottom Player Bar -->

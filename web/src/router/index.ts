@@ -16,6 +16,18 @@ const router = createRouter({
             path: '/dashboard',
             name: 'dashboard',
             component: () => import('../views/DashboardView.vue'),
+            children: [
+                {
+                    path: '',
+                    name: 'dashboard-home',
+                    component: () => import('../views/DashboardHome.vue'),
+                },
+                {
+                    path: 'album/:id',
+                    name: 'album-detail',
+                    component: () => import('../views/AlbumDetailView.vue'),
+                },
+            ],
         },
     ],
 })

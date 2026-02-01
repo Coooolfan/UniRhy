@@ -3,23 +3,23 @@ import { Search } from 'lucide-vue-next'
 </script>
 
 <template>
-    <div class="flex justify-between items-center mb-10 px-2">
-        <div class="flex items-center space-x-2 border-b border-[#D6D1C7] pb-1 w-64">
-            <Search :size="16" class="text-[#9C968B]" />
+    <header
+        class="sticky top-0 z-20 px-8 py-6 flex justify-between items-center bg-[#EBE7E0]/90 backdrop-blur-sm transition-all duration-300"
+    >
+        <div class="flex items-center text-[#8C857B] border-b border-[#DCD6CC] pb-1 w-64">
+            <Search :size="18" />
             <input
                 type="text"
                 placeholder="搜索艺术家、作品..."
-                class="bg-transparent border-none outline-none text-sm w-full placeholder-[#9C968B] text-[#4A4A4A] focus:ring-0"
+                class="bg-transparent border-none outline-none ml-2 text-sm placeholder-[#8C857B] w-full focus:ring-0"
             />
         </div>
-        <div
-            class="w-8 h-8 rounded-full bg-[#D6D1C7] overflow-hidden cursor-pointer opacity-80 hover:opacity-100 transition-opacity ring-2 ring-white ring-offset-1 ring-offset-[#EBE7E0]"
-        >
+        <div class="h-8 w-8 rounded-full bg-[#DCD6CC] overflow-hidden cursor-pointer">
             <img
                 src="https://picsum.photos/seed/user/100/100"
-                alt="User"
-                class="w-full h-full object-cover"
+                alt="avatar"
+                class="h-full w-full object-cover"
             />
         </div>
-    </div>
+    </header>
 </template>
