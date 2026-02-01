@@ -7,6 +7,7 @@ import org.jaudiotagger.tag.images.Artwork
 import java.io.File
 import java.nio.file.Files
 import java.security.MessageDigest
+import kotlin.io.path.Path
 
 private val COVER_EXTENSIONS = listOf("jpg", "jpeg", "png", "gif")
 
@@ -26,7 +27,7 @@ fun fetchCover(
         }
         return MediaFile {
             sha256 = coverFile.sha256()
-            objectKey = coverFile.relativeTo(file.parentFile).path
+            objectKey = coverFile.relativeTo(Path(provider.parentPath).toFile()).path
             mimeType = Files.probeContentType(coverFile.toPath())
             size = coverFile.length()
             width = null
