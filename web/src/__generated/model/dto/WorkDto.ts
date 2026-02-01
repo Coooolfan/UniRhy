@@ -15,6 +15,9 @@ export type WorkDto = {
                     readonly id: number;
                 };
             }>;
+            readonly artists: ReadonlyArray<{
+                readonly id: number;
+            }>;
             readonly cover?: {
                 readonly id: number;
             } | undefined;

@@ -31,9 +31,13 @@ export type ApiErrors = {
                 readonly [key:string]: any
             })
     }, 
+    'albumController': {
+    }, 
+    'mediaFileController': {
+    }, 
     'systemConfigController': {
     }, 
-    'taskManagerController': {
+    'taskController': {
     }, 
     'tokenController': {
         'login': AllErrors & ({

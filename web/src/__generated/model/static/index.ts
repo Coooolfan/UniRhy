@@ -4,7 +4,6 @@ export type {FileProviderFileSystemCreate} from './FileProviderFileSystemCreate'
 export type {FileProviderFileSystemUpdate} from './FileProviderFileSystemUpdate';
 export type {FileProviderOssCreate} from './FileProviderOssCreate';
 export type {FileProviderOssUpdate} from './FileProviderOssUpdate';
+export type {ScanTaskRequest} from './ScanTaskRequest';
 export type {SystemConfigCreate} from './SystemConfigCreate';
 export type {SystemConfigUpdate} from './SystemConfigUpdate';
-export type {TaskInfo} from './TaskInfo';
-export type {TaskRequest} from './TaskRequest';

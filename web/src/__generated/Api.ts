@@ -1,10 +1,12 @@
 import type {Executor} from './';
 import {
     AccountController, 
+    AlbumController, 
     FileSystemStorageController, 
+    MediaFileController, 
     OssStorageController, 
     SystemConfigController, 
-    TaskManagerController, 
+    TaskController, 
     TokenController, 
     WorkController
 } from './services/';
@@ -13,9 +15,13 @@ export class Api {
     
     readonly accountController: AccountController
     
+    readonly albumController: AlbumController
+    
+    readonly mediaFileController: MediaFileController
+    
     readonly systemConfigController: SystemConfigController
     
-    readonly taskManagerController: TaskManagerController
+    readonly taskController: TaskController
     
     readonly tokenController: TokenController
     
@@ -27,8 +33,10 @@ export class Api {
     
     constructor(executor: Executor) {
         this.accountController = new AccountController(executor);
+        this.albumController = new AlbumController(executor);
+        this.mediaFileController = new MediaFileController(executor);
         this.systemConfigController = new SystemConfigController(executor);
-        this.taskManagerController = new TaskManagerController(executor);
+        this.taskController = new TaskController(executor);
         this.tokenController = new TokenController(executor);
         this.workController = new WorkController(executor);
         this.fileSystemStorageController = new FileSystemStorageController(executor);
