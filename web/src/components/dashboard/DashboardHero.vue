@@ -11,7 +11,20 @@ type Album = {
     cover: string
 }
 
+type WorkArtist = {
+    id: number
+    name?: string
+}
+
 const album = ref<Album>({ ...defaultFeaturedAlbum })
+
+const resolveArtistName = (artists?: ReadonlyArray<WorkArtist>) => {
+    const names = artists?.map((artist) => artist.name).filter(Boolean) ?? []
+    if (names.length > 0) {
+        return names.join(' / ')
+    }
+    return 'Unknown Artist'
+}
 
 onMounted(async () => {
     try {
@@ -22,7 +35,9 @@ onMounted(async () => {
         if (work) {
             album.value = {
                 title: work.title,
-                artist: work.recordings[0]?.label || 'Unknown Artist',
+                artist: resolveArtistName(
+                    work.recordings?.[0]?.artists as ReadonlyArray<WorkArtist> | undefined,
+                ),
                 year: '2024', // Fallback as Work doesn't have year
                 cover: work.recordings[0]?.cover?.id
                     ? `/api/media/${work.recordings[0].cover.id}`
@@ -64,7 +79,7 @@ onMounted(async () => {
 
                     <!-- Play Overlay -->
                     <div
-                        class="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[1px]"
+                        class="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
                     >
                         <div
                             class="w-14 h-14 bg-[#F5F2EB] rounded-full flex items-center justify-center shadow-lg transform translate-y-4 group-hover:translate-y-0 transition-all duration-300"

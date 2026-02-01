@@ -73,16 +73,18 @@ class WorkController(
     }
 
     companion object {
-        private val DEFAULT_WORK_FETCHER = newFetcher(Work::class).by {
+        val DEFAULT_WORK_FETCHER = newFetcher(Work::class).by {
             allScalarFields()
             recordings {
                 allScalarFields()
                 assets {
                     allScalarFields()
-                    mediaFile()
+                    mediaFile { allScalarFields() }
                 }
-                artists()
-                cover()
+                artists {
+                    allScalarFields()
+                }
+                cover { allScalarFields() }
             }
         }
     }

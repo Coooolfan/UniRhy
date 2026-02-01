@@ -25,4 +25,8 @@ class AlbumService(private val sql: KSqlClient) {
             select(table.fetch(fetcher))
         }
     }
+
+    fun getAlbum(id: Long, fetcher: Fetcher<Album>): Album {
+        return sql.findOneById(fetcher, id)
+    }
 }

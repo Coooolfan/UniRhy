@@ -1,5 +1,5 @@
 import type {Executor} from '../';
-import type {Dynamic_Album} from '../model/dynamic/';
+import type {AlbumDto} from '../model/dto/';
 
 /**
  * 专辑管理接口
@@ -9,6 +9,14 @@ import type {Dynamic_Album} from '../model/dynamic/';
 export class AlbumController {
     
     constructor(private executor: Executor) {}
+    
+    readonly getAlbum: (options: AlbumControllerOptions['getAlbum']) => Promise<
+        AlbumDto['AlbumController/DETAIL_ALBUM_FETCHER']
+    > = async(options) => {
+        let _uri = '/api/album/';
+        _uri += encodeURIComponent(options.id);
+        return (await this.executor({uri: _uri, method: 'GET'})) as Promise<AlbumDto['AlbumController/DETAIL_ALBUM_FETCHER']>;
+    }
     
     /**
      * 获取专辑列表
@@ -20,13 +28,16 @@ export class AlbumController {
      * 
      */
     readonly listAlbums: () => Promise<
-        ReadonlyArray<Dynamic_Album>
+        ReadonlyArray<AlbumDto['AlbumController/DEFAULT_ALBUM_FETCHER']>
     > = async() => {
         let _uri = '/api/album';
-        return (await this.executor({uri: _uri, method: 'GET'})) as Promise<ReadonlyArray<Dynamic_Album>>;
+        return (await this.executor({uri: _uri, method: 'GET'})) as Promise<ReadonlyArray<AlbumDto['AlbumController/DEFAULT_ALBUM_FETCHER']>>;
     }
 }
 
 export type AlbumControllerOptions = {
-    'listAlbums': {}
+    'listAlbums': {}, 
+    'getAlbum': {
+        readonly id: number
+    }
 }

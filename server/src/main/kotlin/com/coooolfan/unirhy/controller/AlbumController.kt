@@ -4,12 +4,10 @@ import cn.dev33.satoken.annotation.SaCheckLogin
 import com.coooolfan.unirhy.model.Album
 import com.coooolfan.unirhy.model.by
 import com.coooolfan.unirhy.service.AlbumService
+import org.babyfish.jimmer.client.FetchBy
 import org.babyfish.jimmer.sql.kt.fetcher.newFetcher
 import org.springframework.http.HttpStatus
-import org.springframework.web.bind.annotation.GetMapping
-import org.springframework.web.bind.annotation.RequestMapping
-import org.springframework.web.bind.annotation.ResponseStatus
-import org.springframework.web.bind.annotation.RestController
+import org.springframework.web.bind.annotation.*
 
 /**
  * 专辑管理接口
@@ -35,15 +33,38 @@ class AlbumController(private val service: AlbumService) {
      */
     @GetMapping
     @ResponseStatus(HttpStatus.OK)
-    fun listAlbums(): List<Album> {
+    fun listAlbums(): List<@FetchBy("DEFAULT_ALBUM_FETCHER") Album> {
         return service.listAlbum(DEFAULT_ALBUM_FETCHER, true)
+    }
+
+    @GetMapping("{id}")
+    @ResponseStatus(HttpStatus.OK)
+    fun getAlbum(@PathVariable id: Long): @FetchBy("DETAIL_ALBUM_FETCHER") Album {
+        return service.getAlbum(id, DETAIL_ALBUM_FETCHER)
     }
 
     companion object {
         private val DEFAULT_ALBUM_FETCHER = newFetcher(Album::class).by {
-            allTableFields()
-            recordings { allTableFields() }
-            cover { allTableFields() }
+            allScalarFields()
+            recordings { label() }
+            cover()
         }
+
+        private val DETAIL_ALBUM_FETCHER = newFetcher(Album::class).by {
+            allScalarFields()
+            recordings {
+                allScalarFields()
+                assets {
+                    allScalarFields()
+                    mediaFile { allScalarFields() }
+                }
+                artists {
+                    allScalarFields()
+                }
+                cover { allScalarFields() }
+            }
+            cover { allScalarFields() }
+        }
+
     }
 }
