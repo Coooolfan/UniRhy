@@ -171,18 +171,25 @@ onMounted(() => {
                     @click="navigateToAlbum(album.id)"
                 >
                     <div
-                        class="relative aspect-square mb-5 transition-transform duration-500 ease-out group-hover:-translate-y-2"
+                        class="relative aspect-square mb-5 transition-transform duration-500 ease-out perspective-1000"
                     >
                         <div
-                            class="absolute top-1/2 left-1/2 w-[95%] h-[95%] -translate-x-1/2 -translate-y-1/2 bg-[#1A1A1A] rounded-full shadow-xl transition-all duration-700 ease-out group-hover:translate-x-4 opacity-0 group-hover:opacity-100 flex items-center justify-center"
+                            class="absolute top-1/2 left-1/2 w-[95%] h-[95%] -translate-x-1/2 -translate-y-1/2"
                         >
                             <div
-                                class="w-1/3 h-1/3 bg-[#EBE7E0] rounded-full border border-[#333]"
-                            ></div>
+                                class="w-full h-full bg-linear-to-tr from-gray-200 to-gray-100 border border-gray-300 rounded-full shadow-xl transition-all duration-700 ease-out opacity-0 group-hover:opacity-100 transform-gpu group-hover:translate-x-2 group-hover:-translate-y-4 group-hover:rotate-3 flex items-center justify-center relative"
+                            >
+                                <div
+                                    class="w-1/3 h-1/3 border border-gray-300 rounded-full opacity-50"
+                                ></div>
+                                <div
+                                    class="absolute w-8 h-8 bg-[#EBE7E0] rounded-full border border-gray-300"
+                                ></div>
+                            </div>
                         </div>
 
                         <div
-                            class="relative w-full h-full shadow-lg group-hover:shadow-2xl transition-shadow duration-500 bg-[#D6D1C7]"
+                            class="relative z-10 w-full h-full shadow-lg transition-all duration-500 ease-out bg-[#D6D1C7] transform-gpu origin-center group-hover:-rotate-2 group-hover:-translate-x-3 group-hover:-translate-y-1.5"
                         >
                             <img
                                 v-if="album.cover"
@@ -195,16 +202,6 @@ onMounted(() => {
                                 class="w-full h-full flex items-center justify-center text-xs text-[#8C857B]"
                             >
                                 No Cover
-                            </div>
-
-                            <div
-                                class="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center"
-                            >
-                                <div
-                                    class="w-12 h-12 bg-[#EBE7E0]/90 backdrop-blur-sm rounded-full flex items-center justify-center shadow-sm scale-90 group-hover:scale-100 transition-transform duration-300"
-                                >
-                                    <Play :size="20" class="ml-1 text-[#2C2420]" fill="#2C2420" />
-                                </div>
                             </div>
                         </div>
                     </div>
