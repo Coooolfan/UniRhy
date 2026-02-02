@@ -5,7 +5,6 @@ import com.coooolfan.unirhy.config.encodePassword
 import com.coooolfan.unirhy.error.CommonException
 import com.coooolfan.unirhy.error.SystemException
 import com.coooolfan.unirhy.model.Account
-import com.coooolfan.unirhy.model.AccountDraft
 import com.coooolfan.unirhy.model.dto.AccountCreate
 import com.coooolfan.unirhy.model.email
 import org.babyfish.jimmer.sql.ast.mutation.SaveMode
@@ -72,7 +71,7 @@ class AccountService(
         }.first()
         if (accountCount != 0L) throw SystemException.SystemAlreadyInitialized()
 
-        val entity = AccountDraft.`$`.produce(create) {
+        val entity = Account(create) {
             password = passwordEncoder.encodePassword(create.password)
         }
         return sql.saveCommand(entity, SaveMode.INSERT_ONLY).execute(fetcher).modifiedEntity

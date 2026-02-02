@@ -3,6 +3,7 @@ import { onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { Play, Heart, MoreHorizontal, Share2, Pause } from 'lucide-vue-next'
 import { api } from '@/ApiInstance'
+import DashboardTopBar from '@/components/dashboard/DashboardTopBar.vue'
 
 const route = useRoute()
 const isPlaying = ref(false)

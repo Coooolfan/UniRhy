@@ -1,9 +1,18 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useRouter } from 'vue-router'
 
+const router = useRouter()
 const activeTab = ref('发现')
 const navItems = ['发现', '阅览室', '收藏', '最近播放']
 const playlists = ['雨天巴赫', '咖啡馆噪音', '深夜阅读']
+
+const handleNavClick = (item: string) => {
+    activeTab.value = item
+    if (item === '发现') {
+        router.push({ name: 'dashboard-home' })
+    }
+}
 </script>
 
 <template>
@@ -22,7 +31,7 @@ const playlists = ['雨天巴赫', '咖啡馆噪音', '深夜阅读']
                         ? 'text-[#C27E46] font-medium'
                         : 'text-[#8A857D] hover:text-[#5E5950]'
                 "
-                @click="activeTab = item"
+                @click="handleNavClick(item)"
             >
                 {{ item }}
             </div>
