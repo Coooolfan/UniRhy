@@ -1,6 +1,6 @@
 import type {Executor} from '../';
 import type {SystemConfigDto} from '../model/dto/';
-import type {SystemConfigCreate, SystemConfigUpdate} from '../model/static/';
+import type {SystemConfigCreate, SystemConfigUpdate, SystemStatus} from '../model/static/';
 
 /**
  * 系统设置管理接口
@@ -61,6 +61,13 @@ export class SystemConfigController {
         return (await this.executor({uri: _uri, method: 'GET'})) as Promise<SystemConfigDto['SystemConfigController/DEFAULT_SYSTEM_CONFIG_FETCHER']>;
     }
     
+    readonly isInitialized: () => Promise<
+        SystemStatus
+    > = async() => {
+        let _uri = '/api/system/config/status';
+        return (await this.executor({uri: _uri, method: 'GET'})) as Promise<SystemStatus>;
+    }
+    
     /**
      * 更新系统配置
      * 
@@ -97,6 +104,7 @@ export class SystemConfigController {
 }
 
 export type SystemConfigControllerOptions = {
+    'isInitialized': {}, 
     'get': {}, 
     'create': {
         /**

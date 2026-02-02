@@ -10,6 +10,16 @@ export class AlbumController {
     
     constructor(private executor: Executor) {}
     
+    /**
+     * 获取专辑详情
+     * 
+     * 根据专辑 ID 获取完整专辑信息（包含曲目、资源、艺人和封面等）
+     * 
+     * @parameter {AlbumControllerOptions['getAlbum']} options
+     * - id 专辑 ID
+     * @return Album 返回专辑详情（使用 DETAIL_ALBUM_FETCHER）
+     * 
+     */
     readonly getAlbum: (options: AlbumControllerOptions['getAlbum']) => Promise<
         AlbumDto['AlbumController/DETAIL_ALBUM_FETCHER']
     > = async(options) => {
@@ -38,6 +48,9 @@ export class AlbumController {
 export type AlbumControllerOptions = {
     'listAlbums': {}, 
     'getAlbum': {
+        /**
+         * 专辑 ID
+         */
         readonly id: number
     }
 }

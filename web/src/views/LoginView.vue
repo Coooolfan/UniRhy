@@ -29,7 +29,14 @@
                         注册
                     </h1>
 
+                    <div
+                        v-if="isInitialized"
+                        class="flex-1 flex items-center justify-center text-base text-[#8a817c]"
+                    >
+                        回溯不可用
+                    </div>
                     <form
+                        v-else
                         @submit.prevent="handleRegister"
                         class="flex-1 flex flex-col justify-center space-y-6"
                     >
@@ -109,7 +116,7 @@
                             @click.stop="switchToLogin"
                             class="text-sm text-[#8a817c] hover:text-[#d98c28] underline decoration-dotted underline-offset-4"
                         >
-                            已有账号？返回登录
+                            请联系管理员移除所有管理员账号以允许回溯
                         </button>
                     </div>
                 </div>
@@ -226,12 +233,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from 'vue'
+import { onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { api, normalizeApiError } from '@/ApiInstance'
 
 const router = useRouter()
 const isLoginMode = ref(true)
+const isInitialized = ref(false)
 
 const loginForm = reactive({
     username: '',
@@ -271,8 +279,13 @@ const handleLogin = async () => {
 }
 
 const handleRegister = async () => {
+    if (isInitialized.value) {
+        alert('请联系管理员移除所有管理员账号以允许注册管理员账号')
+        return
+    }
+
     try {
-        await api.accountController.create({
+        await api.accountController.createFirst({
             create: {
                 name: registerForm.username,
                 email: registerForm.email,
@@ -280,7 +293,7 @@ const handleRegister = async () => {
             },
         })
     } catch (error) {
-        const normalizedError = normalizeApiError(error, 'accountController', 'create')
+        const normalizedError = normalizeApiError(error, 'accountController', 'createFirst')
         alert(normalizedError.message || '注册失败')
         return
     }
@@ -288,6 +301,15 @@ const handleRegister = async () => {
     alert('注册成功，请登录')
     switchToLogin()
 }
+
+onMounted(async () => {
+    try {
+        const status = await api.systemConfigController.isInitialized()
+        isInitialized.value = status.initialized
+    } catch (error) {
+        console.error('Failed to check system initialization status:', error)
+    }
+})
 </script>
 
 <style scoped>

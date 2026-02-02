@@ -7,3 +7,4 @@ export type {FileProviderOssUpdate} from './FileProviderOssUpdate';
 export type {ScanTaskRequest} from './ScanTaskRequest';
 export type {SystemConfigCreate} from './SystemConfigCreate';
 export type {SystemConfigUpdate} from './SystemConfigUpdate';
+export type {SystemStatus} from './SystemStatus';

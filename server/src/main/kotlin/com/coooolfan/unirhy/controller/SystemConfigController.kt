@@ -5,27 +5,39 @@ import com.coooolfan.unirhy.model.SystemConfig
 import com.coooolfan.unirhy.model.by
 import com.coooolfan.unirhy.model.dto.SystemConfigCreate
 import com.coooolfan.unirhy.model.dto.SystemConfigUpdate
+import com.coooolfan.unirhy.model.dto.SystemStatus
 import com.coooolfan.unirhy.service.SystemConfigService
 import org.babyfish.jimmer.client.FetchBy
 import org.babyfish.jimmer.sql.fetcher.Fetcher
 import org.babyfish.jimmer.sql.kt.fetcher.newFetcher
 import org.springframework.http.HttpStatus
-import org.springframework.web.bind.annotation.GetMapping
-import org.springframework.web.bind.annotation.PostMapping
-import org.springframework.web.bind.annotation.PutMapping
-import org.springframework.web.bind.annotation.RequestMapping
-import org.springframework.web.bind.annotation.ResponseStatus
-import org.springframework.web.bind.annotation.RestController
+import org.springframework.web.bind.annotation.*
 
 /**
  * 系统设置管理接口
  *
  * 提供系统配置的增删改查能力
  */
-@SaCheckLogin
 @RestController
 @RequestMapping("/api/system/config")
 class SystemConfigController(private val service: SystemConfigService) {
+
+    /**
+     * 获取系统初始化状态
+     *
+     * 此接口用于获取系统是否已完成初始化
+     * 无需登录认证即可访问
+     *
+     * @return SystemStatus 返回系统初始化状态
+     *
+     * @api GET /api/system/config/status
+     * @permission 不需要登录认证
+     * @description 调用SystemConfigService.initialized()方法获取系统初始化状态
+     */
+    @GetMapping("/status")
+    fun isInitialized(): SystemStatus {
+        return SystemStatus(service.initialized())
+    }
 
     /**
      * 获取系统配置
@@ -39,6 +51,7 @@ class SystemConfigController(private val service: SystemConfigService) {
      * @permission 需要登录认证
      * @description 调用SystemConfigService.get()方法获取系统配置
      */
+    @SaCheckLogin
     @GetMapping
     fun get(): @FetchBy("DEFAULT_SYSTEM_CONFIG_FETCHER") SystemConfig {
         return service.get(DEFAULT_SYSTEM_CONFIG_FETCHER)
@@ -57,6 +70,7 @@ class SystemConfigController(private val service: SystemConfigService) {
      * @permission 需要登录认证
      * @description 调用SystemConfigService.create()方法创建系统配置
      */
+    @SaCheckLogin
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     fun create(create: SystemConfigCreate): @FetchBy("DEFAULT_SYSTEM_CONFIG_FETCHER") SystemConfig {
@@ -76,6 +90,7 @@ class SystemConfigController(private val service: SystemConfigService) {
      * @permission 需要登录认证
      * @description 调用SystemConfigService.update()方法更新系统配置
      */
+    @SaCheckLogin
     @PutMapping
     fun update(update: SystemConfigUpdate): @FetchBy("DEFAULT_SYSTEM_CONFIG_FETCHER") SystemConfig {
         return service.update(update, DEFAULT_SYSTEM_CONFIG_FETCHER)
