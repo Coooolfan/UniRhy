@@ -1,5 +1,33 @@
 <script setup lang="ts">
+import { ref, watch } from 'vue'
 import { Search } from 'lucide-vue-next'
+
+type Props = {
+    modelValue?: string
+    placeholder?: string
+}
+
+const props = defineProps<Props>()
+const emit = defineEmits<{
+    (event: 'update:modelValue', value: string): void
+}>()
+
+const inputValue = ref(props.modelValue ?? '')
+
+watch(
+    () => props.modelValue,
+    (value) => {
+        if (value !== undefined) {
+            inputValue.value = value
+        }
+    },
+)
+
+const handleInput = (event: Event) => {
+    const value = (event.target as HTMLInputElement).value
+    inputValue.value = value
+    emit('update:modelValue', value)
+}
 </script>
 
 <template>
@@ -10,8 +38,10 @@ import { Search } from 'lucide-vue-next'
             <Search :size="18" />
             <input
                 type="text"
-                placeholder="搜索艺术家、作品..."
+                :value="inputValue"
+                :placeholder="placeholder ?? '搜索艺术家、作品...'"
                 class="bg-transparent border-none outline-none ml-2 text-sm placeholder-[#8C857B] w-full focus:ring-0"
+                @input="handleInput"
             />
         </div>
         <div class="h-8 w-8 rounded-full bg-[#DCD6CC] overflow-hidden cursor-pointer">

@@ -77,6 +77,7 @@ onMounted(async () => {
                     {{ album.title }}
                 </h4>
                 <p class="text-xs text-[#9C968B] mt-1">{{ album.artist }}</p>
+                <p class="text-[10px] text-[#B0AAA0] mt-0.5 font-mono">--:--</p>
             </div>
         </div>
     </div>

@@ -1,16 +1,33 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
+
+type NavItem = {
+    label: string
+    routeName?: string
+    matchNames?: string[]
+}
 
 const router = useRouter()
-const activeTab = ref('发现')
-const navItems = ['发现', '阅览室', '收藏', '最近播放']
+const route = useRoute()
+const navItems: NavItem[] = [
+    { label: '发现', routeName: 'dashboard-home' },
+    { label: '阅览室', routeName: 'album-list', matchNames: ['album-detail'] },
+    { label: '收藏' },
+    { label: '最近播放' },
+]
 const playlists = ['雨天巴赫', '咖啡馆噪音', '深夜阅读']
 
-const handleNavClick = (item: string) => {
-    activeTab.value = item
-    if (item === '发现') {
-        router.push({ name: 'dashboard-home' })
+const isActive = (item: NavItem) => {
+    if (!item.routeName) {
+        return false
+    }
+    const currentName = route.name?.toString()
+    return currentName === item.routeName || item.matchNames?.includes(currentName || '')
+}
+
+const handleNavClick = (item: NavItem) => {
+    if (item.routeName) {
+        router.push({ name: item.routeName })
     }
 }
 </script>
@@ -24,16 +41,16 @@ const handleNavClick = (item: string) => {
         <nav class="space-y-6 flex-1">
             <div
                 v-for="item in navItems"
-                :key="item"
+                :key="item.label"
                 class="text-sm cursor-pointer transition-colors duration-300"
                 :class="
-                    activeTab === item
+                    isActive(item)
                         ? 'text-[#C27E46] font-medium'
                         : 'text-[#8A857D] hover:text-[#5E5950]'
                 "
                 @click="handleNavClick(item)"
             >
-                {{ item }}
+                {{ item.label }}
             </div>
         </nav>
 
