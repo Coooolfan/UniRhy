@@ -162,7 +162,7 @@ onMounted(() => {
 
             <div
                 v-else-if="viewMode === 'grid'"
-                class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-x-8 gap-y-12"
+                class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-x-12 gap-y-16"
             >
                 <div
                     v-for="album in filteredAlbums"
@@ -174,10 +174,10 @@ onMounted(() => {
                         class="relative aspect-square mb-5 transition-transform duration-500 ease-out perspective-1000"
                     >
                         <div
-                            class="absolute top-1/2 left-1/2 w-[95%] h-[95%] -translate-x-1/2 -translate-y-1/2"
+                            class="absolute top-1/2 left-1/2 w-[90%] h-[90%] -translate-x-1/2 -translate-y-1/2"
                         >
                             <div
-                                class="w-full h-full bg-linear-to-tr from-gray-200 to-gray-100 border border-gray-300 rounded-full shadow-xl transition-all duration-700 ease-out opacity-0 group-hover:opacity-100 transform-gpu group-hover:translate-x-2 group-hover:-translate-y-4 group-hover:rotate-3 flex items-center justify-center relative"
+                                class="w-full h-full bg-linear-to-tr from-gray-200 to-gray-100 border border-gray-300 rounded-full shadow-xl transition-all duration-700 ease-out opacity-0 group-hover:opacity-100 transform-gpu group-hover:translate-x-7 group-hover:-translate-y-8 group-hover:rotate-3 flex items-center justify-center relative"
                             >
                                 <div
                                     class="w-1/3 h-1/3 border border-gray-300 rounded-full opacity-50"
@@ -189,7 +189,7 @@ onMounted(() => {
                         </div>
 
                         <div
-                            class="relative z-10 w-full h-full shadow-lg transition-all duration-500 ease-out bg-[#D6D1C7] transform-gpu origin-center group-hover:-rotate-2 group-hover:-translate-x-3 group-hover:-translate-y-1.5"
+                            class="relative z-10 w-full h-full shadow-lg transition-all duration-500 ease-out bg-[#D6D1C7] transform-gpu origin-center group-hover:scale-105 group-hover:-rotate-2 group-hover:-translate-x-3 group-hover:-translate-y-1.5"
                         >
                             <img
                                 v-if="album.cover"
