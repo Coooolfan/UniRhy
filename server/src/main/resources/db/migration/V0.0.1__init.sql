@@ -126,6 +126,11 @@ CREATE TABLE public.account
     CONSTRAINT account_unique_email UNIQUE (email)
 );
 
+-- 仅允许存在一个 admin = TRUE 的账户
+CREATE UNIQUE INDEX account_unique_admin_true
+    ON public.account (admin)
+    WHERE admin = TRUE;
+
 -- ==========================================================
 -- 5. 资源关联模块
 -- ==========================================================

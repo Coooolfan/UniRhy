@@ -1,26 +1,51 @@
 package com.coooolfan.unirhy.service
 
+import com.coooolfan.unirhy.config.encodePassword
+import com.coooolfan.unirhy.error.SystemException
 import com.coooolfan.unirhy.model.Account
 import com.coooolfan.unirhy.model.SystemConfig
 import com.coooolfan.unirhy.model.admin
-import com.coooolfan.unirhy.model.dto.SystemConfigCreate
 import com.coooolfan.unirhy.model.dto.SystemConfigUpdate
+import com.coooolfan.unirhy.model.dto.SystemInitReq
 import org.babyfish.jimmer.sql.ast.mutation.SaveMode
 import org.babyfish.jimmer.sql.fetcher.Fetcher
 import org.babyfish.jimmer.sql.kt.KSqlClient
 import org.babyfish.jimmer.sql.kt.ast.expression.eq
+import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
 
 @Service
-class SystemConfigService(private val sql: KSqlClient) {
+class SystemConfigService(
+    private val sql: KSqlClient,
+    private val passwordEncoder: PasswordEncoder,
+) {
 
     fun get(fetcher: Fetcher<SystemConfig>): SystemConfig {
         return sql.findOneById(fetcher, SYSTEM_CONFIG_ID)
     }
 
-    fun create(create: SystemConfigCreate, fetcher: Fetcher<SystemConfig>): SystemConfig {
-        val entity = create.toEntity { id = SYSTEM_CONFIG_ID }
-        return sql.saveCommand(entity, SaveMode.INSERT_ONLY).execute(fetcher).modifiedEntity
+    @Transactional(rollbackFor = [Exception::class])
+    fun create(create: SystemInitReq) {
+
+        val adminAccount = create.adminAccount.toEntity {
+            admin = true
+            password = passwordEncoder.encodePassword(create.adminAccount.password)
+        }
+        val storageProvider = create.storageProvider.toEntity { id = SYSTEM_CONFIG_ID }
+
+        try {
+            sql.saveCommand(adminAccount, SaveMode.INSERT_ONLY).execute()
+            sql.saveCommand(storageProvider, SaveMode.INSERT_ONLY).execute()
+            sql.saveCommand(SystemConfig {
+                id = SYSTEM_CONFIG_ID
+                ossProvider = null
+                fsProvider = storageProvider
+            }, SaveMode.INSERT_ONLY).execute()
+        } catch (e: Exception) {
+            throw SystemException.SystemAlreadyInitialized()
+        }
+
     }
 
     fun update(update: SystemConfigUpdate, fetcher: Fetcher<SystemConfig>): SystemConfig {

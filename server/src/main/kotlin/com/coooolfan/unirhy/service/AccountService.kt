@@ -64,16 +64,4 @@ class AccountService(
     fun delete(id: Long) {
         sql.deleteById(Account::class, id)
     }
-
-    fun initFirstAccount(create: Account, fetcher: Fetcher<Account>): Account {
-        val accountCount = sql.executeQuery(Account::class) {
-            selectCount()
-        }.first()
-        if (accountCount != 0L) throw SystemException.SystemAlreadyInitialized()
-
-        val entity = Account(create) {
-            password = passwordEncoder.encodePassword(create.password)
-        }
-        return sql.saveCommand(entity, SaveMode.INSERT_ONLY).execute(fetcher).modifiedEntity
-    }
 }

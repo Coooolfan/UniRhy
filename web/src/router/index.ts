@@ -32,6 +32,11 @@ const router = createRouter({
                     name: 'album-detail',
                     component: () => import('../views/AlbumDetailView.vue'),
                 },
+                {
+                    path: 'settings',
+                    name: 'settings',
+                    component: () => import('../views/SettingsView.vue'),
+                },
             ],
         },
     ],

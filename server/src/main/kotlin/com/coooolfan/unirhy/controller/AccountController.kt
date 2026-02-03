@@ -2,7 +2,6 @@ package com.coooolfan.unirhy.controller
 
 import cn.dev33.satoken.annotation.SaCheckLogin
 import com.coooolfan.unirhy.error.CommonException
-import com.coooolfan.unirhy.error.SystemException
 import com.coooolfan.unirhy.model.Account
 import com.coooolfan.unirhy.model.by
 import com.coooolfan.unirhy.model.dto.AccountCreate
@@ -11,15 +10,7 @@ import com.coooolfan.unirhy.service.AccountService
 import org.babyfish.jimmer.client.FetchBy
 import org.babyfish.jimmer.sql.kt.fetcher.newFetcher
 import org.springframework.http.HttpStatus
-import org.springframework.web.bind.annotation.DeleteMapping
-import org.springframework.web.bind.annotation.GetMapping
-import org.springframework.web.bind.annotation.PathVariable
-import org.springframework.web.bind.annotation.PostMapping
-import org.springframework.web.bind.annotation.PutMapping
-import org.springframework.web.bind.annotation.RequestMapping
-import org.springframework.web.bind.annotation.ResponseStatus
-import org.springframework.web.bind.annotation.RestController
-import kotlin.jvm.Throws
+import org.springframework.web.bind.annotation.*
 
 /**
  * 账户管理接口
@@ -105,26 +96,6 @@ class AccountController(private val service: AccountService) {
     @Throws(CommonException.Forbidden::class)
     fun create(create: AccountCreate): @FetchBy("DEFAULT_ACCOUNT_FETCHER") Account {
         return service.create(create, DEFAULT_ACCOUNT_FETCHER)
-    }
-
-    /**
-     * 初始化首个管理员账户
-     *
-     * 此接口用于系统首次初始化时创建管理员账户
-     * 无需登录认证即可访问
-     *
-     * @param create 创建参数
-     * @return Account 返回创建后的账户（默认 fetcher）
-     *
-     * @api POST /api/account/first
-     * @permission 无需登录认证
-     * @description 调用AccountService.initFirstAccount()方法初始化管理员账户
-     */
-    @PostMapping("/first")
-    @ResponseStatus(HttpStatus.CREATED)
-    @Throws(SystemException.SystemAlreadyInitialized::class)
-    fun createFirst(create: AccountCreate): @FetchBy("DEFAULT_ACCOUNT_FETCHER") Account {
-        return service.initFirstAccount(create.toEntity { this.admin = true }, DEFAULT_ACCOUNT_FETCHER)
     }
 
     /**

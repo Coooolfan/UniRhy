@@ -1,10 +1,11 @@
 package com.coooolfan.unirhy.controller
 
 import cn.dev33.satoken.annotation.SaCheckLogin
+import com.coooolfan.unirhy.error.SystemException
 import com.coooolfan.unirhy.model.SystemConfig
 import com.coooolfan.unirhy.model.by
-import com.coooolfan.unirhy.model.dto.SystemConfigCreate
 import com.coooolfan.unirhy.model.dto.SystemConfigUpdate
+import com.coooolfan.unirhy.model.dto.SystemInitReq
 import com.coooolfan.unirhy.model.dto.SystemStatus
 import com.coooolfan.unirhy.service.SystemConfigService
 import org.babyfish.jimmer.client.FetchBy
@@ -58,23 +59,20 @@ class SystemConfigController(private val service: SystemConfigService) {
     }
 
     /**
-     * 创建系统配置
+     * 初始化系统
      *
-     * 此接口用于创建系统配置（单例）
-     * 需要用户登录认证才能访问
+     * 此接口用于初始化系统
      *
      * @param create 创建参数
-     * @return SystemConfig 返回创建后的系统配置（默认 fetcher）
      *
      * @api POST /api/system/config
-     * @permission 需要登录认证
      * @description 调用SystemConfigService.create()方法创建系统配置
      */
-    @SaCheckLogin
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    fun create(create: SystemConfigCreate): @FetchBy("DEFAULT_SYSTEM_CONFIG_FETCHER") SystemConfig {
-        return service.create(create, DEFAULT_SYSTEM_CONFIG_FETCHER)
+    @Throws(SystemException.SystemAlreadyInitialized::class)
+    fun create(@RequestBody create: SystemInitReq) {
+        service.create(create)
     }
 
     /**

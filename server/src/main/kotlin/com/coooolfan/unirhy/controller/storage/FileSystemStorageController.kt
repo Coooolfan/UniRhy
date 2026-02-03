@@ -10,14 +10,7 @@ import org.babyfish.jimmer.client.FetchBy
 import org.babyfish.jimmer.sql.fetcher.Fetcher
 import org.babyfish.jimmer.sql.kt.fetcher.newFetcher
 import org.springframework.http.HttpStatus
-import org.springframework.web.bind.annotation.DeleteMapping
-import org.springframework.web.bind.annotation.GetMapping
-import org.springframework.web.bind.annotation.PathVariable
-import org.springframework.web.bind.annotation.PostMapping
-import org.springframework.web.bind.annotation.PutMapping
-import org.springframework.web.bind.annotation.RequestMapping
-import org.springframework.web.bind.annotation.ResponseStatus
-import org.springframework.web.bind.annotation.RestController
+import org.springframework.web.bind.annotation.*
 
 /**
  * 文件系统存储管理接口
@@ -79,7 +72,7 @@ class FileSystemStorageController(private val service: FileSystemStorageService)
      */
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    fun create(create: FileProviderFileSystemCreate): @FetchBy("DEFAULT_FILE_SYSTEM_FETCHER") FileProviderFileSystem {
+    fun create(@RequestBody create: FileProviderFileSystemCreate): @FetchBy("DEFAULT_FILE_SYSTEM_FETCHER") FileProviderFileSystem {
         return service.create(create, DEFAULT_FILE_SYSTEM_FETCHER)
     }
 
