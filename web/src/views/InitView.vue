@@ -21,7 +21,7 @@
 
             <!-- Top Active Layer (The Content) -->
             <div
-                class="relative z-10 bg-[#FCFAF7] shadow-2xl rounded-sm border-[1px] border-white/40 flex flex-col md:flex-row min-h-[540px] overflow-hidden"
+                class="relative z-10 bg-[#FCFAF7] shadow-2xl rounded-sm border border-white/40 flex flex-col md:flex-row min-h-[540px] overflow-hidden"
             >
                 <form @submit.prevent="handleInit" class="contents">
                     <!-- ================= LEFT COLUMN: Account System ================= -->
@@ -29,7 +29,7 @@
                         class="flex-1 p-10 md:p-14 md:border-r border-[#EFEBE5] flex flex-col relative bg-[#FCFAF7]"
                     >
                         <div
-                            class="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-[#D4A373] to-transparent opacity-50"
+                            class="absolute top-0 left-0 w-full h-[3px] bg-linear-to-r from-[#D4A373] to-transparent opacity-50"
                         ></div>
 
                         <div class="mb-8 md:mb-12">
@@ -57,7 +57,7 @@
                                 >
                                     <User
                                         :size="18"
-                                        class="text-[#BBBBBB] group-focus-within:text-[#D4A373] transition-colors mr-3 flex-shrink-0"
+                                        class="text-[#BBBBBB] group-focus-within:text-[#D4A373] transition-colors mr-3 shrink-0"
                                     />
                                     <input
                                         type="text"
@@ -79,7 +79,7 @@
                                 >
                                     <Mail
                                         :size="18"
-                                        class="text-[#BBBBBB] group-focus-within:text-[#D4A373] transition-colors mr-3 flex-shrink-0"
+                                        class="text-[#BBBBBB] group-focus-within:text-[#D4A373] transition-colors mr-3 shrink-0"
                                     />
                                     <input
                                         type="email"
@@ -101,7 +101,7 @@
                                 >
                                     <Key
                                         :size="18"
-                                        class="text-[#BBBBBB] group-focus-within:text-[#D4A373] transition-colors mr-3 flex-shrink-0"
+                                        class="text-[#BBBBBB] group-focus-within:text-[#D4A373] transition-colors mr-3 shrink-0"
                                     />
                                     <input
                                         type="password"
