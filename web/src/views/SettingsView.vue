@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
-import { Check, Database, Edit2, FolderOpen, Plus, Save, Trash2, X } from 'lucide-vue-next'
+import { Database, Edit2, FolderOpen, Plus, Save, Trash2, HardDrive } from 'lucide-vue-next'
 import { api, normalizeApiError } from '@/ApiInstance'
 import DashboardTopBar from '@/components/dashboard/DashboardTopBar.vue'
 
@@ -25,6 +25,7 @@ const configExists = ref(true)
 
 const isEditing = ref<number | null>(null)
 const isCreating = ref(false)
+const isDeleting = ref<number | null>(null)
 const isSaving = ref(false)
 const isLoadingSystem = ref(false)
 const isLoadingStorage = ref(false)
@@ -91,15 +92,25 @@ const loadData = async () => {
     await Promise.all([fetchSystemConfig(), fetchStorageNodes()])
 }
 
-const handleDelete = async (id: number) => {
-    if (isSaving.value) {
+const startDelete = (id: number) => {
+    if (isSaving.value) return
+    isDeleting.value = id
+}
+
+const cancelDelete = () => {
+    isDeleting.value = null
+}
+
+const confirmDelete = async () => {
+    if (isDeleting.value === null || isSaving.value) {
         return
     }
     isSaving.value = true
     storageError.value = ''
     try {
-        await api.fileSystemStorageController.delete({ id })
+        await api.fileSystemStorageController.delete({ id: isDeleting.value })
         await Promise.all([fetchStorageNodes(), fetchSystemConfig()])
+        isDeleting.value = null
     } catch (error) {
         const normalized = normalizeApiError(error)
         storageError.value = normalized.message ?? '删除失败'
@@ -194,26 +205,6 @@ const saveCreate = async () => {
     }
 }
 
-const setActiveFsProvider = async (id: number) => {
-    if (isSaving.value) {
-        return
-    }
-    isSaving.value = true
-    systemError.value = ''
-    try {
-        const payload = { fsProviderId: id }
-        const config = await api.systemConfigController.update({ update: payload })
-        systemConfig.value.fsProviderId = config.fsProviderId ?? null
-        systemConfig.value.ossProviderId = config.ossProviderId ?? null
-        configExists.value = true
-    } catch (error) {
-        const normalized = normalizeApiError(error)
-        systemError.value = normalized.message ?? '系统配置更新失败'
-    } finally {
-        isSaving.value = false
-    }
-}
-
 onMounted(() => {
     loadData()
 })
@@ -301,75 +292,159 @@ onMounted(() => {
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <!-- Create New Card Form -->
-                    <Transition
-                        enter-active-class="transition duration-200 ease-out"
-                        enter-from-class="opacity-0 -translate-y-2"
-                        enter-to-class="opacity-100 translate-y-0"
-                        leave-active-class="transition duration-150 ease-in"
-                        leave-from-class="opacity-100 translate-y-0"
-                        leave-to-class="opacity-0 -translate-y-2"
-                    >
-                        <div
-                            v-if="isCreating"
-                            class="bg-[#fffcf5] p-6 rounded-sm shadow-[0_4px_20px_rgba(0,0,0,0.05)] border border-[#C67C4E] relative"
+                    <!-- Create New Card Modal -->
+                    <Teleport to="body">
+                        <Transition
+                            enter-active-class="transition duration-200 ease-out"
+                            enter-from-class="opacity-0"
+                            enter-to-class="opacity-100"
+                            leave-active-class="transition duration-150 ease-in"
+                            leave-from-class="opacity-100"
+                            leave-to-class="opacity-0"
                         >
                             <div
-                                class="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-[#C67C4E] text-white px-3 py-1 text-xs tracking-widest uppercase"
+                                v-if="isCreating"
+                                class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#2B221B]/60"
+                                @click.self="cancelEdit"
                             >
-                                New Storage
+                                <div
+                                    class="bg-[#fffcf5] p-8 w-full max-w-md shadow-[0_8px_30px_rgba(0,0,0,0.12)] border border-[#EAE6DE] relative transform transition-all"
+                                >
+                                    <!-- Decorative elements -->
+                                    <div
+                                        class="absolute top-0 right-0 w-16 h-16 bg-linear-to-bl from-[#EAE6DE]/30 to-transparent pointer-events-none"
+                                    ></div>
+
+                                    <div class="mb-8 text-center">
+                                        <div
+                                            class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-[#FAF9F6] mb-4 border border-[#EAE6DE]"
+                                        >
+                                            <Database :size="24" class="text-[#C67C4E]" />
+                                        </div>
+                                        <h3 class="font-serif text-2xl text-[#2B221B]">
+                                            新增存储节点
+                                        </h3>
+                                        <p class="text-xs text-[#8A8A8A] mt-2 font-serif italic">
+                                            Add New Storage Node
+                                        </p>
+                                    </div>
+
+                                    <div class="space-y-6">
+                                        <div>
+                                            <label
+                                                class="text-xs uppercase tracking-wider text-[#8A8A8A] font-serif block mb-2"
+                                                >Name</label
+                                            >
+                                            <input
+                                                v-model="editForm.name"
+                                                type="text"
+                                                placeholder="e.g. Local Backup"
+                                                class="w-full bg-[#F7F5F0] border-b border-[#D6D1C4] p-3 text-[#3D3D3D] focus:outline-none focus:border-[#C67C4E] transition-colors font-serif placeholder:text-[#BDB9AE]"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label
+                                                class="text-xs uppercase tracking-wider text-[#8A8A8A] font-serif block mb-2"
+                                                >Root Path</label
+                                            >
+                                            <input
+                                                v-model="editForm.parentPath"
+                                                type="text"
+                                                placeholder="/path/to/dir"
+                                                class="w-full bg-[#F7F5F0] border-b border-[#D6D1C4] p-3 text-[#3D3D3D] focus:outline-none focus:border-[#C67C4E] transition-colors font-serif placeholder:text-[#BDB9AE]"
+                                            />
+                                        </div>
+                                        <label class="flex items-center gap-3 cursor-pointer group">
+                                            <div class="relative flex items-center">
+                                                <input
+                                                    v-model="editForm.readonly"
+                                                    type="checkbox"
+                                                    class="peer sr-only"
+                                                />
+                                                <div
+                                                    class="w-9 h-5 bg-[#EAE6DE] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#C67C4E]"
+                                                ></div>
+                                            </div>
+                                            <span
+                                                class="text-sm text-[#5A5A5A] group-hover:text-[#2B221B] transition-colors"
+                                                >只读模式 (Read-Only)</span
+                                            >
+                                        </label>
+
+                                        <div class="flex gap-3 mt-8 pt-6 border-t border-[#EAE6DE]">
+                                            <button
+                                                class="flex-1 px-4 py-2.5 border border-[#D6D1C4] text-[#8A8A8A] hover:bg-[#F7F5F0] hover:text-[#5A5A5A] transition-colors text-sm uppercase tracking-wide"
+                                                @click="cancelEdit"
+                                            >
+                                                取消
+                                            </button>
+                                            <button
+                                                class="flex-1 px-4 py-2.5 bg-[#2B221B] text-[#F7F5F0] hover:bg-[#C67C4E] transition-colors text-sm uppercase tracking-wide shadow-md disabled:opacity-60 disabled:cursor-not-allowed"
+                                                :disabled="isSaving"
+                                                @click="saveCreate"
+                                            >
+                                                <span v-if="isSaving">Creating...</span>
+                                                <span v-else>创建节点</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
-                            <div class="space-y-4 mt-2">
-                                <div>
-                                    <label
-                                        class="text-xs uppercase tracking-wider text-[#8A8A8A] font-serif"
-                                        >Name</label
-                                    >
-                                    <input
-                                        v-model="editForm.name"
-                                        type="text"
-                                        placeholder="e.g. Local Backup"
-                                        class="bg-[#F2F0E9] border-b border-[#D6D1C4] p-2 text-[#3D3D3D] focus:outline-none focus:border-[#C67C4E] transition-colors font-serif placeholder:text-[#BDB9AE] w-full"
-                                    />
-                                </div>
-                                <div>
-                                    <label
-                                        class="text-xs uppercase tracking-wider text-[#8A8A8A] font-serif"
-                                        >Root Path</label
-                                    >
-                                    <input
-                                        v-model="editForm.parentPath"
-                                        type="text"
-                                        placeholder="/path/to/dir"
-                                        class="bg-[#F2F0E9] border-b border-[#D6D1C4] p-2 text-[#3D3D3D] focus:outline-none focus:border-[#C67C4E] transition-colors font-serif placeholder:text-[#BDB9AE] w-full"
-                                    />
-                                </div>
-                                <label class="flex items-center gap-2 cursor-pointer mt-2">
-                                    <input
-                                        v-model="editForm.readonly"
-                                        type="checkbox"
-                                        class="accent-[#C67C4E] w-4 h-4"
-                                    />
-                                    <span class="text-sm text-[#5A5A5A]">只读模式 (Read-Only)</span>
-                                </label>
-                                <div class="flex gap-2 mt-6 justify-end">
-                                    <button
-                                        class="p-2 hover:bg-[#EAE6D9] rounded-full text-[#8A8A8A]"
-                                        @click="cancelEdit"
-                                    >
-                                        <X :size="18" />
-                                    </button>
-                                    <button
-                                        class="px-6 py-2 bg-[#C67C4E] text-white text-sm hover:shadow-md transition-shadow disabled:opacity-60"
-                                        :disabled="isSaving"
-                                        @click="saveCreate"
-                                    >
-                                        创建
-                                    </button>
+                        </Transition>
+                    </Teleport>
+
+                    <!-- Delete Confirmation Modal -->
+                    <Teleport to="body">
+                        <Transition
+                            enter-active-class="transition duration-200 ease-out"
+                            enter-from-class="opacity-0"
+                            enter-to-class="opacity-100"
+                            leave-active-class="transition duration-150 ease-in"
+                            leave-from-class="opacity-100"
+                            leave-to-class="opacity-0"
+                        >
+                            <div
+                                v-if="isDeleting !== null"
+                                class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#2B221B]/60"
+                                @click.self="cancelDelete"
+                            >
+                                <div
+                                    class="bg-[#fffcf5] p-8 w-full max-w-sm shadow-[0_8px_30px_rgba(0,0,0,0.12)] border border-[#EAE6DE] relative transform transition-all text-center"
+                                >
+                                    <div class="mb-6">
+                                        <div
+                                            class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-[#FAF9F6] mb-4 border border-[#EAE6DE] text-[#B95D5D]"
+                                        >
+                                            <Trash2 :size="24" />
+                                        </div>
+                                        <h3 class="font-serif text-xl text-[#2B221B] mb-2">
+                                            确认删除?
+                                        </h3>
+                                        <p class="text-sm text-[#8A8A8A] font-serif">
+                                            此操作无法撤销。
+                                        </p>
+                                    </div>
+
+                                    <div class="flex gap-3 pt-2">
+                                        <button
+                                            class="flex-1 px-4 py-2.5 border border-[#D6D1C4] text-[#8A8A8A] hover:bg-[#F7F5F0] hover:text-[#5A5A5A] transition-colors text-sm uppercase tracking-wide"
+                                            @click="cancelDelete"
+                                        >
+                                            取消
+                                        </button>
+                                        <button
+                                            class="flex-1 px-4 py-2.5 bg-[#B95D5D] text-[#F7F5F0] hover:bg-[#9E4C4C] transition-colors text-sm uppercase tracking-wide shadow-md disabled:opacity-60"
+                                            :disabled="isSaving"
+                                            @click="confirmDelete"
+                                        >
+                                            <span v-if="isSaving">Deleting...</span>
+                                            <span v-else>删除</span>
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    </Transition>
+                        </Transition>
+                    </Teleport>
 
                     <!-- Existing Nodes List -->
                     <div
@@ -435,12 +510,9 @@ onMounted(() => {
 
                         <div v-else class="flex h-full">
                             <div
-                                class="w-24 bg-[#EAE6D9] flex items-center justify-center text-4xl border-r border-[#D6D1C4]/30 relative overflow-hidden"
+                                class="w-24 bg-[#EAE6D9] flex items-center justify-center text-[#8A8A8A] border-r border-[#D6D1C4]/30 relative overflow-hidden group-hover:text-[#C67C4E] transition-colors duration-300"
                             >
-                                <span class="z-10 relative">💾</span>
-                                <div
-                                    class="absolute inset-0 bg-[#3D3D3D] opacity-0 group-hover:opacity-5 transition-opacity duration-500"
-                                ></div>
+                                <HardDrive :size="32" stroke-width="1.5" />
                             </div>
 
                             <div class="flex-1 p-6 flex flex-col">
@@ -457,7 +529,9 @@ onMounted(() => {
                                             ID: {{ node.id }}
                                         </div>
                                     </div>
-                                    <div class="flex flex-col gap-1 items-end">
+                                    <div
+                                        class="flex flex-col gap-1 items-end group-hover:opacity-0 transition-opacity duration-300"
+                                    >
                                         <span
                                             v-if="node.readonly"
                                             class="px-2 py-0.5 border border-[#D6D1C4] text-[10px] text-[#8A8A8A] uppercase"
@@ -487,16 +561,8 @@ onMounted(() => {
                                 class="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity"
                             >
                                 <button
-                                    title="设为默认"
-                                    class="p-2 bg-white shadow-sm hover:text-[#C67C4E] rounded-full transition-colors disabled:opacity-50"
-                                    :disabled="isSaving"
-                                    @click="setActiveFsProvider(node.id)"
-                                >
-                                    <Check :size="14" />
-                                </button>
-                                <button
                                     title="编辑"
-                                    class="p-2 bg-white shadow-sm hover:text-[#C67C4E] rounded-full transition-colors disabled:opacity-50"
+                                    class="p-2 hover:text-[#C67C4E] transition-colors disabled:opacity-50"
                                     :disabled="isSaving"
                                     @click="startEdit(node)"
                                 >
@@ -504,9 +570,9 @@ onMounted(() => {
                                 </button>
                                 <button
                                     title="删除"
-                                    class="p-2 bg-white shadow-sm hover:text-red-500 rounded-full transition-colors disabled:opacity-50"
+                                    class="p-2 hover:text-red-500 transition-colors disabled:opacity-50"
                                     :disabled="isSaving"
-                                    @click="handleDelete(node.id)"
+                                    @click="startDelete(node.id)"
                                 >
                                     <Trash2 :size="14" />
                                 </button>

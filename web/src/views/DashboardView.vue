@@ -2,7 +2,7 @@
 import { RouterView } from 'vue-router'
 import NoiseTexture from '@/components/NoiseTexture.vue'
 import DashboardSidebar from '@/components/dashboard/DashboardSidebar.vue'
-import DashboardPlayerBar from '@/components/dashboard/DashboardPlayerBar.vue'
+// import DashboardPlayerBar from '@/components/dashboard/DashboardPlayerBar.vue'
 </script>
 
 <template>
