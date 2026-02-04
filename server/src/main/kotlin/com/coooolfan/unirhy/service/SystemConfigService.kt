@@ -57,6 +57,12 @@ class SystemConfigService(
     }
 
     fun update(update: SystemConfigUpdate, fetcher: Fetcher<SystemConfig>): SystemConfig {
+        if(update.fsProviderId == null)
+            throw SystemException.SystemStorageProviderCannotBeRemote()
+
+        if(sql.findOneById(FileProviderFileSystem::class,update.fsProviderId).readonly)
+            throw SystemException.SystemStorageProviderCannotBeReadonly()
+
         val entity = update.toEntity { id = SYSTEM_CONFIG_ID }
         return sql.saveCommand(entity, SaveMode.UPDATE_ONLY).execute(fetcher).modifiedEntity
     }
@@ -69,6 +75,6 @@ class SystemConfigService(
     }
 
     companion object {
-        private const val SYSTEM_CONFIG_ID = 0L
+        const val SYSTEM_CONFIG_ID = 0L
     }
 }
