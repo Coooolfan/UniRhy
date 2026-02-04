@@ -63,7 +63,7 @@ const handleUpdateReadonly = (value: boolean) => {
         </div>
         <div v-else-if="isLoading" class="text-sm text-[#8A8A8A] mb-4">加载中...</div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
             <!-- 新建节点弹窗 -->
             <StorageNodeFormModal
                 :open="isCreating"
