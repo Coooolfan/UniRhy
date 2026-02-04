@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { api } from '@/ApiInstance'
 
 const router = createRouter({
     history: createWebHistory(import.meta.env.BASE_URL),
@@ -6,6 +7,11 @@ const router = createRouter({
         {
             path: '/',
             redirect: '/login',
+        },
+        {
+            path: '/init',
+            name: 'init',
+            component: () => import('../views/InitView.vue'),
         },
         {
             path: '/login',
@@ -40,6 +46,29 @@ const router = createRouter({
             ],
         },
     ],
+})
+
+router.beforeEach(async (to, from, next) => {
+    try {
+        const status = await api.systemConfigController.isInitialized()
+        if (!status.initialized) {
+            if (to.path !== '/init') {
+                next('/init')
+                return
+            }
+        } else {
+            if (to.path === '/init') {
+                next('/login')
+                return
+            }
+        }
+        next()
+    } catch (error) {
+        console.error('Failed to check initialization status', error)
+        // If check fails, maybe let them proceed or show error page?
+        // For now let's proceed to avoid infinite loops if API is down
+        next()
+    }
 })
 
 export default router

@@ -29,14 +29,7 @@
                         注册
                     </h1>
 
-                    <div
-                        v-if="isInitialized"
-                        class="flex-1 flex items-center justify-center text-base text-[#8a817c]"
-                    >
-                        回溯不可用
-                    </div>
                     <form
-                        v-else
                         @submit.prevent="handleRegister"
                         class="flex-1 flex flex-col justify-center space-y-6"
                     >
@@ -116,7 +109,7 @@
                             @click.stop="switchToLogin"
                             class="text-sm text-[#8a817c] hover:text-[#d98c28] underline decoration-dotted underline-offset-4"
                         >
-                            请联系管理员移除所有管理员账号以允许回溯
+                            已有账号？去登录
                         </button>
                     </div>
                 </div>
@@ -127,7 +120,7 @@
                     class="h-full flex items-center justify-center opacity-40 group-hover:opacity-60 transition-opacity"
                 >
                     <h2 class="text-3xl font-bold tracking-widest writing-vertical-rl select-none">
-                        注册
+                        登录
                     </h2>
                 </div>
             </div>
@@ -224,7 +217,7 @@
 
                 <div v-else class="h-full flex items-center justify-center opacity-40">
                     <h2 class="text-3xl font-bold tracking-widest writing-vertical-rl select-none">
-                        登录
+                        注册
                     </h2>
                 </div>
             </div>
@@ -233,13 +226,12 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { api, normalizeApiError } from '@/ApiInstance'
 
 const router = useRouter()
 const isLoginMode = ref(true)
-const isInitialized = ref(false)
 
 const loginForm = reactive({
     username: '',
@@ -279,13 +271,8 @@ const handleLogin = async () => {
 }
 
 const handleRegister = async () => {
-    if (isInitialized.value) {
-        alert('请联系管理员移除所有管理员账号以允许注册管理员账号')
-        return
-    }
-
     try {
-        await api.accountController.createFirst({
+        await api.accountController.create({
             create: {
                 name: registerForm.username,
                 email: registerForm.email,
@@ -293,7 +280,7 @@ const handleRegister = async () => {
             },
         })
     } catch (error) {
-        const normalizedError = normalizeApiError(error, 'accountController', 'createFirst')
+        const normalizedError = normalizeApiError(error, 'accountController', 'create')
         alert(normalizedError.message || '注册失败')
         return
     }
@@ -301,15 +288,6 @@ const handleRegister = async () => {
     alert('注册成功，请登录')
     switchToLogin()
 }
-
-onMounted(async () => {
-    try {
-        const status = await api.systemConfigController.isInitialized()
-        isInitialized.value = status.initialized
-    } catch (error) {
-        console.error('Failed to check system initialization status:', error)
-    }
-})
 </script>
 
 <style scoped>

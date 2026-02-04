@@ -26,24 +26,7 @@ export class FileSystemStorageController {
         FileProviderFileSystemDto['FileSystemStorageController/DEFAULT_FILE_SYSTEM_FETCHER']
     > = async(options) => {
         let _uri = '/api/storage/fs';
-        let _separator = _uri.indexOf('?') === -1 ? '?' : '&';
-        let _value: any = undefined;
-        _value = options.create.name;
-        _uri += _separator
-        _uri += 'name='
-        _uri += encodeURIComponent(_value);
-        _separator = '&';
-        _value = options.create.parentPath;
-        _uri += _separator
-        _uri += 'parentPath='
-        _uri += encodeURIComponent(_value);
-        _separator = '&';
-        _value = options.create.readonly;
-        _uri += _separator
-        _uri += 'readonly='
-        _uri += encodeURIComponent(_value);
-        _separator = '&';
-        return (await this.executor({uri: _uri, method: 'POST'})) as Promise<FileProviderFileSystemDto['FileSystemStorageController/DEFAULT_FILE_SYSTEM_FETCHER']>;
+        return (await this.executor({uri: _uri, method: 'POST', body: options.body})) as Promise<FileProviderFileSystemDto['FileSystemStorageController/DEFAULT_FILE_SYSTEM_FETCHER']>;
     }
     
     /**
@@ -153,7 +136,7 @@ export type FileSystemStorageControllerOptions = {
         /**
          * 创建参数
          */
-        readonly create: FileProviderFileSystemCreate
+        readonly body: FileProviderFileSystemCreate
     }, 
     'update': {
         /**

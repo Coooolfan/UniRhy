@@ -176,7 +176,7 @@ const saveCreate = async () => {
     storageError.value = ''
     try {
         await api.fileSystemStorageController.create({
-            create: {
+            body: {
                 name,
                 parentPath,
                 readonly: editForm.readonly,
@@ -201,9 +201,7 @@ const setActiveFsProvider = async (id: number) => {
     systemError.value = ''
     try {
         const payload = { fsProviderId: id }
-        const config = configExists.value
-            ? await api.systemConfigController.update({ update: payload })
-            : await api.systemConfigController.create({ create: payload })
+        const config = await api.systemConfigController.update({ update: payload })
         systemConfig.value.fsProviderId = config.fsProviderId ?? null
         systemConfig.value.ossProviderId = config.ossProviderId ?? null
         configExists.value = true
@@ -274,16 +272,6 @@ onMounted(() => {
                         <div v-if="systemError" class="text-sm text-[#B95D5D] mt-4">
                             {{ systemError }}
                         </div>
-                    </div>
-
-                    <div class="p-2">
-                        <p class="text-[#8A8A8A] text-sm leading-relaxed font-serif">
-                            UniRhy 采用模块化存储设计。当前系统优先使用 ID 为
-                            <span class="font-mono text-[#C68C53]">{{
-                                systemConfig.fsProviderId ?? 'None'
-                            }}</span>
-                            的配置作为默认存储后端。
-                        </p>
                     </div>
                 </div>
             </section>

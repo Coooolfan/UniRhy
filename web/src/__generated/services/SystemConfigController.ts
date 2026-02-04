@@ -1,6 +1,6 @@
 import type {Executor} from '../';
 import type {SystemConfigDto} from '../model/dto/';
-import type {SystemConfigCreate, SystemConfigUpdate, SystemStatus} from '../model/static/';
+import type {SystemConfigUpdate, SystemInitReq, SystemStatus} from '../model/static/';
 
 /**
  * 系统设置管理接口
@@ -12,37 +12,19 @@ export class SystemConfigController {
     constructor(private executor: Executor) {}
     
     /**
-     * 创建系统配置
+     * 初始化系统
      * 
-     * 此接口用于创建系统配置（单例）
-     * 需要用户登录认证才能访问
+     * 此接口用于初始化系统
      * 
      * @parameter {SystemConfigControllerOptions['create']} options
      * - create 创建参数
-     * @return SystemConfig 返回创建后的系统配置（默认 fetcher）
      * 
      */
     readonly create: (options: SystemConfigControllerOptions['create']) => Promise<
-        SystemConfigDto['SystemConfigController/DEFAULT_SYSTEM_CONFIG_FETCHER']
+        void
     > = async(options) => {
         let _uri = '/api/system/config';
-        let _separator = _uri.indexOf('?') === -1 ? '?' : '&';
-        let _value: any = undefined;
-        _value = options.create.ossProviderId;
-        if (_value !== undefined && _value !== null) {
-            _uri += _separator
-            _uri += 'ossProviderId='
-            _uri += encodeURIComponent(_value);
-            _separator = '&';
-        }
-        _value = options.create.fsProviderId;
-        if (_value !== undefined && _value !== null) {
-            _uri += _separator
-            _uri += 'fsProviderId='
-            _uri += encodeURIComponent(_value);
-            _separator = '&';
-        }
-        return (await this.executor({uri: _uri, method: 'POST'})) as Promise<SystemConfigDto['SystemConfigController/DEFAULT_SYSTEM_CONFIG_FETCHER']>;
+        return (await this.executor({uri: _uri, method: 'POST', body: options.body})) as Promise<void>;
     }
     
     /**
@@ -61,6 +43,15 @@ export class SystemConfigController {
         return (await this.executor({uri: _uri, method: 'GET'})) as Promise<SystemConfigDto['SystemConfigController/DEFAULT_SYSTEM_CONFIG_FETCHER']>;
     }
     
+    /**
+     * 获取系统初始化状态
+     * 
+     * 此接口用于获取系统是否已完成初始化
+     * 无需登录认证即可访问
+     * 
+     * @return SystemStatus 返回系统初始化状态
+     * 
+     */
     readonly isInitialized: () => Promise<
         SystemStatus
     > = async() => {
@@ -109,8 +100,9 @@ export type SystemConfigControllerOptions = {
     'create': {
         /**
          * 创建参数
+         * 
          */
-        readonly create: SystemConfigCreate
+        readonly body: SystemInitReq
     }, 
     'update': {
         /**

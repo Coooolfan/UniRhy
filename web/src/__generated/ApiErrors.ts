@@ -24,11 +24,6 @@ export type ApiErrors = {
                 family: 'COMMON', 
                 code: 'FORBIDDEN', 
                 readonly [key:string]: any
-            }), 
-        'createFirst': AllErrors & ({
-                family: 'SYSTEM', 
-                code: 'SYSTEM_ALREADY_INITIALIZED', 
-                readonly [key:string]: any
             })
     }, 
     'albumController': {
@@ -36,6 +31,11 @@ export type ApiErrors = {
     'mediaFileController': {
     }, 
     'systemConfigController': {
+        'create': AllErrors & ({
+                family: 'SYSTEM', 
+                code: 'SYSTEM_ALREADY_INITIALIZED', 
+                readonly [key:string]: any
+            })
     }, 
     'taskController': {
     }, 

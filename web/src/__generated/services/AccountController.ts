@@ -47,41 +47,6 @@ export class AccountController {
     }
     
     /**
-     * 初始化首个管理员账户
-     * 
-     * 此接口用于系统首次初始化时创建管理员账户
-     * 无需登录认证即可访问
-     * 
-     * @parameter {AccountControllerOptions['createFirst']} options
-     * - create 创建参数
-     * @return Account 返回创建后的账户（默认 fetcher）
-     * 
-     */
-    readonly createFirst: (options: AccountControllerOptions['createFirst']) => Promise<
-        AccountDto['AccountController/DEFAULT_ACCOUNT_FETCHER']
-    > = async(options) => {
-        let _uri = '/api/account/first';
-        let _separator = _uri.indexOf('?') === -1 ? '?' : '&';
-        let _value: any = undefined;
-        _value = options.create.name;
-        _uri += _separator
-        _uri += 'name='
-        _uri += encodeURIComponent(_value);
-        _separator = '&';
-        _value = options.create.password;
-        _uri += _separator
-        _uri += 'password='
-        _uri += encodeURIComponent(_value);
-        _separator = '&';
-        _value = options.create.email;
-        _uri += _separator
-        _uri += 'email='
-        _uri += encodeURIComponent(_value);
-        _separator = '&';
-        return (await this.executor({uri: _uri, method: 'POST'})) as Promise<AccountDto['AccountController/DEFAULT_ACCOUNT_FETCHER']>;
-    }
-    
-    /**
      * 删除指定账户
      * 
      * 此接口用于删除指定ID的账户
@@ -186,12 +151,6 @@ export type AccountControllerOptions = {
         readonly id: number
     }, 
     'create': {
-        /**
-         * 创建参数
-         */
-        readonly create: AccountCreate
-    }, 
-    'createFirst': {
         /**
          * 创建参数
          */

@@ -7,6 +7,7 @@ import com.coooolfan.unirhy.model.SystemConfig
 import com.coooolfan.unirhy.model.admin
 import com.coooolfan.unirhy.model.dto.SystemConfigUpdate
 import com.coooolfan.unirhy.model.dto.SystemInitReq
+import com.coooolfan.unirhy.model.storage.FileProviderFileSystem
 import org.babyfish.jimmer.sql.ast.mutation.SaveMode
 import org.babyfish.jimmer.sql.fetcher.Fetcher
 import org.babyfish.jimmer.sql.kt.KSqlClient
@@ -28,11 +29,18 @@ class SystemConfigService(
     @Transactional(rollbackFor = [Exception::class])
     fun create(create: SystemInitReq) {
 
-        val adminAccount = create.adminAccount.toEntity {
+        val adminAccount = Account {
+            name = create.adminAccountName
+            email = create.adminAccountEmail
             admin = true
-            password = passwordEncoder.encodePassword(create.adminAccount.password)
+            password = passwordEncoder.encodePassword(create.adminPassword)
         }
-        val storageProvider = create.storageProvider.toEntity { id = SYSTEM_CONFIG_ID }
+        val storageProvider = FileProviderFileSystem {
+            id = SYSTEM_CONFIG_ID
+            name = "Default"
+            parentPath = create.storageProviderPath
+            readonly = false
+        }
 
         try {
             sql.saveCommand(adminAccount, SaveMode.INSERT_ONLY).execute()
