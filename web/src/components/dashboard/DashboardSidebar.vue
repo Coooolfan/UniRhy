@@ -34,7 +34,7 @@ const handleNavClick = (item: NavItem) => {
 </script>
 
 <template>
-    <aside class="w-64 flex flex-col pt-12 pl-10 pr-6 z-10 md:flex">
+    <aside class="w-64 flex flex-col pt-12 pl-10 pr-6 z-10 md:flex bg-[#EBE7E0]">
         <div class="mb-12">
             <h1 class="text-3xl font-serif tracking-tight text-[#2C2C2C]">UniRhy.</h1>
         </div>

@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
-import { Check, Database, Edit2, HardDrive, Plus, Trash2 } from 'lucide-vue-next'
+import { Check, Database, Edit2, FolderOpen, Plus, Save, Trash2, X } from 'lucide-vue-next'
 import { api, normalizeApiError } from '@/ApiInstance'
+import DashboardTopBar from '@/components/dashboard/DashboardTopBar.vue'
 
 type StorageNode = {
     id: number
@@ -31,7 +32,7 @@ const isLoadingStorage = ref(false)
 const systemError = ref('')
 const storageError = ref('')
 
-const editForm = reactive({ name: '', parentPath: '', readonly: false })
+const editForm = reactive({ name: '', parentPath: '', readonly: true })
 
 const activeFsLabel = computed(() => {
     const activeId = systemConfig.value.fsProviderId
@@ -45,7 +46,7 @@ const activeFsLabel = computed(() => {
 const resetForm = () => {
     editForm.name = ''
     editForm.parentPath = ''
-    editForm.readonly = false
+    editForm.readonly = true
 }
 
 const fetchSystemConfig = async () => {
@@ -219,9 +220,11 @@ onMounted(() => {
 </script>
 <template>
     <div
-        class="min-h-screen bg-[#f2efe9] text-[#4A3B32] font-sans selection:bg-[#C68C53] selection:text-white pb-32"
+        class="min-h-screen bg-[#f2efe9] text-[#3D3D3D] font-sans selection:bg-[#C67C4E] selection:text-white pb-32"
     >
-        <div class="max-w-4xl mx-auto px-12 pt-12">
+        <DashboardTopBar />
+
+        <div class="max-w-5xl mx-auto px-8 pt-6">
             <!-- Header -->
             <header class="mb-12">
                 <h1 class="font-serif text-3xl text-[#2B221B] tracking-tight mb-2">系统设置</h1>
@@ -277,16 +280,16 @@ onMounted(() => {
             </section>
 
             <!-- Storage Nodes Section -->
-            <section class="animate-in fade-in duration-500">
-                <div class="flex justify-between items-end mb-6 border-b border-[#E0Dcd0] pb-2">
-                    <h2 class="text-2xl font-serif text-[#4A3B32] tracking-wide">存储节点</h2>
+            <section class="animate-in fade-in duration-500 font-serif">
+                <div class="flex items-center justify-between mb-6">
+                    <h2 class="text-3xl italic text-[#2A2A2A]">存储节点</h2>
                     <button
-                        class="group flex items-center gap-2 px-6 py-2 border border-[#C68C53] text-[#C68C53] hover:bg-[#C68C53] hover:text-white transition-all duration-300 text-sm tracking-widest outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                        class="group flex items-center gap-2 px-6 py-2 bg-[#C67C4E] text-[#F7F5F0] hover:bg-[#A6633C] transition-all duration-300 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
                         :disabled="isCreating || isSaving"
                         @click="startCreate"
                     >
                         <Plus :size="16" />
-                        <span>新增存储</span>
+                        <span>新增节点</span>
                     </button>
                 </div>
 
@@ -297,8 +300,8 @@ onMounted(() => {
                     加载中...
                 </div>
 
-                <div class="space-y-6">
-                    <!-- Create Form -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Create New Card Form -->
                     <Transition
                         enter-active-class="transition duration-200 ease-out"
                         enter-from-class="opacity-0 -translate-y-2"
@@ -309,208 +312,203 @@ onMounted(() => {
                     >
                         <div
                             v-if="isCreating"
-                            class="bg-[#FAF9F6] p-6 shadow-[0_2px_15px_-5px_rgba(0,0,0,0.05)] border border-[#EAE6DE] relative"
+                            class="bg-[#fffcf5] p-6 rounded-sm shadow-[0_4px_20px_rgba(0,0,0,0.05)] border border-[#C67C4E] relative"
                         >
-                            <div class="space-y-4">
-                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div class="group relative">
-                                        <label
-                                            class="text-xs text-[#C68C53] mb-1 block uppercase tracking-wider"
-                                            >Name</label
-                                        >
-                                        <input
-                                            v-model="editForm.name"
-                                            type="text"
-                                            placeholder="e.g. Local Backup"
-                                            class="w-full bg-transparent border-b border-[#D6D0C5] py-2 text-[#4A3B32] placeholder-[#B0AAA0] focus:outline-none focus:border-[#C68C53] transition-colors duration-300"
-                                        />
-                                    </div>
-                                    <div class="group relative">
-                                        <label
-                                            class="text-xs text-[#C68C53] mb-1 block uppercase tracking-wider"
-                                            >Physical Path</label
-                                        >
-                                        <input
-                                            v-model="editForm.parentPath"
-                                            type="text"
-                                            placeholder="/path/to/dir"
-                                            class="w-full bg-transparent border-b border-[#D6D0C5] py-2 text-[#4A3B32] placeholder-[#B0AAA0] focus:outline-none focus:border-[#C68C53] transition-colors duration-300"
-                                        />
-                                    </div>
-                                </div>
-                                <div class="flex items-center justify-between pt-4">
-                                    <label
-                                        class="flex items-center space-x-2 text-[#6B5D52] cursor-pointer hover:text-[#4A3B32] transition-colors"
-                                    >
-                                        <div
-                                            class="w-4 h-4 border transition-colors flex items-center justify-center"
-                                            :class="
-                                                editForm.readonly
-                                                    ? 'bg-[#C68C53] border-[#C68C53]'
-                                                    : 'border-[#C68C53]'
-                                            "
-                                        >
-                                            <input
-                                                v-model="editForm.readonly"
-                                                type="checkbox"
-                                                class="hidden"
-                                            />
-                                            <Check
-                                                v-if="editForm.readonly"
-                                                :size="12"
-                                                class="text-white"
-                                            />
-                                        </div>
-                                        <span class="text-sm">只读模式 (Read-Only)</span>
-                                    </label>
-                                    <div class="flex gap-4">
-                                        <button
-                                            class="text-[#8A8A8A] hover:text-[#5E4B35] text-sm tracking-widest px-4 py-2"
-                                            @click="cancelEdit"
-                                        >
-                                            取消
-                                        </button>
-                                        <button
-                                            class="bg-[#C68C53] text-white px-6 py-2 text-sm tracking-widest hover:bg-[#A0643B] transition-colors shadow-sm disabled:opacity-60"
-                                            :disabled="isSaving"
-                                            @click="saveCreate"
-                                        >
-                                            完成
-                                        </button>
-                                    </div>
-                                </div>
+                            <div
+                                class="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-[#C67C4E] text-white px-3 py-1 text-xs tracking-widest uppercase"
+                            >
+                                New Storage
                             </div>
-                        </div>
-                    </Transition>
-
-                    <!-- Node List -->
-                    <div
-                        v-for="node in storageNodes"
-                        :key="node.id"
-                        class="bg-[#FAF9F6] p-6 shadow-[0_2px_15px_-5px_rgba(0,0,0,0.05)] border border-[#EAE6DE] relative group hover:shadow-lg transition-all duration-500"
-                    >
-                        <div v-if="isEditing === node.id" class="space-y-4">
-                            <!-- Edit Mode -->
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div class="space-y-4 mt-2">
                                 <div>
                                     <label
-                                        class="text-xs text-[#C68C53] mb-1 block uppercase tracking-wider"
+                                        class="text-xs uppercase tracking-wider text-[#8A8A8A] font-serif"
                                         >Name</label
                                     >
                                     <input
                                         v-model="editForm.name"
                                         type="text"
-                                        class="w-full bg-transparent border-b border-[#D6D0C5] py-2 text-[#4A3B32] placeholder-[#B0AAA0] focus:outline-none focus:border-[#C68C53] transition-colors duration-300"
+                                        placeholder="e.g. Local Backup"
+                                        class="bg-[#F2F0E9] border-b border-[#D6D1C4] p-2 text-[#3D3D3D] focus:outline-none focus:border-[#C67C4E] transition-colors font-serif placeholder:text-[#BDB9AE] w-full"
                                     />
                                 </div>
                                 <div>
                                     <label
-                                        class="text-xs text-[#C68C53] mb-1 block uppercase tracking-wider"
-                                        >Physical Path</label
+                                        class="text-xs uppercase tracking-wider text-[#8A8A8A] font-serif"
+                                        >Root Path</label
                                     >
                                     <input
                                         v-model="editForm.parentPath"
                                         type="text"
-                                        class="w-full bg-transparent border-b border-[#D6D0C5] py-2 text-[#4A3B32] placeholder-[#B0AAA0] focus:outline-none focus:border-[#C68C53] transition-colors duration-300"
+                                        placeholder="/path/to/dir"
+                                        class="bg-[#F2F0E9] border-b border-[#D6D1C4] p-2 text-[#3D3D3D] focus:outline-none focus:border-[#C67C4E] transition-colors font-serif placeholder:text-[#BDB9AE] w-full"
                                     />
                                 </div>
-                            </div>
-                            <div class="flex items-center justify-between pt-4">
-                                <label
-                                    class="flex items-center space-x-2 text-[#6B5D52] cursor-pointer hover:text-[#4A3B32] transition-colors"
-                                >
-                                    <div
-                                        class="w-4 h-4 border transition-colors flex items-center justify-center"
-                                        :class="
-                                            editForm.readonly
-                                                ? 'bg-[#C68C53] border-[#C68C53]'
-                                                : 'border-[#C68C53]'
-                                        "
-                                    >
-                                        <input
-                                            v-model="editForm.readonly"
-                                            type="checkbox"
-                                            class="hidden"
-                                        />
-                                        <Check
-                                            v-if="editForm.readonly"
-                                            :size="12"
-                                            class="text-white"
-                                        />
-                                    </div>
-                                    <span class="text-sm">只读模式 (Read-Only)</span>
+                                <label class="flex items-center gap-2 cursor-pointer mt-2">
+                                    <input
+                                        v-model="editForm.readonly"
+                                        type="checkbox"
+                                        class="accent-[#C67C4E] w-4 h-4"
+                                    />
+                                    <span class="text-sm text-[#5A5A5A]">只读模式 (Read-Only)</span>
                                 </label>
-                                <div class="flex gap-4">
+                                <div class="flex gap-2 mt-6 justify-end">
                                     <button
-                                        class="text-[#8A8A8A] hover:text-[#5E4B35] text-sm tracking-widest px-4 py-2"
+                                        class="p-2 hover:bg-[#EAE6D9] rounded-full text-[#8A8A8A]"
+                                        @click="cancelEdit"
+                                    >
+                                        <X :size="18" />
+                                    </button>
+                                    <button
+                                        class="px-6 py-2 bg-[#C67C4E] text-white text-sm hover:shadow-md transition-shadow disabled:opacity-60"
+                                        :disabled="isSaving"
+                                        @click="saveCreate"
+                                    >
+                                        创建
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </Transition>
+
+                    <!-- Existing Nodes List -->
+                    <div
+                        v-for="node in storageNodes"
+                        :key="node.id"
+                        class="group relative bg-[#F7F5F0] p-0 rounded-sm hover:shadow-[0_8px_30px_rgba(0,0,0,0.04)] transition-all duration-300 border border-transparent hover:border-white"
+                    >
+                        <div
+                            v-if="isEditing === node.id"
+                            class="p-6 border border-[#C67C4E] bg-[#fffcf5]"
+                        >
+                            <div class="space-y-4">
+                                <div>
+                                    <label
+                                        class="text-xs uppercase tracking-wider text-[#8A8A8A] font-serif"
+                                        >Name</label
+                                    >
+                                    <input
+                                        v-model="editForm.name"
+                                        type="text"
+                                        class="bg-[#F2F0E9] border-b border-[#D6D1C4] p-2 text-[#3D3D3D] focus:outline-none focus:border-[#C67C4E] transition-colors font-serif w-full"
+                                    />
+                                </div>
+                                <div>
+                                    <label
+                                        class="text-xs uppercase tracking-wider text-[#8A8A8A] font-serif"
+                                        >Root Path</label
+                                    >
+                                    <input
+                                        v-model="editForm.parentPath"
+                                        type="text"
+                                        class="bg-[#F2F0E9] border-b border-[#D6D1C4] p-2 text-[#3D3D3D] focus:outline-none focus:border-[#C67C4E] transition-colors font-serif w-full"
+                                    />
+                                </div>
+                                <label class="flex items-center gap-2 cursor-pointer mt-2">
+                                    <input
+                                        v-model="editForm.readonly"
+                                        type="checkbox"
+                                        class="accent-[#C67C4E] w-4 h-4"
+                                    />
+                                    <span class="text-sm text-[#5A5A5A]">只读模式 (Read-Only)</span>
+                                </label>
+                                <div
+                                    class="flex gap-2 mt-4 justify-end border-t border-[#EAE6D9] pt-4"
+                                >
+                                    <button
+                                        class="text-xs uppercase tracking-wide px-3 py-1 hover:text-[#C67C4E]"
                                         @click="cancelEdit"
                                     >
                                         取消
                                     </button>
                                     <button
-                                        class="bg-[#C68C53] text-white px-6 py-2 text-sm tracking-widest hover:bg-[#A0643B] transition-colors shadow-sm disabled:opacity-60"
+                                        class="flex items-center gap-1 text-xs uppercase tracking-wide px-3 py-1 bg-[#3D3D3D] text-[#F7F5F0] hover:bg-[#C67C4E] transition-colors disabled:opacity-60"
                                         :disabled="isSaving"
                                         @click="saveEdit"
                                     >
-                                        完成
+                                        <Save :size="12" />
+                                        保存
                                     </button>
                                 </div>
                             </div>
                         </div>
 
-                        <div v-else class="flex justify-between items-center">
-                            <!-- View Mode -->
-                            <div class="flex items-start gap-6">
-                                <div class="p-4 bg-[#F2EFE9] rounded-full text-[#8A8A8A]">
-                                    <HardDrive :size="24" :stroke-width="1.5" />
-                                </div>
-                                <div>
-                                    <h3
-                                        class="text-lg font-serif text-[#4A3B32] flex items-center gap-3"
-                                    >
-                                        {{ node.name }}
+                        <div v-else class="flex h-full">
+                            <div
+                                class="w-24 bg-[#EAE6D9] flex items-center justify-center text-4xl border-r border-[#D6D1C4]/30 relative overflow-hidden"
+                            >
+                                <span class="z-10 relative">💾</span>
+                                <div
+                                    class="absolute inset-0 bg-[#3D3D3D] opacity-0 group-hover:opacity-5 transition-opacity duration-500"
+                                ></div>
+                            </div>
+
+                            <div class="flex-1 p-6 flex flex-col">
+                                <div class="flex justify-between items-start mb-2">
+                                    <div>
+                                        <h3
+                                            class="text-xl font-medium group-hover:text-[#C67C4E] transition-colors duration-300"
+                                        >
+                                            {{ node.name }}
+                                        </h3>
+                                        <div
+                                            class="text-[10px] text-[#8A8A8A] uppercase tracking-widest mt-1"
+                                        >
+                                            ID: {{ node.id }}
+                                        </div>
+                                    </div>
+                                    <div class="flex flex-col gap-1 items-end">
                                         <span
                                             v-if="node.readonly"
-                                            class="text-[10px] border border-[#8A8A8A] text-[#8A8A8A] px-1.5 py-0.5 rounded-sm tracking-wider"
-                                            >R-O</span
+                                            class="px-2 py-0.5 border border-[#D6D1C4] text-[10px] text-[#8A8A8A] uppercase"
                                         >
+                                            Read Only
+                                        </span>
                                         <span
                                             v-if="systemConfig.fsProviderId === node.id"
-                                            class="text-[10px] bg-[#C68C53] text-white px-1.5 py-0.5 rounded-sm tracking-wider"
-                                            >ACTIVE</span
+                                            class="px-2 py-0.5 bg-[#C67C4E] text-[10px] text-white uppercase"
                                         >
-                                    </h3>
-                                    <p class="text-[#9C948A] text-sm mt-1 font-mono">
+                                            Active
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div
+                                    class="flex items-center gap-2 text-[#7A756D] text-sm font-mono bg-[#EAE6D9]/50 p-2 rounded-sm mt-auto"
+                                >
+                                    <FolderOpen :size="14" class="text-[#C67C4E]" />
+                                    <span class="truncate" :title="node.parentPath">
                                         {{ node.parentPath }}
-                                    </p>
+                                    </span>
                                 </div>
                             </div>
 
                             <div
-                                class="flex gap-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                                class="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity"
                             >
                                 <button
-                                    title="Set as Active"
-                                    class="text-[#8A8A8A] hover:text-[#C68C53] transition-colors disabled:opacity-50"
+                                    title="设为默认"
+                                    class="p-2 bg-white shadow-sm hover:text-[#C67C4E] rounded-full transition-colors disabled:opacity-50"
                                     :disabled="isSaving"
                                     @click="setActiveFsProvider(node.id)"
                                 >
-                                    <Check :size="18" />
+                                    <Check :size="14" />
                                 </button>
                                 <button
-                                    title="Edit"
-                                    class="text-[#8A8A8A] hover:text-[#5E4B35] transition-colors"
+                                    title="编辑"
+                                    class="p-2 bg-white shadow-sm hover:text-[#C67C4E] rounded-full transition-colors disabled:opacity-50"
+                                    :disabled="isSaving"
                                     @click="startEdit(node)"
                                 >
-                                    <Edit2 :size="18" />
+                                    <Edit2 :size="14" />
                                 </button>
                                 <button
-                                    title="Delete"
-                                    class="text-[#8A8A8A] hover:text-[#B95D5D] transition-colors disabled:opacity-50"
+                                    title="删除"
+                                    class="p-2 bg-white shadow-sm hover:text-red-500 rounded-full transition-colors disabled:opacity-50"
                                     :disabled="isSaving"
                                     @click="handleDelete(node.id)"
                                 >
-                                    <Trash2 :size="18" />
+                                    <Trash2 :size="14" />
                                 </button>
                             </div>
                         </div>

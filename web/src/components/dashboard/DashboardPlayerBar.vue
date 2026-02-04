@@ -6,7 +6,7 @@ import { featuredAlbum } from './data'
 <template>
     <div class="absolute bottom-6 left-6 right-6 z-50">
         <div
-            class="bg-[#FCFBF9] h-20 rounded-sm shadow-[0_8px_30px_rgba(140,130,115,0.2)] border border-[#EBE7E0] flex items-center px-6 justify-between backdrop-blur-xl bg-opacity-95"
+            class="bg-[#f2efe9] h-20 rounded-sm shadow-[0_8px_30px_rgba(140,130,115,0.2)] border border-[#EBE7E0] flex items-center px-6 justify-between backdrop-blur-xl bg-opacity-95"
         >
             <!-- Now Playing Info -->
             <div class="flex items-center w-1/4">

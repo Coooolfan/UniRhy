@@ -32,7 +32,7 @@ const handleInput = (event: Event) => {
 
 <template>
     <header
-        class="sticky top-0 z-20 px-8 py-6 flex justify-between items-center bg-[#EBE7E0]/90 backdrop-blur-sm transition-all duration-300"
+        class="sticky top-0 z-20 px-8 py-6 flex justify-between items-center bg-[#f2efe9]/90 backdrop-blur-sm transition-all duration-300"
     >
         <div class="flex items-center text-[#8C857B] border-b border-[#DCD6CC] pb-1 w-64">
             <Search :size="18" />
