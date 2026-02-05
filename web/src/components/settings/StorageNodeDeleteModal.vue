@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import { Trash2 } from 'lucide-vue-next'
-
 type Props = {
     open: boolean
     isSaving: boolean
@@ -15,47 +13,86 @@ const emit = defineEmits<{
 
 <template>
     <Teleport to="body">
+        <!-- Backdrop: Fade only -->
         <Transition
-            enter-active-class="transition duration-200 ease-out"
+            enter-active-class="transition duration-500 ease-out"
             enter-from-class="opacity-0"
             enter-to-class="opacity-100"
-            leave-active-class="transition duration-150 ease-in"
+            leave-active-class="transition duration-300 ease-in"
             leave-from-class="opacity-100"
             leave-to-class="opacity-0"
         >
             <div
                 v-if="open"
-                class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#2B221B]/60"
-                @click.self="emit('cancel')"
-            >
-                <div
-                    class="bg-[#fffcf5] p-8 w-full max-w-sm shadow-[0_8px_30px_rgba(0,0,0,0.12)] border border-[#EAE6DE] relative transform transition-all text-center"
-                >
-                    <div class="mb-6">
-                        <div
-                            class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-[#FAF9F6] mb-4 border border-[#EAE6DE] text-[#B95D5D]"
-                        >
-                            <Trash2 :size="24" />
-                        </div>
-                        <h3 class="font-serif text-xl text-[#2B221B] mb-2">确认删除?</h3>
-                        <p class="text-sm text-[#8A8A8A] font-serif">此操作无法撤销。</p>
-                    </div>
+                class="fixed inset-0 z-50 bg-black/50"
+                @click="emit('cancel')"
+            ></div>
+        </Transition>
 
-                    <div class="flex gap-3 pt-2">
-                        <button
-                            class="flex-1 px-4 py-2.5 border border-[#D6D1C4] text-[#8A8A8A] hover:bg-[#F7F5F0] hover:text-[#5A5A5A] transition-colors text-sm uppercase tracking-wide"
-                            @click="emit('cancel')"
-                        >
-                            取消
-                        </button>
-                        <button
-                            class="flex-1 px-4 py-2.5 bg-[#B95D5D] text-[#F7F5F0] hover:bg-[#9E4C4C] transition-colors text-sm uppercase tracking-wide shadow-md disabled:opacity-60"
-                            :disabled="isSaving"
-                            @click="emit('confirm')"
-                        >
-                            <span v-if="isSaving">Deleting...</span>
-                            <span v-else>删除</span>
-                        </button>
+        <!-- Modal: Fade + Slide Up -->
+        <Transition
+            enter-active-class="transition duration-500 ease-out"
+            enter-from-class="opacity-0 translate-y-8"
+            enter-to-class="opacity-100 translate-y-0"
+            leave-active-class="transition duration-300 ease-in"
+            leave-from-class="opacity-100 translate-y-0"
+            leave-to-class="opacity-0 translate-y-8"
+        >
+            <div
+                v-if="open"
+                class="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none"
+            >
+                <!-- Card Container -->
+                <div class="relative w-full max-w-[480px] pointer-events-auto">
+                    <!-- Decorative Back Card (Stacked Paper Effect) -->
+                    <div class="absolute inset-0 bg-[#F0EEE6] shadow-md transform -rotate-2"></div>
+
+                    <!-- Main Card -->
+                    <div
+                        class="relative bg-[#FAF9F6] p-12 shadow-[0_20px_40px_-12px_rgba(43,34,27,0.15)]"
+                    >
+                        <!-- Title Section -->
+                        <div class="mb-10">
+                            <h3 class="font-serif text-3xl text-[#2B221B] tracking-wide mb-6">
+                                移除节点
+                            </h3>
+                            <!-- Decorative Line -->
+                            <div class="h-px w-full bg-[#2B221B]"></div>
+                        </div>
+
+                        <!-- Content -->
+                        <div class="mb-12">
+                            <div class="font-serif text-lg text-[#2B221B] mb-3">确认操作</div>
+                            <p class="font-serif text-[#5A5A5A] text-base leading-relaxed mb-6">
+                                确定要永久移除此存储节点配置吗？
+                            </p>
+
+                            <!-- Warning Note -->
+                            <p
+                                class="font-serif text-sm text-[#B95D5D] tracking-wide flex items-center gap-2"
+                            >
+                                * 此操作无法撤销
+                            </p>
+                        </div>
+
+                        <!-- Buttons -->
+                        <div class="flex items-center gap-4">
+                            <button
+                                class="flex-1 py-3 border border-[#8A8A8A] text-[#5A5A5A] hover:bg-[#EAE6DE] hover:text-[#2B221B] transition-all duration-300 font-serif text-sm tracking-[0.2em] uppercase active:scale-95"
+                                @click="emit('cancel')"
+                            >
+                                取消
+                            </button>
+
+                            <button
+                                class="flex-1 py-3 border border-[#B95D5D] text-[#B95D5D] hover:bg-[#B95D5D] hover:text-[#FAF9F6] transition-all duration-300 font-serif text-sm tracking-[0.2em] uppercase active:scale-95"
+                                :disabled="isSaving"
+                                @click="emit('confirm')"
+                            >
+                                <span v-if="isSaving">PROCESSING...</span>
+                                <span v-else>确认移除</span>
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
