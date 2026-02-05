@@ -1,9 +1,12 @@
 package com.coooolfan.unirhy.controller
 
 import cn.dev33.satoken.annotation.SaCheckLogin
+import com.coooolfan.unirhy.service.task.AsyncTaskManager
+import com.coooolfan.unirhy.service.task.RunningTaskView
 import com.coooolfan.unirhy.service.task.ScanTaskRequest
 import com.coooolfan.unirhy.service.task.ScanTaskService
 import org.springframework.http.HttpStatus
+import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
@@ -18,7 +21,10 @@ import org.springframework.web.bind.annotation.RestController
 @SaCheckLogin
 @RestController
 @RequestMapping("/api/task")
-class TaskController(private val scanTaskService: ScanTaskService) {
+class TaskController(
+    private val scanTaskService: ScanTaskService,
+    private val asyncTaskManager: AsyncTaskManager,
+) {
 
     /**
      * 触发扫描任务
@@ -30,11 +36,22 @@ class TaskController(private val scanTaskService: ScanTaskService) {
      *
      * @api POST /api/task/scan
      * @permission 需要登录认证
-     * @description 调用ScanTaskService.execute()方法执行扫描任务
+     * @description 调用ScanTaskService.submit()方法执行扫描任务
      */
     @PostMapping("/scan")
     @ResponseStatus(HttpStatus.ACCEPTED)
     fun executeScanTask(@RequestBody request: ScanTaskRequest) {
-        scanTaskService.execute(request)
+        scanTaskService.submit(request)
+    }
+
+    /**
+     * 获取运行中的任务
+     *
+     * @api GET /api/task/running
+     * @permission 需要登录认证
+     */
+    @GetMapping("/running")
+    fun listRunningTasks(): List<RunningTaskView> {
+        return asyncTaskManager.listRunning()
     }
 }

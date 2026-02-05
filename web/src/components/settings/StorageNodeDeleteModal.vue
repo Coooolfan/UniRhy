@@ -22,11 +22,7 @@ const emit = defineEmits<{
             leave-from-class="opacity-100"
             leave-to-class="opacity-0"
         >
-            <div
-                v-if="open"
-                class="fixed inset-0 z-50 bg-black/50"
-                @click="emit('cancel')"
-            ></div>
+            <div v-if="open" class="fixed inset-0 z-50 bg-black/50" @click="emit('cancel')"></div>
         </Transition>
 
         <!-- Modal: Fade + Slide Up -->

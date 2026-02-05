@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import DashboardTopBar from '@/components/dashboard/DashboardTopBar.vue'
 import DashboardHero from '@/components/dashboard/DashboardHero.vue'
-import DashboardCategories from '@/components/dashboard/DashboardCategories.vue'
 import DashboardAlbumGrid from '@/components/dashboard/DashboardAlbumGrid.vue'
 </script>
 
@@ -10,7 +9,6 @@ import DashboardAlbumGrid from '@/components/dashboard/DashboardAlbumGrid.vue'
         <DashboardTopBar />
         <div class="px-8 mt-2">
             <DashboardHero />
-            <DashboardCategories />
             <DashboardAlbumGrid />
         </div>
     </div>

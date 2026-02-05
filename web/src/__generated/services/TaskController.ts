@@ -1,5 +1,5 @@
 import type {Executor} from '../';
-import type {ScanTaskRequest} from '../model/static/';
+import type {RunningTaskView, ScanTaskRequest} from '../model/static/';
 
 /**
  * 任务管理接口
@@ -26,6 +26,17 @@ export class TaskController {
         let _uri = '/api/task/scan';
         return (await this.executor({uri: _uri, method: 'POST', body: options.body})) as Promise<void>;
     }
+    
+    /**
+     * 获取运行中的任务
+     * 
+     */
+    readonly listRunningTasks: () => Promise<
+        ReadonlyArray<RunningTaskView>
+    > = async() => {
+        let _uri = '/api/task/running';
+        return (await this.executor({uri: _uri, method: 'GET'})) as Promise<ReadonlyArray<RunningTaskView>>;
+    }
 }
 
 export type TaskControllerOptions = {
@@ -35,5 +46,6 @@ export type TaskControllerOptions = {
          * 
          */
         readonly body: ScanTaskRequest
-    }
+    }, 
+    'listRunningTasks': {}
 }

@@ -17,11 +17,20 @@ import java.io.File
 import java.nio.file.Files
 
 @Service
-class ScanTaskService(private val sql: KSqlClient) {
+class ScanTaskService(
+    private val sql: KSqlClient,
+    private val asyncTaskManager: AsyncTaskManager,
+) {
 
     private val logger = LoggerFactory.getLogger(ScanTaskService::class.java)
 
-    fun execute(request: ScanTaskRequest) {
+    fun submit(request: ScanTaskRequest) {
+        asyncTaskManager.submit(TaskType.SCAN) {
+            executeInternal(request)
+        }
+    }
+
+    private fun executeInternal(request: ScanTaskRequest) {
         if (request.providerType != FileProviderType.FILE_SYSTEM) {
             error("Unsupported provider type: ${request.providerType}")
         }

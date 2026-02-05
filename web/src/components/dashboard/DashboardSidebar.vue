@@ -12,8 +12,7 @@ const route = useRoute()
 const navItems: NavItem[] = [
     { label: '发现', routeName: 'dashboard-home' },
     { label: '阅览室', routeName: 'album-list', matchNames: ['album-detail'] },
-    { label: '收藏' },
-    { label: '最近播放' },
+    { label: '任务管理', routeName: 'tasks' },
     { label: '系统设置', routeName: 'settings' },
 ]
 const playlists = ['雨天巴赫', '咖啡馆噪音', '深夜阅读']
