@@ -1,8 +1,11 @@
 package com.coooolfan.unirhy.service
 
 import com.coooolfan.unirhy.model.Work
+import com.coooolfan.unirhy.model.id
+import org.babyfish.jimmer.Page
 import org.babyfish.jimmer.sql.fetcher.Fetcher
 import org.babyfish.jimmer.sql.kt.KSqlClient
+import org.babyfish.jimmer.sql.kt.createQuery
 import org.springframework.stereotype.Service
 import org.springframework.web.server.ResponseStatusException
 import java.util.*
@@ -13,8 +16,11 @@ class WorkService(private val sql: KSqlClient) {
         const val DEFAULT_WORK_RANDOM_LENGTH_MILLIS: Long = 24L * 60 * 60 * 1000
     }
 
-    fun listWork(fetcher: Fetcher<Work>): List<Work> {
-        return sql.findAll(fetcher)
+    fun listWork(pageIndex: Int, pageSize: Int, fetcher: Fetcher<Work>): Page<Work> {
+        return sql.createQuery(Work::class) {
+            orderBy(table.id)
+            select(table.fetch(fetcher))
+        }.fetchPage(pageIndex,pageSize)
     }
 
     fun randomWork(

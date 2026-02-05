@@ -1,5 +1,6 @@
 import type {Executor} from '../';
 import type {WorkDto} from '../model/dto/';
+import type {Page} from '../model/static/';
 
 /**
  * 作品管理接口
@@ -28,14 +29,30 @@ export class WorkController {
     /**
      * 获取作品列表
      * 
-     * @return List<Work> 返回作品列表（默认 fetcher）
+     * @return Page<Work> 返回作品分页列表（默认 fetcher）
      * 
      */
-    readonly listWork: () => Promise<
-        ReadonlyArray<WorkDto['WorkController/DEFAULT_WORK_FETCHER']>
-    > = async() => {
+    readonly listWork: (options: WorkControllerOptions['listWork']) => Promise<
+        Page<WorkDto['WorkController/DEFAULT_WORK_FETCHER']>
+    > = async(options) => {
         let _uri = '/api/work';
-        return (await this.executor({uri: _uri, method: 'GET'})) as Promise<ReadonlyArray<WorkDto['WorkController/DEFAULT_WORK_FETCHER']>>;
+        let _separator = _uri.indexOf('?') === -1 ? '?' : '&';
+        let _value: any = undefined;
+        _value = options.pageIndex;
+        if (_value !== undefined && _value !== null) {
+            _uri += _separator
+            _uri += 'pageIndex='
+            _uri += encodeURIComponent(_value);
+            _separator = '&';
+        }
+        _value = options.pageSize;
+        if (_value !== undefined && _value !== null) {
+            _uri += _separator
+            _uri += 'pageSize='
+            _uri += encodeURIComponent(_value);
+            _separator = '&';
+        }
+        return (await this.executor({uri: _uri, method: 'GET'})) as Promise<Page<WorkDto['WorkController/DEFAULT_WORK_FETCHER']>>;
     }
     
     /**
@@ -83,7 +100,10 @@ export class WorkController {
 }
 
 export type WorkControllerOptions = {
-    'listWork': {}, 
+    'listWork': {
+        readonly pageIndex?: number | undefined, 
+        readonly pageSize?: number | undefined
+    }, 
     'randomWork': {
         /**
          * 时间戳（秒/毫秒），可空，默认当前时间

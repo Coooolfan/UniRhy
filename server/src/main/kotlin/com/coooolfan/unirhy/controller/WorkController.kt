@@ -5,6 +5,7 @@ import com.coooolfan.unirhy.error.CommonException
 import com.coooolfan.unirhy.model.Work
 import com.coooolfan.unirhy.model.by
 import com.coooolfan.unirhy.service.WorkService
+import org.babyfish.jimmer.Page
 import org.babyfish.jimmer.client.FetchBy
 import org.babyfish.jimmer.sql.kt.fetcher.newFetcher
 import org.springframework.web.bind.annotation.*
@@ -23,15 +24,18 @@ class WorkController(
     /**
      * 获取作品列表
      *
-     * @return List<Work> 返回作品列表（默认 fetcher）
+     * @return Page<Work> 返回作品分页列表（默认 fetcher）
      *
      * @api GET /api/work
      * @permission 需要登录认证
      * @description 调用WorkService.listWork()方法获取作品列表
      */
     @GetMapping
-    fun listWork(): List<@FetchBy("DEFAULT_WORK_FETCHER") Work> {
-        return service.listWork(DEFAULT_WORK_FETCHER)
+    fun listWork(
+        @RequestParam(required = false) pageIndex: Int?,
+        @RequestParam(required = false) pageSize: Int?
+    ): Page<@FetchBy("DEFAULT_WORK_FETCHER") Work> {
+        return service.listWork(pageIndex ?: 0, pageSize ?: 10, DEFAULT_WORK_FETCHER)
     }
 
     /**

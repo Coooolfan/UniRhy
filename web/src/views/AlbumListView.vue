@@ -1,27 +1,32 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
-import { LayoutGrid, List as ListIcon, Play } from 'lucide-vue-next'
+import { computed, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { ChevronLeft, ChevronRight, LayoutGrid, List as ListIcon, Play } from 'lucide-vue-next'
 import DashboardTopBar from '@/components/dashboard/DashboardTopBar.vue'
 import { api, normalizeApiError } from '@/ApiInstance'
 
-type AlbumItem = {
+type DisplayItem = {
     id: number
     title: string
-    artist: string
-    year: string
-    kind: string
+    subtitle: string
+    details: string
     cover: string
-    tracks: number
+    badge?: string
 }
 
 const router = useRouter()
+const route = useRoute()
 const viewMode = ref<'grid' | 'list'>('grid')
-const activeTab = ref('All')
+const activeTab = ref<'Albums' | 'Works'>('Albums')
 const searchQuery = ref('')
-const albums = ref<AlbumItem[]>([])
+const displayItems = ref<DisplayItem[]>([])
 const isLoading = ref(false)
 const errorMessage = ref('')
+
+// Pagination state
+const pageIndex = ref(0)
+const pageSize = ref(10)
+const totalPageCount = ref(0)
 
 const resolveCover = (coverId?: number) => (coverId ? `/api/media/${coverId}` : '')
 
@@ -41,15 +46,16 @@ const fetchAlbums = async () => {
     errorMessage.value = ''
     try {
         const list = await api.albumController.listAlbums()
-        albums.value = list.map((album) => ({
+        displayItems.value = list.map((album) => ({
             id: album.id,
             title: album.title || 'Untitled Album',
-            artist: album.recordings?.[0]?.label || 'Unknown Artist',
-            year: formatYear(album.releaseDate),
-            kind: album.kind?.trim() ? album.kind : '其他',
+            subtitle: album.recordings?.[0]?.label || 'Unknown Artist',
+            details: formatYear(album.releaseDate),
             cover: resolveCover(album.cover?.id),
-            tracks: album.recordings?.length ?? 0,
+            badge: album.kind?.trim() ? album.kind : '其他',
         }))
+        // Albums API currently returns all items, so no pagination needed yet
+        totalPageCount.value = 1
     } catch (error) {
         const normalized = normalizeApiError(error)
         errorMessage.value = normalized.message ?? '专辑加载失败'
@@ -58,38 +64,118 @@ const fetchAlbums = async () => {
     }
 }
 
-const tabs = computed(() => {
-    const kinds = new Set(
-        albums.value.map((album) => album.kind).filter((kind) => kind.trim().length > 0),
-    )
-    return ['All', ...Array.from(kinds)]
-})
+const fetchWorks = async () => {
+    isLoading.value = true
+    errorMessage.value = ''
+    try {
+        const page = await api.workController.listWork({
+            pageIndex: pageIndex.value,
+            pageSize: pageSize.value,
+        })
+        totalPageCount.value = page.totalPageCount
+        displayItems.value = page.rows.map((work) => {
+            // Find first recording with cover or artists
+            const mainRecording = work.recordings?.[0]
+            const artistName = mainRecording?.artists?.[0]?.name || 'Unknown Artist'
 
-const filteredAlbums = computed(() => {
+            return {
+                id: work.id,
+                title: work.title || 'Untitled Work',
+                subtitle: artistName,
+                details: `${work.recordings?.length ?? 0} Recordings`,
+                cover: resolveCover(mainRecording?.cover?.id),
+            }
+        })
+    } catch (error) {
+        const normalized = normalizeApiError(error)
+        errorMessage.value = normalized.message ?? '作品加载失败'
+    } finally {
+        isLoading.value = false
+    }
+}
+
+const fetchData = () => {
+    if (activeTab.value === 'Albums') {
+        fetchAlbums()
+    } else {
+        fetchWorks()
+    }
+}
+
+const handlePageChange = (newPage: number) => {
+    if (newPage < 0 || newPage >= totalPageCount.value) return
+
+    router.push({
+        query: {
+            ...route.query,
+            page: (newPage + 1).toString(),
+        },
+    })
+
+    // Scroll to top of list
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+}
+
+const handleTabChange = (tab: 'Albums' | 'Works') => {
+    if (activeTab.value === tab) return
+    router.push({
+        query: {
+            ...route.query,
+            tab,
+            page: undefined, // Reset page when switching tabs
+        },
+    })
+}
+
+// Sync state from URL
+const syncFromRoute = () => {
+    const tab = route.query.tab as string
+    const page = Number(route.query.page)
+
+    if (tab === 'Works' || tab === 'Albums') {
+        activeTab.value = tab
+    } else {
+        activeTab.value = 'Albums'
+    }
+
+    if (!Number.isNaN(page) && page > 0) {
+        pageIndex.value = page - 1
+    } else {
+        pageIndex.value = 0
+    }
+
+    displayItems.value = []
+    fetchData()
+}
+
+watch(
+    () => route.query,
+    () => {
+        syncFromRoute()
+    },
+    { immediate: true },
+)
+
+const filteredItems = computed(() => {
     const query = searchQuery.value.trim().toLowerCase()
-    return albums.value.filter((album) => {
-        if (activeTab.value !== 'All' && album.kind !== activeTab.value) {
-            return false
-        }
-        if (!query) {
-            return true
-        }
+    if (!query) {
+        return displayItems.value
+    }
+    return displayItems.value.filter((item) => {
         return (
-            album.title.toLowerCase().includes(query) ||
-            album.artist.toLowerCase().includes(query) ||
-            album.year.toLowerCase().includes(query) ||
-            album.kind.toLowerCase().includes(query)
+            item.title.toLowerCase().includes(query) || item.subtitle.toLowerCase().includes(query)
         )
     })
 })
 
-const navigateToAlbum = (id: number) => {
-    router.push({ name: 'album-detail', params: { id } })
+const navigateToDetail = (id: number) => {
+    if (activeTab.value === 'Albums') {
+        router.push({ name: 'album-detail', params: { id } })
+    } else {
+        // TODO: Navigate to work detail when available
+        console.log('Navigate to work', id)
+    }
 }
-
-onMounted(() => {
-    fetchAlbums()
-})
 </script>
 
 <template>
@@ -99,7 +185,7 @@ onMounted(() => {
         <div class="px-8 pt-6">
             <div class="flex flex-wrap items-end justify-between gap-6 mb-8">
                 <div>
-                    <h2 class="text-4xl font-serif text-[#2C2420] mb-2">专辑资料库</h2>
+                    <h2 class="text-4xl font-serif text-[#2C2420] mb-2">资料库</h2>
                     <p class="text-[#8C857B] font-serif italic">
                         Collection of your musical journeys.
                     </p>
@@ -135,29 +221,38 @@ onMounted(() => {
 
             <div class="flex flex-wrap gap-6 border-b border-[#D6D1C7] pb-4">
                 <button
-                    v-for="tab in tabs"
-                    :key="tab"
                     class="text-sm tracking-wide transition-colors relative"
                     :class="
-                        activeTab === tab
+                        activeTab === 'Albums'
                             ? 'text-[#2C2420] font-semibold border-b-2 border-[#C27E46] pb-4 -mb-4'
                             : 'text-[#8C857B] hover:text-[#5E5950] pb-4 -mb-4'
                     "
-                    @click="activeTab = tab"
+                    @click="handleTabChange('Albums')"
                 >
-                    {{ tab === 'All' ? '全部专辑' : tab }}
+                    专辑
+                </button>
+                <button
+                    class="text-sm tracking-wide transition-colors relative"
+                    :class="
+                        activeTab === 'Works'
+                            ? 'text-[#2C2420] font-semibold border-b-2 border-[#C27E46] pb-4 -mb-4'
+                            : 'text-[#8C857B] hover:text-[#5E5950] pb-4 -mb-4'
+                    "
+                    @click="handleTabChange('Works')"
+                >
+                    作品
                 </button>
             </div>
         </div>
 
         <div class="px-8 mt-10">
-            <div v-if="isLoading" class="text-[#8C857B] text-sm">专辑加载中...</div>
+            <div v-if="isLoading" class="text-[#8C857B] text-sm">加载中...</div>
             <div v-else-if="errorMessage" class="text-[#B75D5D] text-sm">
                 {{ errorMessage }}
-                <button class="ml-4 text-[#C27E46]" type="button" @click="fetchAlbums">重试</button>
+                <button class="ml-4 text-[#C27E46]" type="button" @click="fetchData">重试</button>
             </div>
-            <div v-else-if="filteredAlbums.length === 0" class="text-[#8C857B] text-sm">
-                未找到匹配的专辑。
+            <div v-else-if="filteredItems.length === 0" class="text-[#8C857B] text-sm">
+                未找到匹配的内容。
             </div>
 
             <div
@@ -165,10 +260,10 @@ onMounted(() => {
                 class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-x-12 gap-y-16"
             >
                 <div
-                    v-for="album in filteredAlbums"
-                    :key="album.id"
+                    v-for="item in filteredItems"
+                    :key="item.id"
                     class="group cursor-pointer"
-                    @click="navigateToAlbum(album.id)"
+                    @click="navigateToDetail(item.id)"
                 >
                     <div
                         class="relative aspect-square mb-5 transition-transform duration-500 ease-out perspective-1000"
@@ -192,9 +287,9 @@ onMounted(() => {
                             class="relative z-10 w-full h-full shadow-lg transition-all duration-500 ease-out bg-[#D6D1C7] transform-gpu origin-center group-hover:scale-105 group-hover:-rotate-2 group-hover:-translate-x-3 group-hover:-translate-y-1.5"
                         >
                             <img
-                                v-if="album.cover"
-                                :src="album.cover"
-                                :alt="album.title"
+                                v-if="item.cover"
+                                :src="item.cover"
+                                :alt="item.title"
                                 class="w-full h-full object-cover"
                             />
                             <div
@@ -210,13 +305,13 @@ onMounted(() => {
                         <h3
                             class="font-serif text-lg leading-tight mb-1 truncate text-[#1A1A1A] group-hover:text-[#C27E46] transition-colors"
                         >
-                            {{ album.title }}
+                            {{ item.title }}
                         </h3>
-                        <p class="text-xs text-[#8C857B] uppercase tracking-wider">
-                            {{ album.artist }}
+                        <p class="text-xs text-[#8C857B] uppercase tracking-wider truncate">
+                            {{ item.subtitle }}
                         </p>
                         <p class="text-[10px] text-[#B0AAA0] mt-1">
-                            {{ album.year || '----' }} · {{ album.kind }}
+                            {{ item.details }} <span v-if="item.badge">· {{ item.badge }}</span>
                         </p>
                     </div>
                 </div>
@@ -228,21 +323,20 @@ onMounted(() => {
                 >
                     <div class="col-span-1">#</div>
                     <div class="col-span-5">Title</div>
-                    <div class="col-span-3">Artist</div>
-                    <div class="col-span-2">Year</div>
-                    <div class="col-span-1 text-right">Tracks</div>
+                    <div class="col-span-4">Subtitle</div>
+                    <div class="col-span-2 text-right">Details</div>
                 </div>
                 <div
-                    v-for="(album, idx) in filteredAlbums"
-                    :key="album.id"
+                    v-for="(item, idx) in filteredItems"
+                    :key="item.id"
                     class="grid grid-cols-12 items-center px-4 py-3 hover:bg-[#EFEAE2]/60 rounded-sm group transition-colors cursor-pointer"
-                    @click="navigateToAlbum(album.id)"
+                    @click="navigateToDetail(item.id)"
                 >
                     <div
                         class="col-span-1 text-sm font-serif text-[#8C857B] group-hover:text-[#2C2420]"
                     >
                         <span class="group-hover:hidden">{{
-                            (idx + 1).toString().padStart(2, '0')
+                            (idx + 1 + pageIndex * pageSize).toString().padStart(2, '0')
                         }}</span>
                         <Play
                             :size="14"
@@ -253,23 +347,48 @@ onMounted(() => {
                     <div class="col-span-5 flex items-center gap-4">
                         <div class="w-10 h-10 shadow-sm bg-[#D6D1C7] overflow-hidden">
                             <img
-                                v-if="album.cover"
-                                :src="album.cover"
-                                :alt="album.title"
+                                v-if="item.cover"
+                                :src="item.cover"
+                                :alt="item.title"
                                 class="w-full h-full object-cover"
                             />
                         </div>
                         <div>
-                            <div class="font-serif text-base text-[#2C2420]">{{ album.title }}</div>
-                            <div class="text-[10px] text-[#B0AAA0]">{{ album.kind }}</div>
+                            <div class="font-serif text-base text-[#2C2420]">{{ item.title }}</div>
+                            <div v-if="item.badge" class="text-[10px] text-[#B0AAA0]">
+                                {{ item.badge }}
+                            </div>
                         </div>
                     </div>
-                    <div class="col-span-3 text-sm text-[#5E5950]">{{ album.artist }}</div>
-                    <div class="col-span-2 text-sm text-[#8C857B]">{{ album.year || '-' }}</div>
-                    <div class="col-span-1 text-sm text-[#8C857B] text-right">
-                        {{ album.tracks }}
+                    <div class="col-span-4 text-sm text-[#5E5950]">{{ item.subtitle }}</div>
+                    <div class="col-span-2 text-sm text-[#8C857B] text-right">
+                        {{ item.details }}
                     </div>
                 </div>
+            </div>
+
+            <!-- Pagination Controls -->
+            <div
+                v-if="activeTab === 'Works' && totalPageCount > 1 && !isLoading"
+                class="flex justify-center items-center mt-12 gap-6"
+            >
+                <button
+                    @click="handlePageChange(pageIndex - 1)"
+                    :disabled="pageIndex === 0"
+                    class="p-2 text-[#8C857B] hover:text-[#C27E46] disabled:opacity-30 disabled:hover:text-[#8C857B] transition-colors"
+                >
+                    <ChevronLeft :size="20" />
+                </button>
+                <span class="font-serif text-sm text-[#5E5950]">
+                    Page {{ pageIndex + 1 }} of {{ totalPageCount }}
+                </span>
+                <button
+                    @click="handlePageChange(pageIndex + 1)"
+                    :disabled="pageIndex >= totalPageCount - 1"
+                    class="p-2 text-[#8C857B] hover:text-[#C27E46] disabled:opacity-30 disabled:hover:text-[#8C857B] transition-colors"
+                >
+                    <ChevronRight :size="20" />
+                </button>
             </div>
         </div>
     </div>
