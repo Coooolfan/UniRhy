@@ -5,7 +5,6 @@ import com.coooolfan.unirhy.model.id
 import org.babyfish.jimmer.Page
 import org.babyfish.jimmer.sql.fetcher.Fetcher
 import org.babyfish.jimmer.sql.kt.KSqlClient
-import org.babyfish.jimmer.sql.kt.createQuery
 import org.springframework.stereotype.Service
 import org.springframework.web.server.ResponseStatusException
 import java.util.*
@@ -20,7 +19,7 @@ class WorkService(private val sql: KSqlClient) {
         return sql.createQuery(Work::class) {
             orderBy(table.id)
             select(table.fetch(fetcher))
-        }.fetchPage(pageIndex,pageSize)
+        }.fetchPage(pageIndex, pageSize)
     }
 
     fun randomWork(
@@ -59,6 +58,10 @@ class WorkService(private val sql: KSqlClient) {
 
     fun deleteWork(id: Long) {
         sql.deleteById(Work::class, id)
+    }
+
+    fun getWorkById(id: Long, fetcher: Fetcher<Work>): Work {
+        return sql.findOneById(fetcher, id)
     }
 }
 

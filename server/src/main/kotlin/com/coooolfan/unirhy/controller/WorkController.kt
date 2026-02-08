@@ -39,6 +39,24 @@ class WorkController(
     }
 
     /**
+     * 获取指定作品
+     *
+     * @param id 作品 ID
+     * @return Work 返回作品详情（默认 fetcher）
+     *
+     * @api GET /api/work/{id}
+     * @permission 需要登录认证
+     * @description 调用WorkService.getWorkById()方法获取作品详情
+     */
+    @GetMapping("/{id}")
+    fun getWorkById(
+        @PathVariable id: Long
+    ): @FetchBy("DEFAULT_WORK_FETCHER") Work {
+        return service.getWorkById(id, DEFAULT_WORK_FETCHER)
+    }
+
+
+    /**
      * 获取时间窗口内的随机作品
      *
      * 通过时间戳、时间长度与时区偏移计算出“时间窗口编号”，并将其作为随机种子，

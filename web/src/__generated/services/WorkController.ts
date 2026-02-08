@@ -27,6 +27,22 @@ export class WorkController {
     }
     
     /**
+     * 获取指定作品
+     * 
+     * @parameter {WorkControllerOptions['getWorkById']} options
+     * - id 作品 ID
+     * @return Work 返回作品详情（默认 fetcher）
+     * 
+     */
+    readonly getWorkById: (options: WorkControllerOptions['getWorkById']) => Promise<
+        WorkDto['WorkController/DEFAULT_WORK_FETCHER']
+    > = async(options) => {
+        let _uri = '/api/work/';
+        _uri += encodeURIComponent(options.id);
+        return (await this.executor({uri: _uri, method: 'GET'})) as Promise<WorkDto['WorkController/DEFAULT_WORK_FETCHER']>;
+    }
+    
+    /**
      * 获取作品列表
      * 
      * @return Page<Work> 返回作品分页列表（默认 fetcher）
@@ -103,6 +119,12 @@ export type WorkControllerOptions = {
     'listWork': {
         readonly pageIndex?: number | undefined, 
         readonly pageSize?: number | undefined
+    }, 
+    'getWorkById': {
+        /**
+         * 作品 ID
+         */
+        readonly id: number
     }, 
     'randomWork': {
         /**

@@ -39,6 +39,11 @@ const router = createRouter({
                     component: () => import('../views/AlbumDetailView.vue'),
                 },
                 {
+                    path: 'work/:id',
+                    name: 'work-detail',
+                    component: () => import('../views/WorkDetailView.vue'),
+                },
+                {
                     path: 'settings',
                     name: 'settings',
                     component: () => import('../views/SettingsView.vue'),

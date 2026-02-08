@@ -171,8 +171,7 @@ const navigateToDetail = (id: number) => {
     if (activeTab.value === 'Albums') {
         router.push({ name: 'album-detail', params: { id } })
     } else {
-        // TODO: Navigate to work detail when available
-        console.log('Navigate to work', id)
+        router.push({ name: 'work-detail', params: { id } })
     }
 }
 </script>
