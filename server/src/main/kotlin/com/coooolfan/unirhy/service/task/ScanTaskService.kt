@@ -71,6 +71,7 @@ class ScanTaskService(
                     title = tag?.getFirst(FieldKey.TITLE).orEmpty()
                     comment = tag?.getFirst(FieldKey.COMMENT).orEmpty()
                     cover = audioCover
+                    defaultInWork = false
                     artists().addBy {
                         name = tag?.getFirst(FieldKey.ARTIST).orEmpty()
                         comment = "load from local file: $relativePath"

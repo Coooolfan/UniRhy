@@ -1,14 +1,6 @@
 package com.coooolfan.unirhy.model
 
-import org.babyfish.jimmer.sql.DissociateAction
-import org.babyfish.jimmer.sql.Entity
-import org.babyfish.jimmer.sql.GeneratedValue
-import org.babyfish.jimmer.sql.GenerationType
-import org.babyfish.jimmer.sql.Id
-import org.babyfish.jimmer.sql.ManyToMany
-import org.babyfish.jimmer.sql.ManyToOne
-import org.babyfish.jimmer.sql.OnDissociate
-import org.babyfish.jimmer.sql.OneToMany
+import org.babyfish.jimmer.sql.*
 
 @Entity
 interface Recording {
@@ -30,6 +22,8 @@ interface Recording {
     val title: String?
 
     val comment: String
+
+    val defaultInWork: Boolean
 
     @ManyToOne
     @OnDissociate(DissociateAction.DELETE)

@@ -25,6 +25,7 @@ export type AlbumDto = {
             readonly label?: string | undefined;
             readonly title?: string | undefined;
             readonly comment: string;
+            readonly defaultInWork: boolean;
             readonly assets: ReadonlyArray<{
                 readonly id: number;
                 readonly comment: string;

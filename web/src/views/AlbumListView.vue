@@ -74,8 +74,9 @@ const fetchWorks = async () => {
         })
         totalPageCount.value = page.totalPageCount
         displayItems.value = page.rows.map((work) => {
-            // Find first recording with cover or artists
-            const mainRecording = work.recordings?.[0]
+            const mainRecording =
+                work.recordings?.find((recording) => recording.defaultInWork) ??
+                work.recordings?.[0]
             const artistName = mainRecording?.artists?.[0]?.name || 'Unknown Artist'
 
             return {
@@ -111,9 +112,6 @@ const handlePageChange = (newPage: number) => {
             page: (newPage + 1).toString(),
         },
     })
-
-    // Scroll to top of list
-    window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
 const handleTabChange = (tab: 'Albums' | 'Works') => {
@@ -132,11 +130,10 @@ const syncFromRoute = () => {
     const tab = route.query.tab as string
     const page = Number(route.query.page)
 
-    if (tab === 'Works' || tab === 'Albums') {
-        activeTab.value = tab
-    } else {
-        activeTab.value = 'Albums'
-    }
+    const targetTab = tab === 'Works' || tab === 'Albums' ? tab : 'Albums'
+
+    const tabChanged = targetTab !== activeTab.value
+    activeTab.value = targetTab
 
     if (!Number.isNaN(page) && page > 0) {
         pageIndex.value = page - 1
@@ -144,7 +141,9 @@ const syncFromRoute = () => {
         pageIndex.value = 0
     }
 
-    displayItems.value = []
+    if (tabChanged) {
+        displayItems.value = []
+    }
     fetchData()
 }
 
@@ -246,135 +245,142 @@ const navigateToDetail = (id: number) => {
         </div>
 
         <div class="px-8 mt-10">
-            <div v-if="isLoading" class="text-[#8C857B] text-sm">加载中...</div>
+            <div v-if="isLoading && displayItems.length === 0" class="text-[#8C857B] text-sm">
+                加载中...
+            </div>
             <div v-else-if="errorMessage" class="text-[#B75D5D] text-sm">
                 {{ errorMessage }}
                 <button class="ml-4 text-[#C27E46]" type="button" @click="fetchData">重试</button>
             </div>
-            <div v-else-if="filteredItems.length === 0" class="text-[#8C857B] text-sm">
-                未找到匹配的内容。
-            </div>
 
-            <div
-                v-else-if="viewMode === 'grid'"
-                class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-x-12 gap-y-16"
-            >
+            <div v-else :class="{ 'opacity-50 pointer-events-none': isLoading }">
+                <div v-if="filteredItems.length === 0" class="text-[#8C857B] text-sm">
+                    未找到匹配的内容。
+                </div>
+
                 <div
-                    v-for="item in filteredItems"
-                    :key="item.id"
-                    class="group cursor-pointer"
-                    @click="navigateToDetail(item.id)"
+                    v-else-if="viewMode === 'grid'"
+                    class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-x-12 gap-y-16"
                 >
                     <div
-                        class="relative aspect-square mb-5 transition-transform duration-500 ease-out perspective-1000"
+                        v-for="item in filteredItems"
+                        :key="item.id"
+                        class="group cursor-pointer"
+                        @click="navigateToDetail(item.id)"
                     >
                         <div
-                            class="absolute top-1/2 left-1/2 w-[90%] h-[90%] -translate-x-1/2 -translate-y-1/2"
+                            class="relative aspect-square mb-5 transition-transform duration-500 ease-out perspective-1000"
                         >
                             <div
-                                class="w-full h-full bg-linear-to-tr from-gray-200 to-gray-100 border border-gray-300 rounded-full shadow-xl transition-all duration-700 ease-out opacity-0 group-hover:opacity-100 transform-gpu group-hover:translate-x-7 group-hover:-translate-y-8 group-hover:rotate-3 flex items-center justify-center relative"
+                                class="absolute top-1/2 left-1/2 w-[90%] h-[90%] -translate-x-1/2 -translate-y-1/2"
                             >
                                 <div
-                                    class="w-1/3 h-1/3 border border-gray-300 rounded-full opacity-50"
-                                ></div>
+                                    class="w-full h-full bg-linear-to-tr from-gray-200 to-gray-100 border border-gray-300 rounded-full shadow-xl transition-all duration-700 ease-out opacity-0 group-hover:opacity-100 transform-gpu group-hover:translate-x-7 group-hover:-translate-y-8 group-hover:rotate-3 flex items-center justify-center relative"
+                                >
+                                    <div
+                                        class="w-1/3 h-1/3 border border-gray-300 rounded-full opacity-50"
+                                    ></div>
+                                    <div
+                                        class="absolute w-8 h-8 bg-[#EBE7E0] rounded-full border border-gray-300"
+                                    ></div>
+                                </div>
+                            </div>
+
+                            <div
+                                class="relative z-10 w-full h-full shadow-lg transition-all duration-500 ease-out bg-[#D6D1C7] transform-gpu origin-center group-hover:scale-105 group-hover:-rotate-2 group-hover:-translate-x-3 group-hover:-translate-y-1.5"
+                            >
+                                <img
+                                    v-if="item.cover"
+                                    :src="item.cover"
+                                    :alt="item.title"
+                                    class="w-full h-full object-cover"
+                                />
                                 <div
-                                    class="absolute w-8 h-8 bg-[#EBE7E0] rounded-full border border-gray-300"
-                                ></div>
+                                    v-else
+                                    class="w-full h-full flex items-center justify-center text-xs text-[#8C857B]"
+                                >
+                                    No Cover
+                                </div>
                             </div>
                         </div>
 
-                        <div
-                            class="relative z-10 w-full h-full shadow-lg transition-all duration-500 ease-out bg-[#D6D1C7] transform-gpu origin-center group-hover:scale-105 group-hover:-rotate-2 group-hover:-translate-x-3 group-hover:-translate-y-1.5"
-                        >
-                            <img
-                                v-if="item.cover"
-                                :src="item.cover"
-                                :alt="item.title"
-                                class="w-full h-full object-cover"
-                            />
-                            <div
-                                v-else
-                                class="w-full h-full flex items-center justify-center text-xs text-[#8C857B]"
+                        <div class="text-center md:text-left">
+                            <h3
+                                class="font-serif text-lg leading-tight mb-1 truncate text-[#1A1A1A] group-hover:text-[#C27E46] transition-colors"
                             >
-                                No Cover
-                            </div>
+                                {{ item.title }}
+                            </h3>
+                            <p class="text-xs text-[#8C857B] uppercase tracking-wider truncate">
+                                {{ item.subtitle }}
+                            </p>
+                            <p class="text-[10px] text-[#B0AAA0] mt-1">
+                                {{ item.details }} <span v-if="item.badge">· {{ item.badge }}</span>
+                            </p>
                         </div>
                     </div>
-
-                    <div class="text-center md:text-left">
-                        <h3
-                            class="font-serif text-lg leading-tight mb-1 truncate text-[#1A1A1A] group-hover:text-[#C27E46] transition-colors"
-                        >
-                            {{ item.title }}
-                        </h3>
-                        <p class="text-xs text-[#8C857B] uppercase tracking-wider truncate">
-                            {{ item.subtitle }}
-                        </p>
-                        <p class="text-[10px] text-[#B0AAA0] mt-1">
-                            {{ item.details }} <span v-if="item.badge">· {{ item.badge }}</span>
-                        </p>
-                    </div>
                 </div>
-            </div>
 
-            <div v-else class="space-y-2">
-                <div
-                    class="grid grid-cols-12 text-xs text-[#8C857B] uppercase tracking-wider border-b border-[#D6D1C7] pb-2 mb-2 px-4"
-                >
-                    <div class="col-span-1">#</div>
-                    <div class="col-span-5">Title</div>
-                    <div class="col-span-4">Subtitle</div>
-                    <div class="col-span-2 text-right">Details</div>
-                </div>
-                <div
-                    v-for="(item, idx) in filteredItems"
-                    :key="item.id"
-                    class="grid grid-cols-12 items-center px-4 py-3 hover:bg-[#EFEAE2]/60 rounded-sm group transition-colors cursor-pointer"
-                    @click="navigateToDetail(item.id)"
-                >
+                <div v-else class="space-y-2">
                     <div
-                        class="col-span-1 text-sm font-serif text-[#8C857B] group-hover:text-[#2C2420]"
+                        class="grid grid-cols-12 text-xs text-[#8C857B] uppercase tracking-wider border-b border-[#D6D1C7] pb-2 mb-2 px-4"
                     >
-                        <span class="group-hover:hidden">{{
-                            (idx + 1 + pageIndex * pageSize).toString().padStart(2, '0')
-                        }}</span>
-                        <Play
-                            :size="14"
-                            class="hidden group-hover:block ml-1"
-                            fill="currentColor"
-                        />
+                        <div class="col-span-1">#</div>
+                        <div class="col-span-5">Title</div>
+                        <div class="col-span-4">Subtitle</div>
+                        <div class="col-span-2 text-right">Details</div>
                     </div>
-                    <div class="col-span-5 flex items-center gap-4">
-                        <div class="w-10 h-10 shadow-sm bg-[#D6D1C7] overflow-hidden">
-                            <img
-                                v-if="item.cover"
-                                :src="item.cover"
-                                :alt="item.title"
-                                class="w-full h-full object-cover"
+                    <div
+                        v-for="(item, idx) in filteredItems"
+                        :key="item.id"
+                        class="grid grid-cols-12 items-center px-4 py-3 hover:bg-[#EFEAE2]/60 rounded-sm group transition-colors cursor-pointer"
+                        @click="navigateToDetail(item.id)"
+                    >
+                        <div
+                            class="col-span-1 text-sm font-serif text-[#8C857B] group-hover:text-[#2C2420]"
+                        >
+                            <span class="group-hover:hidden">{{
+                                (idx + 1 + pageIndex * pageSize).toString().padStart(2, '0')
+                            }}</span>
+                            <Play
+                                :size="14"
+                                class="hidden group-hover:block ml-1"
+                                fill="currentColor"
                             />
                         </div>
-                        <div>
-                            <div class="font-serif text-base text-[#2C2420]">{{ item.title }}</div>
-                            <div v-if="item.badge" class="text-[10px] text-[#B0AAA0]">
-                                {{ item.badge }}
+                        <div class="col-span-5 flex items-center gap-4">
+                            <div class="w-10 h-10 shadow-sm bg-[#D6D1C7] overflow-hidden">
+                                <img
+                                    v-if="item.cover"
+                                    :src="item.cover"
+                                    :alt="item.title"
+                                    class="w-full h-full object-cover"
+                                />
+                            </div>
+                            <div>
+                                <div class="font-serif text-base text-[#2C2420]">
+                                    {{ item.title }}
+                                </div>
+                                <div v-if="item.badge" class="text-[10px] text-[#B0AAA0]">
+                                    {{ item.badge }}
+                                </div>
                             </div>
                         </div>
-                    </div>
-                    <div class="col-span-4 text-sm text-[#5E5950]">{{ item.subtitle }}</div>
-                    <div class="col-span-2 text-sm text-[#8C857B] text-right">
-                        {{ item.details }}
+                        <div class="col-span-4 text-sm text-[#5E5950]">{{ item.subtitle }}</div>
+                        <div class="col-span-2 text-sm text-[#8C857B] text-right">
+                            {{ item.details }}
+                        </div>
                     </div>
                 </div>
             </div>
 
             <!-- Pagination Controls -->
             <div
-                v-if="activeTab === 'Works' && totalPageCount > 1 && !isLoading"
+                v-if="activeTab === 'Works' && totalPageCount > 1"
                 class="flex justify-center items-center mt-12 gap-6"
             >
                 <button
                     @click="handlePageChange(pageIndex - 1)"
-                    :disabled="pageIndex === 0"
+                    :disabled="pageIndex === 0 || isLoading"
                     class="p-2 text-[#8C857B] hover:text-[#C27E46] disabled:opacity-30 disabled:hover:text-[#8C857B] transition-colors"
                 >
                     <ChevronLeft :size="20" />
@@ -384,7 +390,7 @@ const navigateToDetail = (id: number) => {
                 </span>
                 <button
                     @click="handlePageChange(pageIndex + 1)"
-                    :disabled="pageIndex >= totalPageCount - 1"
+                    :disabled="pageIndex >= totalPageCount - 1 || isLoading"
                     class="p-2 text-[#8C857B] hover:text-[#C27E46] disabled:opacity-30 disabled:hover:text-[#8C857B] transition-colors"
                 >
                     <ChevronRight :size="20" />

@@ -71,14 +71,19 @@ CREATE TABLE public.work
 -- 录音表：指代作品的具体音频实现（如：某乐团在某年录制的版本）
 CREATE TABLE public.recording
 (
-    id       BIGSERIAL PRIMARY KEY,
-    work_id  BIGINT NOT NULL REFERENCES work (id) ON DELETE RESTRICT,    -- 关联的作品
-    kind     TEXT   NOT NULL,                                            -- 录音类型（如：录音室版、现场版）
-    label    TEXT,                                                       -- 唱片公司/厂牌
-    title    TEXT,                                                       -- 录音特定标题（可选）
-    comment  TEXT   NOT NULL DEFAULT '',                                 -- 备注
-    cover_id BIGINT REFERENCES public.media_file (id) ON DELETE SET NULL -- 录音封面
+    id              BIGSERIAL PRIMARY KEY,
+    work_id         BIGINT  NOT NULL REFERENCES work (id) ON DELETE RESTRICT,     -- 关联的作品
+    kind            TEXT    NOT NULL,                                             -- 录音类型（如：录音室版、现场版）
+    label           TEXT,                                                         -- 唱片公司/厂牌
+    title           TEXT,                                                         -- 录音特定标题（可选）
+    comment         TEXT    NOT NULL DEFAULT '',                                  -- 备注
+    cover_id        BIGINT  REFERENCES public.media_file (id) ON DELETE SET NULL, -- 录音封面
+    default_in_work BOOLEAN NOT NULL DEFAULT FALSE                                -- 是否为作品的默认版本
 );
+
+-- 同一作品只允许一个默认录音
+CREATE UNIQUE INDEX recording_default_in_work_uniq
+    ON public.recording (work_id) WHERE default_in_work = TRUE;
 
 -- ==========================================================
 -- 3.1 艺术家 (Artist) 模块
