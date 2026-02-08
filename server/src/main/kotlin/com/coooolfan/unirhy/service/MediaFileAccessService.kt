@@ -15,9 +15,9 @@ import java.nio.file.Files
 import java.nio.file.Paths
 
 @Service
-class MediaFileAccessService(private val sql: KSqlClient) {
+class MediaFileAccessService(private val sql: KSqlClient) : MediaFileResolver {
 
-    fun loadLocalFile(id: Long): ResolvedMediaFile {
+    override fun loadLocalFile(id: Long): ResolvedMediaFile {
         val mediaFile = findMediaFile(id)
             ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Media file not found")
 
@@ -59,3 +59,7 @@ data class ResolvedMediaFile(
     val mediaFile: MediaFile,
     val file: File,
 )
+
+interface MediaFileResolver {
+    fun loadLocalFile(id: Long): ResolvedMediaFile
+}

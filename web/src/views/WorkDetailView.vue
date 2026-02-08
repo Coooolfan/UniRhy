@@ -1,13 +1,14 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue'
+import { onMounted, ref, watch, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { Play, Heart, MoreHorizontal, Share2, Pause } from 'lucide-vue-next'
 import { api } from '@/ApiInstance'
+import { useAudioStore } from '@/stores/audio'
 import DashboardTopBar from '@/components/dashboard/DashboardTopBar.vue'
 
 const route = useRoute()
-const isPlaying = ref(false)
-const currentRecording = ref<number | null>(null)
+const audioStore = useAudioStore()
+const currentRecordingId = ref<number | null>(null)
 const isLoading = ref(true)
 const isCdVisible = ref(false)
 
@@ -27,6 +28,7 @@ type Recording = {
     comment: string
     cover: string
     isDefault: boolean
+    audioSrc?: string
 }
 
 const workData = ref<WorkData>({
@@ -43,6 +45,21 @@ const resolveCover = (coverId?: number) => {
         return `/api/media/${coverId}`
     }
     return ''
+}
+
+type Asset = {
+    mediaFile: {
+        id: number
+        mimeType: string
+    }
+}
+
+const resolveAudio = (assets: readonly Asset[]) => {
+    const audioAsset = assets.find((a) => a.mediaFile.mimeType.startsWith('audio/'))
+    if (audioAsset) {
+        return `/api/media/${audioAsset.mediaFile.id}`
+    }
+    return undefined
 }
 
 const fetchWork = async (id: number) => {
@@ -72,12 +89,13 @@ const fetchWork = async (id: number) => {
             comment: recording.comment,
             cover: resolveCover(recording.cover?.id),
             isDefault: recording.defaultInWork,
+            audioSrc: resolveAudio(recording.assets || []),
         }))
 
         if (recordings.value.length > 0) {
             // Select default recording or the first one
             const defaultRec = recordings.value.find((r) => r.isDefault)
-            currentRecording.value = defaultRec ? defaultRec.id : recordings.value[0]!.id
+            currentRecordingId.value = defaultRec ? defaultRec.id : recordings.value[0]!.id
         }
     } catch (error) {
         console.error('Failed to fetch work details:', error)
@@ -86,6 +104,48 @@ const fetchWork = async (id: number) => {
         setTimeout(() => {
             isCdVisible.value = true
         }, 100)
+    }
+}
+
+// Computed to check if the currently selected recording is playing
+const isCurrentPlaying = computed(() => {
+    return audioStore.isPlaying && audioStore.currentTrack?.id === currentRecordingId.value
+})
+
+const handlePlay = (rec?: Recording) => {
+    const targetId = rec?.id ?? currentRecordingId.value
+    if (!targetId) return
+
+    const targetRec = recordings.value.find((r) => r.id === targetId)
+    if (!targetRec || !targetRec.audioSrc) {
+        console.warn('No audio source for recording', targetId)
+        return
+    }
+
+    audioStore.play({
+        id: targetRec.id,
+        title: targetRec.title,
+        artist: targetRec.artist,
+        cover: targetRec.cover || workData.value.cover,
+        src: targetRec.audioSrc,
+        workId: Number(route.params.id),
+    })
+}
+
+// Handle clicking on a recording in the list
+const onRecordingClick = (rec: Recording) => {
+    // If clicking the already selected recording, toggle play
+    if (currentRecordingId.value === rec.id) {
+        handlePlay(rec)
+    } else {
+        // Just select it
+        currentRecordingId.value = rec.id
+        // Optional: Auto-play when switching selection? For now, let's just select.
+        // User might want to see details without playing immediately.
+        // But if we want it to feel like a player playlist, maybe we play.
+        // Let's stick to "click to select", double click or play button to play?
+        // Or keep play button separate.
+        // The original code had @click="currentRecording = rec.id"
     }
 }
 
@@ -181,12 +241,12 @@ watch(
 
                     <div class="flex items-center gap-4 mt-4">
                         <button
-                            @click="isPlaying = !isPlaying"
+                            @click="handlePlay()"
                             class="px-8 py-3 border border-[#C17D46] text-[#C17D46] hover:bg-[#C17D46] hover:text-white transition-all duration-300 flex items-center gap-2 text-sm tracking-widest uppercase font-medium rounded-sm cursor-pointer"
                         >
-                            <Pause v-if="isPlaying" :size="16" />
+                            <Pause v-if="isCurrentPlaying" :size="16" />
                             <Play v-else :size="16" fill="currentColor" />
-                            {{ isPlaying ? '暂停播放' : '立即播放' }}
+                            {{ isCurrentPlaying ? '暂停播放' : '立即播放' }}
                         </button>
                         <button
                             class="p-3 text-[#8C857B] hover:text-[#C17D46] transition-colors border border-transparent hover:border-[#DCD6CC] rounded-full cursor-pointer"
@@ -219,20 +279,22 @@ watch(
                     <div
                         v-for="(rec, index) in recordings"
                         :key="rec.id"
-                        @click="currentRecording = rec.id"
+                        @click="onRecordingClick(rec)"
                         class="group flex items-center gap-6 py-4 px-4 rounded-sm transition-all duration-200 cursor-pointer border-b border-transparent hover:bg-[#F2EFE9]"
-                        :class="{ 'bg-[#F2EFE9]': currentRecording === rec.id }"
+                        :class="{ 'bg-[#F2EFE9]': currentRecordingId === rec.id }"
                     >
                         <div
                             class="w-6 text-center font-serif text-lg"
                             :class="
-                                currentRecording === rec.id
+                                currentRecordingId === rec.id
                                     ? 'text-[#C17D46]'
                                     : 'text-[#DCD6CC] group-hover:text-[#8C857B]'
                             "
                         >
                             <div
-                                v-if="currentRecording === rec.id && isPlaying"
+                                v-if="
+                                    audioStore.isPlaying && audioStore.currentTrack?.id === rec.id
+                                "
                                 class="flex gap-0.5 justify-center h-4 items-end"
                             >
                                 <div class="w-0.5 bg-[#C17D46] h-2 animate-pulse"></div>
@@ -258,7 +320,7 @@ watch(
                                 <div
                                     class="text-base font-medium truncate"
                                     :class="
-                                        currentRecording === rec.id
+                                        currentRecordingId === rec.id
                                             ? 'text-[#C17D46]'
                                             : 'text-[#4A433B]'
                                     "
@@ -286,6 +348,21 @@ watch(
                         <div
                             class="hidden md:flex opacity-0 group-hover:opacity-100 transition-opacity gap-4 mr-4 text-[#8C857B]"
                         >
+                            <button
+                                class="hover:text-[#C17D46] transition-colors"
+                                @click.stop="handlePlay(rec)"
+                            >
+                                <Play
+                                    v-if="
+                                        !(
+                                            audioStore.isPlaying &&
+                                            audioStore.currentTrack?.id === rec.id
+                                        )
+                                    "
+                                    :size="16"
+                                />
+                                <Pause v-else :size="16" />
+                            </button>
                             <Heart :size="16" class="hover:text-[#C17D46]" />
                             <Share2 :size="16" class="hover:text-[#C17D46]" />
                         </div>
