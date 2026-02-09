@@ -10,6 +10,7 @@ import {
     Play,
 } from 'lucide-vue-next'
 import DashboardTopBar from '@/components/dashboard/DashboardTopBar.vue'
+import StackedCovers from '@/components/StackedCovers.vue'
 import { api, normalizeApiError } from '@/ApiInstance'
 import { useAudioStore } from '@/stores/audio'
 
@@ -19,6 +20,7 @@ type DisplayItem = {
     subtitle: string
     details: string
     cover: string
+    stackedImages?: { id: number | string; cover?: string }[]
     badge?: string
     playTrackId?: number
     playTitle?: string
@@ -128,6 +130,10 @@ const fetchWorks = async () => {
                 subtitle: artistName,
                 details: `${work.recordings?.length ?? 0} Recordings`,
                 cover: resolveCover(mainRecording?.cover?.id),
+                stackedImages: work.recordings?.map((r) => ({
+                    id: r.id,
+                    cover: resolveCover(r.cover?.id),
+                })),
             }
         })
     } catch (error) {
@@ -396,37 +402,44 @@ const playItem = async (item: DisplayItem) => {
                         <div
                             class="relative aspect-square mb-5 transition-transform duration-500 ease-out perspective-1000"
                         >
-                            <div
-                                class="absolute top-1/2 left-1/2 w-[90%] h-[90%] -translate-x-1/2 -translate-y-1/2"
-                            >
+                            <template v-if="activeTab === 'Albums'">
                                 <div
-                                    class="w-full h-full bg-linear-to-tr from-gray-200 to-gray-100 border border-gray-300 rounded-full shadow-xl transition-all duration-700 ease-out opacity-0 group-hover:opacity-100 transform-gpu group-hover:translate-x-7 group-hover:-translate-y-8 group-hover:rotate-3 flex items-center justify-center relative"
+                                    class="absolute top-1/2 left-1/2 w-[90%] h-[90%] -translate-x-1/2 -translate-y-1/2"
                                 >
                                     <div
-                                        class="w-1/3 h-1/3 border border-gray-300 rounded-full opacity-50"
-                                    ></div>
-                                    <div
-                                        class="absolute w-8 h-8 bg-[#EBE7E0] rounded-full border border-gray-300"
-                                    ></div>
+                                        class="w-full h-full bg-linear-to-tr from-gray-200 to-gray-100 border border-gray-300 rounded-full shadow-xl transition-all duration-700 ease-out opacity-0 group-hover:opacity-100 transform-gpu group-hover:translate-x-7 group-hover:-translate-y-8 group-hover:rotate-3 flex items-center justify-center relative"
+                                    >
+                                        <div
+                                            class="w-1/3 h-1/3 border border-gray-300 rounded-full opacity-50"
+                                        ></div>
+                                        <div
+                                            class="absolute w-8 h-8 bg-[#EBE7E0] rounded-full border border-gray-300"
+                                        ></div>
+                                    </div>
                                 </div>
-                            </div>
 
-                            <div
-                                class="relative z-10 w-full h-full shadow-lg transition-all duration-500 ease-out bg-[#D6D1C7] transform-gpu origin-center group-hover:scale-105 group-hover:-rotate-2 group-hover:-translate-x-3 group-hover:-translate-y-1.5"
-                            >
-                                <img
-                                    v-if="item.cover"
-                                    :src="item.cover"
-                                    :alt="item.title"
-                                    class="w-full h-full object-cover"
-                                />
                                 <div
-                                    v-else
-                                    class="w-full h-full flex items-center justify-center text-xs text-[#8C857B]"
+                                    class="relative z-10 w-full h-full shadow-lg transition-all duration-500 ease-out bg-[#D6D1C7] transform-gpu origin-center group-hover:scale-105 group-hover:-rotate-2 group-hover:-translate-x-3 group-hover:-translate-y-1.5"
                                 >
-                                    No Cover
+                                    <img
+                                        v-if="item.cover"
+                                        :src="item.cover"
+                                        :alt="item.title"
+                                        class="w-full h-full object-cover"
+                                    />
+                                    <div
+                                        v-else
+                                        class="w-full h-full flex items-center justify-center text-xs text-[#8C857B]"
+                                    >
+                                        No Cover
+                                    </div>
                                 </div>
-                            </div>
+                            </template>
+                            <StackedCovers
+                                v-else
+                                :items="item.stackedImages || []"
+                                :default-cover="item.cover"
+                            />
                         </div>
 
                         <div class="text-center md:text-left">

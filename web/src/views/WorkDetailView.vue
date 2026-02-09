@@ -1,16 +1,17 @@
 <script setup lang="ts">
 import { onMounted, ref, watch, computed } from 'vue'
 import { useRoute } from 'vue-router'
-import { Play, Heart, MoreHorizontal, Share2, Pause } from 'lucide-vue-next'
+import { Play, Heart, MoreHorizontal, Pause } from 'lucide-vue-next'
 import { api } from '@/ApiInstance'
 import { useAudioStore } from '@/stores/audio'
 import DashboardTopBar from '@/components/dashboard/DashboardTopBar.vue'
+import MediaListPanel from '@/components/MediaListPanel.vue'
+import StackedCovers from '@/components/StackedCovers.vue'
 
 const route = useRoute()
 const audioStore = useAudioStore()
 const currentRecordingId = ref<number | null>(null)
 const isLoading = ref(true)
-const isCdVisible = ref(false)
 
 type WorkData = {
     title: string
@@ -65,7 +66,6 @@ const resolveAudio = (assets: readonly Asset[]) => {
 const fetchWork = async (id: number) => {
     try {
         isLoading.value = true
-        isCdVisible.value = false
 
         const data = await api.workController.getWorkById({ id })
 
@@ -101,9 +101,6 @@ const fetchWork = async (id: number) => {
         console.error('Failed to fetch work details:', error)
     } finally {
         isLoading.value = false
-        setTimeout(() => {
-            isCdVisible.value = true
-        }, 100)
     }
 }
 
@@ -179,46 +176,8 @@ watch(
             <!-- 头部卡片 -->
             <div class="mt-8 flex flex-col md:flex-row gap-12 md:gap-32 items-end mb-16">
                 <!-- 封面艺术 -->
-                <div
-                    class="relative z-0 group shrink-0 w-64 h-64 md:w-80 md:h-80 select-none perspective-1000"
-                >
-                    <!-- 滑出的黑胶唱片效果 (Work使用黑胶风格以区别于Album的CD风格) -->
-                    <div
-                        class="absolute top-2 right-2 bottom-2 left-2 bg-[#1a1a1a] rounded-full shadow-lg flex items-center justify-center transition-transform duration-2000 ease-out z-0"
-                        :class="isCdVisible ? 'translate-x-16 md:translate-x-24' : 'translate-x-0'"
-                    >
-                        <!-- 唱片纹理 -->
-                        <div
-                            class="absolute inset-2 rounded-full border-4 border-[#2a2a2a] opacity-50"
-                        ></div>
-                        <div
-                            class="absolute inset-8 rounded-full border border-[#333] opacity-30"
-                        ></div>
-                        <!-- 唱片中心标签 -->
-                        <div
-                            class="w-1/3 h-1/3 bg-[#C17D46] rounded-full flex items-center justify-center shadow-inner"
-                        >
-                            <div class="w-1.5 h-1.5 bg-black rounded-full"></div>
-                        </div>
-                    </div>
-
-                    <!-- 封面 -->
-                    <div
-                        class="relative w-full h-full shadow-xl rounded-sm overflow-hidden bg-[#2C2420] z-10"
-                    >
-                        <img
-                            v-if="workData.cover"
-                            :src="workData.cover"
-                            alt="Work Cover"
-                            class="w-full h-full object-cover"
-                        />
-                        <div
-                            v-else
-                            class="w-full h-full flex items-center justify-center bg-[#2C2420] text-[#8C857B]"
-                        >
-                            <span class="text-xs">No Cover</span>
-                        </div>
-                    </div>
+                <div class="ml-8 mt-4 w-64 h-64 md:w-80 md:h-80 shrink-0">
+                    <StackedCovers :items="recordings" :default-cover="workData.cover" />
                 </div>
 
                 <!-- 信息 -->
@@ -262,117 +221,73 @@ watch(
                 </div>
             </div>
 
-            <!-- 版本列表 -->
-            <div class="bg-[#FDFBF7] rounded-sm shadow-sm p-8 md:p-12 relative">
-                <div
-                    class="absolute -bottom-2 -right-2 w-full h-full bg-[#F5F1EA] rounded-sm -z-10 transform translate-x-1 translate-y-1"
-                ></div>
-
-                <div class="flex items-center justify-between mb-8 border-b border-[#EFEBE4] pb-4">
-                    <h3 class="font-serif text-2xl text-[#2C2420]">Recordings</h3>
-                    <div class="text-xs text-[#8C857B] uppercase tracking-widest">
-                        Versions & Interpretations
-                    </div>
-                </div>
-
-                <div class="flex flex-col">
+            <MediaListPanel
+                title="Recordings"
+                summary="Versions & Interpretations"
+                :items="recordings"
+                :active-id="currentRecordingId"
+                :playing-id="audioStore.isPlaying ? (audioStore.currentTrack?.id ?? null) : null"
+                @item-click="onRecordingClick"
+                @item-double-click="onRecordingDoubleClick"
+                @item-keydown="onRecordingKeydown"
+            >
+                <template #item="{ item, isActive }">
+                    <!-- 录音封面缩略图 -->
                     <div
-                        v-for="(rec, index) in recordings"
-                        :key="rec.id"
-                        @click="onRecordingClick(rec)"
-                        @dblclick="onRecordingDoubleClick(rec)"
-                        @keydown="onRecordingKeydown($event, rec)"
-                        tabindex="0"
-                        role="button"
-                        class="group flex items-center gap-6 py-4 px-4 rounded-sm transition-all duration-200 cursor-pointer border-b border-transparent hover:bg-[#F2EFE9]"
-                        :class="{ 'bg-[#F2EFE9]': currentRecordingId === rec.id }"
+                        class="w-10 h-10 shrink-0 bg-[#D6D1C7] rounded-sm overflow-hidden shadow-sm hidden md:block"
                     >
-                        <div
-                            class="w-6 text-center font-serif text-lg"
-                            :class="
-                                currentRecordingId === rec.id
-                                    ? 'text-[#C17D46]'
-                                    : 'text-[#DCD6CC] group-hover:text-[#8C857B]'
-                            "
-                        >
+                        <img
+                            v-if="item.cover"
+                            :src="item.cover"
+                            class="w-full h-full object-cover"
+                        />
+                    </div>
+
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-2">
                             <div
-                                v-if="
-                                    audioStore.isPlaying && audioStore.currentTrack?.id === rec.id
-                                "
-                                class="flex gap-0.5 justify-center h-4 items-end"
+                                class="text-base font-medium truncate"
+                                :class="isActive ? 'text-[#C17D46]' : 'text-[#4A433B]'"
                             >
-                                <div class="w-0.5 bg-[#C17D46] h-2 animate-pulse"></div>
-                                <div class="w-0.5 bg-[#C17D46] h-4 animate-pulse delay-75"></div>
-                                <div class="w-0.5 bg-[#C17D46] h-3 animate-pulse delay-150"></div>
+                                {{ item.title }}
                             </div>
-                            <span v-else>{{ index + 1 }}</span>
-                        </div>
-
-                        <!-- 录音封面缩略图 -->
-                        <div
-                            class="w-10 h-10 shrink-0 bg-[#D6D1C7] rounded-sm overflow-hidden shadow-sm hidden md:block"
-                        >
-                            <img
-                                v-if="rec.cover"
-                                :src="rec.cover"
-                                class="w-full h-full object-cover"
-                            />
-                        </div>
-
-                        <div class="flex-1 min-w-0">
-                            <div class="flex items-center gap-2">
-                                <div
-                                    class="text-base font-medium truncate"
-                                    :class="
-                                        currentRecordingId === rec.id
-                                            ? 'text-[#C17D46]'
-                                            : 'text-[#4A433B]'
-                                    "
-                                >
-                                    {{ rec.title }}
-                                </div>
-                                <span
-                                    v-if="rec.isDefault"
-                                    class="px-1.5 py-0.5 bg-[#EFEAE2] text-[#8C857B] text-[10px] uppercase tracking-wider rounded-xs"
-                                    >Default</span
-                                >
-                            </div>
-                            <div class="text-sm text-[#8C857B] truncate">
-                                {{ rec.artist }} <span v-if="rec.type" class="mx-1">·</span>
-                                {{ rec.type }}
-                            </div>
-                        </div>
-
-                        <div
-                            class="hidden lg:block text-xs text-[#B0AAA0] max-w-[200px] truncate ml-4"
-                        >
-                            {{ rec.label }}
-                        </div>
-
-                        <div
-                            class="hidden md:flex opacity-0 group-hover:opacity-100 transition-opacity gap-4 mr-4 text-[#8C857B]"
-                        >
-                            <button
-                                class="hover:text-[#C17D46] transition-colors"
-                                @click.stop="handlePlay(rec)"
+                            <span
+                                v-if="item.isDefault"
+                                class="px-1.5 py-0.5 bg-[#EFEAE2] text-[#8C857B] text-[10px] uppercase tracking-wider rounded-xs"
+                                >Default</span
                             >
-                                <Play
-                                    v-if="
-                                        !(
-                                            audioStore.isPlaying &&
-                                            audioStore.currentTrack?.id === rec.id
-                                        )
-                                    "
-                                    :size="16"
-                                />
-                                <Pause v-else :size="16" />
-                            </button>
-                            <Heart :size="16" class="hover:text-[#C17D46]" />
-                            <Share2 :size="16" class="hover:text-[#C17D46]" />
+                        </div>
+                        <div class="text-sm text-[#8C857B] truncate">
+                            {{ item.artist }} <span v-if="item.type" class="mx-1">·</span>
+                            {{ item.type }}
                         </div>
                     </div>
-                </div>
-            </div>
+
+                    <div class="hidden lg:block text-xs text-[#B0AAA0] max-w-[200px] truncate ml-4">
+                        {{ item.label }}
+                    </div>
+
+                    <div
+                        class="hidden md:flex opacity-0 group-hover:opacity-100 transition-opacity gap-4 mr-4 text-[#8C857B]"
+                    >
+                        <button
+                            class="hover:text-[#C17D46] transition-colors"
+                            @click.stop="handlePlay(item)"
+                        >
+                            <Play
+                                v-if="
+                                    !(
+                                        audioStore.isPlaying &&
+                                        audioStore.currentTrack?.id === item.id
+                                    )
+                                "
+                                :size="16"
+                            />
+                            <Pause v-else :size="16" />
+                        </button>
+                    </div>
+                </template>
+            </MediaListPanel>
         </div>
     </div>
 </template>

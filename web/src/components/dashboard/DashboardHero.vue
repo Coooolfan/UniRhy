@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Heart, Pause, Play } from 'lucide-vue-next'
+import { Pause, Play } from 'lucide-vue-next'
 import { featuredAlbum as defaultFeaturedAlbum } from './data'
 import { computed, ref, onMounted } from 'vue'
 import { api } from '@/ApiInstance'
@@ -194,11 +194,6 @@ onMounted(async () => {
                                 @click="handlePlayFeatured"
                             >
                                 {{ isFeaturedPlaying ? '暂停播放' : '立即播放' }}
-                            </button>
-                            <button
-                                class="text-[#9C968B] hover:text-[#C27E46] transition-colors p-2"
-                            >
-                                <Heart :size="24" />
                             </button>
                         </div>
                     </div>

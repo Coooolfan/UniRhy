@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { Play, Heart, MoreHorizontal, Share2, Pause } from 'lucide-vue-next'
+import { Play, Pause } from 'lucide-vue-next'
 import { api } from '@/ApiInstance'
 import { useAudioStore } from '@/stores/audio'
 import DashboardTopBar from '@/components/dashboard/DashboardTopBar.vue'
+import MediaListPanel from '@/components/MediaListPanel.vue'
 
 const route = useRoute()
 const audioStore = useAudioStore()
@@ -252,95 +253,36 @@ watch(
                             <Play v-else :size="16" fill="currentColor" />
                             {{ isCurrentTrackPlaying ? '暂停播放' : '立即播放' }}
                         </button>
-                        <button
-                            class="p-3 text-[#8C857B] hover:text-[#C17D46] transition-colors border border-transparent hover:border-[#DCD6CC] rounded-full cursor-pointer"
-                        >
-                            <Heart :size="20" />
-                        </button>
-                        <button
-                            class="p-3 text-[#8C857B] hover:text-[#C17D46] transition-colors border border-transparent hover:border-[#DCD6CC] rounded-full cursor-pointer"
-                        >
-                            <MoreHorizontal :size="20" />
-                        </button>
                     </div>
                 </div>
             </div>
 
-            <!-- 曲目列表容器 - 卡片/纸张风格 -->
-            <div class="bg-[#FDFBF7] rounded-sm shadow-sm p-8 md:p-12 relative">
-                <!-- 右下角的纸张堆叠效果 -->
-                <div
-                    class="absolute -bottom-2 -right-2 w-full h-full bg-[#F5F1EA] rounded-sm -z-10 transform translate-x-1 translate-y-1"
-                ></div>
-
-                <div class="flex items-center justify-between mb-8 border-b border-[#EFEBE4] pb-4">
-                    <h3 class="font-serif text-2xl text-[#2C2420]">Tracklist</h3>
-                    <div class="text-xs text-[#8C857B] uppercase tracking-widest">
-                        {{ tracks.length }} Songs
-                    </div>
-                </div>
-
-                <div class="flex flex-col">
-                    <div
-                        v-for="(track, index) in tracks"
-                        :key="track.id"
-                        @click="onTrackClick(track)"
-                        @dblclick="onTrackDoubleClick(track)"
-                        @keydown="onTrackKeydown($event, track)"
-                        tabindex="0"
-                        role="button"
-                        class="group flex items-center gap-6 py-4 px-4 rounded-sm transition-all duration-200 cursor-pointer border-b border-transparent hover:bg-[#F2EFE9]"
-                        :class="{ 'bg-[#F2EFE9]': currentTrackId === track.id }"
-                    >
+            <MediaListPanel
+                title="Tracklist"
+                :summary="`${tracks.length} Songs`"
+                :items="tracks"
+                :active-id="currentTrackId"
+                :playing-id="audioStore.isPlaying ? (audioStore.currentTrack?.id ?? null) : null"
+                :playing-requires-active="true"
+                @item-click="onTrackClick"
+                @item-double-click="onTrackDoubleClick"
+                @item-keydown="onTrackKeydown"
+            >
+                <template #item="{ item, isActive }">
+                    <div class="flex-1">
                         <div
-                            class="w-6 text-center font-serif text-lg"
-                            :class="
-                                currentTrackId === track.id
-                                    ? 'text-[#C17D46]'
-                                    : 'text-[#DCD6CC] group-hover:text-[#8C857B]'
-                            "
+                            class="text-base font-medium"
+                            :class="isActive ? 'text-[#C17D46]' : 'text-[#4A433B]'"
                         >
-                            <div
-                                v-if="
-                                    currentTrackId === track.id &&
-                                    audioStore.isPlaying &&
-                                    audioStore.currentTrack?.id === track.id
-                                "
-                                class="flex gap-0.5 justify-center h-4 items-end"
-                            >
-                                <div class="w-0.5 bg-[#C17D46] h-2 animate-pulse"></div>
-                                <div class="w-0.5 bg-[#C17D46] h-4 animate-pulse delay-75"></div>
-                                <div class="w-0.5 bg-[#C17D46] h-3 animate-pulse delay-150"></div>
-                            </div>
-                            <span v-else>{{ index + 1 }}</span>
-                        </div>
-
-                        <div class="flex-1">
-                            <div
-                                class="text-base font-medium"
-                                :class="
-                                    currentTrackId === track.id
-                                        ? 'text-[#C17D46]'
-                                        : 'text-[#4A433B]'
-                                "
-                            >
-                                {{ track.title }}
-                            </div>
-                        </div>
-
-                        <div
-                            class="hidden md:flex opacity-0 group-hover:opacity-100 transition-opacity gap-4 mr-4 text-[#8C857B]"
-                        >
-                            <Heart :size="16" class="hover:text-[#C17D46]" />
-                            <Share2 :size="16" class="hover:text-[#C17D46]" />
-                        </div>
-
-                        <div class="text-sm text-[#8C857B] font-mono w-12 text-right">
-                            {{ track.duration }}
+                            {{ item.title }}
                         </div>
                     </div>
-                </div>
-            </div>
+
+                    <div class="text-sm text-[#8C857B] font-mono w-12 text-right">
+                        {{ item.duration }}
+                    </div>
+                </template>
+            </MediaListPanel>
         </div>
     </div>
 </template>

@@ -10,13 +10,44 @@ export type AudioTrack = {
     workId?: number
 }
 
+const VOLUME_STORAGE_KEY = 'unirhy.audio.volume'
+
+const normalizeVolume = (volume: number) => {
+    return Math.max(0, Math.min(1, volume))
+}
+
+const readSavedVolume = () => {
+    if (typeof window === 'undefined') {
+        return 1
+    }
+
+    const raw = window.localStorage.getItem(VOLUME_STORAGE_KEY)
+    if (raw === null) {
+        return 1
+    }
+
+    const parsed = Number.parseFloat(raw)
+    if (Number.isNaN(parsed)) {
+        return 1
+    }
+
+    return normalizeVolume(parsed)
+}
+
+const persistVolume = (volume: number) => {
+    if (typeof window === 'undefined') {
+        return
+    }
+    window.localStorage.setItem(VOLUME_STORAGE_KEY, volume.toString())
+}
+
 export const useAudioStore = defineStore('audio', () => {
     // State
     const currentTrack = ref<AudioTrack | null>(null)
     const isPlaying = ref(false)
     const currentTime = ref(0)
     const duration = ref(0)
-    const volume = ref(1.0)
+    const volume = ref(readSavedVolume())
     const isLoading = ref(false)
     const error = ref<string | null>(null)
 
@@ -54,7 +85,9 @@ export const useAudioStore = defineStore('audio', () => {
     }
 
     function setVolume(vol: number) {
-        volume.value = Math.max(0, Math.min(1, vol))
+        const normalizedVolume = normalizeVolume(vol)
+        volume.value = normalizedVolume
+        persistVolume(normalizedVolume)
     }
 
     return {
