@@ -1,13 +1,14 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { Play, Heart, MoreHorizontal, Share2, Pause } from 'lucide-vue-next'
 import { api } from '@/ApiInstance'
+import { useAudioStore } from '@/stores/audio'
 import DashboardTopBar from '@/components/dashboard/DashboardTopBar.vue'
 
 const route = useRoute()
-const isPlaying = ref(false)
-const currentTrack = ref<number | null>(null)
+const audioStore = useAudioStore()
+const currentTrackId = ref<number | null>(null)
 const isLoading = ref(true)
 const isCdVisible = ref(false)
 
@@ -23,8 +24,10 @@ type AlbumData = {
 type Track = {
     id: number
     title: string
+    artist: string
     duration: string
-    played: boolean
+    cover: string
+    audioSrc?: string
 }
 
 const albumData = ref<AlbumData>({
@@ -43,6 +46,21 @@ const resolveCover = (coverId?: number) => {
         return `/api/media/${coverId}`
     }
     return ''
+}
+
+type Asset = {
+    mediaFile: {
+        id: number
+        mimeType: string
+    }
+}
+
+const resolveAudio = (assets: readonly Asset[]) => {
+    const audioAsset = assets.find((asset) => asset.mediaFile.mimeType.startsWith('audio/'))
+    if (audioAsset) {
+        return `/api/media/${audioAsset.mediaFile.id}`
+    }
+    return undefined
 }
 
 const fetchAlbum = async (id: number) => {
@@ -72,13 +90,16 @@ const fetchAlbum = async (id: number) => {
         tracks.value = (data.recordings || []).map((recording) => ({
             id: recording.id,
             title: recording.title || recording.comment || 'Untitled Track',
+            artist: recording.artists.map((artist) => artist.name).join(', ') || artistName,
             // API 当前不提供时长，占位或移除
             duration: '',
-            played: false,
+            cover: resolveCover(recording.cover?.id),
+            audioSrc: resolveAudio(recording.assets || []),
         }))
 
         if (tracks.value.length > 0) {
-            currentTrack.value = tracks.value[0]?.id ?? null
+            const firstPlayableTrack = tracks.value.find((track) => track.audioSrc)
+            currentTrackId.value = firstPlayableTrack?.id ?? tracks.value[0]?.id ?? null
         }
     } catch (error) {
         console.error('Failed to fetch album details:', error)
@@ -88,6 +109,48 @@ const fetchAlbum = async (id: number) => {
         setTimeout(() => {
             isCdVisible.value = true
         }, 100)
+    }
+}
+
+const hasPlayableTrack = computed(() => tracks.value.some((track) => !!track.audioSrc))
+
+const isCurrentTrackPlaying = computed(() => {
+    return audioStore.isPlaying && audioStore.currentTrack?.id === currentTrackId.value
+})
+
+const handlePlay = (track?: Track) => {
+    const targetTrackId = track?.id ?? currentTrackId.value
+    if (!targetTrackId) return
+
+    const targetTrack = tracks.value.find((item) => item.id === targetTrackId)
+    if (!targetTrack || !targetTrack.audioSrc) {
+        console.warn('No audio source for track', targetTrackId)
+        return
+    }
+
+    currentTrackId.value = targetTrack.id
+    audioStore.play({
+        id: targetTrack.id,
+        title: targetTrack.title,
+        artist: targetTrack.artist,
+        cover: targetTrack.cover || albumData.value.cover,
+        src: targetTrack.audioSrc,
+    })
+}
+
+const onTrackClick = (track: Track) => {
+    currentTrackId.value = track.id
+}
+
+const onTrackDoubleClick = (track: Track) => {
+    currentTrackId.value = track.id
+    handlePlay(track)
+}
+
+const onTrackKeydown = (event: KeyboardEvent, track: Track) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault()
+        onTrackDoubleClick(track)
     }
 }
 
@@ -181,12 +244,13 @@ watch(
 
                     <div class="flex items-center gap-4 mt-4">
                         <button
-                            @click="isPlaying = !isPlaying"
-                            class="px-8 py-3 border border-[#C17D46] text-[#C17D46] hover:bg-[#C17D46] hover:text-white transition-all duration-300 flex items-center gap-2 text-sm tracking-widest uppercase font-medium rounded-sm cursor-pointer"
+                            @click="handlePlay()"
+                            :disabled="!hasPlayableTrack"
+                            class="px-8 py-3 border border-[#C17D46] text-[#C17D46] hover:bg-[#C17D46] hover:text-white disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-[#C17D46] transition-all duration-300 flex items-center gap-2 text-sm tracking-widest uppercase font-medium rounded-sm cursor-pointer"
                         >
-                            <Pause v-if="isPlaying" :size="16" />
+                            <Pause v-if="isCurrentTrackPlaying" :size="16" />
                             <Play v-else :size="16" fill="currentColor" />
-                            {{ isPlaying ? '暂停播放' : '立即播放' }}
+                            {{ isCurrentTrackPlaying ? '暂停播放' : '立即播放' }}
                         </button>
                         <button
                             class="p-3 text-[#8C857B] hover:text-[#C17D46] transition-colors border border-transparent hover:border-[#DCD6CC] rounded-full cursor-pointer"
@@ -220,20 +284,28 @@ watch(
                     <div
                         v-for="(track, index) in tracks"
                         :key="track.id"
-                        @click="currentTrack = track.id"
+                        @click="onTrackClick(track)"
+                        @dblclick="onTrackDoubleClick(track)"
+                        @keydown="onTrackKeydown($event, track)"
+                        tabindex="0"
+                        role="button"
                         class="group flex items-center gap-6 py-4 px-4 rounded-sm transition-all duration-200 cursor-pointer border-b border-transparent hover:bg-[#F2EFE9]"
-                        :class="{ 'bg-[#F2EFE9]': currentTrack === track.id }"
+                        :class="{ 'bg-[#F2EFE9]': currentTrackId === track.id }"
                     >
                         <div
                             class="w-6 text-center font-serif text-lg"
                             :class="
-                                currentTrack === track.id
+                                currentTrackId === track.id
                                     ? 'text-[#C17D46]'
                                     : 'text-[#DCD6CC] group-hover:text-[#8C857B]'
                             "
                         >
                             <div
-                                v-if="currentTrack === track.id && isPlaying"
+                                v-if="
+                                    currentTrackId === track.id &&
+                                    audioStore.isPlaying &&
+                                    audioStore.currentTrack?.id === track.id
+                                "
                                 class="flex gap-0.5 justify-center h-4 items-end"
                             >
                                 <div class="w-0.5 bg-[#C17D46] h-2 animate-pulse"></div>
@@ -247,7 +319,9 @@ watch(
                             <div
                                 class="text-base font-medium"
                                 :class="
-                                    currentTrack === track.id ? 'text-[#C17D46]' : 'text-[#4A433B]'
+                                    currentTrackId === track.id
+                                        ? 'text-[#C17D46]'
+                                        : 'text-[#4A433B]'
                                 "
                             >
                                 {{ track.title }}

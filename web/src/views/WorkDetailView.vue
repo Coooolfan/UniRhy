@@ -132,21 +132,21 @@ const handlePlay = (rec?: Recording) => {
     })
 }
 
+const onRecordingKeydown = (event: KeyboardEvent, rec: Recording) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault()
+        onRecordingDoubleClick(rec)
+    }
+}
+
 // Handle clicking on a recording in the list
 const onRecordingClick = (rec: Recording) => {
-    // If clicking the already selected recording, toggle play
-    if (currentRecordingId.value === rec.id) {
-        handlePlay(rec)
-    } else {
-        // Just select it
-        currentRecordingId.value = rec.id
-        // Optional: Auto-play when switching selection? For now, let's just select.
-        // User might want to see details without playing immediately.
-        // But if we want it to feel like a player playlist, maybe we play.
-        // Let's stick to "click to select", double click or play button to play?
-        // Or keep play button separate.
-        // The original code had @click="currentRecording = rec.id"
-    }
+    currentRecordingId.value = rec.id
+}
+
+const onRecordingDoubleClick = (rec: Recording) => {
+    currentRecordingId.value = rec.id
+    handlePlay(rec)
 }
 
 onMounted(() => {
@@ -280,6 +280,10 @@ watch(
                         v-for="(rec, index) in recordings"
                         :key="rec.id"
                         @click="onRecordingClick(rec)"
+                        @dblclick="onRecordingDoubleClick(rec)"
+                        @keydown="onRecordingKeydown($event, rec)"
+                        tabindex="0"
+                        role="button"
                         class="group flex items-center gap-6 py-4 px-4 rounded-sm transition-all duration-200 cursor-pointer border-b border-transparent hover:bg-[#F2EFE9]"
                         :class="{ 'bg-[#F2EFE9]': currentRecordingId === rec.id }"
                     >

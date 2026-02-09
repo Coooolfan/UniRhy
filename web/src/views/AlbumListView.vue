@@ -1,9 +1,17 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ChevronLeft, ChevronRight, LayoutGrid, List as ListIcon, Play } from 'lucide-vue-next'
+import {
+    ChevronLeft,
+    ChevronRight,
+    LayoutGrid,
+    List as ListIcon,
+    Pause,
+    Play,
+} from 'lucide-vue-next'
 import DashboardTopBar from '@/components/dashboard/DashboardTopBar.vue'
 import { api, normalizeApiError } from '@/ApiInstance'
+import { useAudioStore } from '@/stores/audio'
 
 type DisplayItem = {
     id: number
@@ -12,16 +20,24 @@ type DisplayItem = {
     details: string
     cover: string
     badge?: string
+    playTrackId?: number
+    playTitle?: string
+    playArtist?: string
+    playCover?: string
+    playSrc?: string
+    playWorkId?: number
 }
 
 const router = useRouter()
 const route = useRoute()
+const audioStore = useAudioStore()
 const viewMode = ref<'grid' | 'list'>('grid')
 const activeTab = ref<'Albums' | 'Works'>('Albums')
 const searchQuery = ref('')
 const displayItems = ref<DisplayItem[]>([])
 const isLoading = ref(false)
 const errorMessage = ref('')
+const playLoadingItemId = ref<number | null>(null)
 
 // Pagination state
 const pageIndex = ref(0)
@@ -29,6 +45,33 @@ const pageSize = ref(10)
 const totalPageCount = ref(0)
 
 const resolveCover = (coverId?: number) => (coverId ? `/api/media/${coverId}` : '')
+
+type Asset = {
+    mediaFile: {
+        id: number
+        mimeType: string
+    }
+}
+
+type Artist = {
+    name?: string
+}
+
+const resolveAudio = (assets: readonly Asset[]) => {
+    const audioAsset = assets.find((asset) => asset.mediaFile.mimeType.startsWith('audio/'))
+    if (audioAsset) {
+        return `/api/media/${audioAsset.mediaFile.id}`
+    }
+    return undefined
+}
+
+const resolveArtistName = (artists?: ReadonlyArray<Artist>) => {
+    const names = artists?.map((artist) => artist.name).filter(Boolean) ?? []
+    if (names.length > 0) {
+        return names.join(', ')
+    }
+    return 'Unknown Artist'
+}
 
 const formatYear = (releaseDate?: string) => {
     if (!releaseDate) {
@@ -172,6 +215,89 @@ const navigateToDetail = (id: number) => {
         router.push({ name: 'album-detail', params: { id } })
     } else {
         router.push({ name: 'work-detail', params: { id } })
+    }
+}
+
+const isItemPlaying = (item: DisplayItem) => {
+    return (
+        audioStore.isPlaying &&
+        item.playTrackId !== undefined &&
+        audioStore.currentTrack?.id === item.playTrackId
+    )
+}
+
+const playItem = async (item: DisplayItem) => {
+    if (playLoadingItemId.value === item.id) {
+        return
+    }
+
+    try {
+        playLoadingItemId.value = item.id
+        if (!item.playSrc || item.playTrackId === undefined) {
+            if (activeTab.value === 'Albums') {
+                const detail = await api.albumController.getAlbum({ id: item.id })
+                const defaultTrack = detail.recordings.find(
+                    (recording) => recording.defaultInWork && resolveAudio(recording.assets || []),
+                )
+                const firstPlayableTrack = detail.recordings.find((recording) =>
+                    resolveAudio(recording.assets || []),
+                )
+                const targetTrack = defaultTrack ?? firstPlayableTrack
+                const targetSrc = resolveAudio(targetTrack?.assets || [])
+                if (!targetTrack || !targetSrc) {
+                    console.warn('No playable track for album', item.id)
+                    return
+                }
+
+                item.playTrackId = targetTrack.id
+                item.playTitle = targetTrack.title || targetTrack.comment || detail.title
+                item.playArtist = resolveArtistName(targetTrack.artists) || item.subtitle
+                item.playCover = targetTrack.cover?.id
+                    ? resolveCover(targetTrack.cover.id)
+                    : item.cover
+                item.playSrc = targetSrc
+            } else {
+                const detail = await api.workController.getWorkById({ id: item.id })
+                const defaultTrack = detail.recordings.find(
+                    (recording) => recording.defaultInWork && resolveAudio(recording.assets || []),
+                )
+                const firstPlayableTrack = detail.recordings.find((recording) =>
+                    resolveAudio(recording.assets || []),
+                )
+                const targetTrack = defaultTrack ?? firstPlayableTrack
+                const targetSrc = resolveAudio(targetTrack?.assets || [])
+                if (!targetTrack || !targetSrc) {
+                    console.warn('No playable track for work', item.id)
+                    return
+                }
+
+                item.playTrackId = targetTrack.id
+                item.playTitle = targetTrack.title || targetTrack.comment || detail.title
+                item.playArtist = resolveArtistName(targetTrack.artists) || item.subtitle
+                item.playCover = targetTrack.cover?.id
+                    ? resolveCover(targetTrack.cover.id)
+                    : item.cover
+                item.playSrc = targetSrc
+                item.playWorkId = detail.id
+            }
+        }
+
+        if (!item.playSrc || item.playTrackId === undefined) {
+            return
+        }
+
+        audioStore.play({
+            id: item.playTrackId,
+            title: item.playTitle || item.title,
+            artist: item.playArtist || item.subtitle,
+            cover: item.playCover || item.cover,
+            src: item.playSrc,
+            workId: item.playWorkId,
+        })
+    } catch (error) {
+        console.error('Failed to play item:', error)
+    } finally {
+        playLoadingItemId.value = null
     }
 }
 </script>
@@ -340,11 +466,24 @@ const navigateToDetail = (id: number) => {
                             <span class="group-hover:hidden">{{
                                 (idx + 1 + pageIndex * pageSize).toString().padStart(2, '0')
                             }}</span>
-                            <Play
-                                :size="14"
-                                class="hidden group-hover:block ml-1"
-                                fill="currentColor"
-                            />
+                            <button
+                                type="button"
+                                class="hidden group-hover:inline-flex ml-1 hover:text-[#C27E46] transition-colors"
+                                @click.stop="playItem(item)"
+                            >
+                                <Play
+                                    v-if="playLoadingItemId === item.id"
+                                    :size="14"
+                                    fill="currentColor"
+                                    class="animate-pulse"
+                                />
+                                <Pause
+                                    v-else-if="isItemPlaying(item)"
+                                    :size="14"
+                                    fill="currentColor"
+                                />
+                                <Play v-else :size="14" fill="currentColor" />
+                            </button>
                         </div>
                         <div class="col-span-5 flex items-center gap-4">
                             <div class="w-10 h-10 shadow-sm bg-[#D6D1C7] overflow-hidden">

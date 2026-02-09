@@ -1,14 +1,18 @@
 <script setup lang="ts">
-import { Heart, Play } from 'lucide-vue-next'
+import { Heart, Pause, Play } from 'lucide-vue-next'
 import { featuredAlbum as defaultFeaturedAlbum } from './data'
-import { ref, onMounted } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { api } from '@/ApiInstance'
+import { useAudioStore } from '@/stores/audio'
 
 type Album = {
+    workId?: number
+    recordingId?: number
     title: string
     artist: string
     year: string
     cover: string
+    audioSrc?: string
 }
 
 type WorkArtist = {
@@ -17,6 +21,7 @@ type WorkArtist = {
 }
 
 const album = ref<Album>({ ...defaultFeaturedAlbum })
+const audioStore = useAudioStore()
 
 const resolveArtistName = (artists?: ReadonlyArray<WorkArtist>) => {
     const names = artists?.map((artist) => artist.name).filter(Boolean) ?? []
@@ -26,22 +31,65 @@ const resolveArtistName = (artists?: ReadonlyArray<WorkArtist>) => {
     return 'Unknown Artist'
 }
 
+type Asset = {
+    mediaFile: {
+        id: number
+        mimeType: string
+    }
+}
+
+const resolveAudio = (assets: readonly Asset[]) => {
+    const audioAsset = assets.find((asset) => asset.mediaFile.mimeType.startsWith('audio/'))
+    if (audioAsset) {
+        return `/api/media/${audioAsset.mediaFile.id}`
+    }
+    return undefined
+}
+
+const isFeaturedPlaying = computed(() => {
+    return audioStore.isPlaying && audioStore.currentTrack?.id === album.value.recordingId
+})
+
+const hasPlayableFeatured = computed(() => {
+    return !!album.value.recordingId && !!album.value.audioSrc
+})
+
+const handlePlayFeatured = () => {
+    if (!album.value.recordingId || !album.value.audioSrc) {
+        return
+    }
+
+    audioStore.play({
+        id: album.value.recordingId,
+        title: album.value.title,
+        artist: album.value.artist,
+        cover: album.value.cover,
+        src: album.value.audioSrc,
+        workId: album.value.workId,
+    })
+}
+
 onMounted(async () => {
     try {
         const work = await api.workController.randomWork({
             offset: new Date().getTimezoneOffset() * 60000,
         })
+        const defaultRecording = work.recordings?.find((recording) => recording.defaultInWork)
+        const featuredRecording = defaultRecording ?? work.recordings?.[0]
 
         if (work) {
             album.value = {
+                workId: work.id,
+                recordingId: featuredRecording?.id,
                 title: work.title,
                 artist: resolveArtistName(
-                    work.recordings?.[0]?.artists as ReadonlyArray<WorkArtist> | undefined,
+                    featuredRecording?.artists as ReadonlyArray<WorkArtist> | undefined,
                 ),
                 year: '2024', // Fallback as Work doesn't have year
-                cover: work.recordings[0]?.cover?.id
-                    ? `/api/media/${work.recordings[0].cover.id}`
+                cover: featuredRecording?.cover?.id
+                    ? `/api/media/${featuredRecording.cover.id}`
                     : defaultFeaturedAlbum.cover,
+                audioSrc: resolveAudio(featuredRecording?.assets || []),
             }
         }
     } catch (e) {
@@ -70,6 +118,7 @@ onMounted(async () => {
                 <!-- Album Cover -->
                 <div
                     class="h-full aspect-square bg-[#D6D2C9] relative flex items-center justify-center group cursor-pointer overflow-hidden border-r border-[#EBE7E0] shrink-0"
+                    @click="handlePlayFeatured"
                 >
                     <img
                         :src="album.cover"
@@ -84,7 +133,13 @@ onMounted(async () => {
                         <div
                             class="w-14 h-14 bg-[#F5F2EB] rounded-full flex items-center justify-center shadow-lg transform translate-y-4 group-hover:translate-y-0 transition-all duration-300"
                         >
-                            <Play :size="24" fill="#C27E46" class="text-[#C27E46] ml-1" />
+                            <Pause
+                                v-if="isFeaturedPlaying"
+                                :size="24"
+                                fill="#C27E46"
+                                class="text-[#C27E46]"
+                            />
+                            <Play v-else :size="24" fill="#C27E46" class="text-[#C27E46] ml-1" />
                         </div>
                     </div>
                 </div>
@@ -134,9 +189,11 @@ onMounted(async () => {
                         </p>
                         <div class="flex items-center space-x-6">
                             <button
-                                class="px-8 py-3 border border-[#C27E46] text-[#C27E46] text-sm hover:bg-[#C27E46] hover:text-white transition-all duration-500 rounded-sm font-medium tracking-wide uppercase"
+                                class="px-8 py-3 border border-[#C27E46] text-[#C27E46] text-sm hover:bg-[#C27E46] hover:text-white disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-[#C27E46] transition-all duration-500 rounded-sm font-medium tracking-wide uppercase"
+                                :disabled="!hasPlayableFeatured"
+                                @click="handlePlayFeatured"
                             >
-                                立即播放
+                                {{ isFeaturedPlaying ? '暂停播放' : '立即播放' }}
                             </button>
                             <button
                                 class="text-[#9C968B] hover:text-[#C27E46] transition-colors p-2"

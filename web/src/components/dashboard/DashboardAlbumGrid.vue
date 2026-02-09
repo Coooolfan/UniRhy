@@ -1,19 +1,27 @@
 <script setup lang="ts">
-import { Play } from 'lucide-vue-next'
+import { Pause, Play } from 'lucide-vue-next'
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '@/ApiInstance'
+import { useAudioStore } from '@/stores/audio'
 
 const router = useRouter()
+const audioStore = useAudioStore()
 
 type AlbumCard = {
     id: number
     title: string
     artist: string
     cover: string
+    defaultRecordingId?: number
+    defaultTrackTitle?: string
+    defaultTrackArtist?: string
+    defaultTrackCover?: string
+    defaultTrackSrc?: string
 }
 
 const albums = ref<AlbumCard[]>([])
+const playLoadingAlbumId = ref<number | null>(null)
 
 const resolveCover = (coverId?: number) => {
     if (coverId !== undefined) {
@@ -24,6 +32,79 @@ const resolveCover = (coverId?: number) => {
 
 const navigateToAlbum = (id: number) => {
     router.push({ name: 'album-detail', params: { id } })
+}
+
+type Asset = {
+    mediaFile: {
+        id: number
+        mimeType: string
+    }
+}
+
+const resolveAudio = (assets: readonly Asset[]) => {
+    const audioAsset = assets.find((asset) => asset.mediaFile.mimeType.startsWith('audio/'))
+    if (audioAsset) {
+        return `/api/media/${audioAsset.mediaFile.id}`
+    }
+    return undefined
+}
+
+const isAlbumPlaying = (album: AlbumCard) => {
+    return (
+        audioStore.isPlaying &&
+        album.defaultRecordingId !== undefined &&
+        audioStore.currentTrack?.id === album.defaultRecordingId
+    )
+}
+
+const playAlbum = async (album: AlbumCard) => {
+    if (playLoadingAlbumId.value === album.id) {
+        return
+    }
+
+    try {
+        playLoadingAlbumId.value = album.id
+        if (!album.defaultTrackSrc || album.defaultRecordingId === undefined) {
+            const detail = await api.albumController.getAlbum({ id: album.id })
+            const defaultTrack = detail.recordings.find(
+                (recording) => recording.defaultInWork && resolveAudio(recording.assets || []),
+            )
+            const firstPlayableTrack = detail.recordings.find((recording) =>
+                resolveAudio(recording.assets || []),
+            )
+            const targetTrack = defaultTrack ?? firstPlayableTrack
+            const targetSrc = resolveAudio(targetTrack?.assets || [])
+            if (!targetTrack || !targetSrc) {
+                console.warn('No playable track for album', album.id)
+                return
+            }
+
+            album.defaultRecordingId = targetTrack.id
+            album.defaultTrackTitle = targetTrack.title || targetTrack.comment || detail.title
+            album.defaultTrackArtist =
+                targetTrack.artists.map((artist) => artist.name).join(', ') || album.artist
+            album.defaultTrackCover = targetTrack.cover?.id
+                ? resolveCover(targetTrack.cover.id)
+                : album.cover
+            album.defaultTrackSrc = targetSrc
+        }
+
+        if (!album.defaultTrackSrc || album.defaultRecordingId === undefined) {
+            return
+        }
+
+        audioStore.play({
+            id: album.defaultRecordingId,
+            title: album.defaultTrackTitle || album.title,
+            artist: album.defaultTrackArtist || album.artist,
+            cover: album.defaultTrackCover || album.cover,
+            src: album.defaultTrackSrc,
+        })
+    } catch (error) {
+        console.error('Failed to play album:', error)
+    } finally {
+        playLoadingAlbumId.value = null
+    }
 }
 
 onMounted(async () => {
@@ -65,11 +146,25 @@ onMounted(async () => {
                         class="w-full h-full object-cover filter sepia-[0.2] group-hover:sepia-0 transition-all duration-500"
                     />
                     <!-- Floating Play Button -->
-                    <div
+                    <button
+                        type="button"
                         class="absolute bottom-3 right-3 w-8 h-8 bg-white/90 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 shadow-sm translate-y-2 group-hover:translate-y-0"
+                        @click.stop="playAlbum(album)"
                     >
-                        <Play :size="12" fill="#C27E46" class="text-[#C27E46] `ml-px" />
-                    </div>
+                        <Play
+                            v-if="playLoadingAlbumId === album.id"
+                            :size="12"
+                            fill="#C27E46"
+                            class="text-[#C27E46] animate-pulse"
+                        />
+                        <Pause
+                            v-else-if="isAlbumPlaying(album)"
+                            :size="12"
+                            fill="#C27E46"
+                            class="text-[#C27E46]"
+                        />
+                        <Play v-else :size="12" fill="#C27E46" class="text-[#C27E46]" />
+                    </button>
                 </div>
                 <h4
                     class="font-serif text-[#2C2C2C] text-lg leading-tight group-hover:text-[#C27E46] transition-colors line-clamp-1"
