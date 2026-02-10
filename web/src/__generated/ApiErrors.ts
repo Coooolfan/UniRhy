@@ -30,6 +30,8 @@ export type ApiErrors = {
     }, 
     'mediaFileController': {
     }, 
+    'playlistController': {
+    }, 
     'systemConfigController': {
         'create': AllErrors & ({
                 family: 'SYSTEM', 

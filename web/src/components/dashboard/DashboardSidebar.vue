@@ -1,5 +1,9 @@
 <script setup lang="ts">
+import { ChevronRight } from 'lucide-vue-next'
+import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { api, normalizeApiError } from '@/ApiInstance'
+import { useAudioStore } from '@/stores/audio'
 
 type NavItem = {
     label: string
@@ -9,13 +13,21 @@ type NavItem = {
 
 const router = useRouter()
 const route = useRoute()
+const audioStore = useAudioStore()
 const navItems: NavItem[] = [
     { label: '发现', routeName: 'dashboard-home' },
     { label: '阅览室', routeName: 'album-list', matchNames: ['album-detail'] },
     { label: '任务管理', routeName: 'tasks' },
     { label: '系统设置', routeName: 'settings' },
 ]
-const playlists = ['雨天巴赫', '咖啡馆噪音', '深夜阅读']
+type SidebarPlaylist = {
+    id: number
+    name: string
+}
+
+const playlists = ref<SidebarPlaylist[]>([])
+const isLoadingPlaylists = ref(false)
+const playlistError = ref('')
 
 const isActive = (item: NavItem) => {
     if (!item.routeName) {
@@ -30,6 +42,28 @@ const handleNavClick = (item: NavItem) => {
         router.push({ name: item.routeName })
     }
 }
+
+const fetchPlaylists = async () => {
+    isLoadingPlaylists.value = true
+    playlistError.value = ''
+    try {
+        const data = await api.playlistController.listPlaylists()
+        playlists.value = data.map((playlist) => ({
+            id: playlist.id,
+            name: playlist.name?.trim() || '未命名歌单',
+        }))
+    } catch (error) {
+        const normalized = normalizeApiError(error)
+        playlistError.value = normalized.message ?? '歌单加载失败'
+        playlists.value = []
+    } finally {
+        isLoadingPlaylists.value = false
+    }
+}
+
+onMounted(() => {
+    fetchPlaylists()
+})
 </script>
 
 <template>
@@ -54,21 +88,40 @@ const handleNavClick = (item: NavItem) => {
             </div>
         </nav>
 
-        <div class="pb-32">
-            <div
-                class="text-xs text-[#9C968B] uppercase tracking-widest mb-4 border-b border-[#D6D1C7] pb-2"
+        <div
+            :class="{
+                'pb-32': audioStore.currentTrack && !audioStore.isPlayerHidden,
+                'pb-8': !audioStore.currentTrack || audioStore.isPlayerHidden,
+            }"
+        >
+            <button
+                v-if="!isLoadingPlaylists && !playlistError && playlists.length === 0"
+                type="button"
+                class="inline-flex items-center gap-2 text-sm text-[#8A857D] hover:text-[#C27E46] transition-colors"
             >
-                我的歌单
-            </div>
-            <ul class="space-y-3 text-sm text-[#6B665E]">
-                <li
-                    v-for="playlist in playlists"
-                    :key="playlist"
-                    class="hover:text-[#C27E46] cursor-pointer transition-colors"
+                <span>创建歌单</span>
+                <ChevronRight :size="14" aria-hidden="true" />
+            </button>
+            <template v-else>
+                <div
+                    class="text-xs text-[#9C968B] uppercase tracking-widest mb-4 border-b border-[#D6D1C7] pb-2"
                 >
-                    {{ playlist }}
-                </li>
-            </ul>
+                    我的歌单
+                </div>
+                <div v-if="isLoadingPlaylists" class="text-sm text-[#9C968B]">加载中...</div>
+                <div v-else-if="playlistError" class="text-sm text-red-500">
+                    {{ playlistError }}
+                </div>
+                <ul v-else class="space-y-3 text-sm text-[#6B665E]">
+                    <li
+                        v-for="playlist in playlists"
+                        :key="playlist.id"
+                        class="hover:text-[#C27E46] cursor-pointer transition-colors"
+                    >
+                        {{ playlist.name }}
+                    </li>
+                </ul>
+            </template>
         </div>
     </aside>
 </template>

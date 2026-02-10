@@ -1,0 +1,13 @@
+export com.coooolfan.unirhy.model.Playlist
+
+input PlaylistUpdate {
+    name?
+
+    comment?
+}
+
+input PlaylistCreate {
+    name
+
+    comment
+}

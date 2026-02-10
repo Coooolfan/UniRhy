@@ -15,7 +15,6 @@ import {
 
 const audioStore = useAudioStore()
 const audioRef = ref<HTMLAudioElement | null>(null)
-const isPlayerHidden = ref(false)
 
 const syncAudioVolume = () => {
     if (audioRef.value) {
@@ -95,7 +94,7 @@ watch(
     () => audioStore.currentTrack,
     async (newTrack) => {
         if (!newTrack) {
-            isPlayerHidden.value = false
+            audioStore.showPlayer()
             return
         }
         await nextTick()
@@ -128,11 +127,11 @@ const toggleMute = () => {
 }
 
 const hidePlayer = () => {
-    isPlayerHidden.value = true
+    audioStore.hidePlayer()
 }
 
 const showPlayer = () => {
-    isPlayerHidden.value = false
+    audioStore.showPlayer()
 }
 </script>
 
@@ -159,7 +158,7 @@ const showPlayer = () => {
             leave-to-class="translate-y-full translate-x-10 opacity-0"
         >
             <div
-                v-show="!isPlayerHidden"
+                v-show="!audioStore.isPlayerHidden"
                 class="fixed bottom-0 left-0 right-0 z-50 bg-[#FDFBF7] border-t border-[#EFEBE4] shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] px-4 py-3 md:px-8"
             >
                 <div class="max-w-7xl mx-auto flex items-center justify-between gap-4">
@@ -313,7 +312,7 @@ const showPlayer = () => {
             leave-to-class="translate-y-4 opacity-0"
         >
             <button
-                v-if="isPlayerHidden"
+                v-if="audioStore.isPlayerHidden"
                 @click="showPlayer"
                 class="fixed right-4 bottom-4 z-50 px-3 py-2 rounded-full bg-[#FDFBF7] border border-[#E6E1D8] text-[#8C857B] shadow-md hover:text-[#C17D46] hover:border-[#D8CEBE] transition-colors flex items-center gap-2"
                 aria-label="展开播放栏"

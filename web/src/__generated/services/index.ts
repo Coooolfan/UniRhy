@@ -3,6 +3,7 @@ export {AlbumController} from './AlbumController';
 export {FileSystemStorageController} from './FileSystemStorageController';
 export {MediaFileController} from './MediaFileController';
 export {OssStorageController} from './OssStorageController';
+export {PlaylistController} from './PlaylistController';
 export {SystemConfigController} from './SystemConfigController';
 export {TaskController} from './TaskController';
 export {TokenController} from './TokenController';

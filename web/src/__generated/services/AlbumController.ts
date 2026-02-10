@@ -35,7 +35,7 @@ export class AlbumController {
      * 此接口用于获取系统中所有专辑信息
      * 需要用户登录认证才能访问
      * 
-     * @return List<Album> 返回专辑列表（默认 fetcher）
+     * @return Page<Album> 返回专辑分页列表（默认 fetcher）
      * 
      */
     readonly listAlbums: (options: AlbumControllerOptions['listAlbums']) => Promise<

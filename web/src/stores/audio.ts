@@ -45,6 +45,7 @@ export const useAudioStore = defineStore('audio', () => {
     // State
     const currentTrack = ref<AudioTrack | null>(null)
     const isPlaying = ref(false)
+    const isPlayerHidden = ref(false)
     const currentTime = ref(0)
     const duration = ref(0)
     const volume = ref(readSavedVolume())
@@ -77,7 +78,18 @@ export const useAudioStore = defineStore('audio', () => {
     function stop() {
         isPlaying.value = false
         currentTrack.value = null
+        isPlayerHidden.value = false
         currentTime.value = 0
+    }
+
+    function hidePlayer() {
+        if (currentTrack.value) {
+            isPlayerHidden.value = true
+        }
+    }
+
+    function showPlayer() {
+        isPlayerHidden.value = false
     }
 
     function seek(time: number) {
@@ -93,6 +105,7 @@ export const useAudioStore = defineStore('audio', () => {
     return {
         currentTrack,
         isPlaying,
+        isPlayerHidden,
         currentTime,
         duration,
         volume,
@@ -102,6 +115,8 @@ export const useAudioStore = defineStore('audio', () => {
         pause,
         resume,
         stop,
+        hidePlayer,
+        showPlayer,
         seek,
         setVolume,
     }
