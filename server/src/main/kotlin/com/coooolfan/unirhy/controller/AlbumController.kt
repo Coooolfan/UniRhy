@@ -4,6 +4,7 @@ import cn.dev33.satoken.annotation.SaCheckLogin
 import com.coooolfan.unirhy.model.Album
 import com.coooolfan.unirhy.model.by
 import com.coooolfan.unirhy.service.AlbumService
+import org.babyfish.jimmer.Page
 import org.babyfish.jimmer.client.FetchBy
 import org.babyfish.jimmer.sql.kt.fetcher.newFetcher
 import org.springframework.http.HttpStatus
@@ -25,7 +26,7 @@ class AlbumController(private val service: AlbumService) {
      * 此接口用于获取系统中所有专辑信息
      * 需要用户登录认证才能访问
      *
-     * @return List<Album> 返回专辑列表（默认 fetcher）
+     * @return Page<Album> 返回专辑分页列表（默认 fetcher）
      *
      * @api GET /api/album
      * @permission 需要登录认证
@@ -33,8 +34,11 @@ class AlbumController(private val service: AlbumService) {
      */
     @GetMapping
     @ResponseStatus(HttpStatus.OK)
-    fun listAlbums(): List<@FetchBy("DEFAULT_ALBUM_FETCHER") Album> {
-        return service.listAlbum(DEFAULT_ALBUM_FETCHER, true)
+    fun listAlbums(
+        @RequestParam(required = false) pageIndex: Int?,
+        @RequestParam(required = false) pageSize: Int?
+    ): Page<@FetchBy("DEFAULT_ALBUM_FETCHER") Album> {
+        return service.listAlbum(pageIndex ?: 0, pageSize ?: 10, DEFAULT_ALBUM_FETCHER, true)
     }
 
     /**

@@ -52,6 +52,7 @@ class WorkService(private val sql: KSqlClient) {
 
         val offset = Random(seed).nextLong(count)
         return sql.createQuery(Work::class) {
+            orderBy(table.id)
             select(table.fetch(fetcher))
         }.limit(1, offset).execute().firstOrNull()
     }

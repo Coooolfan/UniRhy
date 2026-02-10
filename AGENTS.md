@@ -20,7 +20,7 @@ UniRhy (独一律) 是一个私有化的音乐流媒体平台
 
 - 以中文作为第一语言与用户交流
 - 除非用户主动要求，单次改动只能在单一项目中进行
-- `./skills` 文件夹为技能包存放位置，其中包含某一领域的额外文档、脚本等
+- `./skills` 文件夹为技能包存放位置，其中包含某一领域的额外文档、脚本等，先探索项目，再决定是否需要读取相关技能
   - `./skills/skill-creator` 创建技能包：Guide for creating effective skills. This skill should be used when users want to create a new skill (or update an existing skill) that extends Claude's capabilities with specialized knowledge, workflows, or tool integrations.
   - `./skills/jimmer-orm` Jimmer ORM 开发指南：适用于：(1) 定义或修改 Jimmer 实体（使用 @Entity 注解的 interface）；(2) 编写 Jimmer DSL 查询代码；(3) 配置实体关联关系（@ManyToOne, @OneToMany, @ManyToMany）；(4) 使用动态谓词、动态表连接或隐式子查询；(5) 编辑包含 Jimmer 相关代码的 Java/Kotlin 文件。
   - `./skills/serverchan` Server酱 推送：通过 Server酱³ 发送推送通知。在无人值守开发时，需要向用户发送消息、通知、提醒时使用此 skill。从环境变量 FT07_KEY 获取密钥。

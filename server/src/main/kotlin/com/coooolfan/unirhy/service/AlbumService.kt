@@ -2,6 +2,7 @@ package com.coooolfan.unirhy.service
 
 import com.coooolfan.unirhy.model.Album
 import com.coooolfan.unirhy.model.id
+import org.babyfish.jimmer.Page
 import org.babyfish.jimmer.sql.fetcher.Fetcher
 import org.babyfish.jimmer.sql.kt.KSqlClient
 import org.babyfish.jimmer.sql.kt.ast.expression.eq
@@ -11,8 +12,13 @@ import org.springframework.stereotype.Service
 
 @Service
 class AlbumService(private val sql: KSqlClient) {
-    fun listAlbum(fetcher: Fetcher<Album>, filterSingle: Boolean = false): List<Album> {
-        return sql.executeQuery(Album::class) {
+    fun listAlbum(
+        pageIndex: Int,
+        pageSize: Int,
+        fetcher: Fetcher<Album>,
+        filterSingle: Boolean = false
+    ): Page<Album> {
+        return sql.createQuery(Album::class) {
 
             if (filterSingle)
                 where(
@@ -22,8 +28,9 @@ class AlbumService(private val sql: KSqlClient) {
                     } ne 1L
                 )
 
+            orderBy(table.id)
             select(table.fetch(fetcher))
-        }
+        }.fetchPage(pageIndex, pageSize)
     }
 
     fun getAlbum(id: Long, fetcher: Fetcher<Album>): Album {

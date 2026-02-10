@@ -90,8 +90,12 @@ const fetchAlbums = async () => {
     isLoading.value = true
     errorMessage.value = ''
     try {
-        const list = await api.albumController.listAlbums()
-        displayItems.value = list.map((album) => ({
+        const page = await api.albumController.listAlbums({
+            pageIndex: pageIndex.value,
+            pageSize: pageSize.value,
+        })
+        totalPageCount.value = page.totalPageCount
+        displayItems.value = page.rows.map((album) => ({
             id: album.id,
             title: album.title || 'Untitled Album',
             subtitle: album.recordings?.[0]?.label || 'Unknown Artist',
@@ -99,8 +103,6 @@ const fetchAlbums = async () => {
             cover: resolveCover(album.cover?.id),
             badge: album.kind?.trim() ? album.kind : '其他',
         }))
-        // Albums API currently returns all items, so no pagination needed yet
-        totalPageCount.value = 1
     } catch (error) {
         const normalized = normalizeApiError(error)
         errorMessage.value = normalized.message ?? '专辑加载失败'
@@ -525,10 +527,7 @@ const playItem = async (item: DisplayItem) => {
             </div>
 
             <!-- Pagination Controls -->
-            <div
-                v-if="activeTab === 'Works' && totalPageCount > 1"
-                class="flex justify-center items-center mt-12 gap-6"
-            >
+            <div v-if="totalPageCount > 1" class="flex justify-center items-center mt-12 gap-6">
                 <button
                     @click="handlePageChange(pageIndex - 1)"
                     :disabled="pageIndex === 0 || isLoading"

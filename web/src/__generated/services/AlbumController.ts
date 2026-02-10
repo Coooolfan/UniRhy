@@ -1,5 +1,6 @@
 import type {Executor} from '../';
 import type {AlbumDto} from '../model/dto/';
+import type {Page} from '../model/static/';
 
 /**
  * 专辑管理接口
@@ -37,16 +38,35 @@ export class AlbumController {
      * @return List<Album> 返回专辑列表（默认 fetcher）
      * 
      */
-    readonly listAlbums: () => Promise<
-        ReadonlyArray<AlbumDto['AlbumController/DEFAULT_ALBUM_FETCHER']>
-    > = async() => {
+    readonly listAlbums: (options: AlbumControllerOptions['listAlbums']) => Promise<
+        Page<AlbumDto['AlbumController/DEFAULT_ALBUM_FETCHER']>
+    > = async(options) => {
         let _uri = '/api/album';
-        return (await this.executor({uri: _uri, method: 'GET'})) as Promise<ReadonlyArray<AlbumDto['AlbumController/DEFAULT_ALBUM_FETCHER']>>;
+        let _separator = _uri.indexOf('?') === -1 ? '?' : '&';
+        let _value: any = undefined;
+        _value = options.pageIndex;
+        if (_value !== undefined && _value !== null) {
+            _uri += _separator
+            _uri += 'pageIndex='
+            _uri += encodeURIComponent(_value);
+            _separator = '&';
+        }
+        _value = options.pageSize;
+        if (_value !== undefined && _value !== null) {
+            _uri += _separator
+            _uri += 'pageSize='
+            _uri += encodeURIComponent(_value);
+            _separator = '&';
+        }
+        return (await this.executor({uri: _uri, method: 'GET'})) as Promise<Page<AlbumDto['AlbumController/DEFAULT_ALBUM_FETCHER']>>;
     }
 }
 
 export type AlbumControllerOptions = {
-    'listAlbums': {}, 
+    'listAlbums': {
+        readonly pageIndex?: number | undefined, 
+        readonly pageSize?: number | undefined
+    }, 
     'getAlbum': {
         /**
          * 专辑 ID

@@ -7,6 +7,7 @@ import { useAudioStore } from '@/stores/audio'
 
 const router = useRouter()
 const audioStore = useAudioStore()
+const pageSize = 10
 
 type AlbumCard = {
     id: number
@@ -107,13 +108,13 @@ const playAlbum = async (album: AlbumCard) => {
     }
 }
 
-onMounted(async () => {
+const fetchAlbums = async () => {
     try {
-        const list = await api.albumController.listAlbums()
-        if (list.length === 0) {
-            return
-        }
-        albums.value = list.map((album) => ({
+        const page = await api.albumController.listAlbums({
+            pageIndex: 0,
+            pageSize,
+        })
+        albums.value = page.rows.map((album) => ({
             id: album.id,
             title: album.title ?? 'Untitled Album',
             artist: album.recordings?.[0]?.label ?? 'Unknown Artist',
@@ -122,6 +123,10 @@ onMounted(async () => {
     } catch (error) {
         console.error('Failed to fetch albums:', error)
     }
+}
+
+onMounted(() => {
+    fetchAlbums()
 })
 </script>
 
