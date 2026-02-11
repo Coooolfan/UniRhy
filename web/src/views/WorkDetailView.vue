@@ -232,60 +232,18 @@ watch(
                 @item-keydown="onRecordingKeydown"
             >
                 <template #item="{ item, isActive }">
-                    <!-- 录音封面缩略图 -->
-                    <div
-                        class="w-10 h-10 shrink-0 bg-[#D6D1C7] rounded-sm overflow-hidden shadow-sm hidden md:block"
-                    >
-                        <img
-                            v-if="item.cover"
-                            :src="item.cover"
-                            class="w-full h-full object-cover"
-                        />
-                    </div>
-
-                    <div class="flex-1 min-w-0">
-                        <div class="flex items-center gap-2">
-                            <div
-                                class="text-base font-medium truncate"
-                                :class="isActive ? 'text-[#C17D46]' : 'text-[#4A433B]'"
-                            >
-                                {{ item.title }}
-                            </div>
-                            <span
-                                v-if="item.isDefault"
-                                class="px-1.5 py-0.5 bg-[#EFEAE2] text-[#8C857B] text-[10px] uppercase tracking-wider rounded-xs"
-                                >Default</span
-                            >
-                        </div>
-                        <div class="text-sm text-[#8C857B] truncate">
-                            {{ item.artist }} <span v-if="item.type" class="mx-1">·</span>
-                            {{ item.type }}
-                        </div>
-                    </div>
-
-                    <div class="hidden lg:block text-xs text-[#B0AAA0] max-w-[200px] truncate ml-4">
-                        {{ item.label }}
-                    </div>
-
-                    <div
-                        class="hidden md:flex opacity-0 group-hover:opacity-100 transition-opacity gap-4 mr-4 text-[#8C857B]"
-                    >
-                        <button
-                            class="hover:text-[#C17D46] transition-colors"
-                            @click.stop="handlePlay(item)"
-                        >
-                            <Play
-                                v-if="
-                                    !(
-                                        audioStore.isPlaying &&
-                                        audioStore.currentTrack?.id === item.id
-                                    )
-                                "
-                                :size="16"
-                            />
-                            <Pause v-else :size="16" />
-                        </button>
-                    </div>
+                    <MediaListItem
+                        :title="item.title"
+                        :label="item.label"
+                        :cover="item.cover"
+                        :is-default="item.isDefault"
+                        :subtitle="`${item.artist}${item.type ? ' · ' + item.type : ''}`"
+                        :is-active="isActive"
+                        :is-playing="
+                            audioStore.isPlaying && audioStore.currentTrack?.id === item.id
+                        "
+                        @play="handlePlay(item)"
+                    />
                 </template>
             </MediaListPanel>
         </div>

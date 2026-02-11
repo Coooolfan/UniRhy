@@ -21,6 +21,7 @@ const emit = defineEmits<{
 
 defineSlots<{
     item(props: { item: T; index: number; isActive: boolean; isPlaying: boolean }): unknown
+    empty(): unknown
 }>()
 
 const isItemActive = (itemId: number) => {
@@ -52,6 +53,13 @@ const isItemPlaying = (itemId: number) => {
         </div>
 
         <div class="flex flex-col">
+            <div
+                v-if="items.length === 0"
+                class="py-12 text-center text-[#8C857B] text-sm font-serif italic"
+            >
+                <slot name="empty">No items found</slot>
+            </div>
+
             <div
                 v-for="(item, index) in items"
                 :key="item.id"

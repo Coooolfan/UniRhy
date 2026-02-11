@@ -6,6 +6,7 @@ import { api } from '@/ApiInstance'
 import { useAudioStore } from '@/stores/audio'
 import DashboardTopBar from '@/components/dashboard/DashboardTopBar.vue'
 import MediaListPanel from '@/components/MediaListPanel.vue'
+import MediaListItem from '@/components/MediaListItem.vue'
 
 const route = useRoute()
 const audioStore = useAudioStore()
@@ -268,38 +269,15 @@ watch(
                 @item-keydown="onTrackKeydown"
             >
                 <template #item="{ item, isActive }">
-                    <div class="flex-1">
-                        <div
-                            class="text-base font-medium"
-                            :class="isActive ? 'text-[#C17D46]' : 'text-[#4A433B]'"
-                        >
-                            {{ item.title }}
-                        </div>
-                    </div>
-
-                    <div class="hidden lg:block text-xs text-[#B0AAA0] max-w-[200px] truncate ml-4">
-                        {{ item.label }}
-                    </div>
-
-                    <div
-                        class="hidden md:flex opacity-0 group-hover:opacity-100 transition-opacity gap-4 mr-4 text-[#8C857B]"
-                    >
-                        <button
-                            class="hover:text-[#C17D46] transition-colors"
-                            @click.stop="handlePlay(item)"
-                        >
-                            <Play
-                                v-if="
-                                    !(
-                                        audioStore.isPlaying &&
-                                        audioStore.currentTrack?.id === item.id
-                                    )
-                                "
-                                :size="16"
-                            />
-                            <Pause v-else :size="16" />
-                        </button>
-                    </div>
+                    <MediaListItem
+                        :title="item.title"
+                        :label="item.label"
+                        :is-active="isActive"
+                        :is-playing="
+                            audioStore.isPlaying && audioStore.currentTrack?.id === item.id
+                        "
+                        @play="handlePlay(item)"
+                    />
                 </template>
             </MediaListPanel>
         </div>
