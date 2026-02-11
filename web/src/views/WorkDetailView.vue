@@ -7,11 +7,16 @@ import { useAudioStore } from '@/stores/audio'
 import DashboardTopBar from '@/components/dashboard/DashboardTopBar.vue'
 import MediaListPanel from '@/components/MediaListPanel.vue'
 import StackedCovers from '@/components/StackedCovers.vue'
+import MediaListItem from '@/components/MediaListItem.vue'
+import AddRecordingToPlaylistModal from '@/components/playlist/AddRecordingToPlaylistModal.vue'
 
 const route = useRoute()
 const audioStore = useAudioStore()
 const currentRecordingId = ref<number | null>(null)
 const isLoading = ref(true)
+const isAddToPlaylistModalOpen = ref(false)
+const selectedRecordingForPlaylist = ref<Recording | null>(null)
+const addToPlaylistMessage = ref('')
 
 type WorkData = {
     title: string
@@ -30,6 +35,12 @@ type Recording = {
     cover: string
     isDefault: boolean
     audioSrc?: string
+}
+
+type AddToPlaylistDonePayload = {
+    added: boolean
+    playlistId: number
+    playlistName: string
 }
 
 const workData = ref<WorkData>({
@@ -146,6 +157,27 @@ const onRecordingDoubleClick = (rec: Recording) => {
     handlePlay(rec)
 }
 
+const openAddToPlaylistModal = (recording: Recording) => {
+    selectedRecordingForPlaylist.value = recording
+    isAddToPlaylistModalOpen.value = true
+}
+
+const closeAddToPlaylistModal = () => {
+    isAddToPlaylistModalOpen.value = false
+}
+
+const onAddToPlaylistDone = (payload: AddToPlaylistDonePayload) => {
+    const message = payload.added
+        ? `已添加到歌单「${payload.playlistName}」`
+        : `歌曲已在歌单「${payload.playlistName}」中`
+    addToPlaylistMessage.value = message
+    window.setTimeout(() => {
+        if (addToPlaylistMessage.value === message) {
+            addToPlaylistMessage.value = ''
+        }
+    }, 3000)
+}
+
 onMounted(() => {
     const id = Number(route.params.id)
     if (!isNaN(id)) {
@@ -236,6 +268,7 @@ watch(
                         :title="item.title"
                         :label="item.label"
                         :cover="item.cover"
+                        :show-add-button="true"
                         :is-default="item.isDefault"
                         :subtitle="`${item.artist}${item.type ? ' · ' + item.type : ''}`"
                         :is-active="isActive"
@@ -243,9 +276,22 @@ watch(
                             audioStore.isPlaying && audioStore.currentTrack?.id === item.id
                         "
                         @play="handlePlay(item)"
+                        @add="openAddToPlaylistModal(item)"
                     />
                 </template>
             </MediaListPanel>
+
+            <p v-if="addToPlaylistMessage" class="mt-4 text-sm text-[#8C857B]">
+                {{ addToPlaylistMessage }}
+            </p>
         </div>
+
+        <AddRecordingToPlaylistModal
+            :open="isAddToPlaylistModalOpen"
+            :recording-id="selectedRecordingForPlaylist?.id ?? null"
+            :recording-title="selectedRecordingForPlaylist?.title"
+            @close="closeAddToPlaylistModal"
+            @done="onAddToPlaylistDone"
+        />
     </div>
 </template>

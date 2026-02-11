@@ -116,6 +116,28 @@ class PlaylistController(private val service: PlaylistService) {
         service.deletePlaylist(id)
     }
 
+    /**
+     * 向播放列表添加录音
+     *
+     * 此接口用于向指定播放列表追加一条录音记录
+     * 重复添加时保持幂等，返回 added=false
+     * 需要用户登录认证才能访问
+     *
+     * @param id 播放列表 ID
+     * @param recordingId 录音 ID
+     *
+     * @api PUT /api/playlist/{id}/recordings/{recordingId}
+     * @permission 需要登录认证
+     */
+    @PutMapping("{id}/recordings/{recordingId}")
+    @ResponseStatus(HttpStatus.OK)
+    fun addRecordingToPlaylist(
+        @PathVariable id: Long,
+        @PathVariable recordingId: Long,
+    ) {
+        service.addRecordingToPlaylist(id, recordingId)
+    }
+
     companion object {
         private val DEFAULT_PLAYLIST_FETCHER = newFetcher(Playlist::class).by {
             allScalarFields()

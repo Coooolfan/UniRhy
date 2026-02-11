@@ -1,11 +1,7 @@
 package com.coooolfan.unirhy.service
 
 import cn.dev33.satoken.stp.StpUtil
-import com.coooolfan.unirhy.model.Playlist
-import com.coooolfan.unirhy.model.comment
-import com.coooolfan.unirhy.model.id
-import com.coooolfan.unirhy.model.name
-import com.coooolfan.unirhy.model.ownerId
+import com.coooolfan.unirhy.model.*
 import org.babyfish.jimmer.ImmutableObjects
 import org.babyfish.jimmer.sql.ast.mutation.SaveMode
 import org.babyfish.jimmer.sql.fetcher.Fetcher
@@ -13,6 +9,7 @@ import org.babyfish.jimmer.sql.kt.KSqlClient
 import org.babyfish.jimmer.sql.kt.ast.expression.eq
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.server.ResponseStatusException
 
 @Service
@@ -81,4 +78,18 @@ class PlaylistService(private val sql: KSqlClient) {
             throw ResponseStatusException(HttpStatus.NOT_FOUND, "Playlist not found")
         }
     }
+
+    @Transactional
+    fun addRecordingToPlaylist(playlistId: Long, recordingId: Long) {
+        val playlist = sql.executeQuery(Playlist::class) {
+            where(table.id eq playlistId)
+            where(table.ownerId eq StpUtil.getLoginIdAsLong())
+            selectCount()
+        }.first() == 0L
+        if (playlist) throw ResponseStatusException(HttpStatus.NOT_FOUND, "Playlist not found")
+
+        sql.getAssociations(Playlist::recordings)
+            .save(playlistId, recordingId, ignoreConflict = true)
+    }
+
 }

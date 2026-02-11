@@ -7,6 +7,28 @@ export class PlaylistController {
     constructor(private executor: Executor) {}
     
     /**
+     * 向播放列表添加录音
+     * 
+     * 此接口用于向指定播放列表追加一条录音记录
+     * 重复添加时保持幂等，返回 added=false
+     * 需要用户登录认证才能访问
+     * 
+     * @parameter {PlaylistControllerOptions['addRecordingToPlaylist']} options
+     * - id 播放列表 ID
+     * - recordingId 录音 ID
+     * 
+     */
+    readonly addRecordingToPlaylist: (options: PlaylistControllerOptions['addRecordingToPlaylist']) => Promise<
+        void
+    > = async(options) => {
+        let _uri = '/api/playlist/';
+        _uri += encodeURIComponent(options.id);
+        _uri += '/recordings/';
+        _uri += encodeURIComponent(options.recordingId);
+        return (await this.executor({uri: _uri, method: 'PUT'})) as Promise<void>;
+    }
+    
+    /**
      * 创建播放列表
      * 
      * 此接口用于创建新的播放列表
@@ -128,5 +150,16 @@ export type PlaylistControllerOptions = {
          * 
          */
         readonly id: number
+    }, 
+    'addRecordingToPlaylist': {
+        /**
+         * 播放列表 ID
+         */
+        readonly id: number, 
+        /**
+         * 录音 ID
+         * 
+         */
+        readonly recordingId: number
     }
 }

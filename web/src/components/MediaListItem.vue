@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Play, Pause } from 'lucide-vue-next'
+import { Play, Pause, Plus } from 'lucide-vue-next'
 
 defineProps<{
     title: string
@@ -9,10 +9,12 @@ defineProps<{
     cover?: string
     subtitle?: string
     isDefault?: boolean
+    showAddButton?: boolean
 }>()
 
 const emit = defineEmits<{
     (e: 'play'): void
+    (e: 'add'): void
 }>()
 </script>
 
@@ -57,6 +59,14 @@ const emit = defineEmits<{
     <div
         class="hidden md:flex opacity-0 group-hover:opacity-100 transition-opacity gap-4 mr-4 text-[#8C857B]"
     >
+        <button
+            v-if="showAddButton"
+            class="hover:text-[#C17D46] transition-colors cursor-pointer"
+            title="添加到歌单"
+            @click.stop="emit('add')"
+        >
+            <Plus :size="16" />
+        </button>
         <button
             class="hover:text-[#C17D46] transition-colors cursor-pointer"
             @click.stop="emit('play')"
