@@ -185,6 +185,8 @@ CREATE TABLE public.playlist
     comment  TEXT   NOT NULL DEFAULT ''                                         -- 歌单描述
 );
 
+CREATE INDEX playlist_owner_id_idx ON public.playlist (owner_id);
+
 -- 歌单与录音的关联表（多对多）
 CREATE TABLE public.playlist_recording_mapping
 (
