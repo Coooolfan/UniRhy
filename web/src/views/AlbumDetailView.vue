@@ -26,7 +26,7 @@ type Track = {
     id: number
     title: string
     artist: string
-    duration: string
+    label: string
     cover: string
     audioSrc?: string
 }
@@ -92,8 +92,7 @@ const fetchAlbum = async (id: number) => {
             id: recording.id,
             title: recording.title || recording.comment || 'Untitled Track',
             artist: recording.artists.map((artist) => artist.name).join(', ') || artistName,
-            // API 当前不提供时长，占位或移除
-            duration: '',
+            label: recording.label || '',
             cover: resolveCover(recording.cover?.id),
             audioSrc: resolveAudio(recording.assets || []),
         }))
@@ -278,8 +277,28 @@ watch(
                         </div>
                     </div>
 
-                    <div class="text-sm text-[#8C857B] font-mono w-12 text-right">
-                        {{ item.duration }}
+                    <div class="hidden lg:block text-xs text-[#B0AAA0] max-w-[200px] truncate ml-4">
+                        {{ item.label }}
+                    </div>
+
+                    <div
+                        class="hidden md:flex opacity-0 group-hover:opacity-100 transition-opacity gap-4 mr-4 text-[#8C857B]"
+                    >
+                        <button
+                            class="hover:text-[#C17D46] transition-colors"
+                            @click.stop="handlePlay(item)"
+                        >
+                            <Play
+                                v-if="
+                                    !(
+                                        audioStore.isPlaying &&
+                                        audioStore.currentTrack?.id === item.id
+                                    )
+                                "
+                                :size="16"
+                            />
+                            <Pause v-else :size="16" />
+                        </button>
                     </div>
                 </template>
             </MediaListPanel>
