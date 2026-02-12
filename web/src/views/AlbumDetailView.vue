@@ -16,7 +16,6 @@ const isLoading = ref(true)
 const isCdVisible = ref(false)
 const isAddToPlaylistModalOpen = ref(false)
 const selectedTrackForPlaylist = ref<Track | null>(null)
-const addToPlaylistMessage = ref('')
 
 type AlbumData = {
     title: string
@@ -34,12 +33,6 @@ type Track = {
     label: string
     cover: string
     audioSrc?: string
-}
-
-type AddToPlaylistDonePayload = {
-    added: boolean
-    playlistId: number
-    playlistName: string
 }
 
 const albumData = ref<AlbumData>({
@@ -174,18 +167,6 @@ const closeAddToPlaylistModal = () => {
     isAddToPlaylistModalOpen.value = false
 }
 
-const onAddToPlaylistDone = (payload: AddToPlaylistDonePayload) => {
-    const message = payload.added
-        ? `已添加到歌单「${payload.playlistName}」`
-        : `歌曲已在歌单「${payload.playlistName}」中`
-    addToPlaylistMessage.value = message
-    window.setTimeout(() => {
-        if (addToPlaylistMessage.value === message) {
-            addToPlaylistMessage.value = ''
-        }
-    }, 3000)
-}
-
 onMounted(() => {
     const id = Number(route.params.id)
     if (!isNaN(id)) {
@@ -313,10 +294,6 @@ watch(
                     />
                 </template>
             </MediaListPanel>
-
-            <p v-if="addToPlaylistMessage" class="mt-4 text-sm text-[#8C857B]">
-                {{ addToPlaylistMessage }}
-            </p>
         </div>
 
         <AddRecordingToPlaylistModal
@@ -324,7 +301,6 @@ watch(
             :recording-id="selectedTrackForPlaylist?.id ?? null"
             :recording-title="selectedTrackForPlaylist?.title"
             @close="closeAddToPlaylistModal"
-            @done="onAddToPlaylistDone"
         />
     </div>
 </template>

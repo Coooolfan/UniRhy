@@ -100,6 +100,27 @@ export class PlaylistController {
     }
     
     /**
+     * 从播放列表中移除录音
+     * 
+     * 此接口用于从指定播放列表中移除一条录音记录
+     * 需要用户登录认证才能访问
+     * 
+     * @parameter {PlaylistControllerOptions['removeRecordingFromPlaylist']} options
+     * - id 播放列表 ID
+     * - recordingId 录音 ID
+     * 
+     */
+    readonly removeRecordingFromPlaylist: (options: PlaylistControllerOptions['removeRecordingFromPlaylist']) => Promise<
+        void
+    > = async(options) => {
+        let _uri = '/api/playlist/';
+        _uri += encodeURIComponent(options.id);
+        _uri += '/recordings/';
+        _uri += encodeURIComponent(options.recordingId);
+        return (await this.executor({uri: _uri, method: 'DELETE'})) as Promise<void>;
+    }
+    
+    /**
      * 更新播放列表
      * 
      * 此接口用于更新指定 ID 的播放列表信息
@@ -152,6 +173,17 @@ export type PlaylistControllerOptions = {
         readonly id: number
     }, 
     'addRecordingToPlaylist': {
+        /**
+         * 播放列表 ID
+         */
+        readonly id: number, 
+        /**
+         * 录音 ID
+         * 
+         */
+        readonly recordingId: number
+    }, 
+    'removeRecordingFromPlaylist': {
         /**
          * 播放列表 ID
          */

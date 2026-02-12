@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Play, Pause, Plus } from 'lucide-vue-next'
+import { Play, Pause, Plus, Trash2 } from 'lucide-vue-next'
 
 defineProps<{
     title: string
@@ -10,11 +10,14 @@ defineProps<{
     subtitle?: string
     isDefault?: boolean
     showAddButton?: boolean
+    showRemoveButton?: boolean
+    isRemoving?: boolean
 }>()
 
 const emit = defineEmits<{
     (e: 'play'): void
     (e: 'add'): void
+    (e: 'remove'): void
 }>()
 </script>
 
@@ -59,6 +62,15 @@ const emit = defineEmits<{
     <div
         class="hidden md:flex opacity-0 group-hover:opacity-100 transition-opacity gap-4 mr-4 text-[#8C857B]"
     >
+        <button
+            v-if="showRemoveButton"
+            class="hover:text-[#B95D5D] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            :title="isRemoving ? '移除中' : '从歌单移除'"
+            :disabled="isRemoving"
+            @click.stop="emit('remove')"
+        >
+            <Trash2 :size="16" />
+        </button>
         <button
             v-if="showAddButton"
             class="hover:text-[#C17D46] transition-colors cursor-pointer"

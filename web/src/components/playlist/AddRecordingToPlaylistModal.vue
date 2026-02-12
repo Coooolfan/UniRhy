@@ -16,7 +16,6 @@ const props = defineProps<{
 
 const emit = defineEmits<{
     (e: 'close'): void
-    (e: 'done', payload: { added: boolean; playlistId: number; playlistName: string }): void
 }>()
 
 const playlists = ref<PlaylistOption[]>([])
@@ -77,12 +76,6 @@ const addToPlaylist = async (playlist: PlaylistOption) => {
         await api.playlistController.addRecordingToPlaylist({
             id: playlist.id,
             recordingId,
-        })
-
-        emit('done', {
-            added: true,
-            playlistId: playlist.id,
-            playlistName: playlist.name,
         })
         emit('close')
     } catch (e) {

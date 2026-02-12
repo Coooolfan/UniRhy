@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { Play, Pause, Pencil, Music } from 'lucide-vue-next'
+import { Play, Pause, Pencil, Music, Trash2 } from 'lucide-vue-next'
 import { api, normalizeApiError } from '@/ApiInstance'
 import { useAudioStore } from '@/stores/audio'
 import DashboardTopBar from '@/components/dashboard/DashboardTopBar.vue'
@@ -19,6 +19,9 @@ const isEditing = ref(false)
 const editName = ref('')
 const editComment = ref('')
 const editError = ref('')
+const trackPendingRemoval = ref<Track | null>(null)
+const isRemovingTrack = ref(false)
+const removeTrackError = ref('')
 
 type PlaylistData = {
     title: string
@@ -68,6 +71,7 @@ const resolveAudio = (assets: readonly Asset[]) => {
 const fetchPlaylist = async (id: number) => {
     try {
         isLoading.value = true
+        removeTrackError.value = ''
 
         const data = await api.playlistController.getPlaylist({ id })
 
@@ -193,6 +197,59 @@ const submitEdit = async () => {
     }
 }
 
+const openRemoveTrackModal = (track: Track) => {
+    if (isRemovingTrack.value) return
+    trackPendingRemoval.value = track
+    removeTrackError.value = ''
+}
+
+const closeRemoveTrackModal = () => {
+    if (isRemovingTrack.value) return
+    trackPendingRemoval.value = null
+    removeTrackError.value = ''
+}
+
+const confirmRemoveTrack = async () => {
+    const track = trackPendingRemoval.value
+    if (!track || isRemovingTrack.value) return
+
+    const playlistId = Number(route.params.id)
+    if (isNaN(playlistId)) return
+
+    isRemovingTrack.value = true
+    removeTrackError.value = ''
+
+    try {
+        await api.playlistController.removeRecordingFromPlaylist({
+            id: playlistId,
+            recordingId: track.id,
+        })
+
+        const nextTracks = tracks.value.filter((item) => item.id !== track.id)
+        tracks.value = nextTracks
+
+        if (currentTrackId.value === track.id) {
+            const firstPlayableTrack = nextTracks.find((item) => item.audioSrc)
+            currentTrackId.value = firstPlayableTrack?.id ?? nextTracks[0]?.id ?? null
+        }
+
+        if (audioStore.currentTrack?.id === track.id) {
+            audioStore.stop()
+        }
+
+        playlistData.value = {
+            ...playlistData.value,
+            cover: nextTracks[0]?.cover || '',
+        }
+        trackPendingRemoval.value = null
+    } catch (error) {
+        const normalized = normalizeApiError(error)
+        removeTrackError.value = normalized.message ?? '移除歌曲失败'
+    } finally {
+        isRemovingTrack.value = false
+    }
+}
+
 onMounted(() => {
     const id = Number(route.params.id)
     if (!isNaN(id)) {
@@ -295,11 +352,14 @@ watch(
                     <MediaListItem
                         :title="item.title"
                         :label="item.label"
+                        :show-remove-button="true"
+                        :is-removing="isRemovingTrack && trackPendingRemoval?.id === item.id"
                         :is-active="isActive"
                         :is-playing="
                             audioStore.isPlaying && audioStore.currentTrack?.id === item.id
                         "
                         @play="handlePlay(item)"
+                        @remove="openRemoveTrackModal(item)"
                     />
                 </template>
             </MediaListPanel>
@@ -393,6 +453,65 @@ watch(
                                     <span v-else>保存更改</span>
                                 </button>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            </Transition>
+
+            <Transition
+                enter-active-class="transition duration-200 ease-out"
+                enter-from-class="opacity-0"
+                enter-to-class="opacity-100"
+                leave-active-class="transition duration-150 ease-in"
+                leave-from-class="opacity-100"
+                leave-to-class="opacity-0"
+            >
+                <div
+                    v-if="trackPendingRemoval"
+                    class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#2B221B]/60"
+                    @click.self="closeRemoveTrackModal"
+                >
+                    <div
+                        class="bg-[#fffcf5] p-8 w-full max-w-md shadow-[0_8px_30px_rgba(0,0,0,0.12)] border border-[#EAE6DE] relative transform transition-all"
+                    >
+                        <div
+                            class="absolute top-0 right-0 w-16 h-16 bg-linear-to-bl from-[#EAE6DE]/30 to-transparent pointer-events-none"
+                        ></div>
+
+                        <div class="mb-6 text-center">
+                            <div
+                                class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-[#FAF9F6] mb-4 border border-[#EAE6DE]"
+                            >
+                                <Trash2 :size="22" class="text-[#B95D5D]" />
+                            </div>
+                            <h3 class="font-serif text-2xl text-[#2B221B]">移除歌曲</h3>
+                            <p class="text-sm text-[#8C857B] mt-3">
+                                确认从当前歌单中移除「{{ trackPendingRemoval.title }}」？
+                            </p>
+                        </div>
+
+                        <p v-if="removeTrackError" class="text-sm text-[#B95D5D] mb-4">
+                            {{ removeTrackError }}
+                        </p>
+
+                        <div class="flex gap-3 pt-4 border-t border-[#EAE6DE]">
+                            <button
+                                type="button"
+                                class="flex-1 px-4 py-2.5 border border-[#D6D1C4] text-[#8A8A8A] hover:bg-[#F7F5F0] hover:text-[#5A5A5A] transition-colors text-sm uppercase tracking-wide disabled:opacity-60 disabled:cursor-not-allowed"
+                                :disabled="isRemovingTrack"
+                                @click="closeRemoveTrackModal"
+                            >
+                                取消
+                            </button>
+                            <button
+                                type="button"
+                                class="flex-1 px-4 py-2.5 bg-[#2B221B] text-[#F7F5F0] hover:bg-[#B95D5D] transition-colors text-sm uppercase tracking-wide shadow-md disabled:opacity-60 disabled:cursor-not-allowed"
+                                :disabled="isRemovingTrack"
+                                @click="confirmRemoveTrack"
+                            >
+                                <span v-if="isRemovingTrack">移除中...</span>
+                                <span v-else>确认移除</span>
+                            </button>
                         </div>
                     </div>
                 </div>

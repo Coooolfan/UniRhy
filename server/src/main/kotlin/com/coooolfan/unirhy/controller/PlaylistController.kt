@@ -138,6 +138,28 @@ class PlaylistController(private val service: PlaylistService) {
         service.addRecordingToPlaylist(id, recordingId)
     }
 
+    /**
+     * 从播放列表中移除录音
+     *
+     * 此接口用于从指定播放列表中移除一条录音记录
+     * 需要用户登录认证才能访问
+     *
+     * @param id 播放列表 ID
+     * @param recordingId 录音 ID
+     *
+     * @api DELETE /api/playlist/{id}/recordings/{recordingId}
+     * @permission 需要登录认证
+     * @description 调用PlaylistService.removeRecordingFromPlaylist()方法从播放列表中移除录音
+     */
+    @DeleteMapping("{id}/recordings/{recordingId}")
+    @ResponseStatus(HttpStatus.OK)
+    fun removeRecordingFromPlaylist(
+        @PathVariable id: Long,
+        @PathVariable recordingId: Long,
+    ) {
+        service.removeRecordingFromPlaylist(id, recordingId)
+    }
+
     companion object {
         private val DEFAULT_PLAYLIST_FETCHER = newFetcher(Playlist::class).by {
             allScalarFields()
