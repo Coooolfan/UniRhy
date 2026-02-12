@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { ChevronRight, Music, Plus } from 'lucide-vue-next'
 import { onMounted, ref } from 'vue'
+import { storeToRefs } from 'pinia'
 import { useRoute, useRouter } from 'vue-router'
 import { api, normalizeApiError } from '@/ApiInstance'
 import { useAudioStore } from '@/stores/audio'
+import { usePlaylistStore } from '@/stores/playlist'
 
 type NavItem = {
     label: string
@@ -14,20 +16,18 @@ type NavItem = {
 const router = useRouter()
 const route = useRoute()
 const audioStore = useAudioStore()
+const playlistStore = usePlaylistStore()
+const {
+    playlists,
+    isLoading: isLoadingPlaylists,
+    error: playlistError,
+} = storeToRefs(playlistStore)
 const navItems: NavItem[] = [
     { label: '发现', routeName: 'dashboard-home' },
     { label: '阅览室', routeName: 'album-list', matchNames: ['album-detail'] },
     { label: '任务管理', routeName: 'tasks' },
     { label: '系统设置', routeName: 'settings' },
 ]
-type SidebarPlaylist = {
-    id: number
-    name: string
-}
-
-const playlists = ref<SidebarPlaylist[]>([])
-const isLoadingPlaylists = ref(false)
-const playlistError = ref('')
 const isCreatePlaylistModalOpen = ref(false)
 const isCreatingPlaylist = ref(false)
 const createPlaylistName = ref('')
@@ -45,24 +45,6 @@ const isActive = (item: NavItem) => {
 const handleNavClick = (item: NavItem) => {
     if (item.routeName) {
         router.push({ name: item.routeName })
-    }
-}
-
-const fetchPlaylists = async () => {
-    isLoadingPlaylists.value = true
-    playlistError.value = ''
-    try {
-        const data = await api.playlistController.listPlaylists()
-        playlists.value = data.map((playlist) => ({
-            id: playlist.id,
-            name: playlist.name?.trim() || '未命名歌单',
-        }))
-    } catch (error) {
-        const normalized = normalizeApiError(error)
-        playlistError.value = normalized.message ?? '歌单加载失败'
-        playlists.value = []
-    } finally {
-        isLoadingPlaylists.value = false
     }
 }
 
@@ -108,7 +90,7 @@ const submitCreatePlaylist = async () => {
         })
         isCreatePlaylistModalOpen.value = false
         resetCreatePlaylistForm()
-        await fetchPlaylists()
+        await playlistStore.fetchPlaylists(true)
     } catch (error) {
         const normalized = normalizeApiError(error)
         createPlaylistError.value = normalized.message ?? '创建歌单失败'
@@ -118,7 +100,7 @@ const submitCreatePlaylist = async () => {
 }
 
 onMounted(() => {
-    fetchPlaylists()
+    void playlistStore.fetchPlaylists()
 })
 </script>
 

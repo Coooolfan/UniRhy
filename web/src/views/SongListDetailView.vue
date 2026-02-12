@@ -1,15 +1,18 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { Play, Pause, Pencil, Music, Trash2 } from 'lucide-vue-next'
 import { api, normalizeApiError } from '@/ApiInstance'
 import { useAudioStore } from '@/stores/audio'
+import { usePlaylistStore } from '@/stores/playlist'
 import DashboardTopBar from '@/components/dashboard/DashboardTopBar.vue'
 import MediaListPanel from '@/components/MediaListPanel.vue'
 import MediaListItem from '@/components/MediaListItem.vue'
 
 const route = useRoute()
+const router = useRouter()
 const audioStore = useAudioStore()
+const playlistStore = usePlaylistStore()
 const currentTrackId = ref<number | null>(null)
 const isLoading = ref(true)
 
@@ -19,6 +22,9 @@ const isEditing = ref(false)
 const editName = ref('')
 const editComment = ref('')
 const editError = ref('')
+const isDeleteConfirming = ref(false)
+const isDeletingPlaylist = ref(false)
+const deletePlaylistError = ref('')
 const trackPendingRemoval = ref<Track | null>(null)
 const isRemovingTrack = ref(false)
 const removeTrackError = ref('')
@@ -107,6 +113,7 @@ const fetchPlaylist = async (id: number) => {
 }
 
 const hasPlayableTrack = computed(() => tracks.value.some((track) => !!track.audioSrc))
+const isDeleteAction = computed(() => editName.value.trim().length === 0)
 
 const isCurrentTrackPlaying = computed(() => {
     return audioStore.isPlaying && audioStore.currentTrack?.id === currentTrackId.value
@@ -150,31 +157,43 @@ const onTrackKeydown = (event: KeyboardEvent, track: Track) => {
 
 // Edit Modal Functions
 const openEditModal = () => {
-    if (isEditing.value) return
+    if (isEditing.value || isDeletingPlaylist.value) return
     editName.value = playlistData.value.title
     editComment.value = playlistData.value.description
     editError.value = ''
+    deletePlaylistError.value = ''
+    isDeleteConfirming.value = false
     isEditModalOpen.value = true
 }
 
 const closeEditModal = () => {
-    if (isEditing.value) return
+    if (isEditing.value || isDeletingPlaylist.value) return
     isEditModalOpen.value = false
+    isDeleteConfirming.value = false
     editName.value = ''
     editComment.value = ''
     editError.value = ''
+    deletePlaylistError.value = ''
 }
 
 const submitEdit = async () => {
     const name = editName.value.trim()
     const id = Number(route.params.id)
-    if (!name) {
-        editError.value = '请输入歌单名称'
-        return
-    }
     if (isNaN(id)) return
 
-    if (isEditing.value) return
+    if (isDeleteAction.value) {
+        editError.value = ''
+        if (!isDeleteConfirming.value) {
+            isDeleteConfirming.value = true
+            deletePlaylistError.value = ''
+            return
+        }
+        await confirmDeletePlaylist()
+        return
+    }
+
+    if (isEditing.value || isDeletingPlaylist.value) return
+    isDeleteConfirming.value = false
     isEditing.value = true
     editError.value = ''
 
@@ -186,6 +205,7 @@ const submitEdit = async () => {
                 comment: editComment.value.trim(),
             },
         })
+        playlistStore.upsertPlaylist({ id, name })
         isEditModalOpen.value = false
         // Refresh playlist data
         await fetchPlaylist(id)
@@ -194,6 +214,34 @@ const submitEdit = async () => {
         editError.value = normalized.message ?? '更新歌单失败'
     } finally {
         isEditing.value = false
+    }
+}
+
+const confirmDeletePlaylist = async () => {
+    const id = Number(route.params.id)
+    if (isNaN(id) || isDeletingPlaylist.value) return
+
+    isDeletingPlaylist.value = true
+    deletePlaylistError.value = ''
+
+    try {
+        await api.playlistController.deletePlaylist({ id })
+        playlistStore.removePlaylist(id)
+
+        if (
+            audioStore.currentTrack &&
+            tracks.value.some((track) => track.id === audioStore.currentTrack?.id)
+        ) {
+            audioStore.stop()
+        }
+
+        isEditModalOpen.value = false
+        await router.push({ name: 'dashboard-home' })
+    } catch (error) {
+        const normalized = normalizeApiError(error)
+        deletePlaylistError.value = normalized.message ?? '删除歌单失败'
+    } finally {
+        isDeletingPlaylist.value = false
     }
 }
 
@@ -263,6 +311,16 @@ watch(
         const id = Number(newId)
         if (!isNaN(id)) {
             fetchPlaylist(id)
+        }
+    },
+)
+
+watch(
+    () => editName.value,
+    (name) => {
+        if (name.trim().length > 0) {
+            isDeleteConfirming.value = false
+            deletePlaylistError.value = ''
         }
     },
 )
@@ -388,13 +446,23 @@ watch(
 
                         <div class="mb-8 text-center">
                             <div
-                                class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-[#FAF9F6] mb-4 border border-[#EAE6DE]"
+                                class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-[#FAF9F6] mb-4 border"
+                                :class="isDeleteAction ? 'border-[#F0D6D6]' : 'border-[#EAE6DE]'"
                             >
-                                <Music :size="24" class="text-[#C67C4E]" />
+                                <Trash2 v-if="isDeleteAction" :size="22" class="text-[#B95D5D]" />
+                                <Music v-else :size="24" class="text-[#C67C4E]" />
                             </div>
-                            <h3 class="font-serif text-2xl text-[#2B221B]">编辑歌单</h3>
+                            <h3 class="font-serif text-2xl text-[#2B221B]">
+                                {{ isDeleteAction ? '删除歌单' : '编辑歌单' }}
+                            </h3>
                             <p class="text-xs text-[#8A8A8A] mt-2 font-serif italic">
-                                Edit Playlist
+                                {{
+                                    isDeleteAction
+                                        ? isDeleteConfirming
+                                            ? 'Confirm Deletion'
+                                            : 'Delete Playlist'
+                                        : 'Edit Playlist'
+                                }}
                             </p>
                         </div>
 
@@ -410,11 +478,17 @@ watch(
                                     maxlength="100"
                                     class="w-full bg-[#F7F5F0] border-b border-[#D6D1C4] p-3 text-[#3D3D3D] focus:outline-none focus:border-[#C67C4E] transition-colors font-serif placeholder:text-[#BDB9AE]"
                                     placeholder="e.g. My Favorites"
-                                    :disabled="isEditing"
+                                    :disabled="isEditing || isDeletingPlaylist"
                                 />
+                                <p
+                                    v-if="isDeleteAction && isDeleteConfirming"
+                                    class="mt-2 text-sm text-[#B95D5D] font-serif italic"
+                                >
+                                    再次点击“确认删除”后将永久删除歌单，此操作不可恢复。
+                                </p>
                             </label>
 
-                            <label class="block">
+                            <label v-if="!isDeleteAction" class="block">
                                 <span
                                     class="text-xs uppercase tracking-wider text-[#8A8A8A] font-serif block mb-2"
                                 >
@@ -426,30 +500,45 @@ watch(
                                     maxlength="500"
                                     class="w-full resize-none bg-[#F7F5F0] border-b border-[#D6D1C4] p-3 text-[#3D3D3D] focus:outline-none focus:border-[#C67C4E] transition-colors font-serif placeholder:text-[#BDB9AE]"
                                     placeholder="Optional short note for this playlist"
-                                    :disabled="isEditing"
+                                    :disabled="isEditing || isDeletingPlaylist"
                                 />
                             </label>
 
                             <p v-if="editError" class="text-sm text-[#B95D5D]">
                                 {{ editError }}
                             </p>
+                            <p v-if="deletePlaylistError" class="text-sm text-[#B95D5D]">
+                                {{ deletePlaylistError }}
+                            </p>
 
                             <div class="flex gap-3 mt-8 pt-6 border-t border-[#EAE6DE]">
                                 <button
                                     type="button"
                                     class="flex-1 px-4 py-2.5 border border-[#D6D1C4] text-[#8A8A8A] hover:bg-[#F7F5F0] hover:text-[#5A5A5A] transition-colors text-sm uppercase tracking-wide"
-                                    :disabled="isEditing"
+                                    :disabled="isEditing || isDeletingPlaylist"
                                     @click="closeEditModal"
                                 >
                                     取消
                                 </button>
                                 <button
                                     type="button"
-                                    class="flex-1 px-4 py-2.5 bg-[#2B221B] text-[#F7F5F0] hover:bg-[#C67C4E] transition-colors text-sm uppercase tracking-wide shadow-md disabled:opacity-60 disabled:cursor-not-allowed"
-                                    :disabled="isEditing"
+                                    class="flex-1 px-4 py-2.5 text-[#F7F5F0] transition-colors text-sm uppercase tracking-wide shadow-md disabled:opacity-60 disabled:cursor-not-allowed"
+                                    :class="
+                                        isDeleteAction
+                                            ? isDeleteConfirming
+                                                ? 'bg-[#A24E4E] hover:bg-[#8E4040]'
+                                                : 'bg-[#B95D5D] hover:bg-[#A24E4E]'
+                                            : 'bg-[#2B221B] hover:bg-[#C67C4E]'
+                                    "
+                                    :disabled="isEditing || isDeletingPlaylist"
                                     @click="submitEdit"
                                 >
                                     <span v-if="isEditing">Updating...</span>
+                                    <span v-else-if="isDeletingPlaylist">删除中...</span>
+                                    <span v-else-if="isDeleteAction && isDeleteConfirming"
+                                        >确认删除</span
+                                    >
+                                    <span v-else-if="isDeleteAction">删除歌单</span>
                                     <span v-else>保存更改</span>
                                 </button>
                             </div>
