@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { Search } from 'lucide-vue-next'
 
 type Props = {
@@ -12,6 +13,7 @@ const emit = defineEmits<{
     (event: 'update:modelValue', value: string): void
 }>()
 
+const router = useRouter()
 const inputValue = ref(props.modelValue ?? '')
 
 watch(
@@ -28,6 +30,15 @@ const handleInput = (event: Event) => {
     inputValue.value = value
     emit('update:modelValue', value)
 }
+
+const handleSearch = () => {
+    if (inputValue.value.trim()) {
+        router.push({
+            name: 'search',
+            query: { q: inputValue.value.trim() },
+        })
+    }
+}
 </script>
 
 <template>
@@ -42,6 +53,7 @@ const handleInput = (event: Event) => {
                 :placeholder="placeholder ?? '搜索艺术家、作品...'"
                 class="bg-transparent border-none outline-none ml-2 text-sm placeholder-[#8C857B] w-full focus:ring-0"
                 @input="handleInput"
+                @keydown.enter="handleSearch"
             />
         </div>
         <div class="h-8 w-8 rounded-full bg-[#DCD6CC] overflow-hidden cursor-pointer">
