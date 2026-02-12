@@ -19,6 +19,13 @@
 - 默认值与 `ScanSamplePreparer` 中的默认路径保持一致。
 - 示例：`E2E_SCAN_PATH=~/Music ./gradlew :api-e2e:test --tests com.unirhy.e2e.SmokeTest`
 
+## `api-e2e` 覆盖矩阵
+
+- 覆盖矩阵文件位于 `server/api-e2e/README/API_COVERAGE_MATRIX.md`，由测试生成器维护。
+- 生成命令：`cd server && ./gradlew :api-e2e:generateCoverageMatrix`
+- 校验命令：`cd server && ./gradlew :api-e2e:test`
+- 当接口定义或覆盖登记发生变化时，测试会因矩阵过期而失败，需要先重新生成矩阵。
+
 ## `api-e2e` 代码分层
 
 - 场景测试放在 `api-e2e/src/test/kotlin/com/unirhy/e2e`，仅描述业务步骤与断言。

@@ -1,14 +1,7 @@
 package com.unirhy.e2e
 
 import com.coooolfan.unirhy.UnirhyApplication
-import com.unirhy.e2e.support.E2eAwait
-import com.unirhy.e2e.support.E2eHttpClient
-import com.unirhy.e2e.support.E2eJson
-import com.unirhy.e2e.support.E2eRunContext
-import com.unirhy.e2e.support.E2eRuntime
-import com.unirhy.e2e.support.ScanSample
-import com.unirhy.e2e.support.ScanSamplePreparer
-import com.unirhy.e2e.support.findMediaIdByObjectKey
+import com.unirhy.e2e.support.*
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
@@ -19,7 +12,6 @@ import org.springframework.test.annotation.DirtiesContext
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import java.time.Duration
-import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -42,99 +34,112 @@ class SmokeTest {
 
     @Test
     fun `initialize login scan and stream media from real filesystem`() {
-        val context = prepareContext()
-        assertUninitialized(context)
-        initializeSystem(context)
-        login(context)
-        triggerScan(context)
-        awaitScanDone(context)
-        assertMediaRangeReadable(context)
+        val state = prepareState()
+        assertUninitialized(state)
+        initializeSystem(state)
+        login(state)
+        triggerScan(state)
+        awaitScanDone(state)
+        assertMediaRangeReadable(state)
     }
 
-    private fun prepareContext(): ScenarioContext {
+    private fun prepareState(): E2eScenarioState {
         val runtime = E2eRuntime.context
         val scanSample = ScanSamplePreparer.prepare(runtime.scanWorkspace)
         val api = E2eHttpClient("http://127.0.0.1:$port")
-        return ScenarioContext(runtime = runtime, scanSample = scanSample, api = api)
+        return E2eScenarioState(runtime = runtime, scanSample = scanSample, api = api)
     }
 
-    private fun assertUninitialized(context: ScenarioContext) {
-        val statusBeforeInit = context.api.get("/api/system/config/status")
-        assertEquals(200, statusBeforeInit.statusCode(), "[status] status endpoint should be reachable")
-        assertEquals(
+    private fun assertUninitialized(state: E2eScenarioState) {
+        val statusBeforeInit = state.api.get("/api/system/config/status")
+        E2eAssert.status(statusBeforeInit, 200, "[status] status endpoint should be reachable")
+        E2eAssert.jsonAt(
+            statusBeforeInit.body(),
+            "/initialized",
             false,
-            E2eJson.mapper.readTree(statusBeforeInit.body()).path("initialized").asBoolean(),
             "[status] new temporary db should not be initialized",
         )
     }
 
-    private fun initializeSystem(context: ScenarioContext) {
-        val initResponse = context.api.postJson(
-            "/api/system/config",
-            mapOf(
-                "adminAccountName" to context.runtime.admin.name,
-                "adminPassword" to context.runtime.admin.password,
-                "adminAccountEmail" to context.runtime.admin.email,
-                "storageProviderPath" to context.runtime.scanWorkspace.toAbsolutePath().toString(),
+    private fun initializeSystem(state: E2eScenarioState) {
+        val initResponse = state.api.post(
+            path = "/api/system/config",
+            json = mapOf(
+                "adminAccountName" to state.runtime.admin.name,
+                "adminPassword" to state.runtime.admin.password,
+                "adminAccountEmail" to state.runtime.admin.email,
+                "storageProviderPath" to state.runtime.scanWorkspace.toAbsolutePath().toString(),
             ),
         )
-        assertEquals(201, initResponse.statusCode(), "[init] system initialization should succeed")
+        E2eAssert.status(initResponse, 201, "[init] system initialization should succeed")
 
-        val statusAfterInit = context.api.get("/api/system/config/status")
-        assertEquals(200, statusAfterInit.statusCode(), "[init] status endpoint should remain reachable")
-        assertEquals(
+        val statusAfterInit = state.api.get("/api/system/config/status")
+        E2eAssert.status(statusAfterInit, 200, "[init] status endpoint should remain reachable")
+        E2eAssert.jsonAt(
+            statusAfterInit.body(),
+            "/initialized",
             true,
-            E2eJson.mapper.readTree(statusAfterInit.body()).path("initialized").asBoolean(),
             "[init] system should be initialized after create",
         )
     }
 
-    private fun login(context: ScenarioContext) {
-        val loginResponse = context.api.get(
-            "/api/token?email=${E2eHttpClient.urlEncode(context.runtime.admin.email)}" +
-                "&password=${E2eHttpClient.urlEncode(context.runtime.admin.password)}",
+    private fun login(state: E2eScenarioState) {
+        val loginResponse = state.api.get(
+            path = "/api/token",
+            query = mapOf(
+                "email" to state.runtime.admin.email,
+                "password" to state.runtime.admin.password,
+            ),
         )
-        assertEquals(200, loginResponse.statusCode(), "[login] admin login should succeed")
+        E2eAssert.status(loginResponse, 200, "[login] admin login should succeed")
     }
 
-    private fun triggerScan(context: ScenarioContext) {
-        val scanResponse = context.api.postJson(
-            "/api/task/scan",
-            mapOf(
+    private fun triggerScan(state: E2eScenarioState) {
+        val scanResponse = state.api.post(
+            path = "/api/task/scan",
+            json = mapOf(
                 "providerType" to "FILE_SYSTEM",
                 "providerId" to 0,
             ),
         )
-        assertEquals(202, scanResponse.statusCode(), "[scan] scan task should be accepted")
+        E2eAssert.status(scanResponse, 202, "[scan] scan task should be accepted")
     }
 
-    private fun awaitScanDone(context: ScenarioContext) {
+    private fun awaitScanDone(state: E2eScenarioState) {
         E2eAwait.until(timeout = Duration.ofMinutes(2), description = "[wait] scan task completion") {
-            val runningResponse = context.api.get("/api/task/running")
-            assertEquals(200, runningResponse.statusCode(), "[wait] running tasks endpoint should be reachable")
+            val runningResponse = state.api.get("/api/task/running")
+            E2eAssert.status(runningResponse, 200, "[wait] running tasks endpoint should be reachable")
             val tasks = E2eJson.mapper.readTree(runningResponse.body())
             tasks.none { it.path("type").asText() == "SCAN" }
         }
     }
 
-    private fun assertMediaRangeReadable(context: ScenarioContext) {
-        val worksResponse = context.api.get("/api/work?pageIndex=0&pageSize=100")
-        assertEquals(200, worksResponse.statusCode(), "[work] work list should be reachable")
+    private fun assertMediaRangeReadable(state: E2eScenarioState) {
+        val worksResponse = state.api.get(
+            path = "/api/work",
+            query = mapOf(
+                "pageIndex" to 0,
+                "pageSize" to 100,
+            ),
+        )
+        E2eAssert.status(worksResponse, 200, "[work] work list should be reachable")
         val workJson = E2eJson.mapper.readTree(worksResponse.body())
-        val mediaId = workJson.findMediaIdByObjectKey(context.scanSample.relativeObjectKey)
+        state.putJson(E2eScenarioState.KEY_WORK_LIST, workJson)
+        val mediaId = workJson.findMediaIdByObjectKey(state.scanSample.relativeObjectKey)
         assertNotNull(
             mediaId,
-            "[work] scan result should include media objectKey=${context.scanSample.relativeObjectKey}",
+            "[work] scan result should include media objectKey=${state.scanSample.relativeObjectKey}",
         )
+        state.putId(E2eScenarioState.KEY_MEDIA_ID, mediaId)
 
-        val rangeEnd = minOf(context.scanSample.size - 1, 63)
-        val mediaRangeResponse = context.api.getBytes(
+        val rangeEnd = minOf(state.scanSample.size - 1, 63)
+        val mediaRangeResponse = state.api.getBytes(
             "/api/media/$mediaId",
             headers = mapOf("Range" to "bytes=0-$rangeEnd"),
         )
-        assertEquals(206, mediaRangeResponse.statusCode(), "[media] media endpoint should support range response")
+        E2eAssert.status(mediaRangeResponse, 206, "[media] media endpoint should support range response")
 
-        val expectedPrefix = context.scanSample.readPrefixBytes((rangeEnd + 1).toInt())
+        val expectedPrefix = state.scanSample.readPrefixBytes((rangeEnd + 1).toInt())
         assertTrue(
             mediaRangeResponse.body().contentEquals(expectedPrefix),
             "[media] media payload should come from copied real audio sample",
@@ -148,10 +153,4 @@ class SmokeTest {
             E2eRuntime.registerDatasource(registry)
         }
     }
-
-    private data class ScenarioContext(
-        val runtime: E2eRunContext,
-        val scanSample: ScanSample,
-        val api: E2eHttpClient,
-    )
 }
