@@ -17,7 +17,7 @@
 | 6 | TODO | GET | /api/albums | - | Y | AlbumController#listAlbums | - | - |
 | 7 | TODO | GET | /api/albums/{id} | - | Y | AlbumController#getAlbum | - | - |
 | 8 | TODO | GET | /api/media/{id} | !Range | Y | MediaFileController#getMedia | - | - |
-| 9 | SMOKE | GET | /api/media/{id} | Range | Y | MediaFileController#getMediaWithRange | com.unirhy.e2e.SmokeTest#initialize login scan and stream media from real filesystem | - |
+| 9 | TODO | GET | /api/media/{id} | Range | Y | MediaFileController#getMediaWithRange | - | - |
 | 10 | TODO | HEAD | /api/media/{id} | !Range | Y | MediaFileController#headMedia | - | - |
 | 11 | TODO | GET | /api/playlists | - | Y | PlaylistController#listPlaylists | - | - |
 | 12 | TODO | POST | /api/playlists | - | Y | PlaylistController#createPlaylist | - | - |
@@ -37,14 +37,14 @@
 | 26 | TODO | GET | /api/storage/oss/{id} | - | Y | OssStorageController#get | - | - |
 | 27 | TODO | PUT | /api/storage/oss/{id} | - | Y | OssStorageController#update | - | - |
 | 28 | FULL | GET | /api/system/config | - | Y | SystemConfigController#get | com.unirhy.e2e.SystemAuthE2eTest#initialize login get update logout should form closed session flow | - |
-| 29 | SMOKE | POST | /api/system/config | - | N | SystemConfigController#create | com.unirhy.e2e.SmokeTest#initialize login scan and stream media from real filesystem | - |
+| 29 | FULL | POST | /api/system/config | - | N | SystemConfigController#create | com.unirhy.e2e.SystemAuthE2eTest#initialize login get update logout should form closed session flow | - |
 | 30 | FULL | PUT | /api/system/config | - | Y | SystemConfigController#update | com.unirhy.e2e.SystemAuthE2eTest#initialize login get update logout should form closed session flow | - |
-| 31 | SMOKE | GET | /api/system/config/status | - | N | SystemConfigController#isInitialized | com.unirhy.e2e.SmokeTest#initialize login scan and stream media from real filesystem | - |
-| 32 | SMOKE | GET | /api/task/running | - | Y | TaskController#listRunningTasks | com.unirhy.e2e.SmokeTest#initialize login scan and stream media from real filesystem | - |
-| 33 | SMOKE | POST | /api/task/scan | - | Y | TaskController#executeScanTask | com.unirhy.e2e.SmokeTest#initialize login scan and stream media from real filesystem | - |
-| 34 | SMOKE | POST | /api/tokens | - | N | TokenController#login | com.unirhy.e2e.SmokeTest#initialize login scan and stream media from real filesystem | - |
+| 31 | FULL | GET | /api/system/config/status | - | N | SystemConfigController#isInitialized | com.unirhy.e2e.SystemAuthE2eTest#status and protected endpoints require authentication | - |
+| 32 | TODO | GET | /api/task/running | - | Y | TaskController#listRunningTasks | - | - |
+| 33 | TODO | POST | /api/task/scan | - | Y | TaskController#executeScanTask | - | - |
+| 34 | FULL | POST | /api/tokens | - | N | TokenController#login | com.unirhy.e2e.SystemAuthE2eTest#duplicate init and wrong login return stable business errors | - |
 | 35 | FULL | DELETE | /api/tokens/current | - | Y | TokenController#logout | com.unirhy.e2e.SystemAuthE2eTest#initialize login get update logout should form closed session flow | - |
-| 36 | SMOKE | GET | /api/works | - | Y | WorkController#listWork | com.unirhy.e2e.SmokeTest#initialize login scan and stream media from real filesystem | - |
+| 36 | TODO | GET | /api/works | - | Y | WorkController#listWork | - | - |
 | 37 | TODO | GET | /api/works/random | - | Y | WorkController#randomWork | - | - |
 | 38 | TODO | DELETE | /api/works/{id} | - | Y | WorkController#deleteWork | - | - |
 | 39 | TODO | GET | /api/works/{id} | - | Y | WorkController#getWorkById | - | - |

@@ -72,7 +72,7 @@ class E2eHttpClientTest {
                 "/form",
                 form = mapOf(
                     "name" to "tester",
-                    "roles" to arrayOf("smoke", "full"),
+                    "roles" to arrayOf("alpha", "beta"),
                     "skip" to null,
                 ),
             )
@@ -85,7 +85,7 @@ class E2eHttpClientTest {
             assertEquals(
                 mapOf(
                     "name" to listOf("tester"),
-                    "roles" to listOf("smoke", "full"),
+                    "roles" to listOf("alpha", "beta"),
                 ),
                 decodeForm(request.body),
             )
