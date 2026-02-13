@@ -12,3 +12,4 @@ export type {ScanTaskRequest} from './ScanTaskRequest';
 export type {SystemConfigUpdate} from './SystemConfigUpdate';
 export type {SystemInitReq} from './SystemInitReq';
 export type {SystemStatus} from './SystemStatus';
+export type {TokenLoginRequest} from './TokenLoginRequest';

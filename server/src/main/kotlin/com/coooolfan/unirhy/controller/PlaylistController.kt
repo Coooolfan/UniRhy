@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.*
 
 @SaCheckLogin
 @RestController
-@RequestMapping("/api/playlist")
+@RequestMapping("/api/playlists")
 class PlaylistController(private val service: PlaylistService) {
 
     /**
@@ -25,7 +25,7 @@ class PlaylistController(private val service: PlaylistService) {
      *
      * @return List<Playlist> 返回播放列表集合（默认 fetcher）
      *
-     * @api GET /api/playlist
+     * @api GET /api/playlists
      * @permission 需要登录认证
      * @description 调用PlaylistService.getPlaylists()方法获取播放列表列表
      */
@@ -44,11 +44,11 @@ class PlaylistController(private val service: PlaylistService) {
      * @param id 播放列表 ID
      * @return Playlist 返回播放列表详情（详细 fetcher）
      *
-     * @api GET /api/playlist/{id}
+     * @api GET /api/playlists/{id}
      * @permission 需要登录认证
      * @description 调用PlaylistService.getPlaylist()方法获取指定播放列表详情
      */
-    @GetMapping("{id}")
+    @GetMapping("/{id}")
     @ResponseStatus(HttpStatus.OK)
     fun getPlaylist(@PathVariable id: Long): @FetchBy("DETAIL_PLAYLIST_FETCHER") Playlist {
         return service.getPlaylist(id, DETAIL_PLAYLIST_FETCHER)
@@ -64,11 +64,11 @@ class PlaylistController(private val service: PlaylistService) {
      * @param input 播放列表更新参数
      * @return Playlist 返回更新后的播放列表（默认 fetcher）
      *
-     * @api PUT /api/playlist/{id}
+     * @api PUT /api/playlists/{id}
      * @permission 需要登录认证
      * @description 调用PlaylistService.updatePlaylist()方法更新播放列表
      */
-    @PutMapping("{id}")
+    @PutMapping("/{id}")
     @ResponseStatus(HttpStatus.OK)
     fun updatePlaylist(
         @PathVariable id: Long,
@@ -86,12 +86,12 @@ class PlaylistController(private val service: PlaylistService) {
      * @param input 播放列表创建参数
      * @return Playlist 返回创建后的播放列表（默认 fetcher）
      *
-     * @api POST /api/playlist
+     * @api POST /api/playlists
      * @permission 需要登录认证
      * @description 调用PlaylistService.createPlaylist()方法创建播放列表
      */
     @PostMapping
-    @ResponseStatus(HttpStatus.OK)
+    @ResponseStatus(HttpStatus.CREATED)
     fun createPlaylist(
         @RequestBody input: PlaylistCreate
     ): @FetchBy("DEFAULT_PLAYLIST_FETCHER") Playlist {
@@ -106,11 +106,11 @@ class PlaylistController(private val service: PlaylistService) {
      *
      * @param id 播放列表 ID
      *
-     * @api DELETE /api/playlist/{id}
+     * @api DELETE /api/playlists/{id}
      * @permission 需要登录认证
      * @description 调用PlaylistService.deletePlaylist()方法删除播放列表
      */
-    @DeleteMapping("{id}")
+    @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     fun deletePlaylist(@PathVariable id: Long) {
         service.deletePlaylist(id)
@@ -126,11 +126,11 @@ class PlaylistController(private val service: PlaylistService) {
      * @param id 播放列表 ID
      * @param recordingId 录音 ID
      *
-     * @api PUT /api/playlist/{id}/recordings/{recordingId}
+     * @api PUT /api/playlists/{id}/recordings/{recordingId}
      * @permission 需要登录认证
      */
-    @PutMapping("{id}/recordings/{recordingId}")
-    @ResponseStatus(HttpStatus.OK)
+    @PutMapping("/{id}/recordings/{recordingId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
     fun addRecordingToPlaylist(
         @PathVariable id: Long,
         @PathVariable recordingId: Long,
@@ -147,12 +147,12 @@ class PlaylistController(private val service: PlaylistService) {
      * @param id 播放列表 ID
      * @param recordingId 录音 ID
      *
-     * @api DELETE /api/playlist/{id}/recordings/{recordingId}
+     * @api DELETE /api/playlists/{id}/recordings/{recordingId}
      * @permission 需要登录认证
      * @description 调用PlaylistService.removeRecordingFromPlaylist()方法从播放列表中移除录音
      */
-    @DeleteMapping("{id}/recordings/{recordingId}")
-    @ResponseStatus(HttpStatus.OK)
+    @DeleteMapping("/{id}/recordings/{recordingId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
     fun removeRecordingFromPlaylist(
         @PathVariable id: Long,
         @PathVariable recordingId: Long,

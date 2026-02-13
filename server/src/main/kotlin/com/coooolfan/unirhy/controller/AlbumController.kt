@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.*
  */
 @SaCheckLogin
 @RestController
-@RequestMapping("/api/album")
+@RequestMapping("/api/albums")
 class AlbumController(private val service: AlbumService) {
 
     /**
@@ -28,7 +28,7 @@ class AlbumController(private val service: AlbumService) {
      *
      * @return Page<Album> 返回专辑分页列表（默认 fetcher）
      *
-     * @api GET /api/album
+     * @api GET /api/albums
      * @permission 需要登录认证
      * @description 调用AlbumService.listAlbum()方法获取专辑列表
      */
@@ -49,11 +49,11 @@ class AlbumController(private val service: AlbumService) {
      * @param id 专辑 ID
      * @return Album 返回专辑详情（使用 DETAIL_ALBUM_FETCHER）
      *
-     * @api GET /api/album/{id}
+     * @api GET /api/albums/{id}
      * @permission 需要登录认证
      * @description 调用AlbumService.getAlbum()方法获取专辑详情
      */
-    @GetMapping("{id}")
+    @GetMapping("/{id}")
     @ResponseStatus(HttpStatus.OK)
     fun getAlbum(@PathVariable id: Long): @FetchBy("DETAIL_ALBUM_FETCHER") Album {
         return service.getAlbum(id, DETAIL_ALBUM_FETCHER)

@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.PutMapping
+import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
@@ -79,7 +80,7 @@ class OssStorageController(private val service: OssStorageService) {
      */
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    fun create(create: FileProviderOssCreate): @FetchBy("DEFAULT_OSS_FETCHER") FileProviderOss {
+    fun create(@RequestBody create: FileProviderOssCreate): @FetchBy("DEFAULT_OSS_FETCHER") FileProviderOss {
         return service.create(create, DEFAULT_OSS_FETCHER)
     }
 
@@ -100,7 +101,7 @@ class OssStorageController(private val service: OssStorageService) {
     @PutMapping("/{id}")
     fun update(
         @PathVariable id: Long,
-        update: FileProviderOssUpdate,
+        @RequestBody update: FileProviderOssUpdate,
     ): @FetchBy("DEFAULT_OSS_FETCHER") FileProviderOss {
         return service.update(update.toEntity { this.id = id }, DEFAULT_OSS_FETCHER)
     }

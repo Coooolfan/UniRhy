@@ -8,6 +8,7 @@ import com.coooolfan.unirhy.service.WorkService
 import org.babyfish.jimmer.Page
 import org.babyfish.jimmer.client.FetchBy
 import org.babyfish.jimmer.sql.kt.fetcher.newFetcher
+import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.*
 
 /**
@@ -17,7 +18,7 @@ import org.springframework.web.bind.annotation.*
  */
 @SaCheckLogin
 @RestController
-@RequestMapping("/api/work")
+@RequestMapping("/api/works")
 class WorkController(
     private val service: WorkService,
 ) {
@@ -26,7 +27,7 @@ class WorkController(
      *
      * @return Page<Work> 返回作品分页列表（默认 fetcher）
      *
-     * @api GET /api/work
+     * @api GET /api/works
      * @permission 需要登录认证
      * @description 调用WorkService.listWork()方法获取作品列表
      */
@@ -44,7 +45,7 @@ class WorkController(
      * @param id 作品 ID
      * @return Work 返回作品详情（默认 fetcher）
      *
-     * @api GET /api/work/{id}
+     * @api GET /api/works/{id}
      * @permission 需要登录认证
      * @description 调用WorkService.getWorkById()方法获取作品详情
      */
@@ -67,7 +68,7 @@ class WorkController(
      * @param offset 时区偏移（毫秒），可空，默认 0L，建议传浏览器 `Date.getTimezoneOffset() * 60000`（毫秒，满足 `utc = local + offset`）
      * @return Work 返回随机作品（默认 fetcher）
      *
-     * @api GET /api/work/random
+     * @api GET /api/works/random
      * @permission 需要登录认证
      * @description 调用WorkService.randomWork()方法获取时间窗口内的随机作品
      */
@@ -85,11 +86,12 @@ class WorkController(
      *
      * @param id 作品 ID
      *
-     * @api DELETE /api/work/{id}
+     * @api DELETE /api/works/{id}
      * @permission 需要登录认证
      * @description 调用WorkService.deleteWork()方法删除作品
      */
     @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
     fun deleteWork(@PathVariable id: Long) {
         service.deleteWork(id)
     }

@@ -11,11 +11,11 @@ object ApiCoverageRegistry {
         smoke("POST", "/api/system/config"),
         full("GET", "/api/system/config", testRef = SYSTEM_AUTH_FLOW_CASE),
         full("PUT", "/api/system/config", testRef = SYSTEM_AUTH_FLOW_CASE),
-        smoke("GET", "/api/token"),
-        full("DELETE", "/api/token", testRef = SYSTEM_AUTH_FLOW_CASE),
+        smoke("POST", "/api/tokens"),
+        full("DELETE", "/api/tokens/current", testRef = SYSTEM_AUTH_FLOW_CASE),
         smoke("POST", "/api/task/scan"),
         smoke("GET", "/api/task/running"),
-        smoke("GET", "/api/work"),
+        smoke("GET", "/api/works"),
         smoke("GET", "/api/media/{id}", condition = "Range"),
     ).associate { it.key to it.mark }
 

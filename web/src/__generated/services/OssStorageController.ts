@@ -26,46 +26,7 @@ export class OssStorageController {
         FileProviderOssDto['OssStorageController/DEFAULT_OSS_FETCHER']
     > = async(options) => {
         let _uri = '/api/storage/oss';
-        let _separator = _uri.indexOf('?') === -1 ? '?' : '&';
-        let _value: any = undefined;
-        _value = options.create.name;
-        _uri += _separator
-        _uri += 'name='
-        _uri += encodeURIComponent(_value);
-        _separator = '&';
-        _value = options.create.host;
-        _uri += _separator
-        _uri += 'host='
-        _uri += encodeURIComponent(_value);
-        _separator = '&';
-        _value = options.create.bucket;
-        _uri += _separator
-        _uri += 'bucket='
-        _uri += encodeURIComponent(_value);
-        _separator = '&';
-        _value = options.create.accessKey;
-        _uri += _separator
-        _uri += 'accessKey='
-        _uri += encodeURIComponent(_value);
-        _separator = '&';
-        _value = options.create.secretKey;
-        _uri += _separator
-        _uri += 'secretKey='
-        _uri += encodeURIComponent(_value);
-        _separator = '&';
-        _value = options.create.parentPath;
-        if (_value !== undefined && _value !== null) {
-            _uri += _separator
-            _uri += 'parentPath='
-            _uri += encodeURIComponent(_value);
-            _separator = '&';
-        }
-        _value = options.create.readonly;
-        _uri += _separator
-        _uri += 'readonly='
-        _uri += encodeURIComponent(_value);
-        _separator = '&';
-        return (await this.executor({uri: _uri, method: 'POST'})) as Promise<FileProviderOssDto['OssStorageController/DEFAULT_OSS_FETCHER']>;
+        return (await this.executor({uri: _uri, method: 'POST', body: options.body})) as Promise<FileProviderOssDto['OssStorageController/DEFAULT_OSS_FETCHER']>;
     }
     
     /**
@@ -138,56 +99,7 @@ export class OssStorageController {
     > = async(options) => {
         let _uri = '/api/storage/oss/';
         _uri += encodeURIComponent(options.id);
-        let _separator = _uri.indexOf('?') === -1 ? '?' : '&';
-        let _value: any = undefined;
-        _value = options.update.name;
-        if (_value !== undefined && _value !== null) {
-            _uri += _separator
-            _uri += 'name='
-            _uri += encodeURIComponent(_value);
-            _separator = '&';
-        }
-        _value = options.update.host;
-        if (_value !== undefined && _value !== null) {
-            _uri += _separator
-            _uri += 'host='
-            _uri += encodeURIComponent(_value);
-            _separator = '&';
-        }
-        _value = options.update.bucket;
-        if (_value !== undefined && _value !== null) {
-            _uri += _separator
-            _uri += 'bucket='
-            _uri += encodeURIComponent(_value);
-            _separator = '&';
-        }
-        _value = options.update.accessKey;
-        if (_value !== undefined && _value !== null) {
-            _uri += _separator
-            _uri += 'accessKey='
-            _uri += encodeURIComponent(_value);
-            _separator = '&';
-        }
-        _value = options.update.secretKey;
-        if (_value !== undefined && _value !== null) {
-            _uri += _separator
-            _uri += 'secretKey='
-            _uri += encodeURIComponent(_value);
-            _separator = '&';
-        }
-        _value = options.update.parentPath;
-        if (_value !== undefined && _value !== null) {
-            _uri += _separator
-            _uri += 'parentPath='
-            _uri += encodeURIComponent(_value);
-            _separator = '&';
-        }
-        _value = options.update.readonly;
-        _uri += _separator
-        _uri += 'readonly='
-        _uri += encodeURIComponent(_value);
-        _separator = '&';
-        return (await this.executor({uri: _uri, method: 'PUT'})) as Promise<FileProviderOssDto['OssStorageController/DEFAULT_OSS_FETCHER']>;
+        return (await this.executor({uri: _uri, method: 'PUT', body: options.body})) as Promise<FileProviderOssDto['OssStorageController/DEFAULT_OSS_FETCHER']>;
     }
 }
 
@@ -203,7 +115,7 @@ export type OssStorageControllerOptions = {
         /**
          * 创建参数
          */
-        readonly create: FileProviderOssCreate
+        readonly body: FileProviderOssCreate
     }, 
     'update': {
         /**
@@ -213,7 +125,7 @@ export type OssStorageControllerOptions = {
         /**
          * 更新参数
          */
-        readonly update: FileProviderOssUpdate
+        readonly body: FileProviderOssUpdate
     }, 
     'delete': {
         /**

@@ -259,8 +259,10 @@ const switchToLogin = () => {
 const handleLogin = async () => {
     try {
         await api.tokenController.login({
-            email: loginForm.username,
-            password: loginForm.password,
+            body: {
+                email: loginForm.username,
+                password: loginForm.password,
+            },
         })
     } catch (error) {
         const normalizedError = normalizeApiError(error, 'tokenController', 'login')
@@ -273,7 +275,7 @@ const handleLogin = async () => {
 const handleRegister = async () => {
     try {
         await api.accountController.create({
-            create: {
+            body: {
                 name: registerForm.username,
                 email: registerForm.email,
                 password: registerForm.password,

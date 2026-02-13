@@ -90,7 +90,7 @@ class SystemConfigController(private val service: SystemConfigService) {
      */
     @SaCheckLogin
     @PutMapping
-    fun update(update: SystemConfigUpdate): @FetchBy("DEFAULT_SYSTEM_CONFIG_FETCHER") SystemConfig {
+    fun update(@RequestBody update: SystemConfigUpdate): @FetchBy("DEFAULT_SYSTEM_CONFIG_FETCHER") SystemConfig {
         return service.update(update, DEFAULT_SYSTEM_CONFIG_FETCHER)
     }
 

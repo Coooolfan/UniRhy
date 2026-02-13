@@ -1,4 +1,5 @@
 import type {Executor} from '../';
+import type {TokenLoginRequest} from '../model/static/';
 
 /**
  * 登录与登出接口
@@ -16,27 +17,14 @@ export class TokenController {
      * 无需登录认证即可访问
      * 
      * @parameter {TokenControllerOptions['login']} options
-     * - email 登录邮箱
-     * - password 登录密码
+     * - request 登录请求参数
      * 
      */
     readonly login: (options: TokenControllerOptions['login']) => Promise<
         void
     > = async(options) => {
-        let _uri = '/api/token';
-        let _separator = _uri.indexOf('?') === -1 ? '?' : '&';
-        let _value: any = undefined;
-        _value = options.email;
-        _uri += _separator
-        _uri += 'email='
-        _uri += encodeURIComponent(_value);
-        _separator = '&';
-        _value = options.password;
-        _uri += _separator
-        _uri += 'password='
-        _uri += encodeURIComponent(_value);
-        _separator = '&';
-        return (await this.executor({uri: _uri, method: 'GET'})) as Promise<void>;
+        let _uri = '/api/tokens';
+        return (await this.executor({uri: _uri, method: 'POST', body: options.body})) as Promise<void>;
     }
     
     /**
@@ -49,7 +37,7 @@ export class TokenController {
     readonly logout: () => Promise<
         void
     > = async() => {
-        let _uri = '/api/token';
+        let _uri = '/api/tokens/current';
         return (await this.executor({uri: _uri, method: 'DELETE'})) as Promise<void>;
     }
 }
@@ -57,14 +45,10 @@ export class TokenController {
 export type TokenControllerOptions = {
     'login': {
         /**
-         * 登录邮箱
-         */
-        readonly email: string, 
-        /**
-         * 登录密码
+         * 登录请求参数
          * 
          */
-        readonly password: string
+        readonly body: TokenLoginRequest
     }, 
     'logout': {}
 }

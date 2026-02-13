@@ -93,7 +93,7 @@ class FileSystemStorageController(private val service: FileSystemStorageService)
     @PutMapping("/{id}")
     fun update(
         @PathVariable id: Long,
-        update: FileProviderFileSystemUpdate,
+        @RequestBody update: FileProviderFileSystemUpdate,
     ): @FetchBy("DEFAULT_FILE_SYSTEM_FETCHER") FileProviderFileSystem {
         return service.update(update.toEntity { this.id = id }, DEFAULT_FILE_SYSTEM_FETCHER)
     }

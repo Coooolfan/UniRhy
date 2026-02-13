@@ -25,25 +25,8 @@ export class AccountController {
     readonly create: (options: AccountControllerOptions['create']) => Promise<
         AccountDto['AccountController/DEFAULT_ACCOUNT_FETCHER']
     > = async(options) => {
-        let _uri = '/api/account';
-        let _separator = _uri.indexOf('?') === -1 ? '?' : '&';
-        let _value: any = undefined;
-        _value = options.create.name;
-        _uri += _separator
-        _uri += 'name='
-        _uri += encodeURIComponent(_value);
-        _separator = '&';
-        _value = options.create.password;
-        _uri += _separator
-        _uri += 'password='
-        _uri += encodeURIComponent(_value);
-        _separator = '&';
-        _value = options.create.email;
-        _uri += _separator
-        _uri += 'email='
-        _uri += encodeURIComponent(_value);
-        _separator = '&';
-        return (await this.executor({uri: _uri, method: 'POST'})) as Promise<AccountDto['AccountController/DEFAULT_ACCOUNT_FETCHER']>;
+        let _uri = '/api/accounts';
+        return (await this.executor({uri: _uri, method: 'POST', body: options.body})) as Promise<AccountDto['AccountController/DEFAULT_ACCOUNT_FETCHER']>;
     }
     
     /**
@@ -59,7 +42,7 @@ export class AccountController {
     readonly delete: (options: AccountControllerOptions['delete']) => Promise<
         void
     > = async(options) => {
-        let _uri = '/api/account/';
+        let _uri = '/api/accounts/';
         _uri += encodeURIComponent(options.id);
         return (await this.executor({uri: _uri, method: 'DELETE'})) as Promise<void>;
     }
@@ -76,7 +59,7 @@ export class AccountController {
     readonly list: () => Promise<
         ReadonlyArray<AccountDto['AccountController/DEFAULT_ACCOUNT_FETCHER']>
     > = async() => {
-        let _uri = '/api/account';
+        let _uri = '/api/accounts';
         return (await this.executor({uri: _uri, method: 'GET'})) as Promise<ReadonlyArray<AccountDto['AccountController/DEFAULT_ACCOUNT_FETCHER']>>;
     }
     
@@ -92,7 +75,7 @@ export class AccountController {
     readonly me: () => Promise<
         AccountDto['AccountController/DEFAULT_ACCOUNT_FETCHER']
     > = async() => {
-        let _uri = '/api/account/me';
+        let _uri = '/api/accounts/me';
         return (await this.executor({uri: _uri, method: 'GET'})) as Promise<AccountDto['AccountController/DEFAULT_ACCOUNT_FETCHER']>;
     }
     
@@ -111,32 +94,9 @@ export class AccountController {
     readonly update: (options: AccountControllerOptions['update']) => Promise<
         AccountDto['AccountController/DEFAULT_ACCOUNT_FETCHER']
     > = async(options) => {
-        let _uri = '/api/account/';
+        let _uri = '/api/accounts/';
         _uri += encodeURIComponent(options.id);
-        let _separator = _uri.indexOf('?') === -1 ? '?' : '&';
-        let _value: any = undefined;
-        _value = options.update.name;
-        if (_value !== undefined && _value !== null) {
-            _uri += _separator
-            _uri += 'name='
-            _uri += encodeURIComponent(_value);
-            _separator = '&';
-        }
-        _value = options.update.password;
-        if (_value !== undefined && _value !== null) {
-            _uri += _separator
-            _uri += 'password='
-            _uri += encodeURIComponent(_value);
-            _separator = '&';
-        }
-        _value = options.update.email;
-        if (_value !== undefined && _value !== null) {
-            _uri += _separator
-            _uri += 'email='
-            _uri += encodeURIComponent(_value);
-            _separator = '&';
-        }
-        return (await this.executor({uri: _uri, method: 'PUT'})) as Promise<AccountDto['AccountController/DEFAULT_ACCOUNT_FETCHER']>;
+        return (await this.executor({uri: _uri, method: 'PUT', body: options.body})) as Promise<AccountDto['AccountController/DEFAULT_ACCOUNT_FETCHER']>;
     }
 }
 
@@ -154,7 +114,7 @@ export type AccountControllerOptions = {
         /**
          * 创建参数
          */
-        readonly create: AccountCreate
+        readonly body: AccountCreate
     }, 
     'update': {
         /**
@@ -164,6 +124,6 @@ export type AccountControllerOptions = {
         /**
          * 更新参数
          */
-        readonly update: AccountUpdate
+        readonly body: AccountUpdate
     }
 }

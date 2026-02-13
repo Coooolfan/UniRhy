@@ -60,8 +60,8 @@ export const api = new Api(async ({ uri, method, headers, body }) => {
         ...(method !== 'GET' ? { body: isFormData ? body : JSON.stringify(body) } : {}),
     })
 
-    // 401处理：排除获取token的接口，避免循环
-    if (response.status === 401 && !(uri.includes('/api/token') && method.includes('GET'))) {
+    // 401处理：排除登录接口，避免循环
+    if (response.status === 401 && !(uri.includes('/api/tokens') && method === 'POST')) {
         // 清除 token
         document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
 

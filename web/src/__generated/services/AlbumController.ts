@@ -24,7 +24,7 @@ export class AlbumController {
     readonly getAlbum: (options: AlbumControllerOptions['getAlbum']) => Promise<
         AlbumDto['AlbumController/DETAIL_ALBUM_FETCHER']
     > = async(options) => {
-        let _uri = '/api/album/';
+        let _uri = '/api/albums/';
         _uri += encodeURIComponent(options.id);
         return (await this.executor({uri: _uri, method: 'GET'})) as Promise<AlbumDto['AlbumController/DETAIL_ALBUM_FETCHER']>;
     }
@@ -41,7 +41,7 @@ export class AlbumController {
     readonly listAlbums: (options: AlbumControllerOptions['listAlbums']) => Promise<
         Page<AlbumDto['AlbumController/DEFAULT_ALBUM_FETCHER']>
     > = async(options) => {
-        let _uri = '/api/album';
+        let _uri = '/api/albums';
         let _separator = _uri.indexOf('?') === -1 ? '?' : '&';
         let _value: any = undefined;
         _value = options.pageIndex;

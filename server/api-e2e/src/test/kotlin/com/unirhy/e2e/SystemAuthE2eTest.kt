@@ -61,7 +61,7 @@ class SystemAuthE2eTest {
 
         val updateConfigResponse = state.api.put(
             path = "/api/system/config",
-            query = mapOf("fsProviderId" to 0L),
+            json = mapOf("fsProviderId" to 0L),
         )
         assertAuthenticationFailed(
             updateConfigResponse.body(),
@@ -69,7 +69,7 @@ class SystemAuthE2eTest {
             "[auth] update config should require login",
         )
 
-        val logoutResponse = state.api.delete("/api/token")
+        val logoutResponse = state.api.delete("/api/tokens/current")
         assertAuthenticationFailed(
             logoutResponse.body(),
             logoutResponse.statusCode(),
@@ -97,9 +97,9 @@ class SystemAuthE2eTest {
             "[flow] system should be initialized after create",
         )
 
-        val loginResponse = state.api.get(
-            path = "/api/token",
-            query = mapOf(
+        val loginResponse = state.api.post(
+            path = "/api/tokens",
+            json = mapOf(
                 "email" to state.credentials.email,
                 "password" to state.credentials.password,
             ),
@@ -114,14 +114,14 @@ class SystemAuthE2eTest {
 
         val updateConfigResponse = state.api.put(
             path = "/api/system/config",
-            query = mapOf("fsProviderId" to 0L),
+            json = mapOf("fsProviderId" to 0L),
         )
         E2eAssert.status(updateConfigResponse, 200, "[flow] update system config should succeed")
         E2eAssert.jsonAt(updateConfigResponse.body(), "/id", 0, "[flow] updated config id should be singleton id")
         E2eAssert.jsonAt(updateConfigResponse.body(), "/fsProviderId", 0, "[flow] updated fs provider id should stay 0")
         E2eAssert.jsonAt(updateConfigResponse.body(), "/ossProviderId", null, "[flow] updated oss provider should remain null")
 
-        val logoutResponse = state.api.delete("/api/token")
+        val logoutResponse = state.api.delete("/api/tokens/current")
         E2eAssert.status(logoutResponse, 204, "[flow] logout should succeed")
 
         val getAfterLogoutResponse = state.api.get("/api/system/config")
@@ -149,9 +149,9 @@ class SystemAuthE2eTest {
             step = "[error] duplicate init should return system already initialized",
         )
 
-        val wrongLoginResponse = state.api.get(
-            path = "/api/token",
-            query = mapOf(
+        val wrongLoginResponse = state.api.post(
+            path = "/api/tokens",
+            json = mapOf(
                 "email" to state.credentials.email,
                 "password" to "${state.credentials.password}-wrong",
             ),

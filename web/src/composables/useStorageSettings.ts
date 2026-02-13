@@ -161,7 +161,7 @@ export const useStorageSettings = () => {
         try {
             await api.fileSystemStorageController.update({
                 id: isEditing.value,
-                update: {
+                body: {
                     name,
                     parentPath,
                     readonly: editForm.readonly,

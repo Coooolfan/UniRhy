@@ -84,9 +84,9 @@ class SmokeTest {
     }
 
     private fun login(state: E2eScenarioState) {
-        val loginResponse = state.api.get(
-            path = "/api/token",
-            query = mapOf(
+        val loginResponse = state.api.post(
+            path = "/api/tokens",
+            json = mapOf(
                 "email" to state.runtime.admin.email,
                 "password" to state.runtime.admin.password,
             ),
@@ -116,7 +116,7 @@ class SmokeTest {
 
     private fun assertMediaRangeReadable(state: E2eScenarioState) {
         val worksResponse = state.api.get(
-            path = "/api/work",
+            path = "/api/works",
             query = mapOf(
                 "pageIndex" to 0,
                 "pageSize" to 100,

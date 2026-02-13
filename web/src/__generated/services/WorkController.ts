@@ -21,7 +21,7 @@ export class WorkController {
     readonly deleteWork: (options: WorkControllerOptions['deleteWork']) => Promise<
         void
     > = async(options) => {
-        let _uri = '/api/work/';
+        let _uri = '/api/works/';
         _uri += encodeURIComponent(options.id);
         return (await this.executor({uri: _uri, method: 'DELETE'})) as Promise<void>;
     }
@@ -37,7 +37,7 @@ export class WorkController {
     readonly getWorkById: (options: WorkControllerOptions['getWorkById']) => Promise<
         WorkDto['WorkController/DEFAULT_WORK_FETCHER']
     > = async(options) => {
-        let _uri = '/api/work/';
+        let _uri = '/api/works/';
         _uri += encodeURIComponent(options.id);
         return (await this.executor({uri: _uri, method: 'GET'})) as Promise<WorkDto['WorkController/DEFAULT_WORK_FETCHER']>;
     }
@@ -51,7 +51,7 @@ export class WorkController {
     readonly listWork: (options: WorkControllerOptions['listWork']) => Promise<
         Page<WorkDto['WorkController/DEFAULT_WORK_FETCHER']>
     > = async(options) => {
-        let _uri = '/api/work';
+        let _uri = '/api/works';
         let _separator = _uri.indexOf('?') === -1 ? '?' : '&';
         let _value: any = undefined;
         _value = options.pageIndex;
@@ -87,7 +87,7 @@ export class WorkController {
     readonly randomWork: (options: WorkControllerOptions['randomWork']) => Promise<
         WorkDto['WorkController/DEFAULT_WORK_FETCHER']
     > = async(options) => {
-        let _uri = '/api/work/random';
+        let _uri = '/api/works/random';
         let _separator = _uri.indexOf('?') === -1 ? '?' : '&';
         let _value: any = undefined;
         _value = options.timestamp;

@@ -21,7 +21,7 @@ export class PlaylistController {
     readonly addRecordingToPlaylist: (options: PlaylistControllerOptions['addRecordingToPlaylist']) => Promise<
         void
     > = async(options) => {
-        let _uri = '/api/playlist/';
+        let _uri = '/api/playlists/';
         _uri += encodeURIComponent(options.id);
         _uri += '/recordings/';
         _uri += encodeURIComponent(options.recordingId);
@@ -42,7 +42,7 @@ export class PlaylistController {
     readonly createPlaylist: (options: PlaylistControllerOptions['createPlaylist']) => Promise<
         PlaylistDto['PlaylistController/DEFAULT_PLAYLIST_FETCHER']
     > = async(options) => {
-        let _uri = '/api/playlist';
+        let _uri = '/api/playlists';
         return (await this.executor({uri: _uri, method: 'POST', body: options.body})) as Promise<PlaylistDto['PlaylistController/DEFAULT_PLAYLIST_FETCHER']>;
     }
     
@@ -59,7 +59,7 @@ export class PlaylistController {
     readonly deletePlaylist: (options: PlaylistControllerOptions['deletePlaylist']) => Promise<
         void
     > = async(options) => {
-        let _uri = '/api/playlist/';
+        let _uri = '/api/playlists/';
         _uri += encodeURIComponent(options.id);
         return (await this.executor({uri: _uri, method: 'DELETE'})) as Promise<void>;
     }
@@ -78,7 +78,7 @@ export class PlaylistController {
     readonly getPlaylist: (options: PlaylistControllerOptions['getPlaylist']) => Promise<
         PlaylistDto['PlaylistController/DETAIL_PLAYLIST_FETCHER']
     > = async(options) => {
-        let _uri = '/api/playlist/';
+        let _uri = '/api/playlists/';
         _uri += encodeURIComponent(options.id);
         return (await this.executor({uri: _uri, method: 'GET'})) as Promise<PlaylistDto['PlaylistController/DETAIL_PLAYLIST_FETCHER']>;
     }
@@ -95,7 +95,7 @@ export class PlaylistController {
     readonly listPlaylists: () => Promise<
         ReadonlyArray<PlaylistDto['PlaylistController/DEFAULT_PLAYLIST_FETCHER']>
     > = async() => {
-        let _uri = '/api/playlist';
+        let _uri = '/api/playlists';
         return (await this.executor({uri: _uri, method: 'GET'})) as Promise<ReadonlyArray<PlaylistDto['PlaylistController/DEFAULT_PLAYLIST_FETCHER']>>;
     }
     
@@ -113,7 +113,7 @@ export class PlaylistController {
     readonly removeRecordingFromPlaylist: (options: PlaylistControllerOptions['removeRecordingFromPlaylist']) => Promise<
         void
     > = async(options) => {
-        let _uri = '/api/playlist/';
+        let _uri = '/api/playlists/';
         _uri += encodeURIComponent(options.id);
         _uri += '/recordings/';
         _uri += encodeURIComponent(options.recordingId);
@@ -135,7 +135,7 @@ export class PlaylistController {
     readonly updatePlaylist: (options: PlaylistControllerOptions['updatePlaylist']) => Promise<
         PlaylistDto['PlaylistController/DEFAULT_PLAYLIST_FETCHER']
     > = async(options) => {
-        let _uri = '/api/playlist/';
+        let _uri = '/api/playlists/';
         _uri += encodeURIComponent(options.id);
         return (await this.executor({uri: _uri, method: 'PUT', body: options.body})) as Promise<PlaylistDto['PlaylistController/DEFAULT_PLAYLIST_FETCHER']>;
     }

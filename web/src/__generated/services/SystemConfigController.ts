@@ -74,23 +74,7 @@ export class SystemConfigController {
         SystemConfigDto['SystemConfigController/DEFAULT_SYSTEM_CONFIG_FETCHER']
     > = async(options) => {
         let _uri = '/api/system/config';
-        let _separator = _uri.indexOf('?') === -1 ? '?' : '&';
-        let _value: any = undefined;
-        _value = options.update.ossProviderId;
-        if (_value !== undefined && _value !== null) {
-            _uri += _separator
-            _uri += 'ossProviderId='
-            _uri += encodeURIComponent(_value);
-            _separator = '&';
-        }
-        _value = options.update.fsProviderId;
-        if (_value !== undefined && _value !== null) {
-            _uri += _separator
-            _uri += 'fsProviderId='
-            _uri += encodeURIComponent(_value);
-            _separator = '&';
-        }
-        return (await this.executor({uri: _uri, method: 'PUT'})) as Promise<SystemConfigDto['SystemConfigController/DEFAULT_SYSTEM_CONFIG_FETCHER']>;
+        return (await this.executor({uri: _uri, method: 'PUT', body: options.body})) as Promise<SystemConfigDto['SystemConfigController/DEFAULT_SYSTEM_CONFIG_FETCHER']>;
     }
 }
 
@@ -108,6 +92,6 @@ export type SystemConfigControllerOptions = {
         /**
          * 更新参数
          */
-        readonly update: SystemConfigUpdate
+        readonly body: SystemConfigUpdate
     }
 }

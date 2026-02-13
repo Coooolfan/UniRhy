@@ -14,6 +14,7 @@ import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.RequestMethod
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.RequestHeader
 import org.springframework.web.bind.annotation.RequestMapping
@@ -64,6 +65,30 @@ class MediaFileController(
         return fullResponse(resolved, resource, mediaType, etag, lastModified)
     }
 
+    @RequestMapping("/{id}", method = [RequestMethod.HEAD], headers = ["!Range"])
+    @ApiIgnore
+    fun headMedia(
+        @PathVariable id: Long,
+        @RequestHeader headers: HttpHeaders,
+    ): ResponseEntity<Void> {
+        val resolved = service.loadLocalFile(id)
+        val mediaType = parseMediaType(resolved.mediaFile.mimeType)
+        val etag = toStrongEtag(resolved.mediaFile.sha256)
+        val lastModified = normalizeToSeconds(resolved.file.lastModified())
+
+        if (isNotModified(headers, etag, lastModified)) {
+            return ResponseEntity.status(HttpStatus.NOT_MODIFIED)
+                .headers(baseHeaders(resolved, etag, lastModified, null))
+                .build()
+        }
+
+        val responseHeaders = baseHeaders(resolved, etag, lastModified, mediaType)
+        responseHeaders.contentLength = resolved.file.length()
+        return ResponseEntity.status(HttpStatus.OK)
+            .headers(responseHeaders)
+            .build()
+    }
+
     @GetMapping("/{id}", headers = ["Range"])
     @ApiIgnore
     fun getMediaWithRange(
@@ -83,7 +108,7 @@ class MediaFileController(
 
         if (!ifRangeMatched(headers, etag, lastModified)) {
             // If-Range 不匹配时必须回退到完整资源响应
-            return fullResponse(resolved, resource, mediaType, etag, lastModified).asRangeResponse()
+            return fullBytesResponse(resolved, mediaType, etag, lastModified).asRangeResponse()
         }
 
         val rawRange = headers.getFirst(HttpHeaders.RANGE)
@@ -107,7 +132,6 @@ class MediaFileController(
         }
 
         val contentType = if (regions.size == 1) mediaType else null
-
         return ResponseEntity.status(HttpStatus.PARTIAL_CONTENT)
             .headers(baseHeaders(resolved, etag, lastModified, contentType))
             .body(regions)
@@ -125,6 +149,20 @@ class MediaFileController(
         return ResponseEntity.status(HttpStatus.OK)
             .headers(responseHeaders)
             .body(resource)
+    }
+
+    private fun fullBytesResponse(
+        resolved: ResolvedMediaFile,
+        mediaType: MediaType,
+        etag: String,
+        lastModified: Long,
+    ): ResponseEntity<ByteArray> {
+        val body = resolved.file.readBytes()
+        val responseHeaders = baseHeaders(resolved, etag, lastModified, mediaType)
+        responseHeaders.contentLength = body.size.toLong()
+        return ResponseEntity.status(HttpStatus.OK)
+            .headers(responseHeaders)
+            .body(body)
     }
 
     private fun notModifiedResourceResponse(
@@ -256,7 +294,7 @@ class MediaFileController(
     }
 
     @Suppress("UNCHECKED_CAST")
-    private fun ResponseEntity<Resource>.asRangeResponse(): ResponseEntity<List<ResourceRegion>> {
+    private fun ResponseEntity<*>.asRangeResponse(): ResponseEntity<List<ResourceRegion>> {
         return this as ResponseEntity<List<ResourceRegion>>
     }
 

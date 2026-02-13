@@ -99,28 +99,7 @@ export class FileSystemStorageController {
     > = async(options) => {
         let _uri = '/api/storage/fs/';
         _uri += encodeURIComponent(options.id);
-        let _separator = _uri.indexOf('?') === -1 ? '?' : '&';
-        let _value: any = undefined;
-        _value = options.update.name;
-        if (_value !== undefined && _value !== null) {
-            _uri += _separator
-            _uri += 'name='
-            _uri += encodeURIComponent(_value);
-            _separator = '&';
-        }
-        _value = options.update.parentPath;
-        if (_value !== undefined && _value !== null) {
-            _uri += _separator
-            _uri += 'parentPath='
-            _uri += encodeURIComponent(_value);
-            _separator = '&';
-        }
-        _value = options.update.readonly;
-        _uri += _separator
-        _uri += 'readonly='
-        _uri += encodeURIComponent(_value);
-        _separator = '&';
-        return (await this.executor({uri: _uri, method: 'PUT'})) as Promise<FileProviderFileSystemDto['FileSystemStorageController/DEFAULT_FILE_SYSTEM_FETCHER']>;
+        return (await this.executor({uri: _uri, method: 'PUT', body: options.body})) as Promise<FileProviderFileSystemDto['FileSystemStorageController/DEFAULT_FILE_SYSTEM_FETCHER']>;
     }
 }
 
@@ -146,7 +125,7 @@ export type FileSystemStorageControllerOptions = {
         /**
          * 更新参数
          */
-        readonly update: FileProviderFileSystemUpdate
+        readonly body: FileProviderFileSystemUpdate
     }, 
     'delete': {
         /**

@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.*
  * 提供账户的增删改查与当前登录账户信息获取能力
  */
 @RestController
-@RequestMapping("/api/account")
+@RequestMapping("/api/accounts")
 class AccountController(private val service: AccountService) {
     /**
      * 获取账户列表
@@ -28,7 +28,7 @@ class AccountController(private val service: AccountService) {
      *
      * @return List<Account> 返回账户列表（默认 fetcher）
      *
-     * @api GET /api/account
+     * @api GET /api/accounts
      * @permission 需要登录认证
      * @description 调用AccountService.list()方法获取账户列表
      */
@@ -47,7 +47,7 @@ class AccountController(private val service: AccountService) {
      *
      * @return Account 返回当前账户信息（默认 fetcher）
      *
-     * @api GET /api/account/me
+     * @api GET /api/accounts/me
      * @permission 需要登录认证
      * @description 调用AccountService.me()方法获取当前账户信息
      */
@@ -65,7 +65,7 @@ class AccountController(private val service: AccountService) {
      *
      * @param id 账户 ID
      *
-     * @api DELETE /api/account/{id}
+     * @api DELETE /api/accounts/{id}
      * @permission 需要登录认证
      * @description 调用AccountService.delete()方法删除账户
      */
@@ -86,7 +86,7 @@ class AccountController(private val service: AccountService) {
      * @param create 创建参数
      * @return Account 返回创建后的账户（默认 fetcher）
      *
-     * @api POST /api/account
+     * @api POST /api/accounts
      * @permission 需要登录认证
      * @description 调用AccountService.create()方法创建账户
      */
@@ -94,7 +94,7 @@ class AccountController(private val service: AccountService) {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     @Throws(CommonException.Forbidden::class)
-    fun create(create: AccountCreate): @FetchBy("DEFAULT_ACCOUNT_FETCHER") Account {
+    fun create(@RequestBody create: AccountCreate): @FetchBy("DEFAULT_ACCOUNT_FETCHER") Account {
         return service.create(create, DEFAULT_ACCOUNT_FETCHER)
     }
 
@@ -108,13 +108,13 @@ class AccountController(private val service: AccountService) {
      * @param update 更新参数
      * @return Account 返回更新后的账户（默认 fetcher）
      *
-     * @api PUT /api/account/{id}
+     * @api PUT /api/accounts/{id}
      * @permission 需要登录认证
      * @description 调用AccountService.update()方法更新账户信息
      */
     @SaCheckLogin
     @PutMapping("/{id}")
-    fun update(@PathVariable id: Long, update: AccountUpdate): @FetchBy("DEFAULT_ACCOUNT_FETCHER") Account {
+    fun update(@PathVariable id: Long, @RequestBody update: AccountUpdate): @FetchBy("DEFAULT_ACCOUNT_FETCHER") Account {
         return service.update(update.toEntity { this.id = id }, DEFAULT_ACCOUNT_FETCHER)
     }
 
