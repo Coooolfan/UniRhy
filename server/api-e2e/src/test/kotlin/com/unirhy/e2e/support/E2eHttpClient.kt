@@ -29,6 +29,16 @@ class E2eHttpClient(private val baseUrl: String) {
         )
     }
 
+    fun head(path: String, headers: Map<String, String> = emptyMap()): HttpResponse<String> {
+        return requestText(
+            E2eRequest(
+                method = HttpMethod.HEAD,
+                path = path,
+                headers = headers,
+            ),
+        )
+    }
+
     fun getBytes(path: String, headers: Map<String, String> = emptyMap()): HttpResponse<ByteArray> {
         return requestBytes(
             E2eRequest(
@@ -224,6 +234,7 @@ class E2eHttpClient(private val baseUrl: String) {
 
 enum class HttpMethod(val value: String) {
     GET("GET"),
+    HEAD("HEAD"),
     POST("POST"),
     PUT("PUT"),
     DELETE("DELETE"),

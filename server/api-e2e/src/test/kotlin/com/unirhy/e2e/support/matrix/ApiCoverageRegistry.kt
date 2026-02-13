@@ -15,6 +15,14 @@ object ApiCoverageRegistry {
         "com.unirhy.e2e.StorageConfigE2eTest#oss storage should support create get update list delete flow"
     private const val STORAGE_LINKAGE_CONSTRAINT_CASE =
         "com.unirhy.e2e.StorageConfigE2eTest#system config should enforce storage linkage constraints"
+    private const val TASK_CONTENT_AUTH_REQUIRED_CASE =
+        "com.unirhy.e2e.TaskContentReadE2eTest#task and content endpoints should reject unauthenticated access"
+    private const val TASK_SCAN_LIFECYCLE_CASE =
+        "com.unirhy.e2e.TaskContentReadE2eTest#scan task should expose running lifecycle and reject duplicate submission"
+    private const val WORK_ALBUM_READ_CASE =
+        "com.unirhy.e2e.TaskContentReadE2eTest#works and albums should support read random and delete flow"
+    private const val MEDIA_READ_CASE =
+        "com.unirhy.e2e.TaskContentReadE2eTest#media endpoint should support full range head and error branches"
 
     val coverageByKey: Map<ApiEndpointKey, CoverageMark> = listOf(
         full(
@@ -83,6 +91,75 @@ object ApiCoverageRegistry {
         full("PUT", "/api/system/config", testRef = SYSTEM_AUTH_FLOW_CASE),
         full("POST", "/api/tokens", testRef = DUPLICATE_INIT_AND_WRONG_LOGIN_CASE),
         full("DELETE", "/api/tokens/current", testRef = SYSTEM_AUTH_FLOW_CASE),
+        full(
+            "GET",
+            "/api/task/running",
+            testRef = TASK_SCAN_LIFECYCLE_CASE,
+            note = "auth: $TASK_CONTENT_AUTH_REQUIRED_CASE",
+        ),
+        full(
+            "POST",
+            "/api/task/scan",
+            testRef = TASK_SCAN_LIFECYCLE_CASE,
+            note = "auth: $TASK_CONTENT_AUTH_REQUIRED_CASE; conflict: duplicate submission returns 409 when running state is observable",
+        ),
+        full(
+            "GET",
+            "/api/works",
+            testRef = WORK_ALBUM_READ_CASE,
+            note = "auth: $TASK_CONTENT_AUTH_REQUIRED_CASE",
+        ),
+        full(
+            "GET",
+            "/api/works/{id}",
+            testRef = WORK_ALBUM_READ_CASE,
+            note = "auth: $TASK_CONTENT_AUTH_REQUIRED_CASE",
+        ),
+        full(
+            "GET",
+            "/api/works/random",
+            testRef = WORK_ALBUM_READ_CASE,
+            note = "auth: $TASK_CONTENT_AUTH_REQUIRED_CASE; validation: length<=0 returns 400",
+        ),
+        full(
+            "DELETE",
+            "/api/works/{id}",
+            testRef = WORK_ALBUM_READ_CASE,
+            note = "auth: $TASK_CONTENT_AUTH_REQUIRED_CASE",
+        ),
+        full(
+            "GET",
+            "/api/albums",
+            testRef = WORK_ALBUM_READ_CASE,
+            note = "auth: $TASK_CONTENT_AUTH_REQUIRED_CASE",
+        ),
+        full(
+            "GET",
+            "/api/albums/{id}",
+            testRef = WORK_ALBUM_READ_CASE,
+            note = "auth: $TASK_CONTENT_AUTH_REQUIRED_CASE",
+        ),
+        full(
+            "GET",
+            "/api/media/{id}",
+            condition = "!Range",
+            testRef = MEDIA_READ_CASE,
+            note = "auth: $TASK_CONTENT_AUTH_REQUIRED_CASE; error: unknown id returns 404",
+        ),
+        full(
+            "GET",
+            "/api/media/{id}",
+            condition = "Range",
+            testRef = MEDIA_READ_CASE,
+            note = "auth: $TASK_CONTENT_AUTH_REQUIRED_CASE; error: invalid range returns 416",
+        ),
+        full(
+            "HEAD",
+            "/api/media/{id}",
+            condition = "!Range",
+            testRef = MEDIA_READ_CASE,
+            note = "auth: $TASK_CONTENT_AUTH_REQUIRED_CASE",
+        ),
     ).associate { it.key to it.mark }
 
     private fun full(

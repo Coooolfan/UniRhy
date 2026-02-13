@@ -7,6 +7,7 @@ import com.unirhy.e2e.support.E2eJson
 import com.unirhy.e2e.support.E2eRuntime
 import com.unirhy.e2e.support.bootstrapAdminSession
 import org.junit.jupiter.api.AfterAll
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
@@ -382,7 +383,7 @@ class StorageConfigE2eTest {
                 family = "SYSTEM",
                 code = "SYSTEM_STORAGE_PROVIDER_CANNOT_BE_REMOTE",
                 expectedStatus = 409,
-                step = "[linkage] remote provider should not be bindable as system storage",
+                step = "[linkage] remote provider is not yet supported as system storage",
             )
 
             val restoreResponse = state.api.put(
@@ -417,6 +418,61 @@ class StorageConfigE2eTest {
             }
             writableFsProviderId?.let { safeDelete(state.api, "/api/storage/fs/$it") }
             readonlyFsProviderId?.let { safeDelete(state.api, "/api/storage/fs/$it") }
+            ossProviderId?.let { safeDelete(state.api, "/api/storage/oss/$it") }
+        }
+    }
+
+    @Disabled("TODO: enable after backend supports using OSS as system default storage")
+    @Test
+    fun `system config should allow oss provider as default storage once implemented`() {
+        val state = bootstrapAdminSession(baseUrl())
+        var ossProviderId: Long? = null
+
+        try {
+            val suffix = suffix()
+            val ossResponse = state.api.post(
+                path = "/api/storage/oss",
+                json = ossPayload(
+                    name = "e2e-oss-default-$suffix",
+                    host = "https://oss-default-$suffix.example.invalid",
+                    bucket = "bucket-default-$suffix",
+                    accessKey = "access-default-$suffix",
+                    secretKey = "secret-default-$suffix",
+                    parentPath = "/default-$suffix",
+                    readonly = false,
+                ),
+            )
+            E2eAssert.status(ossResponse, 201, "[default-storage] create oss provider should succeed")
+            ossProviderId = readId(ossResponse.body(), "[default-storage] oss provider should return id")
+            val ossId = requireNotNull(ossProviderId)
+
+            val bindRemoteResponse = state.api.put(
+                path = "/api/system/config",
+                json = mapOf<String, Any?>(
+                    "fsProviderId" to null,
+                    "ossProviderId" to ossId,
+                ),
+            )
+            E2eAssert.status(bindRemoteResponse, 200, "[default-storage] bind oss provider should succeed once supported")
+            E2eAssert.jsonAt(
+                bindRemoteResponse.body(),
+                "/ossProviderId",
+                ossId,
+                "[default-storage] system config should bind oss provider id",
+            )
+            E2eAssert.jsonAt(
+                bindRemoteResponse.body(),
+                "/fsProviderId",
+                null,
+                "[default-storage] fs provider id should be null when oss is bound",
+            )
+        } finally {
+            runCatching {
+                state.api.put(
+                    path = "/api/system/config",
+                    json = mapOf("fsProviderId" to 0L),
+                )
+            }
             ossProviderId?.let { safeDelete(state.api, "/api/storage/oss/$it") }
         }
     }

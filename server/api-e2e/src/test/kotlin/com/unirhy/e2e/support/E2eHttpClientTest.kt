@@ -139,6 +139,20 @@ class E2eHttpClientTest {
     }
 
     @Test
+    fun `supports head request`() {
+        withRequestCaptureServer { baseUrl, captured ->
+            val client = E2eHttpClient(baseUrl)
+            val response = client.head("/metadata", headers = mapOf("If-None-Match" to "\"etag\""))
+
+            assertEquals(200, response.statusCode())
+            val request = requireNotNull(captured.get())
+            assertEquals("HEAD", request.method)
+            assertEquals("/metadata", request.path)
+            assertEquals("\"etag\"", request.header("If-None-Match"))
+        }
+    }
+
+    @Test
     fun `json and form cannot be used together`() {
         withRequestCaptureServer { baseUrl, _ ->
             val client = E2eHttpClient(baseUrl)
@@ -177,12 +191,14 @@ class E2eHttpClientTest {
         val query = decodeForm(exchange.requestURI.rawQuery.orEmpty())
         val contentType = exchange.requestHeaders.getFirst("Content-Type")
         val body = exchange.requestBody.readAllBytes().toString(StandardCharsets.UTF_8)
+        val headers = exchange.requestHeaders.entries.associate { it.key to it.value.joinToString(",") }
         return CapturedRequest(
             method = exchange.requestMethod,
             path = exchange.requestURI.path,
             query = query,
             contentType = contentType,
             body = body,
+            headers = headers,
         )
     }
 
@@ -208,5 +224,10 @@ class E2eHttpClientTest {
         val query: Map<String, List<String>>,
         val contentType: String?,
         val body: String,
-    )
+        val headers: Map<String, String>,
+    ) {
+        fun header(name: String): String? {
+            return headers.entries.firstOrNull { it.key.equals(name, ignoreCase = true) }?.value
+        }
+    }
 }

@@ -14,11 +14,11 @@
 | 3 | TODO | GET | /api/accounts/me | - | Y | AccountController#me | - | - |
 | 4 | TODO | DELETE | /api/accounts/{id} | - | Y | AccountController#delete | - | - |
 | 5 | TODO | PUT | /api/accounts/{id} | - | Y | AccountController#update | - | - |
-| 6 | TODO | GET | /api/albums | - | Y | AlbumController#listAlbums | - | - |
-| 7 | TODO | GET | /api/albums/{id} | - | Y | AlbumController#getAlbum | - | - |
-| 8 | TODO | GET | /api/media/{id} | !Range | Y | MediaFileController#getMedia | - | - |
-| 9 | TODO | GET | /api/media/{id} | Range | Y | MediaFileController#getMediaWithRange | - | - |
-| 10 | TODO | HEAD | /api/media/{id} | !Range | Y | MediaFileController#headMedia | - | - |
+| 6 | FULL | GET | /api/albums | - | Y | AlbumController#listAlbums | com.unirhy.e2e.TaskContentReadE2eTest#works and albums should support read random and delete flow | auth: com.unirhy.e2e.TaskContentReadE2eTest#task and content endpoints should reject unauthenticated access |
+| 7 | FULL | GET | /api/albums/{id} | - | Y | AlbumController#getAlbum | com.unirhy.e2e.TaskContentReadE2eTest#works and albums should support read random and delete flow | auth: com.unirhy.e2e.TaskContentReadE2eTest#task and content endpoints should reject unauthenticated access |
+| 8 | FULL | GET | /api/media/{id} | !Range | Y | MediaFileController#getMedia | com.unirhy.e2e.TaskContentReadE2eTest#media endpoint should support full range head and error branches | auth: com.unirhy.e2e.TaskContentReadE2eTest#task and content endpoints should reject unauthenticated access; error: unknown id returns 404 |
+| 9 | FULL | GET | /api/media/{id} | Range | Y | MediaFileController#getMediaWithRange | com.unirhy.e2e.TaskContentReadE2eTest#media endpoint should support full range head and error branches | auth: com.unirhy.e2e.TaskContentReadE2eTest#task and content endpoints should reject unauthenticated access; error: invalid range returns 416 |
+| 10 | FULL | HEAD | /api/media/{id} | !Range | Y | MediaFileController#headMedia | com.unirhy.e2e.TaskContentReadE2eTest#media endpoint should support full range head and error branches | auth: com.unirhy.e2e.TaskContentReadE2eTest#task and content endpoints should reject unauthenticated access |
 | 11 | TODO | GET | /api/playlists | - | Y | PlaylistController#listPlaylists | - | - |
 | 12 | TODO | POST | /api/playlists | - | Y | PlaylistController#createPlaylist | - | - |
 | 13 | TODO | DELETE | /api/playlists/{id} | - | Y | PlaylistController#deletePlaylist | - | - |
@@ -40,11 +40,11 @@
 | 29 | FULL | POST | /api/system/config | - | N | SystemConfigController#create | com.unirhy.e2e.SystemAuthE2eTest#initialize login get update logout should form closed session flow | - |
 | 30 | FULL | PUT | /api/system/config | - | Y | SystemConfigController#update | com.unirhy.e2e.SystemAuthE2eTest#initialize login get update logout should form closed session flow | - |
 | 31 | FULL | GET | /api/system/config/status | - | N | SystemConfigController#isInitialized | com.unirhy.e2e.SystemAuthE2eTest#status and protected endpoints require authentication | - |
-| 32 | TODO | GET | /api/task/running | - | Y | TaskController#listRunningTasks | - | - |
-| 33 | TODO | POST | /api/task/scan | - | Y | TaskController#executeScanTask | - | - |
+| 32 | FULL | GET | /api/task/running | - | Y | TaskController#listRunningTasks | com.unirhy.e2e.TaskContentReadE2eTest#scan task should expose running lifecycle and reject duplicate submission | auth: com.unirhy.e2e.TaskContentReadE2eTest#task and content endpoints should reject unauthenticated access |
+| 33 | FULL | POST | /api/task/scan | - | Y | TaskController#executeScanTask | com.unirhy.e2e.TaskContentReadE2eTest#scan task should expose running lifecycle and reject duplicate submission | auth: com.unirhy.e2e.TaskContentReadE2eTest#task and content endpoints should reject unauthenticated access; conflict: duplicate submission returns 409 when running state is observable |
 | 34 | FULL | POST | /api/tokens | - | N | TokenController#login | com.unirhy.e2e.SystemAuthE2eTest#duplicate init and wrong login return stable business errors | - |
 | 35 | FULL | DELETE | /api/tokens/current | - | Y | TokenController#logout | com.unirhy.e2e.SystemAuthE2eTest#initialize login get update logout should form closed session flow | - |
-| 36 | TODO | GET | /api/works | - | Y | WorkController#listWork | - | - |
-| 37 | TODO | GET | /api/works/random | - | Y | WorkController#randomWork | - | - |
-| 38 | TODO | DELETE | /api/works/{id} | - | Y | WorkController#deleteWork | - | - |
-| 39 | TODO | GET | /api/works/{id} | - | Y | WorkController#getWorkById | - | - |
+| 36 | FULL | GET | /api/works | - | Y | WorkController#listWork | com.unirhy.e2e.TaskContentReadE2eTest#works and albums should support read random and delete flow | auth: com.unirhy.e2e.TaskContentReadE2eTest#task and content endpoints should reject unauthenticated access |
+| 37 | FULL | GET | /api/works/random | - | Y | WorkController#randomWork | com.unirhy.e2e.TaskContentReadE2eTest#works and albums should support read random and delete flow | auth: com.unirhy.e2e.TaskContentReadE2eTest#task and content endpoints should reject unauthenticated access; validation: length<=0 returns 400 |
+| 38 | FULL | DELETE | /api/works/{id} | - | Y | WorkController#deleteWork | com.unirhy.e2e.TaskContentReadE2eTest#works and albums should support read random and delete flow | auth: com.unirhy.e2e.TaskContentReadE2eTest#task and content endpoints should reject unauthenticated access |
+| 39 | FULL | GET | /api/works/{id} | - | Y | WorkController#getWorkById | com.unirhy.e2e.TaskContentReadE2eTest#works and albums should support read random and delete flow | auth: com.unirhy.e2e.TaskContentReadE2eTest#task and content endpoints should reject unauthenticated access |
