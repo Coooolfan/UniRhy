@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref, watch, computed } from 'vue'
 import { useRoute } from 'vue-router'
-import { Play, Heart, MoreHorizontal, Pause } from 'lucide-vue-next'
+import { Play, Pause } from 'lucide-vue-next'
 import { api } from '@/ApiInstance'
 import { useAudioStore } from '@/stores/audio'
 import DashboardTopBar from '@/components/dashboard/DashboardTopBar.vue'
@@ -20,7 +20,6 @@ const selectedRecordingForPlaylist = ref<Recording | null>(null)
 type WorkData = {
     title: string
     artist: string
-    recordingsCount: number
     cover: string
 }
 
@@ -39,7 +38,6 @@ type Recording = {
 const workData = ref<WorkData>({
     title: '',
     artist: '',
-    recordingsCount: 0,
     cover: '',
 })
 
@@ -80,7 +78,6 @@ const fetchWork = async (id: number) => {
         workData.value = {
             title: data.title,
             artist: artistName,
-            recordingsCount: data.recordings?.length ?? 0,
             cover: resolveCover(defaultRecording?.cover?.id),
         }
 
@@ -195,12 +192,8 @@ watch(
 
                 <!-- 信息 -->
                 <div class="flex flex-col gap-4 pb-2 w-full relative z-10">
-                    <div
-                        class="flex items-center gap-3 text-sm tracking-wider uppercase text-[#8C857B]"
-                    >
+                    <div class="text-sm tracking-wider uppercase text-[#8C857B]">
                         <span>Musical Work</span>
-                        <span class="w-8 h-px bg-[#C17D46]"></span>
-                        <span>{{ workData.recordingsCount }} Versions</span>
                     </div>
 
                     <h1 class="text-5xl md:text-7xl font-serif text-[#2C2420] leading-tight">
@@ -219,16 +212,6 @@ watch(
                             <Pause v-if="isCurrentPlaying" :size="16" />
                             <Play v-else :size="16" fill="currentColor" />
                             {{ isCurrentPlaying ? '暂停播放' : '立即播放' }}
-                        </button>
-                        <button
-                            class="p-3 text-[#8C857B] hover:text-[#C17D46] transition-colors border border-transparent hover:border-[#DCD6CC] rounded-full cursor-pointer"
-                        >
-                            <Heart :size="20" />
-                        </button>
-                        <button
-                            class="p-3 text-[#8C857B] hover:text-[#C17D46] transition-colors border border-transparent hover:border-[#DCD6CC] rounded-full cursor-pointer"
-                        >
-                            <MoreHorizontal :size="20" />
                         </button>
                     </div>
                 </div>
