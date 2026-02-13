@@ -26,16 +26,16 @@
 | 15 | TODO | PUT | /api/playlists/{id} | - | Y | PlaylistController#updatePlaylist | - | - |
 | 16 | TODO | DELETE | /api/playlists/{id}/recordings/{recordingId} | - | Y | PlaylistController#removeRecordingFromPlaylist | - | - |
 | 17 | TODO | PUT | /api/playlists/{id}/recordings/{recordingId} | - | Y | PlaylistController#addRecordingToPlaylist | - | - |
-| 18 | TODO | GET | /api/storage/fs | - | Y | FileSystemStorageController#list | - | - |
-| 19 | TODO | POST | /api/storage/fs | - | Y | FileSystemStorageController#create | - | - |
-| 20 | TODO | DELETE | /api/storage/fs/{id} | - | Y | FileSystemStorageController#delete | - | - |
-| 21 | TODO | GET | /api/storage/fs/{id} | - | Y | FileSystemStorageController#get | - | - |
-| 22 | TODO | PUT | /api/storage/fs/{id} | - | Y | FileSystemStorageController#update | - | - |
-| 23 | TODO | GET | /api/storage/oss | - | Y | OssStorageController#list | - | - |
-| 24 | TODO | POST | /api/storage/oss | - | Y | OssStorageController#create | - | - |
-| 25 | TODO | DELETE | /api/storage/oss/{id} | - | Y | OssStorageController#delete | - | - |
-| 26 | TODO | GET | /api/storage/oss/{id} | - | Y | OssStorageController#get | - | - |
-| 27 | TODO | PUT | /api/storage/oss/{id} | - | Y | OssStorageController#update | - | - |
+| 18 | FULL | GET | /api/storage/fs | - | Y | FileSystemStorageController#list | com.unirhy.e2e.StorageConfigE2eTest#file system storage should support create get update list delete flow | auth: com.unirhy.e2e.StorageConfigE2eTest#all storage endpoints should reject unauthenticated access |
+| 19 | FULL | POST | /api/storage/fs | - | Y | FileSystemStorageController#create | com.unirhy.e2e.StorageConfigE2eTest#file system storage should support create get update list delete flow | auth: com.unirhy.e2e.StorageConfigE2eTest#all storage endpoints should reject unauthenticated access |
+| 20 | FULL | DELETE | /api/storage/fs/{id} | - | Y | FileSystemStorageController#delete | com.unirhy.e2e.StorageConfigE2eTest#file system storage should support create get update list delete flow | auth: com.unirhy.e2e.StorageConfigE2eTest#all storage endpoints should reject unauthenticated access; linkage: com.unirhy.e2e.StorageConfigE2eTest#system config should enforce storage linkage constraints |
+| 21 | FULL | GET | /api/storage/fs/{id} | - | Y | FileSystemStorageController#get | com.unirhy.e2e.StorageConfigE2eTest#file system storage should support create get update list delete flow | auth: com.unirhy.e2e.StorageConfigE2eTest#all storage endpoints should reject unauthenticated access |
+| 22 | FULL | PUT | /api/storage/fs/{id} | - | Y | FileSystemStorageController#update | com.unirhy.e2e.StorageConfigE2eTest#file system storage should support create get update list delete flow | auth: com.unirhy.e2e.StorageConfigE2eTest#all storage endpoints should reject unauthenticated access |
+| 23 | FULL | GET | /api/storage/oss | - | Y | OssStorageController#list | com.unirhy.e2e.StorageConfigE2eTest#oss storage should support create get update list delete flow | auth: com.unirhy.e2e.StorageConfigE2eTest#all storage endpoints should reject unauthenticated access |
+| 24 | FULL | POST | /api/storage/oss | - | Y | OssStorageController#create | com.unirhy.e2e.StorageConfigE2eTest#oss storage should support create get update list delete flow | auth: com.unirhy.e2e.StorageConfigE2eTest#all storage endpoints should reject unauthenticated access |
+| 25 | FULL | DELETE | /api/storage/oss/{id} | - | Y | OssStorageController#delete | com.unirhy.e2e.StorageConfigE2eTest#oss storage should support create get update list delete flow | auth: com.unirhy.e2e.StorageConfigE2eTest#all storage endpoints should reject unauthenticated access |
+| 26 | FULL | GET | /api/storage/oss/{id} | - | Y | OssStorageController#get | com.unirhy.e2e.StorageConfigE2eTest#oss storage should support create get update list delete flow | auth: com.unirhy.e2e.StorageConfigE2eTest#all storage endpoints should reject unauthenticated access |
+| 27 | FULL | PUT | /api/storage/oss/{id} | - | Y | OssStorageController#update | com.unirhy.e2e.StorageConfigE2eTest#oss storage should support create get update list delete flow | auth: com.unirhy.e2e.StorageConfigE2eTest#all storage endpoints should reject unauthenticated access |
 | 28 | FULL | GET | /api/system/config | - | Y | SystemConfigController#get | com.unirhy.e2e.SystemAuthE2eTest#initialize login get update logout should form closed session flow | - |
 | 29 | FULL | POST | /api/system/config | - | N | SystemConfigController#create | com.unirhy.e2e.SystemAuthE2eTest#initialize login get update logout should form closed session flow | - |
 | 30 | FULL | PUT | /api/system/config | - | Y | SystemConfigController#update | com.unirhy.e2e.SystemAuthE2eTest#initialize login get update logout should form closed session flow | - |

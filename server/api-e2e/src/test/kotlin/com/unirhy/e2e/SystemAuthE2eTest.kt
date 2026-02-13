@@ -1,12 +1,13 @@
 package com.unirhy.e2e
 
 import com.coooolfan.unirhy.UnirhyApplication
-import com.unirhy.e2e.support.AdminCredentials
+import com.unirhy.e2e.support.E2eAdminSession
 import com.unirhy.e2e.support.E2eAssert
-import com.unirhy.e2e.support.E2eHttpClient
-import com.unirhy.e2e.support.E2eJson
-import com.unirhy.e2e.support.E2eRunContext
 import com.unirhy.e2e.support.E2eRuntime
+import com.unirhy.e2e.support.ensureSystemInitialized
+import com.unirhy.e2e.support.loginAsAdmin
+import com.unirhy.e2e.support.newAdminSession
+import com.unirhy.e2e.support.systemInitRequest
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.MethodOrderer
 import org.junit.jupiter.api.Order
@@ -19,6 +20,7 @@ import org.springframework.boot.test.web.server.LocalServerPort
 import org.springframework.test.annotation.DirtiesContext
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
+import java.net.http.HttpResponse
 
 @SpringBootTest(
     classes = [UnirhyApplication::class],
@@ -54,8 +56,7 @@ class SystemAuthE2eTest {
 
         val getConfigResponse = state.api.get("/api/system/config")
         assertAuthenticationFailed(
-            getConfigResponse.body(),
-            getConfigResponse.statusCode(),
+            getConfigResponse,
             "[auth] get config should require login",
         )
 
@@ -64,15 +65,13 @@ class SystemAuthE2eTest {
             json = mapOf("fsProviderId" to 0L),
         )
         assertAuthenticationFailed(
-            updateConfigResponse.body(),
-            updateConfigResponse.statusCode(),
+            updateConfigResponse,
             "[auth] update config should require login",
         )
 
         val logoutResponse = state.api.delete("/api/tokens/current")
         assertAuthenticationFailed(
-            logoutResponse.body(),
-            logoutResponse.statusCode(),
+            logoutResponse,
             "[auth] logout should require login",
         )
     }
@@ -84,7 +83,7 @@ class SystemAuthE2eTest {
 
         val initResponse = state.api.post(
             path = "/api/system/config",
-            json = initRequest(state.runtime, state.credentials),
+            json = systemInitRequest(state),
         )
         E2eAssert.status(initResponse, 201, "[flow] system initialization should succeed")
 
@@ -97,14 +96,7 @@ class SystemAuthE2eTest {
             "[flow] system should be initialized after create",
         )
 
-        val loginResponse = state.api.post(
-            path = "/api/tokens",
-            json = mapOf(
-                "email" to state.credentials.email,
-                "password" to state.credentials.password,
-            ),
-        )
-        E2eAssert.status(loginResponse, 200, "[flow] login should succeed")
+        loginAsAdmin(state)
 
         val getConfigResponse = state.api.get("/api/system/config")
         E2eAssert.status(getConfigResponse, 200, "[flow] get system config should succeed after login")
@@ -126,8 +118,7 @@ class SystemAuthE2eTest {
 
         val getAfterLogoutResponse = state.api.get("/api/system/config")
         assertAuthenticationFailed(
-            getAfterLogoutResponse.body(),
-            getAfterLogoutResponse.statusCode(),
+            getAfterLogoutResponse,
             "[flow] get system config after logout should require login",
         )
     }
@@ -136,11 +127,11 @@ class SystemAuthE2eTest {
     @Order(3)
     fun `duplicate init and wrong login return stable business errors`() {
         val state = prepareState()
-        ensureInitialized(state)
+        ensureSystemInitialized(state)
 
         val duplicateInitResponse = state.api.post(
             path = "/api/system/config",
-            json = initRequest(state.runtime, state.credentials),
+            json = systemInitRequest(state),
         )
         E2eAssert.apiError(
             duplicateInitResponse.body(),
@@ -164,45 +155,21 @@ class SystemAuthE2eTest {
         )
     }
 
-    private fun prepareState(): SystemAuthState {
-        val runtime = E2eRuntime.context
-        val api = E2eHttpClient("http://127.0.0.1:$port")
-        return SystemAuthState(
-            api = api,
-            runtime = runtime,
-            credentials = runtime.admin,
-        )
+    private fun prepareState(): E2eAdminSession {
+        return newAdminSession(baseUrl())
     }
 
-    private fun ensureInitialized(state: SystemAuthState) {
-        val statusResponse = state.api.get("/api/system/config/status")
-        E2eAssert.status(statusResponse, 200, "[prepare] status endpoint should be reachable")
-        val initialized = E2eJson.mapper.readTree(statusResponse.body()).path("initialized").asBoolean(false)
-        if (!initialized) {
-            val initResponse = state.api.post(
-                path = "/api/system/config",
-                json = initRequest(state.runtime, state.credentials),
-            )
-            E2eAssert.status(initResponse, 201, "[prepare] system initialization should succeed")
-        }
+    private fun baseUrl(): String {
+        return "http://127.0.0.1:$port"
     }
 
-    private fun assertAuthenticationFailed(responseBody: String, statusCode: Int, step: String) {
-        kotlin.test.assertEquals(401, statusCode, "$step unexpected http status")
+    private fun assertAuthenticationFailed(response: HttpResponse<String>, step: String) {
         E2eAssert.apiError(
-            responseBody = responseBody,
+            response = response,
             family = "COMMON",
             code = "AUTHENTICATION_FAILED",
+            expectedStatus = 401,
             step = step,
-        )
-    }
-
-    private fun initRequest(runtime: E2eRunContext, credentials: AdminCredentials): Map<String, Any> {
-        return linkedMapOf(
-            "adminAccountName" to credentials.name,
-            "adminPassword" to credentials.password,
-            "adminAccountEmail" to credentials.email,
-            "storageProviderPath" to runtime.scanWorkspace.toAbsolutePath().toString(),
         )
     }
 
@@ -214,9 +181,3 @@ class SystemAuthE2eTest {
         }
     }
 }
-
-private data class SystemAuthState(
-    val api: E2eHttpClient,
-    val runtime: E2eRunContext,
-    val credentials: AdminCredentials,
-)
