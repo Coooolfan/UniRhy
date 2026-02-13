@@ -126,7 +126,12 @@ class OssStorageController(private val service: OssStorageService) {
 
     companion object {
         private val DEFAULT_OSS_FETCHER: Fetcher<FileProviderOss> = newFetcher(FileProviderOss::class).by {
-            allScalarFields()
+            name()
+            host()
+            bucket()
+            accessKey()
+            parentPath()
+            readonly()
         }
     }
 }

@@ -25,6 +25,11 @@ object E2eAssert {
         assertEquals(expectedNode, actualNode, "$step mismatch at $jsonPointer")
     }
 
+    fun jsonMissing(responseBody: String, jsonPointer: String, step: String) {
+        val actualNode = E2eJson.mapper.readTree(responseBody).at(jsonPointer)
+        assertTrue(actualNode.isMissingNode, "$step expected missing json pointer $jsonPointer")
+    }
+
     fun apiError(
         response: HttpResponse<String>,
         family: String,

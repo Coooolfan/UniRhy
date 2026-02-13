@@ -12,6 +12,15 @@ class GlobalExceptionHandler {
     @ExceptionHandler(CodeBasedRuntimeException::class)
     fun handle(ex: CodeBasedRuntimeException): ResponseEntity<Map<String, Any>> {
         val statusCode = when (ex.code) {
+            SystemErrorCode.SYSTEM_UNINITIALIZED.name,
+            SystemErrorCode.SYSTEM_ALREADY_INITIALIZED.name,
+            SystemErrorCode.SYSTEM_STORAGE_PROVIDER_CANNOT_BE_DELETED.name,
+            SystemErrorCode.SYSTEM_STORAGE_PROVIDER_CANNOT_BE_READONLY.name,
+            SystemErrorCode.SYSTEM_STORAGE_PROVIDER_CANNOT_BE_REMOTE.name,
+            -> 409
+            CommonErrorCode.NOT_FOUND.name -> 404
+            CommonErrorCode.AUTHENTICATION_FAILED.name -> 401
+            CommonErrorCode.FORBIDDEN.name -> 403
             else -> {
                 ex.printStackTrace()
                 500 // Internal Server Error

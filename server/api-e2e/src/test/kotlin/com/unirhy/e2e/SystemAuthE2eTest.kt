@@ -134,9 +134,10 @@ class SystemAuthE2eTest {
             json = systemInitRequest(state),
         )
         E2eAssert.apiError(
-            duplicateInitResponse.body(),
+            duplicateInitResponse,
             family = "SYSTEM",
             code = "SYSTEM_ALREADY_INITIALIZED",
+            expectedStatus = 409,
             step = "[error] duplicate init should return system already initialized",
         )
 
@@ -148,9 +149,10 @@ class SystemAuthE2eTest {
             ),
         )
         E2eAssert.apiError(
-            wrongLoginResponse.body(),
+            wrongLoginResponse,
             family = "COMMON",
             code = "AUTHENTICATION_FAILED",
+            expectedStatus = 401,
             step = "[error] wrong login should return authentication failed",
         )
     }

@@ -202,7 +202,11 @@ class StorageConfigE2eTest {
             E2eAssert.jsonAt(createResponse.body(), "/host", createPayload["host"], "[oss] created provider host should match")
             E2eAssert.jsonAt(createResponse.body(), "/bucket", createPayload["bucket"], "[oss] created provider bucket should match")
             E2eAssert.jsonAt(createResponse.body(), "/accessKey", createPayload["accessKey"], "[oss] created provider access key should match")
-            E2eAssert.jsonAt(createResponse.body(), "/secretKey", createPayload["secretKey"], "[oss] created provider secret key should match")
+            E2eAssert.jsonMissing(
+                createResponse.body(),
+                "/secretKey",
+                "[oss] created provider should not expose secret key",
+            )
             E2eAssert.jsonAt(
                 createResponse.body(),
                 "/parentPath",
@@ -217,6 +221,11 @@ class StorageConfigE2eTest {
             E2eAssert.status(getResponse, 200, "[oss] get provider should succeed")
             E2eAssert.jsonAt(getResponse.body(), "/id", createdOssProviderId, "[oss] get provider id should match")
             E2eAssert.jsonAt(getResponse.body(), "/name", createPayload["name"], "[oss] get provider name should match")
+            E2eAssert.jsonMissing(
+                getResponse.body(),
+                "/secretKey",
+                "[oss] get provider should not expose secret key",
+            )
 
             val updateOssSuffix = suffix()
             val updatePayload = ossPayload(
@@ -234,7 +243,11 @@ class StorageConfigE2eTest {
             E2eAssert.jsonAt(updateResponse.body(), "/name", updatePayload["name"], "[oss] updated provider name should match")
             E2eAssert.jsonAt(updateResponse.body(), "/host", updatePayload["host"], "[oss] updated provider host should match")
             E2eAssert.jsonAt(updateResponse.body(), "/accessKey", updatePayload["accessKey"], "[oss] updated provider access key should match")
-            E2eAssert.jsonAt(updateResponse.body(), "/secretKey", updatePayload["secretKey"], "[oss] updated provider secret key should match")
+            E2eAssert.jsonMissing(
+                updateResponse.body(),
+                "/secretKey",
+                "[oss] updated provider should not expose secret key",
+            )
             E2eAssert.jsonAt(
                 updateResponse.body(),
                 "/parentPath",
@@ -249,6 +262,12 @@ class StorageConfigE2eTest {
                 responseBody = listResponse.body(),
                 createdOssProviderId,
                 step = "[oss] list providers should contain created provider",
+            )
+            assertArrayItemMissingFieldById(
+                responseBody = listResponse.body(),
+                expectedId = createdOssProviderId,
+                fieldName = "secretKey",
+                step = "[oss] list provider should not expose secret key",
             )
 
             val deleteResponse = state.api.delete("/api/storage/oss/$createdOssProviderId")
@@ -335,7 +354,7 @@ class StorageConfigE2eTest {
                 deleteBoundProviderResponse,
                 family = "SYSTEM",
                 code = "SYSTEM_STORAGE_PROVIDER_CANNOT_BE_DELETED",
-                expectedStatus = 500,
+                expectedStatus = 409,
                 step = "[linkage] deleting system fs provider should fail",
             )
 
@@ -347,7 +366,7 @@ class StorageConfigE2eTest {
                 bindReadonlyResponse,
                 family = "SYSTEM",
                 code = "SYSTEM_STORAGE_PROVIDER_CANNOT_BE_READONLY",
-                expectedStatus = 500,
+                expectedStatus = 409,
                 step = "[linkage] readonly fs provider should not be bindable",
             )
 
@@ -362,7 +381,7 @@ class StorageConfigE2eTest {
                 bindRemoteResponse,
                 family = "SYSTEM",
                 code = "SYSTEM_STORAGE_PROVIDER_CANNOT_BE_REMOTE",
-                expectedStatus = 500,
+                expectedStatus = 409,
                 step = "[linkage] remote provider should not be bindable as system storage",
             )
 
@@ -456,6 +475,21 @@ class StorageConfigE2eTest {
 
     private fun safeDelete(api: E2eHttpClient, path: String) {
         runCatching { api.delete(path) }
+    }
+
+    private fun assertArrayItemMissingFieldById(
+        responseBody: String,
+        expectedId: Long,
+        fieldName: String,
+        step: String,
+    ) {
+        val root = E2eJson.mapper.readTree(responseBody)
+        assertTrue(root.isArray, "$step expected array response")
+        val matchedNode = root.firstOrNull { node ->
+            node.path("id").isIntegralNumber && node.path("id").longValue() == expectedId
+        }
+        assertTrue(matchedNode != null, "$step expected id=$expectedId to exist")
+        assertTrue(matchedNode.path(fieldName).isMissingNode, "$step expected field '$fieldName' to be missing")
     }
 
     private fun suffix(): String {
