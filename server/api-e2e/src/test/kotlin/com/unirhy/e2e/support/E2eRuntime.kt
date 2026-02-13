@@ -7,10 +7,17 @@ import java.util.*
 import kotlin.io.path.createDirectories
 
 object E2eRuntime {
-    private val contextDelegate = lazy { E2eRunContext.create() }
+    @Volatile
+    private var currentContext: E2eRunContext? = null
 
     val context: E2eRunContext
-        get() = contextDelegate.value
+        get() {
+            return currentContext ?: synchronized(this) {
+                currentContext ?: E2eRunContext.create().also { created ->
+                    currentContext = created
+                }
+            }
+        }
 
     fun registerDatasource(registry: DynamicPropertyRegistry) {
         val current = context
@@ -23,8 +30,9 @@ object E2eRuntime {
     }
 
     fun cleanup() {
-        if (contextDelegate.isInitialized()) {
-            contextDelegate.value.cleanup()
+        synchronized(this) {
+            currentContext?.cleanup()
+            currentContext = null
         }
     }
 }

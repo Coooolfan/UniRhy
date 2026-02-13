@@ -3,11 +3,16 @@ package com.unirhy.e2e.support.matrix
 object ApiCoverageRegistry {
     private const val SMOKE_CASE =
         "com.unirhy.e2e.SmokeTest#initialize login scan and stream media from real filesystem"
+    private const val SYSTEM_AUTH_FLOW_CASE =
+        "com.unirhy.e2e.SystemAuthE2eTest#initialize login get update logout should form closed session flow"
 
     val coverageByKey: Map<ApiEndpointKey, CoverageMark> = listOf(
         smoke("GET", "/api/system/config/status"),
         smoke("POST", "/api/system/config"),
+        full("GET", "/api/system/config", testRef = SYSTEM_AUTH_FLOW_CASE),
+        full("PUT", "/api/system/config", testRef = SYSTEM_AUTH_FLOW_CASE),
         smoke("GET", "/api/token"),
+        full("DELETE", "/api/token", testRef = SYSTEM_AUTH_FLOW_CASE),
         smoke("POST", "/api/task/scan"),
         smoke("GET", "/api/task/running"),
         smoke("GET", "/api/work"),
@@ -24,6 +29,19 @@ object ApiCoverageRegistry {
         return CoverageEntry(
             key = ApiEndpointKey(method = method, path = path, condition = condition),
             mark = CoverageMark(level = CoverageLevel.SMOKE, testRef = testRef, note = note),
+        )
+    }
+
+    private fun full(
+        method: String,
+        path: String,
+        condition: String = "",
+        testRef: String,
+        note: String = "",
+    ): CoverageEntry {
+        return CoverageEntry(
+            key = ApiEndpointKey(method = method, path = path, condition = condition),
+            mark = CoverageMark(level = CoverageLevel.FULL, testRef = testRef, note = note),
         )
     }
 }

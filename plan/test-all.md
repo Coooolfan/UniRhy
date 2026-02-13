@@ -6,7 +6,7 @@
 
 ## 分阶段实施（6 阶段）
 | 阶段 | 目标 | 接口范围 | 主要产出 | 退出标准 |
-|---|---|---|---|---|
+|:--|:--|:--|:--|:--|
 | 1. 底座与清单 | 先把可扩展测试骨架搭好 | 无新增业务接口 | 扩展 `/Users/yang/Documents/code/UniRhy/server/api-e2e/src/test/kotlin/com/unirhy/e2e/support/E2eHttpClient.kt`（补 `PUT/DELETE`、query/form/json 统一发送）；新增场景状态与断言工具；建立接口覆盖矩阵文件 | 能以统一 DSL 编写任意方法接口测试，覆盖矩阵列出全部 37 接口 |
 | 2. 系统与认证 | 完成系统生命周期与会话闭环 | `/api/system/config/*`、`/api/token` | 新增系统/认证 e2e 用例类；覆盖初始化、登录、登出、配置读取更新 | 系统与认证接口主流程全绿，未登录访问受保护接口返回 401，错误登录可稳定断言 |
 | 3. 存储配置域 | 完成 FS/OSS 配置 CRUD 与系统配置联动 | `/api/storage/fs/*`、`/api/storage/oss/*`、`PUT /api/system/config` | 新增存储域 e2e；覆盖创建/读取/更新/删除与系统引用关系 | FS/OSS 主流程全绿，常见错误（删除当前系统 FS、设置非法系统存储）可稳定断言 |

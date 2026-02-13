@@ -5,7 +5,7 @@
 - 生成命令：`cd server && ./gradlew :api-e2e:generateCoverageMatrix`
 - 校验命令：`cd server && ./gradlew :api-e2e:test`
 - 统计口径：按 `HTTP 方法 + Path + headers 条件` 计数（媒体 Range/非Range 分开）。
-- 当前接口总数：`37`
+- 当前接口总数：`38`
 
 | # | 覆盖级别 | HTTP | Path | 条件 | 需登录 | Controller#method | 用例引用 | 备注 |
 |---|---|---|---|---|---|---|---|---|
@@ -23,26 +23,27 @@
 | 12 | TODO | DELETE | /api/playlist/{id} | - | Y | PlaylistController#deletePlaylist | - | - |
 | 13 | TODO | GET | /api/playlist/{id} | - | Y | PlaylistController#getPlaylist | - | - |
 | 14 | TODO | PUT | /api/playlist/{id} | - | Y | PlaylistController#updatePlaylist | - | - |
-| 15 | TODO | PUT | /api/playlist/{id}/recordings/{recordingId} | - | Y | PlaylistController#addRecordingToPlaylist | - | - |
-| 16 | TODO | GET | /api/storage/fs | - | Y | FileSystemStorageController#list | - | - |
-| 17 | TODO | POST | /api/storage/fs | - | Y | FileSystemStorageController#create | - | - |
-| 18 | TODO | DELETE | /api/storage/fs/{id} | - | Y | FileSystemStorageController#delete | - | - |
-| 19 | TODO | GET | /api/storage/fs/{id} | - | Y | FileSystemStorageController#get | - | - |
-| 20 | TODO | PUT | /api/storage/fs/{id} | - | Y | FileSystemStorageController#update | - | - |
-| 21 | TODO | GET | /api/storage/oss | - | Y | OssStorageController#list | - | - |
-| 22 | TODO | POST | /api/storage/oss | - | Y | OssStorageController#create | - | - |
-| 23 | TODO | DELETE | /api/storage/oss/{id} | - | Y | OssStorageController#delete | - | - |
-| 24 | TODO | GET | /api/storage/oss/{id} | - | Y | OssStorageController#get | - | - |
-| 25 | TODO | PUT | /api/storage/oss/{id} | - | Y | OssStorageController#update | - | - |
-| 26 | TODO | GET | /api/system/config | - | Y | SystemConfigController#get | - | - |
-| 27 | SMOKE | POST | /api/system/config | - | N | SystemConfigController#create | com.unirhy.e2e.SmokeTest#initialize login scan and stream media from real filesystem | - |
-| 28 | TODO | PUT | /api/system/config | - | Y | SystemConfigController#update | - | - |
-| 29 | SMOKE | GET | /api/system/config/status | - | N | SystemConfigController#isInitialized | com.unirhy.e2e.SmokeTest#initialize login scan and stream media from real filesystem | - |
-| 30 | SMOKE | GET | /api/task/running | - | Y | TaskController#listRunningTasks | com.unirhy.e2e.SmokeTest#initialize login scan and stream media from real filesystem | - |
-| 31 | SMOKE | POST | /api/task/scan | - | Y | TaskController#executeScanTask | com.unirhy.e2e.SmokeTest#initialize login scan and stream media from real filesystem | - |
-| 32 | TODO | DELETE | /api/token | - | Y | TokenController#logout | - | - |
-| 33 | SMOKE | GET | /api/token | - | N | TokenController#login | com.unirhy.e2e.SmokeTest#initialize login scan and stream media from real filesystem | - |
-| 34 | SMOKE | GET | /api/work | - | Y | WorkController#listWork | com.unirhy.e2e.SmokeTest#initialize login scan and stream media from real filesystem | - |
-| 35 | TODO | GET | /api/work/random | - | Y | WorkController#randomWork | - | - |
-| 36 | TODO | DELETE | /api/work/{id} | - | Y | WorkController#deleteWork | - | - |
-| 37 | TODO | GET | /api/work/{id} | - | Y | WorkController#getWorkById | - | - |
+| 15 | TODO | DELETE | /api/playlist/{id}/recordings/{recordingId} | - | Y | PlaylistController#removeRecordingFromPlaylist | - | - |
+| 16 | TODO | PUT | /api/playlist/{id}/recordings/{recordingId} | - | Y | PlaylistController#addRecordingToPlaylist | - | - |
+| 17 | TODO | GET | /api/storage/fs | - | Y | FileSystemStorageController#list | - | - |
+| 18 | TODO | POST | /api/storage/fs | - | Y | FileSystemStorageController#create | - | - |
+| 19 | TODO | DELETE | /api/storage/fs/{id} | - | Y | FileSystemStorageController#delete | - | - |
+| 20 | TODO | GET | /api/storage/fs/{id} | - | Y | FileSystemStorageController#get | - | - |
+| 21 | TODO | PUT | /api/storage/fs/{id} | - | Y | FileSystemStorageController#update | - | - |
+| 22 | TODO | GET | /api/storage/oss | - | Y | OssStorageController#list | - | - |
+| 23 | TODO | POST | /api/storage/oss | - | Y | OssStorageController#create | - | - |
+| 24 | TODO | DELETE | /api/storage/oss/{id} | - | Y | OssStorageController#delete | - | - |
+| 25 | TODO | GET | /api/storage/oss/{id} | - | Y | OssStorageController#get | - | - |
+| 26 | TODO | PUT | /api/storage/oss/{id} | - | Y | OssStorageController#update | - | - |
+| 27 | FULL | GET | /api/system/config | - | Y | SystemConfigController#get | com.unirhy.e2e.SystemAuthE2eTest#initialize login get update logout should form closed session flow | - |
+| 28 | SMOKE | POST | /api/system/config | - | N | SystemConfigController#create | com.unirhy.e2e.SmokeTest#initialize login scan and stream media from real filesystem | - |
+| 29 | FULL | PUT | /api/system/config | - | Y | SystemConfigController#update | com.unirhy.e2e.SystemAuthE2eTest#initialize login get update logout should form closed session flow | - |
+| 30 | SMOKE | GET | /api/system/config/status | - | N | SystemConfigController#isInitialized | com.unirhy.e2e.SmokeTest#initialize login scan and stream media from real filesystem | - |
+| 31 | SMOKE | GET | /api/task/running | - | Y | TaskController#listRunningTasks | com.unirhy.e2e.SmokeTest#initialize login scan and stream media from real filesystem | - |
+| 32 | SMOKE | POST | /api/task/scan | - | Y | TaskController#executeScanTask | com.unirhy.e2e.SmokeTest#initialize login scan and stream media from real filesystem | - |
+| 33 | FULL | DELETE | /api/token | - | Y | TokenController#logout | com.unirhy.e2e.SystemAuthE2eTest#initialize login get update logout should form closed session flow | - |
+| 34 | SMOKE | GET | /api/token | - | N | TokenController#login | com.unirhy.e2e.SmokeTest#initialize login scan and stream media from real filesystem | - |
+| 35 | SMOKE | GET | /api/work | - | Y | WorkController#listWork | com.unirhy.e2e.SmokeTest#initialize login scan and stream media from real filesystem | - |
+| 36 | TODO | GET | /api/work/random | - | Y | WorkController#randomWork | - | - |
+| 37 | TODO | DELETE | /api/work/{id} | - | Y | WorkController#deleteWork | - | - |
+| 38 | TODO | GET | /api/work/{id} | - | Y | WorkController#getWorkById | - | - |
