@@ -13,7 +13,9 @@ const audioStore = useAudioStore()
 
 const searchQuery = ref('')
 const isLoading = ref(false)
-const activeTab = ref<'All' | 'Artists' | 'Albums' | 'Works'>('All')
+const searchTabs = ['All', 'Artists', 'Albums', 'Works'] as const
+type SearchTab = (typeof searchTabs)[number]
+const activeTab = ref<SearchTab>('All')
 
 type SearchResultItem = {
     id: number | string
@@ -38,6 +40,20 @@ const artists = ref<SearchResultItem[]>([])
 const albums = ref<SearchResultItem[]>([])
 const works = ref<SearchResultItem[]>([])
 const playLoadingItemId = ref<number | string | null>(null)
+const selectedWorkIds = ref<Set<number | string>>(new Set())
+
+const isWorkSelected = (item: SearchResultItem) => selectedWorkIds.value.has(item.id)
+
+const toggleWorkSelection = (item: SearchResultItem) => {
+    const newSet = new Set(selectedWorkIds.value)
+    if (newSet.has(item.id)) {
+        newSet.delete(item.id)
+    } else {
+        newSet.add(item.id)
+    }
+    selectedWorkIds.value = newSet
+    console.log('Selected Works:', Array.from(newSet))
+}
 
 // Helper functions (reused from AlbumListView)
 const resolveCover = (coverId?: number) => (coverId ? `/api/media/${coverId}` : '')
@@ -154,6 +170,24 @@ const performSearch = async (query: string) => {
     }
 }
 
+const resolveSearchTab = (tabValue: unknown): SearchTab => {
+    const tab = Array.isArray(tabValue) ? tabValue[0] : tabValue
+    return searchTabs.includes(tab as SearchTab) ? (tab as SearchTab) : 'All'
+}
+
+const handleTabChange = (tab: SearchTab) => {
+    if (activeTab.value === tab && route.query.tab === tab) {
+        return
+    }
+    router.push({
+        name: 'search',
+        query: {
+            ...route.query,
+            tab,
+        },
+    })
+}
+
 // Watchers and lifecycle
 watch(
     () => route.query.q,
@@ -161,6 +195,26 @@ watch(
         const q = (newQ as string) || ''
         searchQuery.value = q
         performSearch(q)
+    },
+    { immediate: true },
+)
+
+watch(
+    () => route.query.tab,
+    (newTab) => {
+        const resolvedTab = resolveSearchTab(newTab)
+        activeTab.value = resolvedTab
+
+        const currentTab = Array.isArray(newTab) ? newTab[0] : newTab
+        if (currentTab !== resolvedTab) {
+            router.replace({
+                name: 'search',
+                query: {
+                    ...route.query,
+                    tab: resolvedTab,
+                },
+            })
+        }
     },
     { immediate: true },
 )
@@ -181,7 +235,7 @@ const navigateToDetail = (item: SearchResultItem) => {
     if (item.type === 'album') {
         router.push({ name: 'album-detail', params: { id: item.id } })
     } else if (item.type === 'work') {
-        router.push({ name: 'work-detail', params: { id: item.id } })
+        toggleWorkSelection(item)
     }
     // Artist navigation not implemented yet
 }
@@ -261,7 +315,7 @@ const playItem = async (item: SearchResultItem) => {
             <!-- Tabs -->
             <div class="flex flex-wrap gap-6 border-b border-[#D6D1C7] pb-4 mb-8">
                 <button
-                    v-for="tab in ['All', 'Artists', 'Albums', 'Works']"
+                    v-for="tab in searchTabs"
                     :key="tab"
                     class="text-sm tracking-wide transition-colors relative pb-4 -mb-4"
                     :class="
@@ -269,7 +323,7 @@ const playItem = async (item: SearchResultItem) => {
                             ? 'text-[#2C2420] font-semibold border-b-2 border-[#C27E46]'
                             : 'text-[#8C857B] hover:text-[#5E5950]'
                     "
-                    @click="activeTab = tab as any"
+                    @click="handleTabChange(tab)"
                 >
                     {{
                         tab === 'All'
@@ -420,30 +474,38 @@ const playItem = async (item: SearchResultItem) => {
                             @click="navigateToDetail(item)"
                         >
                             <div
-                                class="relative aspect-square mb-5 transition-transform duration-500 ease-out"
+                                class="relative aspect-square mb-5 transition-all duration-300 ease-out"
                             >
-                                <StackedCovers
-                                    :items="item.stackedImages || []"
-                                    :default-cover="item.cover"
-                                />
+                                <div class="relative w-full h-full">
+                                    <StackedCovers
+                                        :items="item.stackedImages || []"
+                                        :default-cover="item.cover"
+                                        :is-selected="isWorkSelected(item)"
+                                    />
 
-                                <button
-                                    class="absolute bottom-4 right-4 w-10 h-10 bg-white/90 rounded-full shadow-lg flex items-center justify-center text-[#2C2420] opacity-0 group-hover:opacity-100 transition-all duration-300 hover:scale-110 z-20"
-                                    @click.stop="playItem(item)"
-                                >
-                                    <Play
-                                        v-if="playLoadingItemId === item.id"
-                                        :size="16"
-                                        class="animate-pulse"
-                                        fill="currentColor"
-                                    />
-                                    <Pause
-                                        v-else-if="isItemPlaying(item)"
-                                        :size="16"
-                                        fill="currentColor"
-                                    />
-                                    <Play v-else :size="16" fill="currentColor" class="ml-0.5" />
-                                </button>
+                                    <button
+                                        class="absolute bottom-4 right-4 w-10 h-10 bg-white/90 rounded-full shadow-lg flex items-center justify-center text-[#2C2420] opacity-0 group-hover:opacity-100 transition-all duration-300 hover:scale-110 z-20"
+                                        @click.stop="playItem(item)"
+                                    >
+                                        <Play
+                                            v-if="playLoadingItemId === item.id"
+                                            :size="16"
+                                            class="animate-pulse"
+                                            fill="currentColor"
+                                        />
+                                        <Pause
+                                            v-else-if="isItemPlaying(item)"
+                                            :size="16"
+                                            fill="currentColor"
+                                        />
+                                        <Play
+                                            v-else
+                                            :size="16"
+                                            fill="currentColor"
+                                            class="ml-0.5"
+                                        />
+                                    </button>
+                                </div>
                             </div>
 
                             <div class="text-center md:text-left">
