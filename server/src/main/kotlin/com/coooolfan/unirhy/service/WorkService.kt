@@ -1,13 +1,14 @@
 package com.coooolfan.unirhy.service
 
-import com.coooolfan.unirhy.model.Work
-import com.coooolfan.unirhy.model.id
-import com.coooolfan.unirhy.model.title
+import com.coooolfan.unirhy.model.*
+import com.coooolfan.unirhy.model.dto.WorkMergeReq
 import org.babyfish.jimmer.Page
 import org.babyfish.jimmer.sql.fetcher.Fetcher
 import org.babyfish.jimmer.sql.kt.KSqlClient
 import org.babyfish.jimmer.sql.kt.ast.expression.ilike
+import org.babyfish.jimmer.sql.kt.ast.expression.valueIn
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.server.ResponseStatusException
 import java.util.*
 
@@ -71,6 +72,22 @@ class WorkService(private val sql: KSqlClient) {
         return sql.createQuery(Work::class) {
             where(table.title.ilike(name))
             select(table.fetch(fetcher))
+        }.execute()
+    }
+
+    @Transactional
+    fun mergeWork(input: WorkMergeReq) {
+        val workIdsNeedMerge = input.needMergeIds - input.targetId
+        // https://jimmer.coooolfan.com/zh/docs/mutation/save-command/association/owner
+        // jimmer 允许通过 被关联方 修改关联关系，这被称作“抢夺子对象”
+        // 为避免性能问题，这里直接使用 update 处理关联关系
+        sql.createUpdate(Recording::class) {
+            set(table.workId, input.targetId)
+            where(table.workId valueIn workIdsNeedMerge)
+        }.execute()
+
+        sql.createDelete(Work::class) {
+            where(table.id valueIn workIdsNeedMerge)
         }.execute()
     }
 }

@@ -13,3 +13,4 @@ export type {SystemConfigUpdate} from './SystemConfigUpdate';
 export type {SystemInitReq} from './SystemInitReq';
 export type {SystemStatus} from './SystemStatus';
 export type {TokenLoginRequest} from './TokenLoginRequest';
+export type {WorkMergeReq} from './WorkMergeReq';

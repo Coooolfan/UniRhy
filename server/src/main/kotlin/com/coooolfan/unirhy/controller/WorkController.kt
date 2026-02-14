@@ -4,6 +4,7 @@ import cn.dev33.satoken.annotation.SaCheckLogin
 import com.coooolfan.unirhy.error.CommonException
 import com.coooolfan.unirhy.model.Work
 import com.coooolfan.unirhy.model.by
+import com.coooolfan.unirhy.model.dto.WorkMergeReq
 import com.coooolfan.unirhy.service.WorkService
 import org.babyfish.jimmer.Page
 import org.babyfish.jimmer.client.FetchBy
@@ -112,6 +113,24 @@ class WorkController(
     @ResponseStatus(HttpStatus.NO_CONTENT)
     fun deleteWork(@PathVariable id: Long) {
         service.deleteWork(id)
+    }
+
+    /**
+     * 合并作品
+     *
+     * 将多个作品合并为一个作品，将所有曲目合并到目标作品中，
+     * 并删除其他作品。
+     *
+     * @param input 合并请求体
+     *
+     * @api POST /api/works/merge
+     * @permission 需要登录认证
+     * @description 调用WorkService.mergeWork()方法合并作品
+     */
+    @PostMapping("/merge")
+    @ResponseStatus(HttpStatus.OK)
+    fun mergeWork(@RequestBody input: WorkMergeReq) {
+        service.mergeWork(input)
     }
 
     companion object {

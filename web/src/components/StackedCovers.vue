@@ -66,15 +66,15 @@ const getStackStyle = (index: number, total: number) => {
                 v-if="index === 0 && isSelected"
                 class="absolute -top-1.5 left-4 z-30 w-8 drop-shadow-lg"
             >
-            <!-- this svg code by human -->
+                <!-- this svg code by human -->
                 <svg
                     viewBox="0 0 32 64"
                     fill="none"
                     xmlns="http://www.w3.org/2000/svg"
                     class="w-full h-full drop-shadow-xl"
                 >
-                    <path d="M0 0H20V36L12 30L0 36V0Z" fill="#d7b472"/>
-                    <path d="M20 0V6H26Z" fill="#979185"/>
+                    <path d="M0 0H20V36L12 30L0 36V0Z" fill="#d7b472" />
+                    <path d="M20 0V6H26Z" fill="#979185" />
                 </svg>
             </div>
 

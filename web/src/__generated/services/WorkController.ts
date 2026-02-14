@@ -1,6 +1,6 @@
 import type {Executor} from '../';
 import type {WorkDto} from '../model/dto/';
-import type {Page} from '../model/static/';
+import type {Page, WorkMergeReq} from '../model/static/';
 
 /**
  * 作品管理接口
@@ -94,6 +94,23 @@ export class WorkController {
     }
     
     /**
+     * 合并作品
+     * 
+     * 将多个作品合并为一个作品，将所有曲目合并到目标作品中，
+     * 并删除其他作品。
+     * 
+     * @parameter {WorkControllerOptions['mergeWork']} options
+     * - input 合并请求体
+     * 
+     */
+    readonly mergeWork: (options: WorkControllerOptions['mergeWork']) => Promise<
+        void
+    > = async(options) => {
+        let _uri = '/api/works/merge';
+        return (await this.executor({uri: _uri, method: 'POST', body: options.body})) as Promise<void>;
+    }
+    
+    /**
      * 获取时间窗口内的随机作品
      * 
      * 通过时间戳、时间长度与时区偏移计算出“时间窗口编号”，并将其作为随机种子，
@@ -174,5 +191,12 @@ export type WorkControllerOptions = {
          * 
          */
         readonly id: number
+    }, 
+    'mergeWork': {
+        /**
+         * 合并请求体
+         * 
+         */
+        readonly body: WorkMergeReq
     }
 }

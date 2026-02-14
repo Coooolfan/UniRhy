@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { Play, Pause } from 'lucide-vue-next'
 import DashboardTopBar from '@/components/dashboard/DashboardTopBar.vue'
 import StackedCovers from '@/components/StackedCovers.vue'
-import { api } from '@/ApiInstance'
+import { api, normalizeApiError } from '@/ApiInstance'
 import { useAudioStore } from '@/stores/audio'
 
 const route = useRoute()
@@ -40,19 +40,114 @@ const artists = ref<SearchResultItem[]>([])
 const albums = ref<SearchResultItem[]>([])
 const works = ref<SearchResultItem[]>([])
 const playLoadingItemId = ref<number | string | null>(null)
-const selectedWorkIds = ref<Set<number | string>>(new Set())
+type SelectedWorkOption = {
+    id: number
+    title: string
+    subtitle: string
+}
 
-const isWorkSelected = (item: SearchResultItem) => selectedWorkIds.value.has(item.id)
+const selectedWorkIds = ref<Set<number>>(new Set())
+const selectedWorks = ref<Map<number, SelectedWorkOption>>(new Map())
+const mergeModalOpen = ref(false)
+const mergeTargetWorkId = ref<number | null>(null)
+const mergeModalError = ref('')
+const mergeSubmitting = ref(false)
+
+const selectedWorkOptions = computed(() => Array.from(selectedWorks.value.values()))
+const hasSelectedWorks = computed(() => selectedWorkOptions.value.length > 0)
+const canSubmitMerge = computed(
+    () =>
+        !mergeSubmitting.value &&
+        selectedWorkOptions.value.length >= 2 &&
+        mergeTargetWorkId.value !== null,
+)
+
+const isWorkSelected = (item: SearchResultItem) =>
+    item.type === 'work' && typeof item.id === 'number' && selectedWorkIds.value.has(item.id)
 
 const toggleWorkSelection = (item: SearchResultItem) => {
+    if (item.type !== 'work' || typeof item.id !== 'number') {
+        return
+    }
+
     const newSet = new Set(selectedWorkIds.value)
+    const newSelectedWorks = new Map(selectedWorks.value)
     if (newSet.has(item.id)) {
         newSet.delete(item.id)
+        newSelectedWorks.delete(item.id)
     } else {
         newSet.add(item.id)
+        newSelectedWorks.set(item.id, {
+            id: item.id,
+            title: item.title,
+            subtitle: item.subtitle,
+        })
     }
+
     selectedWorkIds.value = newSet
-    console.log('Selected Works:', Array.from(newSet))
+    selectedWorks.value = newSelectedWorks
+}
+
+const openMergeModal = () => {
+    if (selectedWorkOptions.value.length === 0) {
+        return
+    }
+
+    mergeModalError.value = ''
+    mergeTargetWorkId.value = selectedWorkOptions.value[0]?.id ?? null
+    mergeModalOpen.value = true
+}
+
+const closeMergeModal = () => {
+    if (mergeSubmitting.value) {
+        return
+    }
+    mergeModalOpen.value = false
+    mergeModalError.value = ''
+    mergeTargetWorkId.value = null
+}
+
+const submitMerge = async () => {
+    if (selectedWorkOptions.value.length < 2) {
+        mergeModalError.value = '至少选择 2 个作品后才能合并。'
+        return
+    }
+
+    if (mergeTargetWorkId.value === null) {
+        mergeModalError.value = '请选择一个目标作品。'
+        return
+    }
+
+    const sourceWorkIds = selectedWorkOptions.value
+        .map((work) => work.id)
+        .filter((id) => id !== mergeTargetWorkId.value)
+
+    if (sourceWorkIds.length === 0) {
+        mergeModalError.value = '请选择至少一个要合并的来源作品。'
+        return
+    }
+
+    mergeSubmitting.value = true
+    mergeModalError.value = ''
+    try {
+        await api.workController.mergeWork({
+            body: {
+                targetId: mergeTargetWorkId.value,
+                needMergeIds: sourceWorkIds,
+            },
+        })
+
+        selectedWorkIds.value = new Set()
+        selectedWorks.value = new Map()
+        mergeModalOpen.value = false
+        mergeTargetWorkId.value = null
+        await performSearch(searchQuery.value)
+    } catch (error) {
+        const normalized = normalizeApiError(error)
+        mergeModalError.value = normalized.message ?? '合并作品失败。'
+    } finally {
+        mergeSubmitting.value = false
+    }
 }
 
 // Helper functions (reused from AlbumListView)
@@ -235,7 +330,7 @@ const navigateToDetail = (item: SearchResultItem) => {
     if (item.type === 'album') {
         router.push({ name: 'album-detail', params: { id: item.id } })
     } else if (item.type === 'work') {
-        toggleWorkSelection(item)
+        router.push({ name: 'work-detail', params: { id: item.id } })
     }
     // Artist navigation not implemented yet
 }
@@ -305,11 +400,21 @@ const playItem = async (item: SearchResultItem) => {
         />
 
         <div class="px-8 pt-6">
-            <div class="mb-8">
-                <h2 class="text-4xl font-serif text-[#2C2420] mb-2">搜索结果</h2>
-                <p class="text-[#8C857B] font-serif italic">
-                    Search results for "{{ searchQuery }}"
-                </p>
+            <div class="mb-8 flex items-start justify-between gap-4">
+                <div>
+                    <h2 class="text-4xl font-serif text-[#2C2420] mb-2">搜索结果</h2>
+                    <p class="text-[#8C857B] font-serif italic">
+                        Search results for "{{ searchQuery }}"
+                    </p>
+                </div>
+                <button
+                    v-if="hasSelectedWorks"
+                    type="button"
+                    class="shrink-0 mt-1 px-4 py-2 border border-[#C27E46] text-[#C27E46] text-sm tracking-wide transition-colors hover:bg-[#C27E46] hover:text-white"
+                    @click="openMergeModal"
+                >
+                    合并
+                </button>
             </div>
 
             <!-- Tabs -->
@@ -484,6 +589,13 @@ const playItem = async (item: SearchResultItem) => {
                                     />
 
                                     <button
+                                        type="button"
+                                        aria-label="选择作品"
+                                        class="absolute top-0 left-0 w-1/2 h-1/2 z-30 cursor-pointer"
+                                        @click.stop="toggleWorkSelection(item)"
+                                    ></button>
+
+                                    <button
                                         class="absolute bottom-4 right-4 w-10 h-10 bg-white/90 rounded-full shadow-lg flex items-center justify-center text-[#2C2420] opacity-0 group-hover:opacity-100 transition-all duration-300 hover:scale-110 z-20"
                                         @click.stop="playItem(item)"
                                     >
@@ -527,4 +639,86 @@ const playItem = async (item: SearchResultItem) => {
             </div>
         </div>
     </div>
+
+    <Teleport to="body">
+        <Transition
+            enter-active-class="transition duration-200 ease-out"
+            enter-from-class="opacity-0"
+            enter-to-class="opacity-100"
+            leave-active-class="transition duration-150 ease-in"
+            leave-from-class="opacity-100"
+            leave-to-class="opacity-0"
+        >
+            <div
+                v-if="mergeModalOpen"
+                class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#2B221B]/60"
+                @click.self="closeMergeModal"
+            >
+                <div
+                    class="bg-[#fffcf5] w-full max-w-lg max-h-[85vh] flex flex-col shadow-[0_8px_30px_rgba(0,0,0,0.12)] border border-[#EAE6DE]"
+                >
+                    <div class="px-8 pt-8 pb-6 border-b border-[#EAE6DE]">
+                        <h3 class="font-serif text-2xl text-[#2B221B]">合并作品</h3>
+                        <p class="text-sm text-[#8C857B] mt-2">
+                            请选择保留的目标作品，其余已选作品将合并到该作品。
+                        </p>
+                    </div>
+
+                    <div class="px-8 py-6 overflow-y-auto">
+                        <div class="space-y-3">
+                            <label
+                                v-for="work in selectedWorkOptions"
+                                :key="work.id"
+                                class="flex items-start gap-3 p-3 border border-[#EAE6DE] cursor-pointer hover:bg-[#F7F5F0] transition-colors"
+                            >
+                                <input
+                                    v-model="mergeTargetWorkId"
+                                    type="radio"
+                                    :value="work.id"
+                                    class="mt-1 accent-[#C27E46]"
+                                />
+                                <span class="min-w-0">
+                                    <span class="block text-[#2B221B] font-serif truncate">
+                                        {{ work.title }}
+                                    </span>
+                                    <span class="block text-xs text-[#8C857B] truncate">
+                                        {{ work.subtitle }}
+                                    </span>
+                                </span>
+                            </label>
+                        </div>
+
+                        <p v-if="mergeModalError" class="text-sm text-[#B95D5D] mt-4">
+                            {{ mergeModalError }}
+                        </p>
+                        <p
+                            v-else-if="selectedWorkOptions.length < 2"
+                            class="text-sm text-[#8C857B] mt-4"
+                        >
+                            需要至少选中 2 个作品才能执行合并。
+                        </p>
+                    </div>
+
+                    <div class="p-8 pt-6 border-t border-[#EAE6DE] grid grid-cols-2 gap-3">
+                        <button
+                            type="button"
+                            class="px-4 py-2.5 border border-[#D6D1C4] text-[#8A8A8A] hover:bg-[#F7F5F0] hover:text-[#5A5A5A] transition-colors text-sm tracking-wide"
+                            :disabled="mergeSubmitting"
+                            @click="closeMergeModal"
+                        >
+                            取消
+                        </button>
+                        <button
+                            type="button"
+                            class="px-4 py-2.5 bg-[#C27E46] text-white text-sm tracking-wide transition-colors hover:bg-[#B06D39] disabled:opacity-50 disabled:cursor-not-allowed"
+                            :disabled="!canSubmitMerge"
+                            @click="submitMerge"
+                        >
+                            {{ mergeSubmitting ? '合并中...' : '确认合并' }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </Transition>
+    </Teleport>
 </template>
