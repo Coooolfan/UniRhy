@@ -59,6 +59,23 @@ class AlbumController(private val service: AlbumService) {
         return service.getAlbum(id, DETAIL_ALBUM_FETCHER)
     }
 
+    /**
+     * 根据专辑名称搜索
+     *
+     * @param name 专辑名称
+     * @return List<Album> 返回专辑列表（默认 fetcher）
+     *
+     * @api GET /api/albums/search
+     * @permission 需要登录认证
+     * @description 调用AlbumService.getAlbumByName()方法搜索专辑
+     */
+    @GetMapping("/search")
+    fun getAlbumByName(
+        @RequestParam(required = true) name: String,
+    ): List<@FetchBy("DEFAULT_ALBUM_FETCHER") Album> {
+        return service.getAlbumByName(name, DEFAULT_ALBUM_FETCHER)
+    }
+
     companion object {
         private val DEFAULT_ALBUM_FETCHER = newFetcher(Album::class).by {
             allScalarFields()

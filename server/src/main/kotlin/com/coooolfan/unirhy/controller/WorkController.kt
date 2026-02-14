@@ -81,6 +81,24 @@ class WorkController(
         return service.randomWork(timestamp, length, offset, DEFAULT_WORK_FETCHER) ?: throw CommonException.NotFound()
     }
 
+
+    /**
+     * 根据作品名称搜索
+     *
+     * @param name 作品名称
+     * @return List<Work> 返回作品列表（默认 fetcher）
+     *
+     * @api GET /api/works/search
+     * @permission 需要登录认证
+     * @description 调用WorkService.getWorkByName()方法搜索作品
+     */
+    @GetMapping("/search")
+    fun getWorkByName(
+        @RequestParam(required = true) name: String,
+    ): List<@FetchBy("DEFAULT_WORK_FETCHER") Work> {
+        return service.getWorkByName(name, DEFAULT_WORK_FETCHER)
+    }
+
     /**
      * 删除指定作品
      *

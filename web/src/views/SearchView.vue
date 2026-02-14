@@ -79,7 +79,8 @@ const getRandomEmoji = () => {
 }
 
 const performSearch = async (query: string) => {
-    if (!query.trim()) {
+    const keyword = query.trim()
+    if (!keyword) {
         artists.value = []
         albums.value = []
         works.value = []
@@ -88,54 +89,39 @@ const performSearch = async (query: string) => {
 
     isLoading.value = true
     try {
-        // Fetch albums and works in parallel
-        // Note: Since backend doesn't support search query yet, we fetch a larger page and filter client-side
-        // This is a temporary solution for the prototype
-        const [albumsPage, worksPage] = await Promise.all([
-            api.albumController.listAlbums({ pageIndex: 0, pageSize: 100 }),
-            api.workController.listWork({ pageIndex: 0, pageSize: 100 }),
+        const [albumResults, workResults] = await Promise.all([
+            api.albumController.getAlbumByName({ name: keyword }),
+            api.workController.getWorkByName({ name: keyword }),
         ])
 
-        const q = query.toLowerCase()
+        const q = keyword.toLowerCase()
 
-        albums.value = albumsPage.rows
-            .filter(
-                (a) =>
-                    a.title?.toLowerCase().includes(q) ||
-                    a.recordings?.[0]?.label?.toLowerCase().includes(q),
-            )
-            .map((album) => ({
-                id: album.id,
-                type: 'album',
-                title: album.title || 'Untitled Album',
-                subtitle: album.recordings?.[0]?.label || 'Unknown Artist',
-                details: formatYear(album.releaseDate),
-                cover: resolveCover(album.cover?.id),
-                badge: album.kind?.trim() ? album.kind : 'Album',
-            }))
+        albums.value = albumResults.map((album) => ({
+            id: album.id,
+            type: 'album',
+            title: album.title || 'Untitled Album',
+            subtitle: album.recordings?.[0]?.label || 'Unknown Artist',
+            details: formatYear(album.releaseDate),
+            cover: resolveCover(album.cover?.id),
+            badge: album.kind?.trim() ? album.kind : 'Album',
+        }))
 
-        works.value = worksPage.rows
-            .filter(
-                (w) =>
-                    w.title?.toLowerCase().includes(q) ||
-                    w.recordings?.[0]?.artists?.[0]?.name?.toLowerCase().includes(q),
-            )
-            .map((work) => {
-                const mainRecording =
-                    work.recordings?.find((r) => r.defaultInWork) ?? work.recordings?.[0]
-                return {
-                    id: work.id,
-                    type: 'work',
-                    title: work.title || 'Untitled Work',
-                    subtitle: mainRecording?.artists?.[0]?.name || 'Unknown Artist',
-                    details: `${work.recordings?.length ?? 0} Recordings`,
-                    cover: resolveCover(mainRecording?.cover?.id),
-                    stackedImages: work.recordings?.map((r) => ({
-                        id: r.id,
-                        cover: resolveCover(r.cover?.id),
-                    })),
-                }
-            })
+        works.value = workResults.map((work) => {
+            const mainRecording =
+                work.recordings?.find((r) => r.defaultInWork) ?? work.recordings?.[0]
+            return {
+                id: work.id,
+                type: 'work',
+                title: work.title || 'Untitled Work',
+                subtitle: mainRecording?.artists?.[0]?.name || 'Unknown Artist',
+                details: `${work.recordings?.length ?? 0} Recordings`,
+                cover: resolveCover(mainRecording?.cover?.id),
+                stackedImages: work.recordings?.map((r) => ({
+                    id: r.id,
+                    cover: resolveCover(r.cover?.id),
+                })),
+            }
+        })
 
         // Extract Artists from results
         const artistMap = new Map<string, SearchResultItem>()
@@ -156,7 +142,7 @@ const performSearch = async (query: string) => {
             }
         }
 
-        worksPage.rows.forEach((w) => {
+        workResults.forEach((w) => {
             w.recordings?.forEach((r) => r.artists?.forEach((art) => addArtist(art.name)))
         })
 
@@ -258,7 +244,7 @@ const playItem = async (item: SearchResultItem) => {
 </script>
 
 <template>
-    <div class="pb-32 min-h-screen">
+    <div class="pb-40">
         <DashboardTopBar
             :model-value="searchQuery"
             @update:model-value="(v) => (searchQuery = v)"

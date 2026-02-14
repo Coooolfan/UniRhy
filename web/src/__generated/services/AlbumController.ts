@@ -30,6 +30,28 @@ export class AlbumController {
     }
     
     /**
+     * 根据专辑名称搜索
+     * 
+     * @parameter {AlbumControllerOptions['getAlbumByName']} options
+     * - name 专辑名称
+     * @return List<Album> 返回专辑列表（默认 fetcher）
+     * 
+     */
+    readonly getAlbumByName: (options: AlbumControllerOptions['getAlbumByName']) => Promise<
+        ReadonlyArray<AlbumDto['AlbumController/DEFAULT_ALBUM_FETCHER']>
+    > = async(options) => {
+        let _uri = '/api/albums/search';
+        let _separator = _uri.indexOf('?') === -1 ? '?' : '&';
+        let _value: any = undefined;
+        _value = options.name;
+        _uri += _separator
+        _uri += 'name='
+        _uri += encodeURIComponent(_value);
+        _separator = '&';
+        return (await this.executor({uri: _uri, method: 'GET'})) as Promise<ReadonlyArray<AlbumDto['AlbumController/DEFAULT_ALBUM_FETCHER']>>;
+    }
+    
+    /**
      * 获取专辑列表
      * 
      * 此接口用于获取系统中所有专辑信息
@@ -72,5 +94,11 @@ export type AlbumControllerOptions = {
          * 专辑 ID
          */
         readonly id: number
+    }, 
+    'getAlbumByName': {
+        /**
+         * 专辑名称
+         */
+        readonly name: string
     }
 }

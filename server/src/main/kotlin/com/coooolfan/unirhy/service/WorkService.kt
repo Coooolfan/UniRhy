@@ -2,9 +2,11 @@ package com.coooolfan.unirhy.service
 
 import com.coooolfan.unirhy.model.Work
 import com.coooolfan.unirhy.model.id
+import com.coooolfan.unirhy.model.title
 import org.babyfish.jimmer.Page
 import org.babyfish.jimmer.sql.fetcher.Fetcher
 import org.babyfish.jimmer.sql.kt.KSqlClient
+import org.babyfish.jimmer.sql.kt.ast.expression.ilike
 import org.springframework.stereotype.Service
 import org.springframework.web.server.ResponseStatusException
 import java.util.*
@@ -63,6 +65,13 @@ class WorkService(private val sql: KSqlClient) {
 
     fun getWorkById(id: Long, fetcher: Fetcher<Work>): Work {
         return sql.findOneById(fetcher, id)
+    }
+
+    fun getWorkByName(name: String, fetcher: Fetcher<Work>): List<Work> {
+        return sql.createQuery(Work::class) {
+            where(table.title.ilike(name))
+            select(table.fetch(fetcher))
+        }.execute()
     }
 }
 

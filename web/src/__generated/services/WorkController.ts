@@ -43,6 +43,28 @@ export class WorkController {
     }
     
     /**
+     * 根据作品名称搜索
+     * 
+     * @parameter {WorkControllerOptions['getWorkByName']} options
+     * - name 作品名称
+     * @return List<Work> 返回作品列表（默认 fetcher）
+     * 
+     */
+    readonly getWorkByName: (options: WorkControllerOptions['getWorkByName']) => Promise<
+        ReadonlyArray<WorkDto['WorkController/DEFAULT_WORK_FETCHER']>
+    > = async(options) => {
+        let _uri = '/api/works/search';
+        let _separator = _uri.indexOf('?') === -1 ? '?' : '&';
+        let _value: any = undefined;
+        _value = options.name;
+        _uri += _separator
+        _uri += 'name='
+        _uri += encodeURIComponent(_value);
+        _separator = '&';
+        return (await this.executor({uri: _uri, method: 'GET'})) as Promise<ReadonlyArray<WorkDto['WorkController/DEFAULT_WORK_FETCHER']>>;
+    }
+    
+    /**
      * 获取作品列表
      * 
      * @return Page<Work> 返回作品分页列表（默认 fetcher）
@@ -139,6 +161,12 @@ export type WorkControllerOptions = {
          * 时区偏移（毫秒），可空，默认 0L，建议传浏览器 `Date.getTimezoneOffset() * 60000`（毫秒，满足 `utc = local + offset`）
          */
         readonly offset?: number | undefined
+    }, 
+    'getWorkByName': {
+        /**
+         * 作品名称
+         */
+        readonly name: string
     }, 
     'deleteWork': {
         /**
