@@ -1,6 +1,6 @@
 import type {Executor} from '../';
 import type {WorkDto} from '../model/dto/';
-import type {Page, WorkMergeReq} from '../model/static/';
+import type {Page, WorkMergeReq, WorkUpdate} from '../model/static/';
 
 /**
  * 作品管理接口
@@ -152,6 +152,23 @@ export class WorkController {
         }
         return (await this.executor({uri: _uri, method: 'GET'})) as Promise<WorkDto['WorkController/DEFAULT_WORK_FETCHER']>;
     }
+    
+    /**
+     * 更新指定作品
+     * 
+     * @parameter {WorkControllerOptions['updateWork']} options
+     * - id 作品 ID
+     * - input 更新请求体
+     * @return Work 返回更新后的作品详情（默认 fetcher）
+     * 
+     */
+    readonly updateWork: (options: WorkControllerOptions['updateWork']) => Promise<
+        WorkDto['WorkController/DEFAULT_WORK_FETCHER']
+    > = async(options) => {
+        let _uri = '/api/works/';
+        _uri += encodeURIComponent(options.id);
+        return (await this.executor({uri: _uri, method: 'PUT', body: options.body})) as Promise<WorkDto['WorkController/DEFAULT_WORK_FETCHER']>;
+    }
 }
 
 export type WorkControllerOptions = {
@@ -191,6 +208,16 @@ export type WorkControllerOptions = {
          * 
          */
         readonly id: number
+    }, 
+    'updateWork': {
+        /**
+         * 作品 ID
+         */
+        readonly id: number, 
+        /**
+         * 更新请求体
+         */
+        readonly body: WorkUpdate
     }, 
     'mergeWork': {
         /**

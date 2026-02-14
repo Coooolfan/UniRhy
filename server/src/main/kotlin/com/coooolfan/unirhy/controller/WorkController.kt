@@ -5,6 +5,7 @@ import com.coooolfan.unirhy.error.CommonException
 import com.coooolfan.unirhy.model.Work
 import com.coooolfan.unirhy.model.by
 import com.coooolfan.unirhy.model.dto.WorkMergeReq
+import com.coooolfan.unirhy.model.dto.WorkUpdate
 import com.coooolfan.unirhy.service.WorkService
 import org.babyfish.jimmer.Page
 import org.babyfish.jimmer.client.FetchBy
@@ -113,6 +114,26 @@ class WorkController(
     @ResponseStatus(HttpStatus.NO_CONTENT)
     fun deleteWork(@PathVariable id: Long) {
         service.deleteWork(id)
+    }
+
+    /**
+     * 更新指定作品
+     *
+     * @param id 作品 ID
+     * @param input 更新请求体
+     * @return Work 返回更新后的作品详情（默认 fetcher）
+     *
+     * @api PUT /api/works/{id}
+     * @permission 需要登录认证
+     * @description 调用WorkService.updateWork()方法更新作品
+     */
+    @PutMapping("/{id}")
+    @ResponseStatus(HttpStatus.OK)
+    fun updateWork(
+        @PathVariable id: Long,
+        @RequestBody input: WorkUpdate,
+    ): @FetchBy("DEFAULT_WORK_FETCHER") Work {
+        return service.updateWork(input.toEntity { this.id = id }, DEFAULT_WORK_FETCHER)
     }
 
     /**

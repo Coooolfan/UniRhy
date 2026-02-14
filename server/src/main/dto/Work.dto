@@ -1,0 +1,5 @@
+export com.coooolfan.unirhy.model.Work
+
+input WorkUpdate {
+    title
+}

@@ -3,6 +3,7 @@ package com.coooolfan.unirhy.service
 import com.coooolfan.unirhy.model.*
 import com.coooolfan.unirhy.model.dto.WorkMergeReq
 import org.babyfish.jimmer.Page
+import org.babyfish.jimmer.sql.ast.mutation.SaveMode
 import org.babyfish.jimmer.sql.fetcher.Fetcher
 import org.babyfish.jimmer.sql.kt.KSqlClient
 import org.babyfish.jimmer.sql.kt.ast.expression.ilike
@@ -10,6 +11,7 @@ import org.babyfish.jimmer.sql.kt.ast.expression.valueIn
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.server.ResponseStatusException
+import java.lang.ScopedValue.where
 import java.util.*
 
 @Service
@@ -89,6 +91,10 @@ class WorkService(private val sql: KSqlClient) {
         sql.createDelete(Work::class) {
             where(table.id valueIn workIdsNeedMerge)
         }.execute()
+    }
+
+    fun updateWork(toEntity: Work, fetcher: Fetcher<Work>): Work {
+        return sql.saveCommand(toEntity, SaveMode.UPDATE_ONLY).execute(fetcher).modifiedEntity
     }
 }
 
