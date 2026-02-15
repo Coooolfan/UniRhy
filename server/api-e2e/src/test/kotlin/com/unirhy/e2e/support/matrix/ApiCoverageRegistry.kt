@@ -23,8 +23,100 @@ object ApiCoverageRegistry {
         "com.unirhy.e2e.TaskContentReadE2eTest#works and albums should support read random and delete flow"
     private const val MEDIA_READ_CASE =
         "com.unirhy.e2e.TaskContentReadE2eTest#media endpoint should support full range head and error branches"
+    private const val ACCOUNT_PLAYLIST_CONTENT_AUTH_REQUIRED_CASE =
+        "com.unirhy.e2e.AccountPlaylistContentE2eTest#auth gate for account playlist and content mutation endpoints should reject unauthenticated access"
+    private const val ACCOUNT_CRUD_CASE =
+        "com.unirhy.e2e.AccountPlaylistContentE2eTest#accounts should support create list me update delete with permission boundary"
+    private const val PLAYLIST_OWNER_SCOPE_CASE =
+        "com.unirhy.e2e.AccountPlaylistContentE2eTest#playlists should support owner scoped crud and recording association"
+    private const val CONTENT_SEARCH_UPDATE_MERGE_CASE =
+        "com.unirhy.e2e.AccountPlaylistContentE2eTest#content endpoints should support search update recording update and merge flow"
 
     val coverageByKey: Map<ApiEndpointKey, CoverageMark> = listOf(
+        full(
+            "GET",
+            "/api/accounts",
+            testRef = ACCOUNT_CRUD_CASE,
+            note = "auth: $ACCOUNT_PLAYLIST_CONTENT_AUTH_REQUIRED_CASE",
+        ),
+        full(
+            "POST",
+            "/api/accounts",
+            testRef = ACCOUNT_CRUD_CASE,
+            note = "auth: $ACCOUNT_PLAYLIST_CONTENT_AUTH_REQUIRED_CASE",
+        ),
+        full(
+            "GET",
+            "/api/accounts/me",
+            testRef = ACCOUNT_CRUD_CASE,
+            note = "auth: $ACCOUNT_PLAYLIST_CONTENT_AUTH_REQUIRED_CASE",
+        ),
+        full(
+            "DELETE",
+            "/api/accounts/{id}",
+            testRef = ACCOUNT_CRUD_CASE,
+            note = "auth: $ACCOUNT_PLAYLIST_CONTENT_AUTH_REQUIRED_CASE",
+        ),
+        full(
+            "PUT",
+            "/api/accounts/{id}",
+            testRef = ACCOUNT_CRUD_CASE,
+            note = "auth: $ACCOUNT_PLAYLIST_CONTENT_AUTH_REQUIRED_CASE; permission: non-admin cannot update admin",
+        ),
+        full(
+            "GET",
+            "/api/albums/search",
+            testRef = CONTENT_SEARCH_UPDATE_MERGE_CASE,
+            note = "auth: $ACCOUNT_PLAYLIST_CONTENT_AUTH_REQUIRED_CASE; validation: unknown keyword returns empty array",
+        ),
+        full(
+            "GET",
+            "/api/playlists",
+            testRef = PLAYLIST_OWNER_SCOPE_CASE,
+            note = "auth: $ACCOUNT_PLAYLIST_CONTENT_AUTH_REQUIRED_CASE",
+        ),
+        full(
+            "POST",
+            "/api/playlists",
+            testRef = PLAYLIST_OWNER_SCOPE_CASE,
+            note = "auth: $ACCOUNT_PLAYLIST_CONTENT_AUTH_REQUIRED_CASE",
+        ),
+        full(
+            "DELETE",
+            "/api/playlists/{id}",
+            testRef = PLAYLIST_OWNER_SCOPE_CASE,
+            note = "auth: $ACCOUNT_PLAYLIST_CONTENT_AUTH_REQUIRED_CASE; ownership: non-owner returns 404",
+        ),
+        full(
+            "GET",
+            "/api/playlists/{id}",
+            testRef = PLAYLIST_OWNER_SCOPE_CASE,
+            note = "auth: $ACCOUNT_PLAYLIST_CONTENT_AUTH_REQUIRED_CASE; ownership: non-owner returns 404",
+        ),
+        full(
+            "PUT",
+            "/api/playlists/{id}",
+            testRef = PLAYLIST_OWNER_SCOPE_CASE,
+            note = "auth: $ACCOUNT_PLAYLIST_CONTENT_AUTH_REQUIRED_CASE; ownership: non-owner returns 404",
+        ),
+        full(
+            "DELETE",
+            "/api/playlists/{id}/recordings/{recordingId}",
+            testRef = PLAYLIST_OWNER_SCOPE_CASE,
+            note = "auth: $ACCOUNT_PLAYLIST_CONTENT_AUTH_REQUIRED_CASE; idempotent remove; ownership: non-owner returns 404",
+        ),
+        full(
+            "PUT",
+            "/api/playlists/{id}/recordings/{recordingId}",
+            testRef = PLAYLIST_OWNER_SCOPE_CASE,
+            note = "auth: $ACCOUNT_PLAYLIST_CONTENT_AUTH_REQUIRED_CASE; idempotent add; ownership: non-owner returns 404",
+        ),
+        full(
+            "PUT",
+            "/api/recordings/{id}",
+            testRef = CONTENT_SEARCH_UPDATE_MERGE_CASE,
+            note = "auth: $ACCOUNT_PLAYLIST_CONTENT_AUTH_REQUIRED_CASE",
+        ),
         full(
             "GET",
             "/api/storage/fs",
@@ -126,6 +218,24 @@ object ApiCoverageRegistry {
             "/api/works/{id}",
             testRef = WORK_ALBUM_READ_CASE,
             note = "auth: $TASK_CONTENT_AUTH_REQUIRED_CASE",
+        ),
+        full(
+            "PUT",
+            "/api/works/{id}",
+            testRef = CONTENT_SEARCH_UPDATE_MERGE_CASE,
+            note = "auth: $ACCOUNT_PLAYLIST_CONTENT_AUTH_REQUIRED_CASE",
+        ),
+        full(
+            "POST",
+            "/api/works/merge",
+            testRef = CONTENT_SEARCH_UPDATE_MERGE_CASE,
+            note = "auth: $ACCOUNT_PLAYLIST_CONTENT_AUTH_REQUIRED_CASE; merge: source work removed and recordings moved to target",
+        ),
+        full(
+            "GET",
+            "/api/works/search",
+            testRef = CONTENT_SEARCH_UPDATE_MERGE_CASE,
+            note = "auth: $ACCOUNT_PLAYLIST_CONTENT_AUTH_REQUIRED_CASE; validation: unknown keyword returns empty array",
         ),
         full(
             "GET",
