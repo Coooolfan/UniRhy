@@ -11,11 +11,14 @@
     "build": "run-p type-check \"build-only {@}\" --",
     "preview": "vite preview",
     "build-only": "vite build",
-    "type-check": "vue-tsc --build",
-    "typecheck": "vue-tsc --build",
-    "lint": "eslint . --fix --cache",
-    "format": "prettier --write --experimental-cli src/",
-    "verify": "run-s lint format typecheck"
+    "type-check": "oxlint . --type-check -A all -A nursery --deny-warnings",
+    "typecheck": "oxlint . --type-check -A all -A nursery --deny-warnings",
+    "lint": "oxlint . --type-aware --deny-warnings",
+    "lint:fix": "oxlint . --fix",
+    "format": "oxfmt .",
+    "format:check": "oxfmt . --check",
+    "verify": "run-s lint typecheck",
+    "fix": "run-s lint:fix"
   },
   "dependencies": {
     "@types/three": "^0.182.0",
@@ -26,18 +29,14 @@
     "@tsconfig/node24": "^24.0.3",
     "@types/node": "^24.10.1",
     "@vitejs/plugin-vue": "^6.0.2",
-    "@vue/eslint-config-prettier": "^10.2.0",
-    "@vue/eslint-config-typescript": "^14.6.0",
     "@vue/tsconfig": "^0.8.1",
-    "eslint": "^9.39.2",
-    "eslint-plugin-vue": "~10.6.2",
-    "jiti": "^2.6.1",
     "npm-run-all2": "^8.0.4",
-    "prettier": "3.6.2",
+    "oxfmt": "^0.32.0",
+    "oxlint": "~1.38.0",
+    "oxlint-tsgolint": "^0.10.0",
     "typescript": "~5.9.0",
     "vite": "npm:rolldown-vite@latest",
-    "vite-plugin-vue-devtools": "^8.0.5",
-    "vue-tsc": "^3.1.5"
+    "vite-plugin-vue-devtools": "^8.0.5"
   },
   "packageManager": "yarn@4.12.0"
 }

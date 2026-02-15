@@ -12,9 +12,9 @@ UniRhy (独一律) 是一个私有化的音乐流媒体平台
   - 测试约定见 [server/README/TESTING.md](server/README/TESTING.md)
   - Jimmer ORM 开发指南与约定见 [skills/jimmer-orm/skills.md](skills/jimmer-orm/skills.md)
 - **前端**: 于 `./web` 文件夹. Vue, TypeScript, Vite, Pinia, Tailwind CSS.
-  - 除非用户要求，每次更改后都应当在此项目中执行`yarn verify`以确保格式化与类型检查通过
+  - 除非用户要求，每次更改后都应当在此项目中执行`yarn verify && yarn format:check`以确保 Lint、类型检查与格式检查通过（若格式检查失败，先执行`yarn format`）
 - **官网**: 于 `./website` 文件夹. Vue, TypeScript, Vite.
-  - 除非用户要求，每次更改后都应当在此项目中执行`yarn verify`以确保格式化与类型检查通过
+  - 除非用户要求，每次更改后都应当在此项目中执行`yarn verify && yarn format:check`以确保 Lint、类型检查与格式检查通过（若格式检查失败，先执行`yarn format`）
 
 # 注意事项
 
