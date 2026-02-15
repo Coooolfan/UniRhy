@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { LogOut, X, User, Mail, Lock, Edit2, Eye, EyeOff } from 'lucide-vue-next'
 import { useUserStore } from '@/stores/user'
 import { normalizeApiError } from '@/ApiInstance'
+import avatarPlaceholderUrl from '@/assets/avatar-placeholder.svg'
 
 const props = defineProps<{
     isOpen: boolean
@@ -198,7 +199,7 @@ const confirmLogout = async () => {
                                     class="w-20 h-20 rounded-full bg-[#EAE6DE] mb-4 overflow-hidden"
                                 >
                                     <img
-                                        src="https://picsum.photos/seed/user/200/200"
+                                        :src="avatarPlaceholderUrl"
                                         alt="avatar"
                                         class="h-full w-full object-cover"
                                     />

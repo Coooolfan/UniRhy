@@ -3,6 +3,7 @@ import { ref, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Search } from 'lucide-vue-next'
 import { useUserStore } from '@/stores/user'
+import avatarPlaceholderUrl from '@/assets/avatar-placeholder.svg'
 import ProfileModal from './ProfileModal.vue'
 
 type Props = {
@@ -81,7 +82,7 @@ const closeProfileModal = () => {
             @click="openProfileModal"
         >
             <img
-                src="https://picsum.photos/seed/user/100/100"
+                :src="avatarPlaceholderUrl"
                 alt="avatar"
                 class="h-full w-full object-cover"
             />

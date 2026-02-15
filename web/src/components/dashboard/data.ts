@@ -1,6 +1,8 @@
+import albumCoverPlaceholderUrl from '@/assets/album-cover-placeholder.svg'
+
 export const featuredAlbum = {
     title: 'Nocturnes, Op. 9',
     artist: 'Frédéric Chopin',
     year: '1832',
-    cover: 'https://picsum.photos/seed/chopin/600/600',
+    cover: albumCoverPlaceholderUrl,
 } as const
