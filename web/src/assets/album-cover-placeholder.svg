@@ -1,13 +1,41 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 600" fill="none">
   <defs>
     <linearGradient id="cover-bg" x1="0" y1="0" x2="600" y2="600" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#D8CCBB"/>
-      <stop offset="1" stop-color="#B79F83"/>
+      <stop stop-color="#FAF9F6"/>
+      <stop offset="1" stop-color="#E8E4DD"/>
     </linearGradient>
+    <filter id="cover-noise">
+      <feTurbulence type="fractalNoise" baseFrequency="0.65" numOctaves="3" stitchTiles="stitch" result="noise"/>
+      <feColorMatrix type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 0.3 0" in="noise" result="coloredNoise"/>
+      <feComposite operator="in" in="coloredNoise" in2="SourceGraphic" result="composite"/>
+      <feBlend mode="multiply" in="composite" in2="SourceGraphic"/>
+    </filter>
   </defs>
+  
+  <!-- Background -->
   <rect width="600" height="600" fill="url(#cover-bg)"/>
-  <rect x="72" y="72" width="456" height="456" rx="14" fill="#EFE8DC" fill-opacity="0.22"/>
-  <circle cx="300" cy="300" r="148" fill="#F5EFE4" fill-opacity="0.85"/>
-  <circle cx="300" cy="300" r="40" fill="#C7B299"/>
-  <path d="M372 174V346.5C372 381.57 343.57 410 308.5 410C273.43 410 245 381.57 245 346.5C245 311.43 273.43 283 308.5 283C322.35 283 335.17 287.44 345.62 294.98V222L456 194V366.5C456 401.57 427.57 430 392.5 430C357.43 430 329 401.57 329 366.5C329 331.43 357.43 303 392.5 303C406.35 303 419.17 307.44 429.62 314.98V226.5L372 241.2V174Z" fill="#8A755D" fill-opacity="0.85"/>
+  
+  <!-- Texture Overlay -->
+  <rect width="600" height="600" fill="#2C2825" fill-opacity="0.03" filter="url(#cover-noise)"/>
+  
+  <!-- Decorative Inner Border -->
+  <rect x="40" y="40" width="520" height="520" rx="4" stroke="#D4A373" stroke-width="2" stroke-opacity="0.4" stroke-dasharray="12 8"/>
+  
+  <!-- Center Motif: Abstract Record/Music Note -->
+  <g transform="translate(300, 300)">
+    <!-- Record Circles -->
+    <circle r="160" stroke="#2C2825" stroke-width="1" stroke-opacity="0.1"/>
+    <circle r="130" stroke="#2C2825" stroke-width="1" stroke-opacity="0.15"/>
+    <circle r="100" stroke="#2C2825" stroke-width="1" stroke-opacity="0.2"/>
+    
+    <!-- Central Graphic -->
+    <circle r="50" fill="#D98C28" fill-opacity="0.9"/>
+    
+    <!-- Stylized Tone Arm / Note Stem -->
+    <path d="M0 -50 L0 -120 L50 -140" stroke="#2C2825" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" fill="none" opacity="0.8"/>
+    <circle cx="50" cy="-140" r="8" fill="#2C2825" opacity="0.8"/>
+  </g>
+  
+  <!-- UniRhy Text (Subtle) -->
+  <text x="540" y="560" font-family="serif" font-size="24" fill="#8A817C" opacity="0.4" text-anchor="end" letter-spacing="0.1em">UniRhy</text>
 </svg>

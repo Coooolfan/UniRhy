@@ -81,11 +81,7 @@ const closeProfileModal = () => {
             aria-label="个人中心"
             @click="openProfileModal"
         >
-            <img
-                :src="avatarPlaceholderUrl"
-                alt="avatar"
-                class="h-full w-full object-cover"
-            />
+            <img :src="avatarPlaceholderUrl" alt="avatar" class="h-full w-full object-cover" />
         </button>
     </header>
 
