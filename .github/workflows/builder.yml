@@ -1,0 +1,178 @@
+name: UniRhy Builder
+on:
+  release:
+    types: [ published ]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "版本号"
+        required: true
+        default: "dev"
+
+permissions:
+  contents: write
+
+jobs:
+  build-frontend:
+    name: 构建前端资源
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v5
+
+      - name: 设置 Node 环境
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: 启用 Corepack 并激活 Yarn 4
+        run: |
+          corepack enable
+          corepack prepare yarn@4.12.0 --activate
+
+      - name: 缓存 Yarn 包缓存
+        uses: actions/cache@v4
+        with:
+          path: web/.yarn/cache
+          key: ${{ runner.os }}-yarn-web-${{ hashFiles('web/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-yarn-web-
+
+      - name: 构建前端
+        working-directory: ./web
+        run: |
+          yarn --version
+          yarn install --immutable
+          yarn build
+
+      - name: 上传前端产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: web/dist
+
+  build-jar:
+    name: 构建 JAR 包
+    needs: build-frontend
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v5
+
+      - name: 设置版本号
+        run: |
+          if [ "${{ github.event_name }}" = "release" ]; then
+            echo "VERSION=${{ github.event.release.tag_name }}" >> $GITHUB_ENV
+          else
+            echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_ENV
+          fi
+
+      - name: 设置 JDK 环境
+        uses: actions/setup-java@v5
+        with:
+          java-version: '25'
+          distribution: 'temurin'
+
+      - name: 缓存 Gradle 依赖
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('server/**/*.gradle*', 'server/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: 下载前端产物
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: server/src/main/resources/static
+
+      - name: 编译 JAR 包
+        working-directory: ./server
+        run: |
+          chmod +x ./gradlew
+          ./gradlew bootJar
+          ./gradlew --stop || true
+
+      - name: 整理 JAR 产物
+        working-directory: ./server/build/libs
+        run: |
+          ls -al
+          JAR_FILE=$(ls *.jar | grep -v plain | head -n 1)
+          mv "$JAR_FILE" "unirhy-v${VERSION}.jar"
+
+      - name: 上传编译产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: jar
+          path: server/build/libs/unirhy-v${{ env.VERSION }}.jar
+
+  upload-release-assets:
+    name: 上传产物到 Release
+    if: github.event_name == 'release'
+    needs: build-jar
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 下载 JAR 产物
+        uses: actions/download-artifact@v4
+        with:
+          name: jar
+          path: dist
+
+      - name: 查看产物结构
+        run: ls -R dist
+
+      - name: 上传到 Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.release.tag_name }}
+          files: |
+            dist/unirhy-v${{ github.event.release.tag_name }}.jar
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-docker-for-jvm:
+    name: 构建并推送 Docker 镜像
+    if: github.event_name == 'release'
+    needs: build-jar
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v5
+
+      - name: 设置 QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: 设置 Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: 下载 JAR 产物
+        uses: actions/download-artifact@v4
+        with:
+          name: jar
+          path: dist
+
+      - name: 登录到 DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: 构建并推送 Docker 镜像
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./docker/Dockerfile.jvm
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/unirhy:${{ github.event.release.tag_name }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/unirhy:latest
+          build-args: |
+            JAR_FILE=dist/unirhy-v${{ github.event.release.tag_name }}.jar
