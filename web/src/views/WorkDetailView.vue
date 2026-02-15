@@ -635,7 +635,7 @@ watch(
                                 </div>
                                 <span
                                     class="text-sm text-[#5E564D] group-hover:text-[#2C2420] transition-colors"
-                                    >Set as Default Recording</span
+                                    >默认版本</span
                                 >
                             </label>
 

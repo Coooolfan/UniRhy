@@ -147,7 +147,7 @@ const confirmLogout = async () => {
         >
             <div
                 v-if="isOpen"
-                class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#2B221B]/60 backdrop-blur-sm"
+                class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#2B221B]/60"
                 @click.self="handleClose"
             >
                 <div
