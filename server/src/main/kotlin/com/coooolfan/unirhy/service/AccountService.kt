@@ -3,10 +3,10 @@ package com.coooolfan.unirhy.service
 import cn.dev33.satoken.stp.StpUtil
 import com.coooolfan.unirhy.config.encodePassword
 import com.coooolfan.unirhy.error.CommonException
-import com.coooolfan.unirhy.error.SystemException
 import com.coooolfan.unirhy.model.Account
 import com.coooolfan.unirhy.model.dto.AccountCreate
 import com.coooolfan.unirhy.model.email
+import org.babyfish.jimmer.kt.isLoaded
 import org.babyfish.jimmer.sql.ast.mutation.SaveMode
 import org.babyfish.jimmer.sql.fetcher.Fetcher
 import org.babyfish.jimmer.sql.kt.KSqlClient
@@ -55,8 +55,18 @@ class AccountService(
     }
 
     fun update(account: Account, fetcher: Fetcher<Account>): Account {
+
+        val currentLoginId = StpUtil.getLoginIdAsLong()
+
+        val isAdmin = sql.findOneById(Account::class, currentLoginId).admin
+
+        if (account.id != currentLoginId && !isAdmin) {
+            throw CommonException.Forbidden()
+        }
+
         val encodedAccount = Account(account) {
-            this.password = passwordEncoder.encodePassword(account.password)
+            if (isLoaded(account, Account::password))
+                this.password = passwordEncoder.encodePassword(account.password)
         }
         return sql.saveCommand(encodedAccount, SaveMode.UPDATE_ONLY).execute(fetcher).modifiedEntity
     }
