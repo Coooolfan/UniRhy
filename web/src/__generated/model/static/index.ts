@@ -7,6 +7,7 @@ export type {FileProviderOssUpdate} from './FileProviderOssUpdate';
 export type {Page} from './Page';
 export type {PlaylistCreate} from './PlaylistCreate';
 export type {PlaylistUpdate} from './PlaylistUpdate';
+export type {RecordingUpdate} from './RecordingUpdate';
 export type {RunningTaskView} from './RunningTaskView';
 export type {ScanTaskRequest} from './ScanTaskRequest';
 export type {SystemConfigUpdate} from './SystemConfigUpdate';

@@ -6,6 +6,7 @@ import {
     MediaFileController, 
     OssStorageController, 
     PlaylistController, 
+    RecordingController, 
     SystemConfigController, 
     TaskController, 
     TokenController, 
@@ -21,6 +22,8 @@ export class Api {
     readonly mediaFileController: MediaFileController
     
     readonly playlistController: PlaylistController
+    
+    readonly recordingController: RecordingController
     
     readonly systemConfigController: SystemConfigController
     
@@ -39,6 +42,7 @@ export class Api {
         this.albumController = new AlbumController(executor);
         this.mediaFileController = new MediaFileController(executor);
         this.playlistController = new PlaylistController(executor);
+        this.recordingController = new RecordingController(executor);
         this.systemConfigController = new SystemConfigController(executor);
         this.taskController = new TaskController(executor);
         this.tokenController = new TokenController(executor);

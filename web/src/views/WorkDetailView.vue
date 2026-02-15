@@ -21,6 +21,18 @@ const isEditing = ref(false)
 const editTitle = ref('')
 const editError = ref('')
 
+const isEditRecordingModalOpen = ref(false)
+const isEditingRecording = ref(false)
+const editingRecordingId = ref<number | null>(null)
+const editRecordingForm = ref({
+    title: '',
+    label: '',
+    comment: '',
+    type: '',
+    isDefault: false,
+})
+const editRecordingError = ref('')
+
 type WorkData = {
     title: string
     artist: string
@@ -85,17 +97,22 @@ const fetchWork = async (id: number) => {
             cover: resolveCover(defaultRecording?.cover?.id),
         }
 
-        recordings.value = (data.recordings || []).map((recording) => ({
-            id: recording.id,
-            title: recording.title || recording.comment || 'Untitled Recording',
-            artist: recording.artists.map((a) => a.name).join(', '),
-            type: recording.kind,
-            label: recording.label || '',
-            comment: recording.comment,
-            cover: resolveCover(recording.cover?.id),
-            isDefault: recording.defaultInWork,
-            audioSrc: resolveAudio(recording.assets || []),
-        }))
+        recordings.value = (data.recordings || [])
+            .map((recording) => ({
+                id: recording.id,
+                title: recording.title || recording.comment || 'Untitled Recording',
+                artist: recording.artists.map((a) => a.name).join(', '),
+                type: recording.kind,
+                label: recording.label || '',
+                comment: recording.comment,
+                cover: resolveCover(recording.cover?.id),
+                isDefault: recording.defaultInWork,
+                audioSrc: resolveAudio(recording.assets || []),
+            }))
+            .sort((a, b) => {
+                if (a.isDefault === b.isDefault) return 0
+                return a.isDefault ? -1 : 1
+            })
 
         if (recordings.value.length > 0) {
             // Select default recording or the first one
@@ -169,6 +186,102 @@ const closeEditModal = () => {
     isEditModalOpen.value = false
     editTitle.value = ''
     editError.value = ''
+}
+
+const openEditRecordingModal = (rec: Recording) => {
+    if (isEditingRecording.value) return
+
+    editingRecordingId.value = rec.id
+    editRecordingForm.value = {
+        title: rec.title,
+        label: rec.label,
+        comment: rec.comment,
+        type: rec.type,
+        isDefault: rec.isDefault,
+    }
+    editRecordingError.value = ''
+    isEditRecordingModalOpen.value = true
+}
+
+const closeEditRecordingModal = () => {
+    if (isEditingRecording.value) return
+
+    isEditRecordingModalOpen.value = false
+    editingRecordingId.value = null
+    editRecordingForm.value = {
+        title: '',
+        label: '',
+        comment: '',
+        type: '',
+        isDefault: false,
+    }
+    editRecordingError.value = ''
+}
+
+const submitRecordingEdit = async () => {
+    if (!editingRecordingId.value || isEditingRecording.value) return
+
+    const { title, label, comment, type, isDefault } = editRecordingForm.value
+
+    if (!title.trim()) {
+        editRecordingError.value = '标题不能为空'
+        return
+    }
+
+    isEditingRecording.value = true
+    editRecordingError.value = ''
+
+    try {
+        await api.recordingController.updateRecording({
+            id: editingRecordingId.value,
+            body: {
+                title: title.trim(),
+                label: label?.trim(),
+                comment: comment?.trim() || '',
+                kind: type.trim(),
+                defaultInWork: isDefault,
+            },
+        })
+
+        // Update local state
+        const index = recordings.value.findIndex((r) => r.id === editingRecordingId.value)
+        if (index !== -1) {
+            const current = recordings.value[index]
+            if (current) {
+                recordings.value[index] = {
+                    ...current,
+                    title: title.trim(),
+                    label: label?.trim() || '',
+                    comment: comment?.trim() || '',
+                    type: type.trim(),
+                    isDefault: isDefault,
+                }
+            }
+        }
+
+        // If this became default, unset others
+        if (isDefault) {
+            recordings.value.forEach((r, i) => {
+                if (i !== index && r.isDefault) {
+                    recordings.value[i] = { ...r, isDefault: false }
+                }
+            })
+        }
+
+        // Re-sort recordings to keep default at top
+        recordings.value.sort((a, b) => {
+            if (a.isDefault === b.isDefault) return 0
+            return a.isDefault ? -1 : 1
+        })
+
+        isEditingRecording.value = false
+        closeEditRecordingModal()
+    } catch (error) {
+        const normalized = normalizeApiError(error)
+        editRecordingError.value = normalized.message ?? '更新录音失败'
+    } finally {
+        isEditingRecording.value = false
+    }
 }
 
 const submitEdit = async () => {
@@ -301,6 +414,7 @@ watch(
                         :label="item.label"
                         :cover="item.cover"
                         :show-add-button="true"
+                        :show-edit-button="true"
                         :is-default="item.isDefault"
                         :subtitle="`${item.artist}${item.type ? ' · ' + item.type : ''}`"
                         :is-active="isActive"
@@ -309,6 +423,7 @@ watch(
                         "
                         @play="handlePlay(item)"
                         @add="openAddToPlaylistModal(item)"
+                        @edit="openEditRecordingModal(item)"
                     />
                 </template>
             </MediaListPanel>
@@ -389,6 +504,161 @@ watch(
                                     @click="submitEdit"
                                 >
                                     {{ isEditing ? '更新中...' : '保存更改' }}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </Transition>
+        </Teleport>
+
+        <Teleport to="body">
+            <Transition
+                enter-active-class="transition duration-200 ease-out"
+                enter-from-class="opacity-0"
+                enter-to-class="opacity-100"
+                leave-active-class="transition duration-150 ease-in"
+                leave-from-class="opacity-100"
+                leave-to-class="opacity-0"
+            >
+                <div
+                    v-if="isEditRecordingModalOpen"
+                    class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#2B221B]/60"
+                    @click.self="closeEditRecordingModal"
+                >
+                    <div
+                        class="bg-[#fffcf5] p-8 w-full max-w-lg shadow-[0_8px_30px_rgba(0,0,0,0.12)] border border-[#EAE6DE] relative transform transition-all max-h-[90vh] overflow-y-auto"
+                    >
+                        <div
+                            class="absolute top-0 right-0 w-16 h-16 bg-linear-to-bl from-[#EAE6DE]/30 to-transparent pointer-events-none"
+                        ></div>
+
+                        <div class="mb-8 text-center">
+                            <div
+                                class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-[#FAF9F6] mb-4 border border-[#EAE6DE]"
+                            >
+                                <Music :size="24" class="text-[#C67C4E]" />
+                            </div>
+                            <h3 class="font-serif text-2xl text-[#2B221B]">编辑录音</h3>
+                            <p class="text-xs text-[#8A8A8A] mt-2 font-serif italic">
+                                Edit Recording
+                            </p>
+                        </div>
+
+                        <div class="space-y-6">
+                            <!-- Title -->
+                            <label class="block">
+                                <span
+                                    class="text-xs uppercase tracking-wider text-[#8A8A8A] font-serif block mb-2"
+                                    >Title</span
+                                >
+                                <input
+                                    v-model="editRecordingForm.title"
+                                    type="text"
+                                    maxlength="255"
+                                    class="w-full bg-[#F7F5F0] border-b border-[#D6D1C4] p-3 text-[#3D3D3D] focus:outline-none focus:border-[#C67C4E] transition-colors font-serif placeholder:text-[#BDB9AE]"
+                                    placeholder="Recording Title"
+                                    :disabled="isEditingRecording"
+                                />
+                            </label>
+
+                            <!-- Type & Label -->
+                            <div class="grid grid-cols-2 gap-4">
+                                <label class="block">
+                                    <span
+                                        class="text-xs uppercase tracking-wider text-[#8A8A8A] font-serif block mb-2"
+                                        >Type</span
+                                    >
+                                    <input
+                                        v-model="editRecordingForm.type"
+                                        type="text"
+                                        maxlength="50"
+                                        class="w-full bg-[#F7F5F0] border-b border-[#D6D1C4] p-3 text-[#3D3D3D] focus:outline-none focus:border-[#C67C4E] transition-colors font-serif placeholder:text-[#BDB9AE]"
+                                        placeholder="e.g. Live, Studio"
+                                        :disabled="isEditingRecording"
+                                    />
+                                </label>
+                                <label class="block">
+                                    <span
+                                        class="text-xs uppercase tracking-wider text-[#8A8A8A] font-serif block mb-2"
+                                        >Label</span
+                                    >
+                                    <input
+                                        v-model="editRecordingForm.label"
+                                        type="text"
+                                        maxlength="50"
+                                        class="w-full bg-[#F7F5F0] border-b border-[#D6D1C4] p-3 text-[#3D3D3D] focus:outline-none focus:border-[#C67C4E] transition-colors font-serif placeholder:text-[#BDB9AE]"
+                                        placeholder="Optional label"
+                                        :disabled="isEditingRecording"
+                                    />
+                                </label>
+                            </div>
+
+                            <!-- Comment -->
+                            <label class="block">
+                                <span
+                                    class="text-xs uppercase tracking-wider text-[#8A8A8A] font-serif block mb-2"
+                                    >Comment</span
+                                >
+                                <textarea
+                                    v-model="editRecordingForm.comment"
+                                    rows="3"
+                                    class="w-full bg-[#F7F5F0] border-b border-[#D6D1C4] p-3 text-[#3D3D3D] focus:outline-none focus:border-[#C67C4E] transition-colors font-serif placeholder:text-[#BDB9AE] resize-none"
+                                    placeholder="Add a comment..."
+                                    :disabled="isEditingRecording"
+                                ></textarea>
+                            </label>
+
+                            <!-- Default Checkbox -->
+                            <label class="flex items-center gap-3 cursor-pointer group">
+                                <div class="relative flex items-center">
+                                    <input
+                                        v-model="editRecordingForm.isDefault"
+                                        type="checkbox"
+                                        class="peer sr-only"
+                                        :disabled="isEditingRecording"
+                                    />
+                                    <div
+                                        class="w-5 h-5 border border-[#D6D1C4] bg-[#F7F5F0] peer-checked:bg-[#C67C4E] peer-checked:border-[#C67C4E] transition-colors"
+                                    ></div>
+                                    <svg
+                                        class="absolute inset-0 w-5 h-5 text-white opacity-0 peer-checked:opacity-100 transition-opacity pointer-events-none"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        stroke-width="3"
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                    >
+                                        <polyline points="20 6 9 17 4 12"></polyline>
+                                    </svg>
+                                </div>
+                                <span
+                                    class="text-sm text-[#5E564D] group-hover:text-[#2C2420] transition-colors"
+                                    >Set as Default Recording</span
+                                >
+                            </label>
+
+                            <p v-if="editRecordingError" class="text-sm text-[#B95D5D]">
+                                {{ editRecordingError }}
+                            </p>
+
+                            <div class="flex gap-3 mt-8 pt-6 border-t border-[#EAE6DE]">
+                                <button
+                                    type="button"
+                                    class="flex-1 px-4 py-2.5 border border-[#D6D1C4] text-[#8A8A8A] hover:bg-[#F7F5F0] hover:text-[#5A5A5A] transition-colors text-sm uppercase tracking-wide"
+                                    :disabled="isEditingRecording"
+                                    @click="closeEditRecordingModal"
+                                >
+                                    取消
+                                </button>
+                                <button
+                                    type="button"
+                                    class="flex-1 px-4 py-2.5 bg-[#2B221B] text-[#F7F5F0] hover:bg-[#C67C4E] transition-colors text-sm uppercase tracking-wide shadow-md disabled:opacity-60 disabled:cursor-not-allowed"
+                                    :disabled="isEditingRecording"
+                                    @click="submitRecordingEdit"
+                                >
+                                    {{ isEditingRecording ? '保存中...' : '保存更改' }}
                                 </button>
                             </div>
                         </div>

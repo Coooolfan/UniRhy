@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Play, Pause, Plus, Trash2 } from 'lucide-vue-next'
+import { Play, Pause, Plus, Trash2, Pencil } from 'lucide-vue-next'
 
 defineProps<{
     title: string
@@ -11,6 +11,7 @@ defineProps<{
     isDefault?: boolean
     showAddButton?: boolean
     showRemoveButton?: boolean
+    showEditButton?: boolean
     isRemoving?: boolean
 }>()
 
@@ -18,6 +19,7 @@ const emit = defineEmits<{
     (e: 'play'): void
     (e: 'add'): void
     (e: 'remove'): void
+    (e: 'edit'): void
 }>()
 </script>
 
@@ -78,6 +80,14 @@ const emit = defineEmits<{
             @click.stop="emit('add')"
         >
             <Plus :size="16" />
+        </button>
+        <button
+            v-if="showEditButton"
+            class="hover:text-[#C17D46] transition-colors cursor-pointer"
+            title="编辑录音"
+            @click.stop="emit('edit')"
+        >
+            <Pencil :size="16" />
         </button>
         <button
             class="hover:text-[#C17D46] transition-colors cursor-pointer"

@@ -17,6 +17,7 @@ const emit = defineEmits<{
     (e: 'item-click', item: T): void
     (e: 'item-double-click', item: T): void
     (e: 'item-keydown', event: KeyboardEvent, item: T): void
+    (e: 'item-edit', item: T): void
 }>()
 
 defineSlots<{

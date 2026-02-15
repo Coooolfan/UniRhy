@@ -1,0 +1,13 @@
+export com.coooolfan.unirhy.model.Recording
+
+input RecordingUpdate {
+    kind
+
+    label
+
+    title
+
+    comment
+
+    defaultInWork
+}

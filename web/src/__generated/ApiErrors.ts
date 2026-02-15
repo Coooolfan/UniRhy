@@ -32,6 +32,8 @@ export type ApiErrors = {
     }, 
     'playlistController': {
     }, 
+    'recordingController': {
+    }, 
     'systemConfigController': {
         'create': AllErrors & ({
                 family: 'SYSTEM', 
