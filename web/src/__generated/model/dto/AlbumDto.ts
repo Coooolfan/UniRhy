@@ -32,11 +32,17 @@ export type AlbumDto = {
                 readonly mediaFile: {
                     readonly id: number;
                     readonly sha256: string;
-                    readonly objectKey: string;
                     readonly mimeType: string;
                     readonly size: number;
                     readonly width?: number | undefined;
                     readonly height?: number | undefined;
+                    readonly ossProvider?: {
+                        readonly id: number;
+                    } | undefined;
+                    readonly fsProvider?: {
+                        readonly id: number;
+                    } | undefined;
+                    readonly objectKey: string;
                 };
             }>;
             readonly artists: ReadonlyArray<{

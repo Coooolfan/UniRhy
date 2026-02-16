@@ -3,5 +3,5 @@ export interface RecordingUpdate {
     readonly label?: string | undefined;
     readonly title?: string | undefined;
     readonly comment: string;
-    readonly defaultInWork: boolean;
+    readonly defaultInWork?: boolean | undefined;
 }

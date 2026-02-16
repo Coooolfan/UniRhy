@@ -13,7 +13,7 @@ export class TaskController {
     /**
      * 触发扫描任务
      * 
-     * 此接口用于提交媒体扫描任务
+     * 此接口用于提交媒体扫描任务，对同一存储节点的请求是幂等的
      * 需要用户登录认证才能访问
      * 
      * @parameter {TaskControllerOptions['executeScanTask']} options

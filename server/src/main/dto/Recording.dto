@@ -9,5 +9,5 @@ input RecordingUpdate {
 
     comment
 
-    defaultInWork
+    defaultInWork?
 }

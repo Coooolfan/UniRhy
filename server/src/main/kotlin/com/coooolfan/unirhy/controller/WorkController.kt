@@ -161,7 +161,12 @@ class WorkController(
                 allScalarFields()
                 assets {
                     allScalarFields()
-                    mediaFile { allScalarFields() }
+                    mediaFile {
+                        allScalarFields()
+                        ossProvider()
+                        fsProvider()
+                        objectKey()
+                    }
                 }
                 artists {
                     allScalarFields()

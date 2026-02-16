@@ -89,7 +89,12 @@ class AlbumController(private val service: AlbumService) {
                 allScalarFields()
                 assets {
                     allScalarFields()
-                    mediaFile { allScalarFields() }
+                    mediaFile {
+                        allScalarFields()
+                        ossProvider()
+                        fsProvider()
+                        objectKey()
+                    }
                 }
                 artists {
                     allScalarFields()
