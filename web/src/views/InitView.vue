@@ -94,7 +94,7 @@
                             <div class="group">
                                 <label
                                     class="text-xs text-[#A0A0A0] uppercase tracking-wider mb-2 block"
-                                    >Secure Key</label
+                                    >Password</label
                                 >
                                 <div
                                     class="flex items-center pb-2 border-b border-[#E0E0E0] group-focus-within:border-[#D4A373] transition-colors relative"
@@ -131,7 +131,7 @@
                                     >Part 02</span
                                 >
                                 <h2 class="text-3xl font-serif text-[#2C2C2C] mb-3 tracking-tight">
-                                    系统存储点
+                                    系统存储节点
                                 </h2>
                                 <p
                                     class="text-xs text-[#888888] font-light leading-relaxed max-w-xs"
@@ -167,7 +167,7 @@
                             <div class="group">
                                 <label
                                     class="text-xs text-[#A0A0A0] uppercase tracking-wider mb-2 block"
-                                    >Storage Path</label
+                                    >Root Path</label
                                 >
                                 <div
                                     class="flex items-center pb-2 border-b border-[#E0E0E0] group-focus-within:border-[#D4A373] transition-colors relative"

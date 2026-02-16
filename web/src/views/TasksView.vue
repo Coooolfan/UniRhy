@@ -212,9 +212,9 @@ const getTaskLabel = (type: string) => {
                                 class="grid grid-cols-12 gap-4 px-8 py-4 text-xs font-medium text-[#9C968B] uppercase tracking-widest border-b border-[#F2EFE9]"
                             >
                                 <div class="col-span-1">#</div>
-                                <div class="col-span-5">Task Name</div>
-                                <div class="col-span-4 text-right">Started At</div>
-                                <div class="col-span-2 text-right">Status</div>
+                                <div class="col-span-5">任务名称</div>
+                                <div class="col-span-4 text-right">开始时间</div>
+                                <div class="col-span-2 text-right">状态</div>
                             </div>
 
                             <!-- List Items -->

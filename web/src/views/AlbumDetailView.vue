@@ -11,11 +11,11 @@ import AddRecordingToPlaylistModal from '@/components/playlist/AddRecordingToPla
 
 const route = useRoute()
 const audioStore = useAudioStore()
-const currentTrackId = ref<number | null>(null)
+const currentRecordingId = ref<number | null>(null)
 const isLoading = ref(true)
 const isCdVisible = ref(false)
 const isAddToPlaylistModalOpen = ref(false)
-const selectedTrackForPlaylist = ref<Track | null>(null)
+const selectedRecordingForPlaylist = ref<Recording | null>(null)
 
 type AlbumData = {
     title: string
@@ -26,7 +26,7 @@ type AlbumData = {
     cover: string
 }
 
-type Track = {
+type Recording = {
     id: number
     title: string
     artist: string
@@ -44,7 +44,7 @@ const albumData = ref<AlbumData>({
     cover: '',
 })
 
-const tracks = ref<Track[]>([])
+const recordings = ref<Recording[]>([])
 
 const resolveCover = (coverId?: number) => {
     if (coverId !== undefined) {
@@ -91,19 +91,19 @@ const fetchAlbum = async (id: number) => {
             cover: resolveCover(data.cover?.id),
         }
 
-        // 映射曲目
-        tracks.value = (data.recordings || []).map((recording) => ({
+        // 映射录音
+        recordings.value = (data.recordings || []).map((recording) => ({
             id: recording.id,
-            title: recording.title || recording.comment || 'Untitled Track',
+            title: recording.title || recording.comment || 'Untitled Recording',
             artist: recording.artists.map((artist) => artist.name).join(', ') || artistName,
             label: recording.label || '',
             cover: resolveCover(recording.cover?.id),
             audioSrc: resolveAudio(recording.assets || []),
         }))
 
-        if (tracks.value.length > 0) {
-            const firstPlayableTrack = tracks.value.find((track) => track.audioSrc)
-            currentTrackId.value = firstPlayableTrack?.id ?? tracks.value[0]?.id ?? null
+        if (recordings.value.length > 0) {
+            const firstPlayableRecording = recordings.value.find((recording) => recording.audioSrc)
+            currentRecordingId.value = firstPlayableRecording?.id ?? recordings.value[0]?.id ?? null
         }
     } catch (error) {
         console.error('Failed to fetch album details:', error)
@@ -116,50 +116,52 @@ const fetchAlbum = async (id: number) => {
     }
 }
 
-const hasPlayableTrack = computed(() => tracks.value.some((track) => !!track.audioSrc))
+const hasPlayableRecording = computed(() =>
+    recordings.value.some((recording) => !!recording.audioSrc),
+)
 
-const isCurrentTrackPlaying = computed(() => {
-    return audioStore.isPlaying && audioStore.currentTrack?.id === currentTrackId.value
+const isCurrentRecordingPlaying = computed(() => {
+    return audioStore.isPlaying && audioStore.currentTrack?.id === currentRecordingId.value
 })
 
-const handlePlay = (track?: Track) => {
-    const targetTrackId = track?.id ?? currentTrackId.value
-    if (!targetTrackId) return
+const handlePlay = (recording?: Recording) => {
+    const targetRecordingId = recording?.id ?? currentRecordingId.value
+    if (!targetRecordingId) return
 
-    const targetTrack = tracks.value.find((item) => item.id === targetTrackId)
-    if (!targetTrack || !targetTrack.audioSrc) {
-        console.warn('No audio source for track', targetTrackId)
+    const targetRecording = recordings.value.find((item) => item.id === targetRecordingId)
+    if (!targetRecording || !targetRecording.audioSrc) {
+        console.warn('No audio source for recording', targetRecordingId)
         return
     }
 
-    currentTrackId.value = targetTrack.id
+    currentRecordingId.value = targetRecording.id
     audioStore.play({
-        id: targetTrack.id,
-        title: targetTrack.title,
-        artist: targetTrack.artist,
-        cover: targetTrack.cover || albumData.value.cover,
-        src: targetTrack.audioSrc,
+        id: targetRecording.id,
+        title: targetRecording.title,
+        artist: targetRecording.artist,
+        cover: targetRecording.cover || albumData.value.cover,
+        src: targetRecording.audioSrc,
     })
 }
 
-const onTrackClick = (track: Track) => {
-    currentTrackId.value = track.id
+const onRecordingClick = (recording: Recording) => {
+    currentRecordingId.value = recording.id
 }
 
-const onTrackDoubleClick = (track: Track) => {
-    currentTrackId.value = track.id
-    handlePlay(track)
+const onRecordingDoubleClick = (recording: Recording) => {
+    currentRecordingId.value = recording.id
+    handlePlay(recording)
 }
 
-const onTrackKeydown = (event: KeyboardEvent, track: Track) => {
+const onRecordingKeydown = (event: KeyboardEvent, recording: Recording) => {
     if (event.key === 'Enter' || event.key === ' ') {
         event.preventDefault()
-        onTrackDoubleClick(track)
+        onRecordingDoubleClick(recording)
     }
 }
 
-const openAddToPlaylistModal = (track: Track) => {
-    selectedTrackForPlaylist.value = track
+const openAddToPlaylistModal = (recording: Recording) => {
+    selectedRecordingForPlaylist.value = recording
     isAddToPlaylistModalOpen.value = true
 }
 
@@ -258,27 +260,27 @@ watch(
                     <div class="flex items-center gap-4 mt-4">
                         <button
                             @click="handlePlay()"
-                            :disabled="!hasPlayableTrack"
+                            :disabled="!hasPlayableRecording"
                             class="px-8 py-3 border border-[#C17D46] text-[#C17D46] hover:bg-[#C17D46] hover:text-white disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-[#C17D46] transition-all duration-300 flex items-center gap-2 text-sm tracking-widest uppercase font-medium rounded-sm cursor-pointer"
                         >
-                            <Pause v-if="isCurrentTrackPlaying" :size="16" />
+                            <Pause v-if="isCurrentRecordingPlaying" :size="16" />
                             <Play v-else :size="16" fill="currentColor" />
-                            {{ isCurrentTrackPlaying ? '暂停播放' : '立即播放' }}
+                            {{ isCurrentRecordingPlaying ? '暂停播放' : '立即播放' }}
                         </button>
                     </div>
                 </div>
             </div>
 
             <MediaListPanel
-                title="Tracklist"
-                :summary="`${tracks.length} Songs`"
-                :items="tracks"
-                :active-id="currentTrackId"
+                title="Recordings"
+                :summary="`${recordings.length} Recordings`"
+                :items="recordings"
+                :active-id="currentRecordingId"
                 :playing-id="audioStore.isPlaying ? (audioStore.currentTrack?.id ?? null) : null"
                 :playing-requires-active="true"
-                @item-click="onTrackClick"
-                @item-double-click="onTrackDoubleClick"
-                @item-keydown="onTrackKeydown"
+                @item-click="onRecordingClick"
+                @item-double-click="onRecordingDoubleClick"
+                @item-keydown="onRecordingKeydown"
             >
                 <template #item="{ item, isActive }">
                     <MediaListItem
@@ -298,8 +300,8 @@ watch(
 
         <AddRecordingToPlaylistModal
             :open="isAddToPlaylistModalOpen"
-            :recording-id="selectedTrackForPlaylist?.id ?? null"
-            :recording-title="selectedTrackForPlaylist?.title"
+            :recording-id="selectedRecordingForPlaylist?.id ?? null"
+            :recording-title="selectedRecordingForPlaylist?.title"
             @close="closeAddToPlaylistModal"
         />
     </div>

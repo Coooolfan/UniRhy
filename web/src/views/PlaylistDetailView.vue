@@ -13,7 +13,7 @@ const route = useRoute()
 const router = useRouter()
 const audioStore = useAudioStore()
 const playlistStore = usePlaylistStore()
-const currentTrackId = ref<number | null>(null)
+const currentRecordingId = ref<number | null>(null)
 const isLoading = ref(true)
 
 // Edit Modal State
@@ -25,9 +25,9 @@ const editError = ref('')
 const isDeleteConfirming = ref(false)
 const isDeletingPlaylist = ref(false)
 const deletePlaylistError = ref('')
-const trackPendingRemoval = ref<Track | null>(null)
-const isRemovingTrack = ref(false)
-const removeTrackError = ref('')
+const recordingPendingRemoval = ref<Recording | null>(null)
+const isRemovingRecording = ref(false)
+const removeRecordingError = ref('')
 
 type PlaylistData = {
     title: string
@@ -35,7 +35,7 @@ type PlaylistData = {
     cover: string
 }
 
-type Track = {
+type Recording = {
     id: number
     title: string
     artist: string
@@ -50,7 +50,7 @@ const playlistData = ref<PlaylistData>({
     cover: '',
 })
 
-const tracks = ref<Track[]>([])
+const recordings = ref<Recording[]>([])
 
 const resolveCover = (coverId?: number) => {
     if (coverId !== undefined) {
@@ -77,7 +77,7 @@ const resolveAudio = (assets: readonly Asset[]) => {
 const fetchPlaylist = async (id: number) => {
     try {
         isLoading.value = true
-        removeTrackError.value = ''
+        removeRecordingError.value = ''
 
         const data = await api.playlistController.getPlaylist({ id })
 
@@ -87,23 +87,23 @@ const fetchPlaylist = async (id: number) => {
         playlistData.value = {
             title: data.name,
             description: data.comment || '',
-            // 歌单本身可能没有封面，使用第一首歌的封面或者默认封面
+            // 歌单本身可能没有封面，使用第一条录音的封面或者默认封面
             cover: firstCover ? resolveCover(firstCover.id) : '',
         }
 
-        // 映射曲目
-        tracks.value = (data.recordings || []).map((recording) => ({
+        // 映射录音
+        recordings.value = (data.recordings || []).map((recording) => ({
             id: recording.id,
-            title: recording.title || recording.comment || 'Untitled Track',
+            title: recording.title || recording.comment || 'Untitled Recording',
             artist: recording.artists.map((artist) => artist.name).join(', ') || 'Unknown Artist',
             label: recording.label || '',
             cover: resolveCover(recording.cover?.id),
             audioSrc: resolveAudio(recording.assets || []),
         }))
 
-        if (tracks.value.length > 0) {
-            const firstPlayableTrack = tracks.value.find((track) => track.audioSrc)
-            currentTrackId.value = firstPlayableTrack?.id ?? tracks.value[0]?.id ?? null
+        if (recordings.value.length > 0) {
+            const firstPlayableRecording = recordings.value.find((recording) => recording.audioSrc)
+            currentRecordingId.value = firstPlayableRecording?.id ?? recordings.value[0]?.id ?? null
         }
     } catch (error) {
         console.error('Failed to fetch playlist details:', error)
@@ -112,46 +112,48 @@ const fetchPlaylist = async (id: number) => {
     }
 }
 
-const hasPlayableTrack = computed(() => tracks.value.some((track) => !!track.audioSrc))
+const hasPlayableRecording = computed(() =>
+    recordings.value.some((recording) => !!recording.audioSrc),
+)
 const isDeleteAction = computed(() => editName.value.trim().length === 0)
 
-const isCurrentTrackPlaying = computed(() => {
-    return audioStore.isPlaying && audioStore.currentTrack?.id === currentTrackId.value
+const isCurrentRecordingPlaying = computed(() => {
+    return audioStore.isPlaying && audioStore.currentTrack?.id === currentRecordingId.value
 })
 
-const handlePlay = (track?: Track) => {
-    const targetTrackId = track?.id ?? currentTrackId.value
-    if (!targetTrackId) return
+const handlePlay = (recording?: Recording) => {
+    const targetRecordingId = recording?.id ?? currentRecordingId.value
+    if (!targetRecordingId) return
 
-    const targetTrack = tracks.value.find((item) => item.id === targetTrackId)
-    if (!targetTrack || !targetTrack.audioSrc) {
-        console.warn('No audio source for track', targetTrackId)
+    const targetRecording = recordings.value.find((item) => item.id === targetRecordingId)
+    if (!targetRecording || !targetRecording.audioSrc) {
+        console.warn('No audio source for recording', targetRecordingId)
         return
     }
 
-    currentTrackId.value = targetTrack.id
+    currentRecordingId.value = targetRecording.id
     audioStore.play({
-        id: targetTrack.id,
-        title: targetTrack.title,
-        artist: targetTrack.artist,
-        cover: targetTrack.cover || playlistData.value.cover,
-        src: targetTrack.audioSrc,
+        id: targetRecording.id,
+        title: targetRecording.title,
+        artist: targetRecording.artist,
+        cover: targetRecording.cover || playlistData.value.cover,
+        src: targetRecording.audioSrc,
     })
 }
 
-const onTrackClick = (track: Track) => {
-    currentTrackId.value = track.id
+const onRecordingClick = (recording: Recording) => {
+    currentRecordingId.value = recording.id
 }
 
-const onTrackDoubleClick = (track: Track) => {
-    currentTrackId.value = track.id
-    handlePlay(track)
+const onRecordingDoubleClick = (recording: Recording) => {
+    currentRecordingId.value = recording.id
+    handlePlay(recording)
 }
 
-const onTrackKeydown = (event: KeyboardEvent, track: Track) => {
+const onRecordingKeydown = (event: KeyboardEvent, recording: Recording) => {
     if (event.key === 'Enter' || event.key === ' ') {
         event.preventDefault()
-        onTrackDoubleClick(track)
+        onRecordingDoubleClick(recording)
     }
 }
 
@@ -230,7 +232,7 @@ const confirmDeletePlaylist = async () => {
 
         if (
             audioStore.currentTrack &&
-            tracks.value.some((track) => track.id === audioStore.currentTrack?.id)
+            recordings.value.some((recording) => recording.id === audioStore.currentTrack?.id)
         ) {
             audioStore.stop()
         }
@@ -245,56 +247,56 @@ const confirmDeletePlaylist = async () => {
     }
 }
 
-const openRemoveTrackModal = (track: Track) => {
-    if (isRemovingTrack.value) return
-    trackPendingRemoval.value = track
-    removeTrackError.value = ''
+const openRemoveRecordingModal = (recording: Recording) => {
+    if (isRemovingRecording.value) return
+    recordingPendingRemoval.value = recording
+    removeRecordingError.value = ''
 }
 
-const closeRemoveTrackModal = () => {
-    if (isRemovingTrack.value) return
-    trackPendingRemoval.value = null
-    removeTrackError.value = ''
+const closeRemoveRecordingModal = () => {
+    if (isRemovingRecording.value) return
+    recordingPendingRemoval.value = null
+    removeRecordingError.value = ''
 }
 
-const confirmRemoveTrack = async () => {
-    const track = trackPendingRemoval.value
-    if (!track || isRemovingTrack.value) return
+const confirmRemoveRecording = async () => {
+    const recording = recordingPendingRemoval.value
+    if (!recording || isRemovingRecording.value) return
 
     const playlistId = Number(route.params.id)
     if (isNaN(playlistId)) return
 
-    isRemovingTrack.value = true
-    removeTrackError.value = ''
+    isRemovingRecording.value = true
+    removeRecordingError.value = ''
 
     try {
         await api.playlistController.removeRecordingFromPlaylist({
             id: playlistId,
-            recordingId: track.id,
+            recordingId: recording.id,
         })
 
-        const nextTracks = tracks.value.filter((item) => item.id !== track.id)
-        tracks.value = nextTracks
+        const nextRecordings = recordings.value.filter((item) => item.id !== recording.id)
+        recordings.value = nextRecordings
 
-        if (currentTrackId.value === track.id) {
-            const firstPlayableTrack = nextTracks.find((item) => item.audioSrc)
-            currentTrackId.value = firstPlayableTrack?.id ?? nextTracks[0]?.id ?? null
+        if (currentRecordingId.value === recording.id) {
+            const firstPlayableRecording = nextRecordings.find((item) => item.audioSrc)
+            currentRecordingId.value = firstPlayableRecording?.id ?? nextRecordings[0]?.id ?? null
         }
 
-        if (audioStore.currentTrack?.id === track.id) {
+        if (audioStore.currentTrack?.id === recording.id) {
             audioStore.stop()
         }
 
         playlistData.value = {
             ...playlistData.value,
-            cover: nextTracks[0]?.cover || '',
+            cover: nextRecordings[0]?.cover || '',
         }
-        trackPendingRemoval.value = null
+        recordingPendingRemoval.value = null
     } catch (error) {
         const normalized = normalizeApiError(error)
-        removeTrackError.value = normalized.message ?? '移除歌曲失败'
+        removeRecordingError.value = normalized.message ?? '移除录音失败'
     } finally {
-        isRemovingTrack.value = false
+        isRemovingRecording.value = false
     }
 }
 
@@ -382,42 +384,44 @@ watch(
                     <div class="flex items-center gap-4 mt-4">
                         <button
                             @click="handlePlay()"
-                            :disabled="!hasPlayableTrack"
+                            :disabled="!hasPlayableRecording"
                             class="px-8 py-3 border border-[#C17D46] text-[#C17D46] hover:bg-[#C17D46] hover:text-white disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-[#C17D46] transition-all duration-300 flex items-center gap-2 text-sm tracking-widest uppercase font-medium rounded-sm cursor-pointer"
                         >
-                            <Pause v-if="isCurrentTrackPlaying" :size="16" />
+                            <Pause v-if="isCurrentRecordingPlaying" :size="16" />
                             <Play v-else :size="16" fill="currentColor" />
-                            {{ isCurrentTrackPlaying ? '暂停播放' : '立即播放' }}
+                            {{ isCurrentRecordingPlaying ? '暂停播放' : '立即播放' }}
                         </button>
                     </div>
                 </div>
             </div>
 
             <MediaListPanel
-                title="Tracklist"
-                :summary="`${tracks.length} Songs`"
-                :items="tracks"
-                :active-id="currentTrackId"
+                title="Recordings"
+                :summary="`${recordings.length} Recordings`"
+                :items="recordings"
+                :active-id="currentRecordingId"
                 :playing-id="audioStore.isPlaying ? (audioStore.currentTrack?.id ?? null) : null"
                 :playing-requires-active="true"
-                @item-click="onTrackClick"
-                @item-double-click="onTrackDoubleClick"
-                @item-keydown="onTrackKeydown"
+                @item-click="onRecordingClick"
+                @item-double-click="onRecordingDoubleClick"
+                @item-keydown="onRecordingKeydown"
             >
-                <template #empty> 前往 Work 或者 Album 详情页添加歌曲到您的歌单 </template>
+                <template #empty> 前往 Work 或者 Album 详情页添加录音到您的歌单 </template>
 
                 <template #item="{ item, isActive }">
                     <MediaListItem
                         :title="item.title"
                         :label="item.label"
                         :show-remove-button="true"
-                        :is-removing="isRemovingTrack && trackPendingRemoval?.id === item.id"
+                        :is-removing="
+                            isRemovingRecording && recordingPendingRemoval?.id === item.id
+                        "
                         :is-active="isActive"
                         :is-playing="
                             audioStore.isPlaying && audioStore.currentTrack?.id === item.id
                         "
                         @play="handlePlay(item)"
-                        @remove="openRemoveTrackModal(item)"
+                        @remove="openRemoveRecordingModal(item)"
                     />
                 </template>
             </MediaListPanel>
@@ -556,9 +560,9 @@ watch(
                 leave-to-class="opacity-0"
             >
                 <div
-                    v-if="trackPendingRemoval"
+                    v-if="recordingPendingRemoval"
                     class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#2B221B]/60"
-                    @click.self="closeRemoveTrackModal"
+                    @click.self="closeRemoveRecordingModal"
                 >
                     <div
                         class="bg-[#fffcf5] p-8 w-full max-w-md shadow-[0_8px_30px_rgba(0,0,0,0.12)] border border-[#EAE6DE] relative transform transition-all"
@@ -573,32 +577,32 @@ watch(
                             >
                                 <Trash2 :size="22" class="text-[#B95D5D]" />
                             </div>
-                            <h3 class="font-serif text-2xl text-[#2B221B]">移除歌曲</h3>
+                            <h3 class="font-serif text-2xl text-[#2B221B]">移除录音</h3>
                             <p class="text-sm text-[#8C857B] mt-3">
-                                确认从当前歌单中移除「{{ trackPendingRemoval.title }}」？
+                                确认从当前歌单中移除「{{ recordingPendingRemoval.title }}」？
                             </p>
                         </div>
 
-                        <p v-if="removeTrackError" class="text-sm text-[#B95D5D] mb-4">
-                            {{ removeTrackError }}
+                        <p v-if="removeRecordingError" class="text-sm text-[#B95D5D] mb-4">
+                            {{ removeRecordingError }}
                         </p>
 
                         <div class="flex gap-3 pt-4 border-t border-[#EAE6DE]">
                             <button
                                 type="button"
                                 class="flex-1 px-4 py-2.5 border border-[#D6D1C4] text-[#8A8A8A] hover:bg-[#F7F5F0] hover:text-[#5A5A5A] transition-colors text-sm uppercase tracking-wide disabled:opacity-60 disabled:cursor-not-allowed"
-                                :disabled="isRemovingTrack"
-                                @click="closeRemoveTrackModal"
+                                :disabled="isRemovingRecording"
+                                @click="closeRemoveRecordingModal"
                             >
                                 取消
                             </button>
                             <button
                                 type="button"
                                 class="flex-1 px-4 py-2.5 bg-[#2B221B] text-[#F7F5F0] hover:bg-[#B95D5D] transition-colors text-sm uppercase tracking-wide shadow-md disabled:opacity-60 disabled:cursor-not-allowed"
-                                :disabled="isRemovingTrack"
-                                @click="confirmRemoveTrack"
+                                :disabled="isRemovingRecording"
+                                @click="confirmRemoveRecording"
                             >
-                                <span v-if="isRemovingTrack">移除中...</span>
+                                <span v-if="isRemovingRecording">移除中...</span>
                                 <span v-else>确认移除</span>
                             </button>
                         </div>

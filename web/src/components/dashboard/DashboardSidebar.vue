@@ -24,7 +24,7 @@ const {
 } = storeToRefs(playlistStore)
 const navItems: NavItem[] = [
     { label: '发现', routeName: 'dashboard-home' },
-    { label: '阅览室', routeName: 'album-list', matchNames: ['album-detail'] },
+    { label: '资料库', routeName: 'album-list', matchNames: ['album-detail'] },
     { label: '任务管理', routeName: 'tasks' },
     { label: '系统设置', routeName: 'settings' },
 ]

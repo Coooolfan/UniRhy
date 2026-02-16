@@ -45,7 +45,7 @@ const emit = defineEmits<{
                             v-if="node.readonly"
                             class="px-2 py-0.5 border border-[#D6D1C4] text-[10px] text-[#8A8A8A] uppercase"
                         >
-                            Read Only
+                            Read-Only
                         </span>
                         <span
                             v-if="activeFsId === node.id"

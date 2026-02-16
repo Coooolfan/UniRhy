@@ -152,8 +152,8 @@
                     >
                         <div class="group relative">
                             <input
-                                id="login-username"
-                                v-model="loginForm.username"
+                                id="login-email"
+                                v-model="loginForm.email"
                                 type="text"
                                 name="email"
                                 autocomplete="email"
@@ -164,7 +164,7 @@
                                 placeholder="Email"
                             />
                             <label
-                                for="login-username"
+                                for="login-email"
                                 class="absolute left-0 -top-3.5 text-[#8a817c] text-sm transition-all peer-placeholder-shown:text-base peer-placeholder-shown:text-[#b0a8a0] peer-placeholder-shown:top-2 peer-focus:-top-3.5 peer-focus:text-[#2c2825] peer-focus:text-sm cursor-text"
                             >
                                 邮箱
@@ -234,7 +234,7 @@ const router = useRouter()
 const isLoginMode = ref(true)
 
 const loginForm = reactive({
-    username: '',
+    email: '',
     password: '',
 })
 
@@ -260,7 +260,7 @@ const handleLogin = async () => {
     try {
         await api.tokenController.login({
             body: {
-                email: loginForm.username,
+                email: loginForm.email,
                 password: loginForm.password,
             },
         })
