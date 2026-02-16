@@ -7,7 +7,7 @@ defineProps<{
 <template>
   <Transition name="fade-up" mode="out-in">
     <p class="subtitle" :key="isChinese ? 'cn' : 'en'">
-      {{ isChinese ? '享受音乐 / 即将到来' : 'Just Listen / Coming Soon' }}
+      {{ isChinese ? '享受音乐' : 'Just Listen' }}
     </p>
   </Transition>
 </template>
@@ -36,6 +36,6 @@ defineProps<{
   opacity: 1;
   text-transform: uppercase;
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
-  padding-bottom: 10rem;
+  padding-bottom: 1.5rem;
 }
 </style>

@@ -26,6 +26,18 @@ const isChinese = ref(false)
     <div class="overlay">
       <BrandLogo :isChinese="isChinese" />
       <HeroSubtitle :isChinese="isChinese" />
+      <div class="quick-links">
+        <a class="link-item" href="/blog.html">{{ isChinese ? '博客' : 'Blog' }}</a>
+        <span class="separator">/</span>
+        <a
+          class="link-item"
+          href="https://github.com/Coooolfan/UniRhy"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          GitHub
+        </a>
+      </div>
     </div>
     <div class="footer">
       <div class="lang-switch">
@@ -113,6 +125,27 @@ body,
   display: flex;
   justify-content: center;
   z-index: 20;
+}
+
+.quick-links {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1rem;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 1.1rem;
+  color: rgba(255, 255, 255, 0.6);
+  pointer-events: auto;
+}
+
+.link-item {
+  color: inherit;
+  text-decoration: none;
+  transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.link-item:hover {
+  color: rgba(255, 255, 255, 0.9);
 }
 
 .lang-switch {

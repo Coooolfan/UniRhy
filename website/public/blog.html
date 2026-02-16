@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>UniRhy Blog</title>
+    <link href="/fonts/barlow-condensed.css" rel="stylesheet" />
+    <style>
+      :root {
+        /* Colors from web project */
+        --primary-gold: #d98c28;
+        --primary-gold-hover: #b8721b;
+        --paper-bg: #f9f7f2;
+        --card-bg: #fcfbf9;
+        --text-dark: #2c2825;
+        --text-light: #8a817c;
+        --border-color: #dcd6cc;
+
+        /* Shadows */
+        --shadow-soft: 0 10px 30px -10px rgba(168, 160, 149, 0.4);
+        --shadow-card: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+
+        /* Fonts */
+        --font-serif: 'Georgia', 'Times New Roman', Times, serif;
+        --font-sans: 'Barlow Condensed', sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        background: radial-gradient(circle at top left, #f5f0e6, #e6dcc8);
+        color: var(--text-dark);
+        font-family: var(--font-serif);
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        position: relative;
+      }
+
+      /* Noise Texture */
+      body::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100' height='100' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+        pointer-events: none;
+        z-index: 0;
+      }
+
+      /* Decorative Circles */
+      .deco-circle {
+        position: absolute;
+        border-radius: 50%;
+        filter: blur(80px);
+        z-index: -1;
+        opacity: 0.6;
+      }
+
+      .circle-1 {
+        width: 400px;
+        height: 400px;
+        background: rgba(217, 140, 40, 0.1);
+        top: -100px;
+        left: -100px;
+      }
+
+      .circle-2 {
+        width: 300px;
+        height: 300px;
+        background: rgba(217, 140, 40, 0.15);
+        bottom: -50px;
+        right: -50px;
+      }
+
+      main {
+        position: relative;
+        z-index: 10;
+        width: min(90vw, 600px);
+        /* Card Stack Effect */
+      }
+
+      .card-stack-1 {
+        position: absolute;
+        top: 1rem;
+        left: 1rem;
+        right: -0.5rem;
+        bottom: -0.5rem;
+        background: #f0ebe3;
+        border: 1px solid #e6e1d8;
+        transform: rotate(1deg);
+        border-radius: 4px;
+        z-index: -2;
+      }
+
+      .card-stack-2 {
+        position: absolute;
+        top: 0.5rem;
+        left: 0.5rem;
+        right: -0.25rem;
+        bottom: -0.25rem;
+        background: #f5f2eb;
+        border: 1px solid #e6e1d8;
+        transform: rotate(-1deg);
+        border-radius: 4px;
+        z-index: -1;
+        box-shadow: var(--shadow-card);
+      }
+
+      .card-content {
+        background: var(--card-bg);
+        padding: 4rem 3rem;
+        text-align: center;
+        border: 1px solid rgba(255, 255, 255, 0.8);
+        box-shadow: var(--shadow-soft);
+        border-radius: 4px;
+        position: relative;
+        overflow: hidden;
+      }
+
+      /* Inner texture for card */
+      .card-content::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background-image: url('https://www.transparenttextures.com/patterns/cream-paper.png');
+        /* Fallback if external image fails or to match local style */
+        opacity: 0.4;
+        pointer-events: none;
+        z-index: 0;
+      }
+
+      .inner-content {
+        position: relative;
+        z-index: 1;
+      }
+
+      h1 {
+        font-family: var(--font-serif);
+        font-weight: bold;
+        font-size: clamp(2.5rem, 6vw, 4rem);
+        color: var(--text-dark);
+        margin-bottom: 1.5rem;
+        letter-spacing: 0.05em;
+        line-height: 1.1;
+      }
+
+      .subtitle {
+        font-family: var(--font-sans);
+        text-transform: uppercase;
+        letter-spacing: 0.2em;
+        font-size: 0.85rem;
+        color: #9c968b;
+        margin-bottom: 1rem;
+        display: block;
+      }
+
+      .divider {
+        width: 40px;
+        height: 2px;
+        background: var(--primary-gold);
+        margin: 0 auto 2rem;
+      }
+
+      p {
+        font-size: 1.1rem;
+        line-height: 1.8;
+        color: var(--text-light);
+        margin-bottom: 0.5rem;
+        font-style: italic;
+      }
+
+      .btn {
+        display: inline-block;
+        margin-top: 3rem;
+        padding: 0.8em 2.5em;
+        font-family: var(--font-sans);
+        font-weight: 700;
+        font-size: 1rem;
+        text-transform: uppercase;
+        letter-spacing: 0.15em;
+        color: var(--primary-gold);
+        border: 1px solid var(--primary-gold);
+        background: transparent;
+        text-decoration: none;
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .btn:hover {
+        background: var(--primary-gold);
+        color: #fff;
+        box-shadow: 0 4px 15px rgba(217, 140, 40, 0.25);
+        transform: translateY(-1px);
+      }
+
+      .btn:active {
+        transform: translateY(0);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="deco-circle circle-1"></div>
+    <div class="deco-circle circle-2"></div>
+
+    <main>
+      <div class="card-stack-1"></div>
+      <div class="card-stack-2"></div>
+      <div class="card-content">
+        <div class="inner-content">
+          <span class="subtitle">Coming Soon</span>
+          <h1>UniRhy Blog</h1>
+          <div class="divider"></div>
+          <p>这里是 Blog 占位页面，正式内容准备后会在此发布。</p>
+          <p>This is a placeholder page for the future UniRhy Blog.</p>
+          <a href="/" class="btn">Back to Home</a>
+        </div>
+      </div>
+    </main>
+  </body>
+</html>
