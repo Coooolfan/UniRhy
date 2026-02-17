@@ -4,15 +4,12 @@ const props = withDefaults(
         title: string
         summary?: string
         items: T[]
-        activeId: number | null
         playingId: number | null
-        playingRequiresActive?: boolean
-        selectionStyle?: 'default' | 'ribbon'
+        enableMultiSelect?: boolean
         selectedIds?: Set<number>
     }>(),
     {
-        playingRequiresActive: false,
-        selectionStyle: 'default',
+        enableMultiSelect: false,
         selectedIds: () => new Set(),
     },
 )
@@ -26,23 +23,17 @@ const emit = defineEmits<{
 }>()
 
 defineSlots<{
-    item(props: { item: T; index: number; isActive: boolean; isPlaying: boolean }): unknown
+    item(props: { item: T; index: number; isPlaying: boolean }): unknown
     empty(): unknown
     actions(): unknown
 }>()
 
-const isItemActive = (itemId: number) => {
-    return props.activeId === itemId
+const isItemPlaying = (itemId: number) => {
+    return props.playingId === itemId
 }
 
-const isItemPlaying = (itemId: number) => {
-    if (props.playingId !== itemId) {
-        return false
-    }
-    if (props.playingRequiresActive) {
-        return props.activeId === itemId
-    }
-    return true
+const isItemSelected = (itemId: number) => {
+    return props.selectedIds?.has(itemId) ?? false
 }
 </script>
 
@@ -83,39 +74,36 @@ const isItemPlaying = (itemId: number) => {
                 @keydown="(event) => emit('item-keydown', event, item)"
                 tabindex="0"
                 role="button"
-                class="group flex items-center gap-6 py-4 px-4 rounded-sm transition-all duration-200 border-b border-transparent hover:bg-[#F2EFE9] relative overflow-hidden"
+                class="group flex items-center gap-6 py-4 px-4 rounded-sm transition-all duration-200 border-b border-transparent hover:bg-[#F2EFE9] relative overflow-visible"
                 :class="{
-                    'bg-[#F2EFE9]': isItemActive(item.id),
+                    'bg-[#F2EFE9]': enableMultiSelect && isItemSelected(item.id),
                     'cursor-pointer': true,
                 }"
             >
                 <div
-                    v-if="selectionStyle === 'ribbon' && selectedIds?.has(item.id)"
-                    class="absolute top-0 left-0 w-0 h-0 border-t-[#FF0000] border-r-transparent pointer-events-none"
-                    style="
-                        border-top-width: 32px;
-                        border-right-width: 32px;
-                        border-top-style: solid;
-                        border-right-style: solid;
-                    "
-                ></div>
+                    v-if="enableMultiSelect && isItemSelected(item.id)"
+                    class="absolute -top-1 left-3 z-20 w-5 drop-shadow-lg pointer-events-none"
+                >
+                    <svg
+                        viewBox="0 0 32 64"
+                        fill="none"
+                        xmlns="http://www.w3.org/2000/svg"
+                        class="w-full h-full drop-shadow-xl"
+                    >
+                        <path d="M0 0H20V36L12 30L0 36V0Z" fill="#d7b472" />
+                        <path d="M20 0V6H26Z" fill="#979185" />
+                    </svg>
+                </div>
 
                 <div
-                    class="w-6 text-center font-serif text-lg relative z-10 select-none"
-                    :class="[
-                        isItemActive(item.id)
-                            ? 'text-[#C17D46]'
-                            : 'text-[#DCD6CC] group-hover:text-[#8C857B]',
-                        { 'cursor-pointer': selectionStyle === 'ribbon' },
-                    ]"
+                    class="w-6 text-center font-serif text-lg relative z-10 select-none text-[#DCD6CC] group-hover:text-[#8C857B]"
+                    :class="{ 'cursor-pointer': enableMultiSelect }"
                     @click.stop="
-                        selectionStyle === 'ribbon'
+                        enableMultiSelect
                             ? emit('item-toggle-select', item, $event)
                             : emit('item-click', item)
                     "
-                    @dblclick.stop="
-                        selectionStyle === 'ribbon' ? undefined : emit('item-double-click', item)
-                    "
+                    @dblclick.stop="enableMultiSelect ? undefined : emit('item-double-click', item)"
                 >
                     <div
                         v-if="isItemPlaying(item.id)"
@@ -132,7 +120,6 @@ const isItemPlaying = (itemId: number) => {
                     name="item"
                     :item="item"
                     :index="index"
-                    :is-active="isItemActive(item.id)"
                     :is-playing="isItemPlaying(item.id)"
                 />
             </div>

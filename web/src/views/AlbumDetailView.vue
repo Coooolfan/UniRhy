@@ -266,19 +266,16 @@ watch(
                 title="Recordings"
                 :summary="`${recordings.length} Recordings`"
                 :items="recordings"
-                :active-id="currentRecordingId"
                 :playing-id="playingId"
-                :playing-requires-active="true"
                 @item-double-click="onRecordingDoubleClick"
                 @item-keydown="onRecordingKeydown"
             >
-                <template #item="{ item, isActive }">
+                <template #item="{ item }">
                     <MediaListItem
                         :title="item.title"
                         :label="item.label"
                         :show-add-button="true"
                         :show-edit-button="true"
-                        :is-active="isActive"
                         :is-playing="
                             audioStore.isPlaying && audioStore.currentTrack?.id === item.id
                         "

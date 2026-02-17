@@ -399,15 +399,13 @@ watch(
                 title="Recordings"
                 :summary="`${recordings.length} Recordings`"
                 :items="recordings"
-                :active-id="currentRecordingId"
                 :playing-id="audioStore.isPlaying ? (audioStore.currentTrack?.id ?? null) : null"
-                :playing-requires-active="true"
                 @item-double-click="onRecordingDoubleClick"
                 @item-keydown="onRecordingKeydown"
             >
                 <template #empty> 前往 Work 或者 Album 详情页添加录音到您的歌单 </template>
 
-                <template #item="{ item, isActive }">
+                <template #item="{ item }">
                     <MediaListItem
                         :title="item.title"
                         :label="item.label"
@@ -415,7 +413,6 @@ watch(
                         :is-removing="
                             isRemovingRecording && recordingPendingRemoval?.id === item.id
                         "
-                        :is-active="isActive"
                         :is-playing="
                             audioStore.isPlaying && audioStore.currentTrack?.id === item.id
                         "

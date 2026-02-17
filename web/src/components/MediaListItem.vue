@@ -3,7 +3,6 @@ import { Play, Pause, Plus, Trash2, Pencil } from 'lucide-vue-next'
 
 defineProps<{
     title: string
-    isActive: boolean
     isPlaying: boolean
     label?: string
     cover?: string
@@ -36,10 +35,7 @@ const emit = defineEmits<{
     <div class="flex-1 min-w-0">
         <div class="flex items-center gap-2">
             <!-- Title -->
-            <div
-                class="text-base font-medium truncate"
-                :class="isActive ? 'text-[#C17D46]' : 'text-[#4A433B]'"
-            >
+            <div class="text-base font-medium truncate text-[#4A433B]">
                 {{ title }}
             </div>
             <!-- Default Badge (Optional) -->

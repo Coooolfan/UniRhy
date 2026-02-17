@@ -486,9 +486,8 @@ watch(
             <MediaListPanel
                 title="Recordings"
                 :items="recordings"
-                :active-id="currentRecordingId"
                 :playing-id="playingId"
-                selection-style="ribbon"
+                enable-multi-select
                 :selected-ids="selectedRecordingIds"
                 @item-double-click="onRecordingDoubleClick"
                 @item-toggle-select="toggleRecordingSelection"
@@ -505,7 +504,7 @@ watch(
                         合并
                     </button>
                 </template>
-                <template #item="{ item, isActive }">
+                <template #item="{ item }">
                     <MediaListItem
                         :title="item.title"
                         :label="item.label"
@@ -514,7 +513,6 @@ watch(
                         :show-edit-button="true"
                         :is-default="item.isDefault"
                         :subtitle="`${item.artist}${item.type ? ' · ' + item.type : ''}`"
-                        :is-active="isActive"
                         :is-playing="
                             audioStore.isPlaying && audioStore.currentTrack?.id === item.id
                         "
