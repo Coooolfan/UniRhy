@@ -269,7 +269,6 @@ watch(
                 :active-id="currentRecordingId"
                 :playing-id="playingId"
                 :playing-requires-active="true"
-                @item-click="onRecordingClick"
                 @item-double-click="onRecordingDoubleClick"
                 @item-keydown="onRecordingKeydown"
             >

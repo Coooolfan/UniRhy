@@ -1,5 +1,5 @@
 import type {Executor} from '../';
-import type {RecordingUpdate} from '../model/static/';
+import type {RecordingMergeReq, RecordingUpdate} from '../model/static/';
 
 /**
  * 录音管理接口
@@ -9,6 +9,23 @@ import type {RecordingUpdate} from '../model/static/';
 export class RecordingController {
     
     constructor(private executor: Executor) {}
+    
+    /**
+     * 录音合并接口
+     * 
+     * 此接口用于将多个录音合并为一个录音
+     * 需要用户登录认证才能访问
+     * 
+     * @parameter {RecordingControllerOptions['mergeRecording']} options
+     * - input RecordingMergeReq 合并参数
+     * 
+     */
+    readonly mergeRecording: (options: RecordingControllerOptions['mergeRecording']) => Promise<
+        void
+    > = async(options) => {
+        let _uri = '/api/recordings/merge';
+        return (await this.executor({uri: _uri, method: 'PUT', body: options.body})) as Promise<void>;
+    }
     
     /**
      * 更新录音信息
@@ -41,5 +58,12 @@ export type RecordingControllerOptions = {
          * 
          */
         readonly body: RecordingUpdate
+    }, 
+    'mergeRecording': {
+        /**
+         * RecordingMergeReq 合并参数
+         * 
+         */
+        readonly body: RecordingMergeReq
     }
 }

@@ -2,14 +2,18 @@
 const props = withDefaults(
     defineProps<{
         title: string
-        summary: string
+        summary?: string
         items: T[]
         activeId: number | null
         playingId: number | null
         playingRequiresActive?: boolean
+        selectionStyle?: 'default' | 'ribbon'
+        selectedIds?: Set<number>
     }>(),
     {
         playingRequiresActive: false,
+        selectionStyle: 'default',
+        selectedIds: () => new Set(),
     },
 )
 
@@ -18,11 +22,13 @@ const emit = defineEmits<{
     (e: 'item-double-click', item: T): void
     (e: 'item-keydown', event: KeyboardEvent, item: T): void
     (e: 'item-edit', item: T): void
+    (e: 'item-toggle-select', item: T, event: MouseEvent): void
 }>()
 
 defineSlots<{
     item(props: { item: T; index: number; isActive: boolean; isPlaying: boolean }): unknown
     empty(): unknown
+    actions(): unknown
 }>()
 
 const isItemActive = (itemId: number) => {
@@ -47,13 +53,21 @@ const isItemPlaying = (itemId: number) => {
         ></div>
 
         <div class="flex items-center justify-between mb-8 border-b border-[#EFEBE4] pb-4">
-            <h3 class="font-serif text-2xl text-[#2C2420]">{{ title }}</h3>
-            <div class="text-xs text-[#8C857B] uppercase tracking-widest">
-                {{ summary }}
+            <div class="flex items-end gap-4">
+                <h3 class="font-serif text-2xl text-[#2C2420]">{{ title }}</h3>
+                <div
+                    v-if="summary"
+                    class="text-xs text-[#8C857B] uppercase tracking-widest leading-none mb-1"
+                >
+                    {{ summary }}
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                <slot name="actions"></slot>
             </div>
         </div>
 
-        <div class="flex flex-col">
+        <div class="flex flex-col gap-1">
             <div
                 v-if="items.length === 0"
                 class="py-12 text-center text-[#8C857B] text-sm font-serif italic"
@@ -69,15 +83,38 @@ const isItemPlaying = (itemId: number) => {
                 @keydown="(event) => emit('item-keydown', event, item)"
                 tabindex="0"
                 role="button"
-                class="group flex items-center gap-6 py-4 px-4 rounded-sm transition-all duration-200 cursor-pointer border-b border-transparent hover:bg-[#F2EFE9]"
-                :class="{ 'bg-[#F2EFE9]': isItemActive(item.id) }"
+                class="group flex items-center gap-6 py-4 px-4 rounded-sm transition-all duration-200 border-b border-transparent hover:bg-[#F2EFE9] relative overflow-hidden"
+                :class="{
+                    'bg-[#F2EFE9]': isItemActive(item.id),
+                    'cursor-pointer': true,
+                }"
             >
                 <div
-                    class="w-6 text-center font-serif text-lg"
-                    :class="
+                    v-if="selectionStyle === 'ribbon' && selectedIds?.has(item.id)"
+                    class="absolute top-0 left-0 w-0 h-0 border-t-[#FF0000] border-r-transparent pointer-events-none"
+                    style="
+                        border-top-width: 32px;
+                        border-right-width: 32px;
+                        border-top-style: solid;
+                        border-right-style: solid;
+                    "
+                ></div>
+
+                <div
+                    class="w-6 text-center font-serif text-lg relative z-10 select-none"
+                    :class="[
                         isItemActive(item.id)
                             ? 'text-[#C17D46]'
-                            : 'text-[#DCD6CC] group-hover:text-[#8C857B]'
+                            : 'text-[#DCD6CC] group-hover:text-[#8C857B]',
+                        { 'cursor-pointer': selectionStyle === 'ribbon' },
+                    ]"
+                    @click.stop="
+                        selectionStyle === 'ribbon'
+                            ? emit('item-toggle-select', item, $event)
+                            : emit('item-click', item)
+                    "
+                    @dblclick.stop="
+                        selectionStyle === 'ribbon' ? undefined : emit('item-double-click', item)
                     "
                 >
                     <div

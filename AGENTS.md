@@ -24,5 +24,5 @@ UniRhy (独一律) 是一个私有化的音乐流媒体平台
   - `./skills/jimmer-orm` Jimmer ORM 开发指南：适用于：(1) 定义或修改 Jimmer 实体（使用 @Entity 注解的 interface）；(2) 编写 Jimmer DSL 查询代码；(3) 配置实体关联关系（@ManyToOne, @OneToMany, @ManyToMany）；(4) 使用动态谓词、动态表连接或隐式子查询；(5) 编辑包含 Jimmer 相关代码的 Java/Kotlin 文件。
   - `./skills/serverchan` Server酱 推送：通过 Server酱³ 发送推送通知。在无人值守开发时，需要向用户发送消息、通知、提醒时使用此 skill。从环境变量 FT07_KEY 获取密钥。
 - 如果你需要访问开发环境数据库，请直接使用postgres相关工具，此工具已配置好连接信息与数据库
-- yarn --cwd <project> <command> 用于指定工作路径
+- yarn --cwd <project> <command> 用于指定工作路径，遇到问题时优先使用 cd 绝对路径一次性执行多条命令
 - 所有描述性文字应该始终是面向 开发者/用户 的最终产物，不需要描述中间过程和演变原因。

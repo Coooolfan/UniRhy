@@ -402,7 +402,6 @@ watch(
                 :active-id="currentRecordingId"
                 :playing-id="audioStore.isPlaying ? (audioStore.currentTrack?.id ?? null) : null"
                 :playing-requires-active="true"
-                @item-click="onRecordingClick"
                 @item-double-click="onRecordingDoubleClick"
                 @item-keydown="onRecordingKeydown"
             >
