@@ -10,24 +10,27 @@ import {
     Play,
 } from 'lucide-vue-next'
 import DashboardTopBar from '@/components/dashboard/DashboardTopBar.vue'
-import StackedCovers from '@/components/StackedCovers.vue'
+import AlbumGridCard from '@/components/media/AlbumGridCard.vue'
+import WorkGridCard from '@/components/media/WorkGridCard.vue'
 import { api, normalizeApiError } from '@/ApiInstance'
+import { formatYear, resolveCover } from '@/composables/recordingMedia'
+import {
+    resolveAlbumPlayableTrack,
+    resolveWorkPlayableTrack,
+    type PlayableTrack,
+} from '@/services/playableTrackResolver'
 import { useAudioStore } from '@/stores/audio'
 
 type DisplayItem = {
     id: number
+    type: 'album' | 'work'
     title: string
     subtitle: string
     details: string
     cover: string
     stackedImages?: { id: number | string; cover?: string }[]
     badge?: string
-    playTrackId?: number
-    playTitle?: string
-    playArtist?: string
-    playCover?: string
-    playSrc?: string
-    playWorkId?: number
+    playableTrack?: PlayableTrack
 }
 
 const router = useRouter()
@@ -41,54 +44,14 @@ const isLoading = ref(false)
 const errorMessage = ref('')
 const playLoadingItemId = ref<number | null>(null)
 
-// Pagination state
 const pageIndex = ref(0)
 const pageSize = ref(10)
 const totalPageCount = ref(0)
 
-const resolveCover = (coverId?: number) => (coverId ? `/api/media/${coverId}` : '')
-
-type Asset = {
-    mediaFile: {
-        id: number
-        mimeType: string
-    }
-}
-
-type Artist = {
-    name?: string
-}
-
-const resolveAudio = (assets: readonly Asset[]) => {
-    const audioAsset = assets.find((asset) => asset.mediaFile.mimeType.startsWith('audio/'))
-    if (audioAsset) {
-        return `/api/media/${audioAsset.mediaFile.id}`
-    }
-    return undefined
-}
-
-const resolveArtistName = (artists?: ReadonlyArray<Artist>) => {
-    const names = artists?.map((artist) => artist.name).filter(Boolean) ?? []
-    if (names.length > 0) {
-        return names.join(', ')
-    }
-    return 'Unknown Artist'
-}
-
-const formatYear = (releaseDate?: string) => {
-    if (!releaseDate) {
-        return ''
-    }
-    const date = new Date(releaseDate)
-    if (Number.isNaN(date.getTime())) {
-        return ''
-    }
-    return date.getFullYear().toString()
-}
-
 const fetchAlbums = async () => {
     isLoading.value = true
     errorMessage.value = ''
+
     try {
         const page = await api.albumController.listAlbums({
             pageIndex: pageIndex.value,
@@ -97,6 +60,7 @@ const fetchAlbums = async () => {
         totalPageCount.value = page.totalPageCount
         displayItems.value = page.rows.map((album) => ({
             id: album.id,
+            type: 'album',
             title: album.title || 'Untitled Album',
             subtitle: album.recordings?.[0]?.label || 'Unknown Artist',
             details: formatYear(album.releaseDate),
@@ -114,6 +78,7 @@ const fetchAlbums = async () => {
 const fetchWorks = async () => {
     isLoading.value = true
     errorMessage.value = ''
+
     try {
         const page = await api.workController.listWork({
             pageIndex: pageIndex.value,
@@ -128,13 +93,14 @@ const fetchWorks = async () => {
 
             return {
                 id: work.id,
+                type: 'work',
                 title: work.title || 'Untitled Work',
                 subtitle: artistName,
                 details: `${work.recordings?.length ?? 0} Recordings`,
                 cover: resolveCover(mainRecording?.cover?.id),
-                stackedImages: work.recordings?.map((r) => ({
-                    id: r.id,
-                    cover: resolveCover(r.cover?.id),
+                stackedImages: work.recordings?.map((recording) => ({
+                    id: recording.id,
+                    cover: resolveCover(recording.cover?.id),
                 })),
             }
         })
@@ -155,7 +121,9 @@ const fetchData = () => {
 }
 
 const handlePageChange = (newPage: number) => {
-    if (newPage < 0 || newPage >= totalPageCount.value) return
+    if (newPage < 0 || newPage >= totalPageCount.value) {
+        return
+    }
 
     router.push({
         query: {
@@ -166,23 +134,24 @@ const handlePageChange = (newPage: number) => {
 }
 
 const handleTabChange = (tab: 'Albums' | 'Works') => {
-    if (activeTab.value === tab) return
+    if (activeTab.value === tab) {
+        return
+    }
+
     router.push({
         query: {
             ...route.query,
             tab,
-            page: undefined, // Reset page when switching tabs
+            page: undefined,
         },
     })
 }
 
-// Sync state from URL
 const syncFromRoute = () => {
     const tab = route.query.tab as string
     const page = Number(route.query.page)
 
     const targetTab = tab === 'Works' || tab === 'Albums' ? tab : 'Albums'
-
     const tabChanged = targetTab !== activeTab.value
     activeTab.value = targetTab
 
@@ -195,6 +164,7 @@ const syncFromRoute = () => {
     if (tabChanged) {
         displayItems.value = []
     }
+
     fetchData()
 }
 
@@ -211,6 +181,7 @@ const filteredItems = computed(() => {
     if (!query) {
         return displayItems.value
     }
+
     return displayItems.value.filter((item) => {
         return (
             item.title.toLowerCase().includes(query) || item.subtitle.toLowerCase().includes(query)
@@ -229,8 +200,8 @@ const navigateToDetail = (id: number) => {
 const isItemPlaying = (item: DisplayItem) => {
     return (
         audioStore.isPlaying &&
-        item.playTrackId !== undefined &&
-        audioStore.currentTrack?.id === item.playTrackId
+        item.playableTrack !== undefined &&
+        audioStore.currentTrack?.id === item.playableTrack.id
     )
 }
 
@@ -241,67 +212,25 @@ const playItem = async (item: DisplayItem) => {
 
     try {
         playLoadingItemId.value = item.id
-        if (!item.playSrc || item.playTrackId === undefined) {
-            if (activeTab.value === 'Albums') {
-                const detail = await api.albumController.getAlbum({ id: item.id })
-                const defaultTrack = detail.recordings.find(
-                    (recording) => recording.defaultInWork && resolveAudio(recording.assets || []),
-                )
-                const firstPlayableTrack = detail.recordings.find((recording) =>
-                    resolveAudio(recording.assets || []),
-                )
-                const targetTrack = defaultTrack ?? firstPlayableTrack
-                const targetSrc = resolveAudio(targetTrack?.assets || [])
-                if (!targetTrack || !targetSrc) {
-                    console.warn('No playable track for album', item.id)
-                    return
-                }
 
-                item.playTrackId = targetTrack.id
-                item.playTitle = targetTrack.title || targetTrack.comment || detail.title
-                item.playArtist = resolveArtistName(targetTrack.artists) || item.subtitle
-                item.playCover = targetTrack.cover?.id
-                    ? resolveCover(targetTrack.cover.id)
-                    : item.cover
-                item.playSrc = targetSrc
-            } else {
-                const detail = await api.workController.getWorkById({ id: item.id })
-                const defaultTrack = detail.recordings.find(
-                    (recording) => recording.defaultInWork && resolveAudio(recording.assets || []),
-                )
-                const firstPlayableTrack = detail.recordings.find((recording) =>
-                    resolveAudio(recording.assets || []),
-                )
-                const targetTrack = defaultTrack ?? firstPlayableTrack
-                const targetSrc = resolveAudio(targetTrack?.assets || [])
-                if (!targetTrack || !targetSrc) {
-                    console.warn('No playable track for work', item.id)
-                    return
-                }
-
-                item.playTrackId = targetTrack.id
-                item.playTitle = targetTrack.title || targetTrack.comment || detail.title
-                item.playArtist = resolveArtistName(targetTrack.artists) || item.subtitle
-                item.playCover = targetTrack.cover?.id
-                    ? resolveCover(targetTrack.cover.id)
-                    : item.cover
-                item.playSrc = targetSrc
-                item.playWorkId = detail.id
+        if (!item.playableTrack) {
+            const fallback = {
+                title: item.title,
+                artist: item.subtitle,
+                cover: item.cover,
             }
+            item.playableTrack =
+                item.type === 'album'
+                    ? await resolveAlbumPlayableTrack(item.id, fallback)
+                    : await resolveWorkPlayableTrack(item.id, fallback)
         }
 
-        if (!item.playSrc || item.playTrackId === undefined) {
+        if (!item.playableTrack) {
+            console.warn('No playable track for item', item.id)
             return
         }
 
-        audioStore.play({
-            id: item.playTrackId,
-            title: item.playTitle || item.title,
-            artist: item.playArtist || item.subtitle,
-            cover: item.playCover || item.cover,
-            src: item.playSrc,
-            workId: item.playWorkId,
-        })
+        audioStore.play(item.playableTrack)
     } catch (error) {
         console.error('Failed to play item:', error)
     } finally {
@@ -395,69 +324,38 @@ const playItem = async (item: DisplayItem) => {
                     v-else-if="viewMode === 'grid'"
                     class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-x-12 gap-y-16"
                 >
-                    <div
-                        v-for="item in filteredItems"
-                        :key="item.id"
-                        class="group cursor-pointer"
-                        @click="navigateToDetail(item.id)"
-                    >
-                        <div
-                            class="relative aspect-square mb-5 transition-transform duration-500 ease-out perspective-1000"
-                        >
-                            <template v-if="activeTab === 'Albums'">
-                                <div
-                                    class="absolute top-1/2 left-1/2 w-[90%] h-[90%] -translate-x-1/2 -translate-y-1/2"
-                                >
-                                    <div
-                                        class="w-full h-full bg-linear-to-tr from-gray-200 to-gray-100 border border-gray-300 rounded-full shadow-xl transition-all duration-700 ease-out opacity-0 group-hover:opacity-100 transform-gpu group-hover:translate-x-7 group-hover:-translate-y-8 group-hover:rotate-3 flex items-center justify-center relative"
-                                    >
-                                        <div
-                                            class="w-1/3 h-1/3 border border-gray-300 rounded-full opacity-50"
-                                        ></div>
-                                        <div
-                                            class="absolute w-8 h-8 bg-[#EBE7E0] rounded-full border border-gray-300"
-                                        ></div>
-                                    </div>
-                                </div>
-
-                                <div
-                                    class="relative z-10 w-full h-full shadow-lg transition-all duration-500 ease-out bg-[#D6D1C7] transform-gpu origin-center group-hover:scale-105 group-hover:-rotate-2 group-hover:-translate-x-3 group-hover:-translate-y-1.5"
-                                >
-                                    <img
-                                        v-if="item.cover"
-                                        :src="item.cover"
-                                        :alt="item.title"
-                                        class="w-full h-full object-cover"
-                                    />
-                                    <div
-                                        v-else
-                                        class="w-full h-full flex items-center justify-center text-xs text-[#8C857B]"
-                                    >
-                                        No Cover
-                                    </div>
-                                </div>
-                            </template>
-                            <StackedCovers
-                                v-else
-                                :items="item.stackedImages || []"
-                                :default-cover="item.cover"
-                            />
-                        </div>
-
-                        <div class="text-center md:text-left">
-                            <h3
-                                class="font-serif text-lg leading-tight mb-1 truncate text-[#1A1A1A] group-hover:text-[#C27E46] transition-colors"
-                            >
-                                {{ item.title }}
-                            </h3>
-                            <p class="text-xs text-[#8C857B] uppercase tracking-wider truncate">
-                                {{ item.subtitle }}
-                            </p>
-                            <p class="text-[10px] text-[#B0AAA0] mt-1">
-                                {{ item.details }} <span v-if="item.badge">· {{ item.badge }}</span>
-                            </p>
-                        </div>
-                    </div>
+                    <template v-if="activeTab === 'Albums'">
+                        <AlbumGridCard
+                            v-for="item in filteredItems"
+                            :key="item.id"
+                            :title="item.title"
+                            :subtitle="item.subtitle"
+                            :details="item.details"
+                            :badge="item.badge"
+                            :cover="item.cover"
+                            :show-play-button="false"
+                            :play-loading="playLoadingItemId === item.id"
+                            :is-playing="isItemPlaying(item)"
+                            @open="navigateToDetail(item.id)"
+                            @play="playItem(item)"
+                        />
+                    </template>
+                    <template v-else>
+                        <WorkGridCard
+                            v-for="item in filteredItems"
+                            :key="item.id"
+                            :title="item.title"
+                            :subtitle="item.subtitle"
+                            :details="item.details"
+                            :cover="item.cover"
+                            :stacked-images="item.stackedImages || []"
+                            :show-play-button="false"
+                            :play-loading="playLoadingItemId === item.id"
+                            :is-playing="isItemPlaying(item)"
+                            @open="navigateToDetail(item.id)"
+                            @play="playItem(item)"
+                        />
+                    </template>
                 </div>
 
                 <div v-else class="space-y-2">
@@ -526,12 +424,11 @@ const playItem = async (item: DisplayItem) => {
                 </div>
             </div>
 
-            <!-- Pagination Controls -->
             <div v-if="totalPageCount > 1" class="flex justify-center items-center mt-12 gap-6">
                 <button
-                    @click="handlePageChange(pageIndex - 1)"
                     :disabled="pageIndex === 0 || isLoading"
                     class="p-2 text-[#8C857B] hover:text-[#C27E46] disabled:opacity-30 disabled:hover:text-[#8C857B] transition-colors"
+                    @click="handlePageChange(pageIndex - 1)"
                 >
                     <ChevronLeft :size="20" />
                 </button>
@@ -539,9 +436,9 @@ const playItem = async (item: DisplayItem) => {
                     Page {{ pageIndex + 1 }} of {{ totalPageCount }}
                 </span>
                 <button
-                    @click="handlePageChange(pageIndex + 1)"
                     :disabled="pageIndex >= totalPageCount - 1 || isLoading"
                     class="p-2 text-[#8C857B] hover:text-[#C27E46] disabled:opacity-30 disabled:hover:text-[#8C857B] transition-colors"
+                    @click="handlePageChange(pageIndex + 1)"
                 >
                     <ChevronRight :size="20" />
                 </button>

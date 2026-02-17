@@ -19,7 +19,7 @@ const emit = defineEmits<{
     (e: 'item-double-click', item: T): void
     (e: 'item-keydown', event: KeyboardEvent, item: T): void
     (e: 'item-edit', item: T): void
-    (e: 'item-toggle-select', item: T, event: MouseEvent): void
+    (e: 'item-toggle-select', item: T, event?: MouseEvent): void
 }>()
 
 defineSlots<{
@@ -80,6 +80,15 @@ const isItemSelected = (itemId: number) => {
                     'cursor-pointer': true,
                 }"
             >
+                <input
+                    v-if="enableMultiSelect"
+                    type="checkbox"
+                    data-testid="recording-select-checkbox"
+                    class="sr-only"
+                    :checked="isItemSelected(item.id)"
+                    @change="emit('item-toggle-select', item)"
+                />
+
                 <div
                     v-if="enableMultiSelect && isItemSelected(item.id)"
                     class="absolute -top-1 left-3 z-20 w-5 drop-shadow-lg pointer-events-none"
