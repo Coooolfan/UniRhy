@@ -48,31 +48,63 @@ class RecordingService(
             where(table.recordingId valueIn recordingIdsNeedMerge)
         }.execute()
 
+        val params = mapOf("targetId" to input.targetId, "needMergeIds" to recordingIdsNeedMerge)
+
         jdbc.update(
             """
-                UPDATE public.album_recording_mapping 
-                SET recording_id = :targetId 
-                WHERE recording_id IN (:needMergeIds)
+                INSERT INTO public.album_recording_mapping (album_id, recording_id)
+                SELECT DISTINCT arm.album_id, :targetId
+                FROM public.album_recording_mapping arm
+                WHERE arm.recording_id IN (:needMergeIds)
+                ON CONFLICT (album_id, recording_id) DO NOTHING
                 """.trimIndent(),
-            mapOf("targetId" to input.targetId, "needMergeIds" to recordingIdsNeedMerge)
+            params
         )
 
         jdbc.update(
             """
-                UPDATE public.playlist_recording_mapping 
-                SET recording_id = :targetId 
+                DELETE FROM public.album_recording_mapping
                 WHERE recording_id IN (:needMergeIds)
                 """.trimIndent(),
-            mapOf("targetId" to input.targetId, "needMergeIds" to recordingIdsNeedMerge)
+            params
         )
-        
+
         jdbc.update(
             """
-                UPDATE public.recording_artist_mapping 
-                SET recording_id = :targetId 
+                INSERT INTO public.playlist_recording_mapping (playlist_id, recording_id)
+                SELECT DISTINCT prm.playlist_id, :targetId
+                FROM public.playlist_recording_mapping prm
+                WHERE prm.recording_id IN (:needMergeIds)
+                ON CONFLICT (playlist_id, recording_id) DO NOTHING
+                """.trimIndent(),
+            params
+        )
+
+        jdbc.update(
+            """
+                DELETE FROM public.playlist_recording_mapping
                 WHERE recording_id IN (:needMergeIds)
                 """.trimIndent(),
-            mapOf("targetId" to input.targetId, "needMergeIds" to recordingIdsNeedMerge)
+            params
+        )
+
+        jdbc.update(
+            """
+                INSERT INTO public.recording_artist_mapping (recording_id, artist_id)
+                SELECT DISTINCT :targetId, ram.artist_id
+                FROM public.recording_artist_mapping ram
+                WHERE ram.recording_id IN (:needMergeIds)
+                ON CONFLICT (recording_id, artist_id) DO NOTHING
+                """.trimIndent(),
+            params
+        )
+
+        jdbc.update(
+            """
+                DELETE FROM public.recording_artist_mapping
+                WHERE recording_id IN (:needMergeIds)
+                """.trimIndent(),
+            params
         )
 
         sql.createDelete(Recording::class) {
