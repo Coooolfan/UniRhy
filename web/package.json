@@ -5,12 +5,15 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "run-p type-check \"build-only {@}\" --",
+    "build": "run-s typecheck:app typecheck:node build-only",
     "preview": "vite preview",
     "test:unit": "vitest",
     "build-only": "vite build",
-    "type-check": "oxlint . --type-check -A all -A nursery --deny-warnings",
-    "typecheck": "oxlint . --type-check -A all -A nursery --deny-warnings",
+    "type-check": "run-s typecheck:app typecheck:node",
+    "typecheck": "run-s typecheck:app typecheck:test typecheck:node",
+    "typecheck:app": "vue-tsc -p tsconfig.app.json --noEmit",
+    "typecheck:test": "vue-tsc -p tsconfig.vitest.json --noEmit",
+    "typecheck:node": "tsc -p tsconfig.node.json --noEmit",
     "lint": "oxlint . --type-aware --deny-warnings",
     "lint:fix": "oxlint . --fix",
     "format": "oxfmt .",
@@ -46,7 +49,8 @@
     "uuid": "^13.0.0",
     "vite": "^8.0.0-beta.14",
     "vite-plugin-vue-devtools": "^8.0.6",
-    "vitest": "^4.0.18"
+    "vitest": "^4.0.18",
+    "vue-tsc": "^2.2.10"
   },
   "engines": {
     "node": "^24.0.0"

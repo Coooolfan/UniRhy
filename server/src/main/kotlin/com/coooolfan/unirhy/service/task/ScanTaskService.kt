@@ -71,6 +71,7 @@ class ScanTaskService(
                     title = tag?.getFirst(FieldKey.TITLE).orEmpty()
                     comment = tag?.getFirst(FieldKey.COMMENT).orEmpty()
                     cover = audioCover
+                    durationMs = audioTag.audioHeader.preciseTrackLength.toLong() * 1000
                     defaultInWork = false
                     artists().addBy {
                         name = tag?.getFirst(FieldKey.ARTIST).orEmpty()

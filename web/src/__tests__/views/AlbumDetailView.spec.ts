@@ -51,6 +51,7 @@ const buildAlbumResponse = () => ({
             label: 'Label A',
             title: 'Track One',
             comment: 'Track Comment',
+            durationMs: 240000,
             defaultInWork: false,
             assets: [],
             artists: [{ id: 101, name: 'Artist A', comment: '' }],

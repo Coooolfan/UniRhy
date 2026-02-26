@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Pause, Play } from 'lucide-vue-next'
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '@/ApiInstance'
 import { useAudioStore } from '@/stores/audio'
@@ -23,6 +23,10 @@ type AlbumCard = {
 
 const albums = ref<AlbumCard[]>([])
 const playLoadingAlbumId = ref<number | null>(null)
+const isLoadingAlbums = ref(false)
+const hasAlbumError = ref(false)
+
+const showAlbumEmptyNote = computed(() => !isLoadingAlbums.value && albums.value.length === 0)
 
 const resolveCover = (coverId?: number) => {
     if (coverId !== undefined) {
@@ -33,6 +37,10 @@ const resolveCover = (coverId?: number) => {
 
 const navigateToAlbum = (id: number) => {
     router.push({ name: 'album-detail', params: { id } })
+}
+
+const navigateToSettings = () => {
+    router.push({ name: 'settings' })
 }
 
 type Asset = {
@@ -109,6 +117,8 @@ const playAlbum = async (album: AlbumCard) => {
 }
 
 const fetchAlbums = async () => {
+    isLoadingAlbums.value = true
+    hasAlbumError.value = false
     try {
         const page = await api.albumController.listAlbums({
             pageIndex: 0,
@@ -121,7 +131,11 @@ const fetchAlbums = async () => {
             cover: resolveCover(album.cover?.id),
         }))
     } catch (error) {
+        albums.value = []
+        hasAlbumError.value = true
         console.error('Failed to fetch albums:', error)
+    } finally {
+        isLoadingAlbums.value = false
     }
 }
 
@@ -132,7 +146,31 @@ onMounted(() => {
 
 <template>
     <div class="mb-8">
+        <div v-if="showAlbumEmptyNote" class="px-2">
+            <div
+                class="max-w-md -rotate-1 bg-[#FBF6E8] shadow-[0_14px_28px_-14px_rgba(94,89,80,0.6)] border border-[#E5D8BD] relative overflow-hidden"
+            >
+                <div class="p-6 pt-8">
+                    <p class="text-base text-[#5E5950] font-serif mb-2">还没有专辑数据</p>
+                    <p class="text-sm leading-6 text-[#8A857D]">
+                        去系统设置配置存储节点后，即可导入音乐并在这里显示唱片。
+                    </p>
+                    <p v-if="hasAlbumError" class="text-xs text-[#A17855] mt-3">
+                        数据加载失败，请检查配置后重试。
+                    </p>
+                    <button
+                        type="button"
+                        class="mt-5 px-4 py-2 text-xs border border-[#C27E46] text-[#C27E46] hover:bg-[#C27E46] hover:text-white transition-colors rounded-sm"
+                        @click="navigateToSettings"
+                    >
+                        前往设置
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <div
+            v-else
             class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-8 px-2"
         >
             <div

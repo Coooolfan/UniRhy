@@ -78,6 +78,7 @@ CREATE TABLE public.recording
     title           TEXT,                                                         -- 录音特定标题（可选）
     comment         TEXT    NOT NULL DEFAULT '',                                  -- 备注
     cover_id        BIGINT  REFERENCES public.media_file (id) ON DELETE SET NULL, -- 录音封面
+    duration_ms     BIGINT  NOT NULL,                                             -- 录音时长（单位毫秒）
     default_in_work BOOLEAN NOT NULL DEFAULT FALSE                                -- 是否为作品的默认版本
 );
 

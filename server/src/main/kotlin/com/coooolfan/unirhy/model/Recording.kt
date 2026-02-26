@@ -23,6 +23,8 @@ interface Recording {
 
     val comment: String
 
+    val durationMs: Long
+
     val defaultInWork: Boolean
 
     @ManyToOne
