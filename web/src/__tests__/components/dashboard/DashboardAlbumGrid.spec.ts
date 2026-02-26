@@ -58,7 +58,7 @@ describe('DashboardAlbumGrid', () => {
         pushMock.mockReset()
     })
 
-    it('shows sticky-note empty state and navigates to settings when album list is empty', async () => {
+    it('shows centered empty state and navigates to settings when album list is empty', async () => {
         listAlbumsMock.mockResolvedValueOnce({
             rows: [],
             totalPageCount: 0,
@@ -68,7 +68,7 @@ describe('DashboardAlbumGrid', () => {
         const wrapper = mount(DashboardAlbumGrid)
         await flushView()
 
-        expect(wrapper.text()).toContain('还没有专辑数据')
+        expect(wrapper.text()).toContain('唱片架空空如也')
         expect(wrapper.text()).toContain('前往设置')
 
         const settingsButton = wrapper
@@ -82,13 +82,13 @@ describe('DashboardAlbumGrid', () => {
         expect(pushMock).toHaveBeenCalledWith({ name: 'settings' })
     })
 
-    it('shows sticky-note empty state when album request fails', async () => {
+    it('shows centered empty state when album request fails', async () => {
         listAlbumsMock.mockRejectedValueOnce(new Error('request failed'))
 
         const wrapper = mount(DashboardAlbumGrid)
         await flushView()
 
-        expect(wrapper.text()).toContain('还没有专辑数据')
+        expect(wrapper.text()).toContain('唱片架空空如也')
         expect(wrapper.text()).toContain('数据加载失败，请检查配置后重试。')
     })
 
@@ -100,7 +100,7 @@ describe('DashboardAlbumGrid', () => {
 
         expect(wrapper.text()).toContain('Album A')
         expect(wrapper.text()).toContain('Artist A')
-        expect(wrapper.text()).not.toContain('还没有专辑数据')
+        expect(wrapper.text()).not.toContain('唱片架空空如也')
         expect(listAlbumsMock).toHaveBeenCalledWith({ pageIndex: 0, pageSize: 10 })
     })
 })
