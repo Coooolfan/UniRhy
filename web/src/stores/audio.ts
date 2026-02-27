@@ -61,6 +61,8 @@ export const useAudioStore = defineStore('audio', () => {
             // New track
             currentTrack.value = track
             isPlaying.value = true
+            currentTime.value = 0
+            duration.value = 0
             error.value = null
         }
     }
@@ -80,6 +82,7 @@ export const useAudioStore = defineStore('audio', () => {
         currentTrack.value = null
         isPlayerHidden.value = false
         currentTime.value = 0
+        duration.value = 0
     }
 
     function hidePlayer() {

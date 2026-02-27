@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { nextTick, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { useAudioStore } from '@/stores/audio'
 import {
     ChevronUp,
@@ -133,6 +133,33 @@ const hidePlayer = () => {
 const showPlayer = () => {
     audioStore.showPlayer()
 }
+
+const togglePlayerVisibility = () => {
+    if (audioStore.isPlayerHidden) {
+        audioStore.showPlayer()
+    } else {
+        audioStore.hidePlayer()
+    }
+}
+
+const isCornerHovered = ref(false)
+
+const cornerTheme = {
+    primary: '#BC5D36',
+    sleeveBg: '#EFECE6',
+    textLight: '#8B8682',
+    border: '#E2DCD3',
+}
+
+const progressPercentage = computed(() => {
+    const duration = audioStore.duration
+    if (!Number.isFinite(duration) || duration <= 0) {
+        return 0
+    }
+
+    const percentage = (audioStore.currentTime / duration) * 100
+    return Math.min(100, Math.max(0, percentage))
+})
 </script>
 
 <template>
@@ -231,16 +258,11 @@ const showPlayer = () => {
                                 />
                                 <div
                                     class="absolute top-0 left-0 h-full bg-[#C17D46] rounded-full pointer-events-none"
-                                    :style="{
-                                        width: `${(audioStore.currentTime / (audioStore.duration || 1)) * 100}%`,
-                                    }"
+                                    :style="{ width: `${progressPercentage}%` }"
                                 ></div>
                                 <div
-                                    class="absolute top-1/2 -translate-y-1/2 w-2.5 h-2.5 bg-[#C17D46] rounded-full opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-sm"
-                                    :style="{
-                                        left: `${(audioStore.currentTime / (audioStore.duration || 1)) * 100}%`,
-                                        transform: 'translate(-50%, -50%)',
-                                    }"
+                                    class="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 w-2.5 h-2.5 bg-[#C17D46] rounded-full opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-sm"
+                                    :style="{ left: `${progressPercentage}%` }"
                                 ></div>
                             </div>
                             <span class="w-10">{{ formatTime(audioStore.duration) }}</span>
@@ -311,15 +333,106 @@ const showPlayer = () => {
             leave-from-class="translate-y-0 opacity-100"
             leave-to-class="translate-y-4 opacity-0"
         >
-            <button
+            <div
                 v-if="audioStore.isPlayerHidden"
-                @click="showPlayer"
-                class="fixed right-4 bottom-4 z-50 px-3 py-2 rounded-full bg-[#FDFBF7] border border-[#E6E1D8] text-[#8C857B] shadow-md hover:text-[#C17D46] hover:border-[#D8CEBE] transition-colors flex items-center gap-2"
-                aria-label="展开播放栏"
+                class="fixed bottom-0 right-0 translate-x-1/2 translate-y-1/2 z-50 flex items-center justify-center"
+                @mouseenter="isCornerHovered = true"
+                @mouseleave="isCornerHovered = false"
             >
-                <ChevronUp :size="16" />
-                <span class="text-xs font-medium tracking-wide">展开播放栏</span>
-            </button>
+                <button
+                    type="button"
+                    class="absolute rounded-full flex items-center justify-center transition-all duration-[600ms] ease-[cubic-bezier(0.34,1.56,0.64,1)] shadow-[-10px_-10px_30px_rgba(0,0,0,0.04)]"
+                    :style="{
+                        width: '320px',
+                        height: '320px',
+                        backgroundColor: cornerTheme.sleeveBg,
+                        border: `1px solid ${cornerTheme.border}`,
+                        transform: isCornerHovered
+                            ? 'scale(1) rotate(0deg)'
+                            : 'scale(0.6) rotate(-20deg)',
+                        opacity: isCornerHovered ? 1 : 0,
+                        pointerEvents: isCornerHovered ? 'auto' : 'none',
+                    }"
+                    aria-label="展开播放栏"
+                    @click="showPlayer"
+                >
+                    <svg viewBox="0 0 320 320" class="absolute inset-0 w-full h-full">
+                        <defs>
+                            <path id="player-corner-text-arc" d="M 24,160 A 136,136 0 0,1 160,24" />
+                        </defs>
+                        <text class="font-sans" letter-spacing="0.06em">
+                            <textPath
+                                href="#player-corner-text-arc"
+                                startOffset="50%"
+                                text-anchor="middle"
+                            >
+                                <tspan :fill="cornerTheme.primary" font-size="14" font-weight="600">
+                                    {{ audioStore.currentTrack.title }}
+                                </tspan>
+                                <tspan
+                                    :fill="cornerTheme.textLight"
+                                    font-size="12"
+                                    font-weight="400"
+                                >
+                                    • {{ audioStore.currentTrack.artist }}
+                                </tspan>
+                            </textPath>
+                        </text>
+                        <path
+                            d="M 24,160 A 136,136 0 0,1 160,24"
+                            fill="none"
+                            :stroke="cornerTheme.border"
+                            stroke-width="1"
+                            stroke-dasharray="3 6"
+                        />
+                    </svg>
+                </button>
+
+                <button
+                    type="button"
+                    class="absolute rounded-full transition-all duration-[500ms] ease-[cubic-bezier(0.34,1.56,0.64,1)] shadow-[-4px_-4px_15px_rgba(0,0,0,0.1)] flex items-center justify-center overflow-hidden cursor-pointer"
+                    :style="{
+                        width: isCornerHovered ? '230px' : '200px',
+                        height: isCornerHovered ? '230px' : '200px',
+                        background: `conic-gradient(from 0deg, transparent 0%, rgba(255,255,255,0.08) 15%, transparent 30%, transparent 50%, rgba(255,255,255,0.08) 65%, transparent 80%), repeating-radial-gradient(circle at 50% 50%, #1A1A1A 0%, #242424 1%, #1A1A1A 2%)`,
+                        backgroundColor: '#1A1A1A',
+                    }"
+                    aria-label="切换播放器展开状态"
+                    title="切换播放器展开状态"
+                    @click="togglePlayerVisibility"
+                >
+                    <div
+                        class="absolute inset-0 w-full h-full flex items-center justify-center"
+                        :class="audioStore.isPlaying ? 'animate-[spin_4s_linear_infinite]' : ''"
+                    >
+                        <div
+                            class="absolute inset-4 rounded-full border border-white/5 pointer-events-none"
+                        ></div>
+                        <div
+                            class="absolute inset-8 rounded-full border border-white/5 pointer-events-none"
+                        ></div>
+
+                        <div
+                            class="absolute w-[76px] h-[76px] rounded-full border-[3px] border-[#111] flex items-center justify-center shadow-inner relative overflow-hidden"
+                            :style="{ backgroundColor: cornerTheme.primary }"
+                        >
+                            <div
+                                class="absolute inset-1 rounded-full border border-white/30 border-dashed"
+                            ></div>
+                            <div
+                                class="absolute w-[12px] h-[12px] bg-[#EFECE6] rounded-full shadow-[inset_0_2px_4px_rgba(0,0,0,0.5)] z-10 flex items-center justify-center"
+                            >
+                                <div class="w-[4px] h-[4px] bg-[#111] rounded-full"></div>
+                            </div>
+                            <ChevronUp
+                                v-if="isCornerHovered"
+                                :size="20"
+                                class="text-white/80 z-0 absolute drop-shadow-md"
+                            />
+                        </div>
+                    </div>
+                </button>
+            </div>
         </Transition>
     </div>
 </template>
