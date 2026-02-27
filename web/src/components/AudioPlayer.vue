@@ -341,10 +341,10 @@ const progressPercentage = computed(() => {
             >
                 <button
                     type="button"
-                    class="absolute rounded-full flex items-center justify-center transition-all duration-[600ms] ease-[cubic-bezier(0.34,1.56,0.64,1)] shadow-[-10px_-10px_30px_rgba(0,0,0,0.04)]"
+                    class="absolute rounded-full flex items-center justify-center transition-all duration-600 ease-[cubic-bezier(0.34,1.56,0.64,1)] shadow-[-10px_-10px_30px_rgba(0,0,0,0.04)]"
                     :style="{
-                        width: '320px',
-                        height: '320px',
+                        width: '288px',
+                        height: '288px',
                         backgroundColor: cornerTheme.sleeveBg,
                         border: `1px solid ${cornerTheme.border}`,
                         transform: isCornerHovered
@@ -378,19 +378,12 @@ const progressPercentage = computed(() => {
                                 </tspan>
                             </textPath>
                         </text>
-                        <path
-                            d="M 24,160 A 136,136 0 0,1 160,24"
-                            fill="none"
-                            :stroke="cornerTheme.border"
-                            stroke-width="1"
-                            stroke-dasharray="3 6"
-                        />
                     </svg>
                 </button>
 
                 <button
                     type="button"
-                    class="absolute rounded-full transition-all duration-[500ms] ease-[cubic-bezier(0.34,1.56,0.64,1)] shadow-[-4px_-4px_15px_rgba(0,0,0,0.1)] flex items-center justify-center overflow-hidden cursor-pointer"
+                    class="absolute rounded-full transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] shadow-[-4px_-4px_15px_rgba(0,0,0,0.1)] flex items-center justify-center overflow-hidden cursor-pointer"
                     :style="{
                         width: isCornerHovered ? '230px' : '200px',
                         height: isCornerHovered ? '230px' : '200px',
@@ -403,7 +396,7 @@ const progressPercentage = computed(() => {
                 >
                     <div
                         class="absolute inset-0 w-full h-full flex items-center justify-center"
-                        :class="audioStore.isPlaying ? 'animate-[spin_4s_linear_infinite]' : ''"
+                        :class="audioStore.isPlaying ? 'animate-[spin_8s_linear_infinite]' : ''"
                     >
                         <div
                             class="absolute inset-4 rounded-full border border-white/5 pointer-events-none"
@@ -413,7 +406,7 @@ const progressPercentage = computed(() => {
                         ></div>
 
                         <div
-                            class="absolute w-[76px] h-[76px] rounded-full border-[3px] border-[#111] flex items-center justify-center shadow-inner relative overflow-hidden"
+                            class="absolute w-[76px] h-[76px] rounded-full border-[3px] border-[#111] flex items-center justify-center shadow-inner overflow-hidden"
                             :style="{ backgroundColor: cornerTheme.primary }"
                         >
                             <div
