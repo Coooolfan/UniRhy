@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ChevronRight, Music, Plus } from 'lucide-vue-next'
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRoute, useRouter } from 'vue-router'
 import { api, normalizeApiError } from '@/ApiInstance'
@@ -33,6 +33,19 @@ const isCreatingPlaylist = ref(false)
 const createPlaylistName = ref('')
 const createPlaylistComment = ref('')
 const createPlaylistError = ref('')
+
+const playlistSectionPaddingBottom = computed(() =>
+    audioStore.currentTrack && !audioStore.isPlayerHidden ? '8rem' : '2rem',
+)
+
+const playlistSectionTransitionStyle = computed(() => {
+    const isCollapsingWhilePlayerHiding = audioStore.currentTrack && audioStore.isPlayerHidden
+    return {
+        paddingBottom: playlistSectionPaddingBottom.value,
+        transitionDuration: isCollapsingWhilePlayerHiding ? '520ms' : '420ms',
+        transitionDelay: isCollapsingWhilePlayerHiding ? '160ms' : '0ms',
+    }
+})
 
 const isActive = (item: NavItem) => {
     if (!item.routeName) {
@@ -127,10 +140,8 @@ onMounted(() => {
         </nav>
 
         <div
-            :class="{
-                'pb-32': audioStore.currentTrack && !audioStore.isPlayerHidden,
-                'pb-8': !audioStore.currentTrack || audioStore.isPlayerHidden,
-            }"
+            class="transition-[padding-bottom] ease-[cubic-bezier(0.22,1,0.36,1)]"
+            :style="playlistSectionTransitionStyle"
         >
             <button
                 v-if="!isLoadingPlaylists && !playlistError && playlists.length === 0"

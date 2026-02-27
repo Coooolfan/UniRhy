@@ -151,6 +151,20 @@ const cornerTheme = {
     border: '#E2DCD3',
 }
 
+const isExpandedPlayerLeaving = ref(false)
+
+const onExpandedPlayerBeforeEnter = () => {
+    isExpandedPlayerLeaving.value = false
+}
+
+const onExpandedPlayerBeforeLeave = () => {
+    isExpandedPlayerLeaving.value = true
+}
+
+const onExpandedPlayerAfterLeave = () => {
+    isExpandedPlayerLeaving.value = false
+}
+
 const progressPercentage = computed(() => {
     const duration = audioStore.duration
     if (!Number.isFinite(duration) || duration <= 0) {
@@ -177,18 +191,28 @@ const progressPercentage = computed(() => {
         ></audio>
 
         <Transition
-            enter-active-class="transition-all duration-300 ease-out"
-            enter-from-class="translate-y-full translate-x-10 opacity-0"
-            enter-to-class="translate-y-0 translate-x-0 opacity-100"
-            leave-active-class="transition-all duration-300 ease-in"
-            leave-from-class="translate-y-0 translate-x-0 opacity-100"
-            leave-to-class="translate-y-full translate-x-10 opacity-0"
+            enter-active-class="transition-transform duration-320 ease-out"
+            enter-from-class="translate-y-full"
+            enter-to-class="translate-y-0"
+            leave-active-class="transition-transform duration-320 ease-in"
+            leave-from-class="translate-y-0"
+            leave-to-class="translate-y-full"
+            @before-enter="onExpandedPlayerBeforeEnter"
+            @before-leave="onExpandedPlayerBeforeLeave"
+            @after-leave="onExpandedPlayerAfterLeave"
         >
             <div
                 v-show="!audioStore.isPlayerHidden"
                 class="fixed bottom-0 left-0 right-0 z-50 bg-[#FDFBF7] border-t border-[#EFEBE4] shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] px-4 py-3 md:px-8"
             >
-                <div class="max-w-7xl mx-auto flex items-center justify-between gap-4">
+                <div
+                    class="max-w-7xl mx-auto flex items-center justify-between gap-4 transition-all duration-280 ease-in transform-gpu will-change-transform will-change-opacity"
+                    :class="
+                        isExpandedPlayerLeaving
+                            ? 'translate-x-8 translate-y-4 opacity-0'
+                            : 'translate-x-0 translate-y-0 opacity-100'
+                    "
+                >
                     <!-- Track Info -->
                     <div class="flex items-center gap-4 w-1/4 min-w-0">
                         <div
@@ -326,105 +350,115 @@ const progressPercentage = computed(() => {
         </Transition>
 
         <Transition
-            enter-active-class="transition-all duration-200 ease-out"
-            enter-from-class="translate-y-4 opacity-0"
-            enter-to-class="translate-y-0 opacity-100"
+            enter-active-class="transition-all duration-240 ease-out"
+            enter-from-class="translate-x-8 translate-y-8 scale-90 opacity-0"
+            enter-to-class="translate-x-0 translate-y-0 scale-100 opacity-100"
             leave-active-class="transition-all duration-200 ease-in"
-            leave-from-class="translate-y-0 opacity-100"
-            leave-to-class="translate-y-4 opacity-0"
+            leave-from-class="translate-x-0 translate-y-0 scale-100 opacity-100"
+            leave-to-class="translate-x-8 translate-y-8 scale-90 opacity-0"
         >
-            <div
-                v-if="audioStore.isPlayerHidden"
-                class="fixed bottom-0 right-0 translate-x-1/2 translate-y-1/2 z-50 flex items-center justify-center"
-                @mouseenter="isCornerHovered = true"
-                @mouseleave="isCornerHovered = false"
-            >
-                <button
-                    type="button"
-                    class="absolute rounded-full flex items-center justify-center transition-all duration-600 ease-[cubic-bezier(0.34,1.56,0.64,1)] shadow-[-10px_-10px_30px_rgba(0,0,0,0.04)]"
-                    :style="{
-                        width: '288px',
-                        height: '288px',
-                        backgroundColor: cornerTheme.sleeveBg,
-                        border: `1px solid ${cornerTheme.border}`,
-                        transform: isCornerHovered
-                            ? 'scale(1) rotate(0deg)'
-                            : 'scale(0.6) rotate(-20deg)',
-                        opacity: isCornerHovered ? 1 : 0,
-                        pointerEvents: isCornerHovered ? 'auto' : 'none',
-                    }"
-                    aria-label="展开播放栏"
-                    @click="showPlayer"
+            <div v-if="audioStore.isPlayerHidden" class="fixed bottom-0 right-0 z-50">
+                <div
+                    class="translate-x-1/2 translate-y-1/2 flex items-center justify-center"
+                    @mouseenter="isCornerHovered = true"
+                    @mouseleave="isCornerHovered = false"
                 >
-                    <svg viewBox="0 0 320 320" class="absolute inset-0 w-full h-full">
-                        <defs>
-                            <path id="player-corner-text-arc" d="M 24,160 A 136,136 0 0,1 160,24" />
-                        </defs>
-                        <text class="font-sans" letter-spacing="0.06em">
-                            <textPath
-                                href="#player-corner-text-arc"
-                                startOffset="50%"
-                                text-anchor="middle"
-                            >
-                                <tspan :fill="cornerTheme.primary" font-size="14" font-weight="600">
-                                    {{ audioStore.currentTrack.title }}
-                                </tspan>
-                                <tspan
-                                    :fill="cornerTheme.textLight"
-                                    font-size="12"
-                                    font-weight="400"
+                    <button
+                        type="button"
+                        class="absolute rounded-full flex items-center justify-center transition-all duration-600 ease-[cubic-bezier(0.34,1.56,0.64,1)] shadow-[-10px_-10px_30px_rgba(0,0,0,0.04)]"
+                        :style="{
+                            width: '288px',
+                            height: '288px',
+                            backgroundColor: cornerTheme.sleeveBg,
+                            border: `1px solid ${cornerTheme.border}`,
+                            transform: isCornerHovered
+                                ? 'scale(1) rotate(0deg)'
+                                : 'scale(0.6) rotate(-20deg)',
+                            opacity: isCornerHovered ? 1 : 0,
+                            pointerEvents: isCornerHovered ? 'auto' : 'none',
+                        }"
+                        aria-label="展开播放栏"
+                        @click="showPlayer"
+                    >
+                        <svg viewBox="0 0 320 320" class="absolute inset-0 w-full h-full">
+                            <defs>
+                                <path
+                                    id="player-corner-text-arc"
+                                    d="M 24,160 A 136,136 0 0,1 160,24"
+                                />
+                            </defs>
+                            <text class="font-sans" letter-spacing="0.06em">
+                                <textPath
+                                    href="#player-corner-text-arc"
+                                    startOffset="50%"
+                                    text-anchor="middle"
                                 >
-                                    • {{ audioStore.currentTrack.artist }}
-                                </tspan>
-                            </textPath>
-                        </text>
-                    </svg>
-                </button>
+                                    <tspan
+                                        :fill="cornerTheme.primary"
+                                        font-size="14"
+                                        font-weight="600"
+                                    >
+                                        {{ audioStore.currentTrack.title }}
+                                    </tspan>
+                                    <tspan
+                                        :fill="cornerTheme.textLight"
+                                        font-size="12"
+                                        font-weight="400"
+                                    >
+                                        • {{ audioStore.currentTrack.artist }}
+                                    </tspan>
+                                </textPath>
+                            </text>
+                        </svg>
+                    </button>
 
-                <button
-                    type="button"
-                    class="absolute rounded-full transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] shadow-[-4px_-4px_15px_rgba(0,0,0,0.1)] flex items-center justify-center overflow-hidden cursor-pointer"
-                    :style="{
-                        width: isCornerHovered ? '230px' : '200px',
-                        height: isCornerHovered ? '230px' : '200px',
-                        background: `conic-gradient(from 0deg, transparent 0%, rgba(255,255,255,0.08) 15%, transparent 30%, transparent 50%, rgba(255,255,255,0.08) 65%, transparent 80%), repeating-radial-gradient(circle at 50% 50%, #1A1A1A 0%, #242424 1%, #1A1A1A 2%)`,
-                        backgroundColor: '#1A1A1A',
-                    }"
-                    aria-label="切换播放器展开状态"
-                    title="切换播放器展开状态"
-                    @click="togglePlayerVisibility"
-                >
-                    <div
-                        class="absolute inset-0 w-full h-full flex items-center justify-center"
-                        :class="audioStore.isPlaying ? 'animate-[spin_8s_linear_infinite]' : ''"
+                    <button
+                        type="button"
+                        class="absolute rounded-full transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] shadow-[-4px_-4px_15px_rgba(0,0,0,0.1)] flex items-center justify-center overflow-hidden cursor-pointer"
+                        :style="{
+                            width: isCornerHovered ? '230px' : '200px',
+                            height: isCornerHovered ? '230px' : '200px',
+                            background: `conic-gradient(from 0deg, transparent 0%, rgba(255,255,255,0.08) 15%, transparent 30%, transparent 50%, rgba(255,255,255,0.08) 65%, transparent 80%), repeating-radial-gradient(circle at 50% 50%, #1A1A1A 0%, #242424 1%, #1A1A1A 2%)`,
+                            backgroundColor: '#1A1A1A',
+                        }"
+                        aria-label="切换播放器展开状态"
+                        title="切换播放器展开状态"
+                        @click="togglePlayerVisibility"
                     >
                         <div
-                            class="absolute inset-4 rounded-full border border-white/5 pointer-events-none"
-                        ></div>
-                        <div
-                            class="absolute inset-8 rounded-full border border-white/5 pointer-events-none"
-                        ></div>
-
-                        <div
-                            class="absolute w-[76px] h-[76px] rounded-full border-[3px] border-[#111] flex items-center justify-center shadow-inner overflow-hidden"
-                            :style="{ backgroundColor: cornerTheme.primary }"
+                            class="absolute inset-0 w-full h-full flex items-center justify-center"
+                            :class="
+                                audioStore.isPlaying ? 'animate-[spin_32s_linear_infinite]' : ''
+                            "
                         >
                             <div
-                                class="absolute inset-1 rounded-full border border-white/30 border-dashed"
+                                class="absolute inset-4 rounded-full border border-white/5 pointer-events-none"
                             ></div>
                             <div
-                                class="absolute w-[12px] h-[12px] bg-[#EFECE6] rounded-full shadow-[inset_0_2px_4px_rgba(0,0,0,0.5)] z-10 flex items-center justify-center"
+                                class="absolute inset-8 rounded-full border border-white/5 pointer-events-none"
+                            ></div>
+
+                            <div
+                                class="absolute w-[76px] h-[76px] rounded-full border-[3px] border-[#111] flex items-center justify-center shadow-inner overflow-hidden"
+                                :style="{ backgroundColor: cornerTheme.primary }"
                             >
-                                <div class="w-[4px] h-[4px] bg-[#111] rounded-full"></div>
+                                <div
+                                    class="absolute inset-1 rounded-full border border-white/30 border-dashed"
+                                ></div>
+                                <div
+                                    class="absolute w-[12px] h-[12px] bg-[#EFECE6] rounded-full shadow-[inset_0_2px_4px_rgba(0,0,0,0.5)] z-10 flex items-center justify-center"
+                                >
+                                    <div class="w-[4px] h-[4px] bg-[#111] rounded-full"></div>
+                                </div>
+                                <ChevronUp
+                                    v-if="isCornerHovered"
+                                    :size="20"
+                                    class="text-white/80 z-0 absolute drop-shadow-md"
+                                />
                             </div>
-                            <ChevronUp
-                                v-if="isCornerHovered"
-                                :size="20"
-                                class="text-white/80 z-0 absolute drop-shadow-md"
-                            />
                         </div>
-                    </div>
-                </button>
+                    </button>
+                </div>
             </div>
         </Transition>
     </div>
