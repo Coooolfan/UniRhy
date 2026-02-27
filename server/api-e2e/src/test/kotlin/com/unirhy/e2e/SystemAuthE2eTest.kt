@@ -157,6 +157,25 @@ class SystemAuthE2eTest {
         )
     }
 
+    @Test
+    @Order(4)
+    fun `uppercase API prefix should not bypass authentication`() {
+        val state = prepareState()
+
+        val lowercaseProtectedResponse = state.api.get("/api/system/config")
+        assertAuthenticationFailed(
+            lowercaseProtectedResponse,
+            "[case] lowercase protected endpoint should require login",
+        )
+
+        val uppercasePrefixResponse = state.api.get("/API/system/config")
+        E2eAssert.status(
+            uppercasePrefixResponse,
+            404,
+            "[case] uppercase API prefix should not resolve protected endpoint mapping",
+        )
+    }
+
     private fun prepareState(): E2eAdminSession {
         return newAdminSession(baseUrl())
     }
