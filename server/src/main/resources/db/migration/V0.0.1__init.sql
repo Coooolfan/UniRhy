@@ -93,10 +93,11 @@ CREATE UNIQUE INDEX recording_default_in_work_uniq
 -- 艺术家表：用于归一化存储作者/演奏者等信息
 CREATE TABLE public.artist
 (
-    id        BIGSERIAL PRIMARY KEY,
-    name      TEXT   NOT NULL,                                            -- 艺术家名称
-    comment   TEXT   NOT NULL DEFAULT '',                                 -- 简介/备注
-    avatar_id BIGINT REFERENCES public.media_file (id) ON DELETE SET NULL -- 艺术家头像
+    id           BIGSERIAL PRIMARY KEY,
+    display_name TEXT   NOT NULL,                                            -- 艺术家名称
+    alias        TEXT[] NOT NULL,                                            -- 艺术家别名
+    comment      TEXT   NOT NULL DEFAULT '',                                 -- 简介/备注
+    avatar_id    BIGINT REFERENCES public.media_file (id) ON DELETE SET NULL -- 艺术家头像
 );
 
 -- 作品与艺术家的关联表（多对多）

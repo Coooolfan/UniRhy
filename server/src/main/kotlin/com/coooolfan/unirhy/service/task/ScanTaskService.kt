@@ -74,7 +74,8 @@ class ScanTaskService(
                     durationMs = audioTag.audioHeader.preciseTrackLength.toLong() * 1000
                     defaultInWork = false
                     artists().addBy {
-                        name = tag?.getFirst(FieldKey.ARTIST).orEmpty()
+                        displayName = tag?.getFirst(FieldKey.ARTIST).orEmpty()
+                        alias = listOf(tag?.getFirst(FieldKey.ARTIST).orEmpty())
                         comment = "load from local file: $relativePath"
                         avatar = null
                     }

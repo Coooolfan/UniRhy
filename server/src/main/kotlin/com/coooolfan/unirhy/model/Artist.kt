@@ -1,11 +1,6 @@
 package com.coooolfan.unirhy.model
 
-import org.babyfish.jimmer.sql.Entity
-import org.babyfish.jimmer.sql.GeneratedValue
-import org.babyfish.jimmer.sql.GenerationType
-import org.babyfish.jimmer.sql.Id
-import org.babyfish.jimmer.sql.Key
-import org.babyfish.jimmer.sql.ManyToOne
+import org.babyfish.jimmer.sql.*
 
 @Entity
 interface Artist {
@@ -14,7 +9,9 @@ interface Artist {
     val id: Long
 
     @Key
-    val name: String
+    val displayName: String
+
+    val alias: List<String>
 
     val comment: String
 

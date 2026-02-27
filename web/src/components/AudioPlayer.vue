@@ -428,7 +428,7 @@ const progressPercentage = computed(() => {
                         <div
                             class="absolute inset-0 w-full h-full flex items-center justify-center"
                             :class="
-                                audioStore.isPlaying ? 'animate-[spin_32s_linear_infinite]' : ''
+                                audioStore.isPlaying ? 'animate-[spin_48s_linear_infinite]' : ''
                             "
                         >
                             <div
