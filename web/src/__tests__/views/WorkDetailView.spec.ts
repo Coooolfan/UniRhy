@@ -101,6 +101,25 @@ describe('WorkDetailView', () => {
         expect(playButton?.attributes('disabled')).toBeDefined()
     })
 
+    it('shows recording durations in list', async () => {
+        getWorkByIdMock.mockResolvedValueOnce(buildWorkResponse())
+
+        const wrapper = mount(WorkDetailView, {
+            global: {
+                stubs: {
+                    teleport: true,
+                    transition: false,
+                    DashboardTopBar: true,
+                },
+            },
+        })
+
+        await flushView()
+
+        expect(wrapper.text()).toContain('3:15')
+        expect(wrapper.text()).toContain('3:45')
+    })
+
     it('submits defaultInWork=true and keeps a single default recording in list', async () => {
         getWorkByIdMock.mockResolvedValueOnce(buildWorkResponse())
         updateRecordingMock.mockResolvedValueOnce()

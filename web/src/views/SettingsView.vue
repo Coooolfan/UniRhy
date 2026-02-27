@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { computed, onMounted } from 'vue'
 import DashboardTopBar from '@/components/dashboard/DashboardTopBar.vue'
 import StorageNodesSection from '@/components/settings/StorageNodesSection.vue'
 import SystemStatusSection from '@/components/settings/SystemStatusSection.vue'
@@ -30,6 +30,10 @@ const {
     saveCreate,
 } = useStorageSettings()
 
+const activeNode = computed(
+    () => storageNodes.value.find((node) => node.id === systemConfig.value.fsProviderId) ?? null,
+)
+
 onMounted(() => {
     loadData()
 })
@@ -52,6 +56,7 @@ onMounted(() => {
             <SystemStatusSection
                 :active-fs-label="activeFsLabel"
                 :system-config="systemConfig"
+                :active-node="activeNode"
                 :is-loading="isLoadingSystem"
                 :error="systemError"
             />

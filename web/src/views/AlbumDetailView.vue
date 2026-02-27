@@ -11,7 +11,12 @@ import RecordingEditModal, {
     type RecordingEditForm,
     type RecordingPreview,
 } from '@/components/recording/RecordingEditModal.vue'
-import { resolveAudio, resolveCover, type RecordingAsset } from '@/composables/recordingMedia'
+import {
+    formatDurationMs,
+    resolveAudio,
+    resolveCover,
+    type RecordingAsset,
+} from '@/composables/recordingMedia'
 import { useRecordingPlayback } from '@/composables/useRecordingPlayback'
 
 const route = useRoute()
@@ -51,6 +56,7 @@ type Recording = RecordingPreview & {
     type: string
     comment: string
     isDefault: boolean
+    durationMs: number
 }
 
 const albumData = ref<AlbumData>({
@@ -109,6 +115,7 @@ const fetchAlbum = async (id: number) => {
             audioSrc: resolveAudio((recording.assets || []) as readonly RecordingAsset[]),
             type: recording.kind,
             comment: recording.comment,
+            durationMs: recording.durationMs,
             rawArtists: recording.artists || [],
             assets: (recording.assets || []) as readonly RecordingAsset[],
             isDefault: recording.defaultInWork,
@@ -137,6 +144,17 @@ const openAddToPlaylistModal = (recording: Recording) => {
 
 const closeAddToPlaylistModal = () => {
     isAddToPlaylistModalOpen.value = false
+}
+
+const buildRecordingLabel = (recording: Recording) => {
+    const duration = formatDurationMs(recording.durationMs)
+    if (!recording.label) {
+        return duration
+    }
+    if (!duration) {
+        return recording.label
+    }
+    return `${recording.label} · ${duration}`
 }
 
 const openEditRecordingModal = (recording: Recording) => {
@@ -273,7 +291,7 @@ watch(
                 <template #item="{ item }">
                     <MediaListItem
                         :title="item.title"
-                        :label="item.label"
+                        :label="buildRecordingLabel(item)"
                         :show-add-button="true"
                         :show-edit-button="true"
                         :is-playing="

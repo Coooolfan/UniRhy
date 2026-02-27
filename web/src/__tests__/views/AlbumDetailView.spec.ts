@@ -89,6 +89,24 @@ describe('AlbumDetailView', () => {
         expect(playButton?.attributes('disabled')).toBeDefined()
     })
 
+    it('shows recording duration in list', async () => {
+        getAlbumMock.mockResolvedValueOnce(buildAlbumResponse())
+
+        const wrapper = mount(AlbumDetailView, {
+            global: {
+                stubs: {
+                    teleport: true,
+                    transition: false,
+                    DashboardTopBar: true,
+                },
+            },
+        })
+
+        await flushView()
+
+        expect(wrapper.text()).toContain('4:00')
+    })
+
     it('opens recording edit modal and submits recording update payload', async () => {
         getAlbumMock.mockResolvedValueOnce(buildAlbumResponse())
         updateRecordingMock.mockResolvedValueOnce()

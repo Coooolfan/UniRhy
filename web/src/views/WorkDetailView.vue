@@ -13,7 +13,12 @@ import RecordingEditModal, {
 } from '@/components/recording/RecordingEditModal.vue'
 import WorkDetailHero from '@/components/work/WorkDetailHero.vue'
 import WorkTitleEditModal from '@/components/work/WorkTitleEditModal.vue'
-import { resolveAudio, resolveCover, type RecordingAsset } from '@/composables/recordingMedia'
+import {
+    formatDurationMs,
+    resolveAudio,
+    resolveCover,
+    type RecordingAsset,
+} from '@/composables/recordingMedia'
 import { useRecordingMergeState } from '@/composables/useRecordingMergeState'
 import { useRecordingPlayback } from '@/composables/useRecordingPlayback'
 
@@ -56,6 +61,7 @@ type Recording = RecordingPreview & {
     cover: string
     isDefault: boolean
     audioSrc?: string
+    durationMs: number
 }
 
 const workData = ref<WorkData>({
@@ -93,6 +99,7 @@ const fetchWork = async (id: number) => {
                 cover: resolveCover(recording.cover?.id),
                 isDefault: recording.defaultInWork,
                 audioSrc: resolveAudio((recording.assets || []) as readonly RecordingAsset[]),
+                durationMs: recording.durationMs,
                 assets: (recording.assets || []) as readonly RecordingAsset[],
                 rawArtists: recording.artists || [],
             }))
@@ -353,6 +360,22 @@ const closeAddToPlaylistModal = () => {
     isAddToPlaylistModalOpen.value = false
 }
 
+const buildRecordingLabel = (recording: Recording) => {
+    const duration = formatDurationMs(recording.durationMs)
+    if (!recording.label) {
+        return duration
+    }
+    if (!duration) {
+        return recording.label
+    }
+    return `${recording.label} · ${duration}`
+}
+
+const buildRecordingSubtitle = (recording: Recording) => {
+    const parts = [recording.artist, recording.type].filter(Boolean)
+    return parts.join(' · ')
+}
+
 onMounted(() => {
     const id = Number(route.params.id)
     if (!Number.isNaN(id)) {
@@ -415,12 +438,12 @@ watch(
                 <template #item="{ item }">
                     <MediaListItem
                         :title="item.title"
-                        :label="item.label"
+                        :label="buildRecordingLabel(item)"
                         :cover="item.cover"
                         :show-add-button="true"
                         :show-edit-button="true"
                         :is-default="item.isDefault"
-                        :subtitle="`${item.artist}${item.type ? ' · ' + item.type : ''}`"
+                        :subtitle="buildRecordingSubtitle(item)"
                         :is-playing="
                             audioStore.isPlaying && audioStore.currentTrack?.id === item.id
                         "

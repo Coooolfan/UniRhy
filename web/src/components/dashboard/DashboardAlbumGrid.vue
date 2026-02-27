@@ -161,7 +161,7 @@ onMounted(() => {
                     唱片架空空如也
                 </h3>
                 <p class="text-sm text-[#8A847A] leading-relaxed mb-8">
-                    我们将旋律的集合，称之为唱片。<br />
+                    我们将旋律的有序集合，称之为唱片。<br />
                     连接存储节点，发起扫描任务，UniRhy 将自动发现唱片。
                 </p>
 
