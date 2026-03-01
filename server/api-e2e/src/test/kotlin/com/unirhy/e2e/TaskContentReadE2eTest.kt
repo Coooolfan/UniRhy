@@ -26,6 +26,7 @@ import java.net.http.HttpResponse
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
+import java.sql.DriverManager
 import java.util.UUID
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -63,6 +64,10 @@ class TaskContentReadE2eTest {
         assertAuthenticationFailed(
             api.get("/api/task/running"),
             "[auth] get running tasks should require login",
+        )
+        assertAuthenticationFailed(
+            api.get("/api/task/logs"),
+            "[auth] get task logs should require login",
         )
         assertAuthenticationFailed(
             api.post(
@@ -385,6 +390,7 @@ class TaskContentReadE2eTest {
         val timeoutMillis = scanWaitTimeoutMillis()
         val deadline = System.currentTimeMillis() + timeoutMillis
         var observedRunning = false
+        var validatedRunningLogQuery = false
         var validatedDuplicateConflict = false
         var finishedAfterRunning = false
         var fastCompletedBeforeObservation = false
@@ -401,6 +407,23 @@ class TaskContentReadE2eTest {
             if (containsScanTask(lastRunningBody)) {
                 observedRunning = true
                 emptyPollsBeforeObservation = 0
+                if (!validatedRunningLogQuery) {
+                    val runningLogsResponse = state.api.get(
+                        path = "/api/task/logs",
+                        query = mapOf(
+                            "pageIndex" to 0,
+                            "pageSize" to 50,
+                            "taskType" to "SCAN",
+                            "status" to "RUNNING",
+                        ),
+                    )
+                    E2eAssert.status(runningLogsResponse, 200, "[scan] list running task logs should succeed")
+                    assertTrue(
+                        containsScanTaskLog(runningLogsResponse.body(), expectedStatus = "RUNNING"),
+                        "[scan] running task logs should include SCAN in RUNNING status",
+                    )
+                    validatedRunningLogQuery = true
+                }
                 if (!validatedDuplicateConflict) {
                     val duplicateSubmitResponse = state.api.post(
                         path = "/api/task/scan",
@@ -456,6 +479,10 @@ class TaskContentReadE2eTest {
                 "[scan] running task endpoint never observed SCAN task before timeout ${timeoutMillis}ms, last=$lastRunningBody",
             )
             assertTrue(
+                validatedRunningLogQuery,
+                "[scan] task log endpoint never observed SCAN running logs before completion",
+            )
+            assertTrue(
                 validatedDuplicateConflict,
                 "[scan] duplicate submit conflict was not observed while SCAN task was running",
             )
@@ -471,6 +498,46 @@ class TaskContentReadE2eTest {
             containsScanTask(finalRunningResponse.body()),
             "[scan] no SCAN task should remain after lifecycle wait",
         )
+
+        val completedLogsResponse = state.api.get(
+            path = "/api/task/logs",
+            query = mapOf(
+                "pageIndex" to 0,
+                "pageSize" to 200,
+                "taskType" to "SCAN",
+                "status" to "COMPLETED",
+            ),
+        )
+        E2eAssert.status(completedLogsResponse, 200, "[scan] list completed task logs should succeed")
+        val completedRows = pageRows(completedLogsResponse.body(), "[scan] completed task logs response")
+        val completedRow = completedRows.firstOrNull { row ->
+            row.path("taskType").asText() == "SCAN" && row.path("status").asText() == "COMPLETED"
+        } ?: fail("[scan] completed task logs should contain at least one SCAN row")
+        assertTrue(completedRow.path("completedAt").isTextual, "[scan] completed task log should contain completedAt")
+        val completedReason = completedRow.path("completedReason").asText("")
+        assertTrue(
+            completedReason == "SUCCESS" || completedReason.startsWith("FAILED:"),
+            "[scan] completed task log reason should be SUCCESS or FAILED:* actual=$completedReason",
+        )
+
+        val abortedId = insertAbortedScanLog(state)
+        val abortedLogsResponse = state.api.get(
+            path = "/api/task/logs",
+            query = mapOf(
+                "pageIndex" to 0,
+                "pageSize" to 200,
+                "taskType" to "SCAN",
+                "status" to "ABORTED",
+            ),
+        )
+        E2eAssert.status(abortedLogsResponse, 200, "[scan] list aborted task logs should succeed")
+        val abortedRows = pageRows(abortedLogsResponse.body(), "[scan] aborted task logs response")
+        val abortedRow = abortedRows.firstOrNull { row ->
+            row.path("id").isIntegralNumber && row.path("id").longValue() == abortedId
+        } ?: fail("[scan] aborted task logs should contain inserted aborted row id=$abortedId")
+        assertEquals("ABORTED", abortedRow.path("status").asText(), "[scan] inserted aborted task log status should be ABORTED")
+        assertTrue(abortedRow.path("completedAt").isNull, "[scan] aborted task log should keep completedAt null")
+        assertTrue(abortedRow.path("completedReason").isNull, "[scan] aborted task log should keep completedReason null")
     }
 
     private fun pollIntervalMillis(pollCount: Int): Long {
@@ -569,7 +636,33 @@ class TaskContentReadE2eTest {
         if (!root.isArray) {
             return false
         }
-        return root.any { item -> item.path("type").asText() == "SCAN" }
+        return root.any { item -> item.path("taskType").asText() == "SCAN" }
+    }
+
+    private fun containsScanTaskLog(responseBody: String, expectedStatus: String): Boolean {
+        return pageRows(responseBody, "[scan] running task logs response").any { row ->
+            row.path("taskType").asText() == "SCAN" && row.path("status").asText() == expectedStatus
+        }
+    }
+
+    private fun insertAbortedScanLog(state: E2eAdminSession): Long {
+        val database = state.runtime.database
+        DriverManager.getConnection(database.jdbcUrl, database.user, database.password).use { connection ->
+            connection.prepareStatement(
+                """
+                INSERT INTO public.async_task_log (task_type, started_at, completed_at, params, completed_reason)
+                VALUES (?, now() - interval '10 minutes', NULL, ?, NULL)
+                RETURNING id
+                """.trimIndent(),
+            ).use { statement ->
+                statement.setString(1, "SCAN")
+                statement.setString(2, """{"providerType":"FILE_SYSTEM","providerId":-1}""")
+                statement.executeQuery().use { result ->
+                    assertTrue(result.next(), "[scan] aborted task log insert should return id")
+                    return result.getLong("id")
+                }
+            }
+        }
     }
 
     private fun pageRows(responseBody: String, step: String): List<JsonNode> {

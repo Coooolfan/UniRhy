@@ -700,7 +700,7 @@ class AccountPlaylistContentE2eTest {
         if (!root.isArray) {
             return false
         }
-        return root.any { item -> item.path("type").asText() == "SCAN" }
+        return root.any { item -> item.path("taskType").asText() == "SCAN" }
     }
 
     private fun prepareScanFixture(scanWorkspace: Path) {

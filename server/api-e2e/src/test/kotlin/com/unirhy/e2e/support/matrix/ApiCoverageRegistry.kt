@@ -190,6 +190,12 @@ object ApiCoverageRegistry {
             note = "auth: $TASK_CONTENT_AUTH_REQUIRED_CASE",
         ),
         full(
+            "GET",
+            "/api/task/logs",
+            testRef = TASK_SCAN_LIFECYCLE_CASE,
+            note = "auth: $TASK_CONTENT_AUTH_REQUIRED_CASE; status: supports RUNNING/COMPLETED/ABORTED filters",
+        ),
+        full(
             "POST",
             "/api/task/scan",
             testRef = TASK_SCAN_LIFECYCLE_CASE,

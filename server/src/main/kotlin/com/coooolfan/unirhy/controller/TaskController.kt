@@ -1,15 +1,21 @@
 package com.coooolfan.unirhy.controller
 
 import cn.dev33.satoken.annotation.SaCheckLogin
+import com.coooolfan.unirhy.model.AsyncTaskLog
+import com.coooolfan.unirhy.service.task.AsyncTaskLogPageRow
+import com.coooolfan.unirhy.service.task.AsyncTaskLogService
 import com.coooolfan.unirhy.service.task.common.AsyncTaskManager
-import com.coooolfan.unirhy.service.task.common.RunningTaskView
+import com.coooolfan.unirhy.service.task.common.AsyncTaskLogStatus
+import com.coooolfan.unirhy.service.task.common.TaskType
 import com.coooolfan.unirhy.service.task.ScanTaskRequest
 import com.coooolfan.unirhy.service.task.ScanTaskService
+import org.babyfish.jimmer.Page
 import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
 
@@ -24,6 +30,7 @@ import org.springframework.web.bind.annotation.RestController
 class TaskController(
     private val scanTaskService: ScanTaskService,
     private val asyncTaskManager: AsyncTaskManager,
+    private val asyncTaskLogService: AsyncTaskLogService,
 ) {
 
     /**
@@ -51,7 +58,28 @@ class TaskController(
      * @permission 需要登录认证
      */
     @GetMapping("/running")
-    fun listRunningTasks(): List<RunningTaskView> {
+    fun listRunningTasks(): List<AsyncTaskLog> {
         return asyncTaskManager.listRunning()
+    }
+
+    /**
+     * 分页查询任务日志
+     *
+     * @api GET /api/task/logs
+     * @permission 需要登录认证
+     */
+    @GetMapping("/logs")
+    fun listTaskLogs(
+        @RequestParam(required = false) pageIndex: Int?,
+        @RequestParam(required = false) pageSize: Int?,
+        @RequestParam(required = false) taskType: TaskType?,
+        @RequestParam(required = false) status: AsyncTaskLogStatus?,
+    ): Page<AsyncTaskLogPageRow> {
+        return asyncTaskLogService.listLogs(
+            pageIndex = pageIndex ?: 0,
+            pageSize = pageSize ?: 10,
+            taskType = taskType,
+            status = status,
+        )
     }
 }

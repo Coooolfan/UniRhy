@@ -212,4 +212,17 @@ CREATE TABLE public.system_config
     -- 程序内抽象为一个 defaultStorageProviderId
     CONSTRAINT ck_system_config_provider_xor
         CHECK ( (oss_provider_id IS NOT NULL) <> (fs_provider_id IS NOT NULL) )
-)
+);
+
+CREATE TABLE public.async_task_log
+(
+    id               BIGSERIAL PRIMARY KEY,
+    task_type        TEXT        NOT NULL, -- 任务类型 枚举 com.coooolfan.unirhy.service.task.common.TaskType
+    started_at       TIMESTAMPTZ NOT NULL, -- 任务开始时间
+    completed_at     TIMESTAMPTZ,          -- 任务完成时间，如果任务未完成则为 NULL
+    params           TEXT        NOT NULL, -- 任务参数 JSON 格式
+    completed_reason TEXT                  -- 任务完成原因，如果任务未完成则为 NULL
+);
+
+CREATE INDEX idx_async_task_log_task_type ON public.async_task_log (task_type);
+CREATE INDEX idx_async_task_log_started_at ON public.async_task_log (started_at DESC);

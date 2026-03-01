@@ -30,7 +30,7 @@ class ScanTaskService(
     private val logger = LoggerFactory.getLogger(ScanTaskService::class.java)
 
     fun submit(request: ScanTaskRequest) {
-        asyncTaskManager.submit(TaskType.SCAN) {
+        asyncTaskManager.submit(TaskType.SCAN, request) {
             executeInternal(request)
         }
     }
