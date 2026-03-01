@@ -1,8 +1,8 @@
 package com.coooolfan.unirhy.controller
 
 import cn.dev33.satoken.annotation.SaCheckLogin
-import com.coooolfan.unirhy.service.task.AsyncTaskManager
-import com.coooolfan.unirhy.service.task.RunningTaskView
+import com.coooolfan.unirhy.service.task.common.AsyncTaskManager
+import com.coooolfan.unirhy.service.task.common.RunningTaskView
 import com.coooolfan.unirhy.service.task.ScanTaskRequest
 import com.coooolfan.unirhy.service.task.ScanTaskService
 import org.springframework.http.HttpStatus

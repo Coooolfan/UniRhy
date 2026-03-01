@@ -1,4 +1,4 @@
-package com.coooolfan.unirhy.service.task
+package com.coooolfan.unirhy.service.task.common
 
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Qualifier
@@ -42,3 +42,8 @@ class AsyncTaskManager(
         return runningTasks.values.sortedBy { it.startedAt }
     }
 }
+
+data class RunningTaskView(
+    val type: TaskType,
+    val startedAt: Long,
+)
