@@ -123,12 +123,12 @@ describe('AlbumDetailView', () => {
 
         await flushView()
 
-        const editButton = wrapper.find('button[title="关于录音"]')
+        const editButton = wrapper.find('button[title="关于曲目"]')
         expect(editButton.exists()).toBe(true)
         await editButton.trigger('click')
         await nextTick()
 
-        const titleInput = wrapper.find('input[placeholder="Recording Title"]')
+        const titleInput = wrapper.find('input[placeholder="Track Title"]')
         expect(titleInput.exists()).toBe(true)
         await titleInput.setValue('Track One Updated')
 

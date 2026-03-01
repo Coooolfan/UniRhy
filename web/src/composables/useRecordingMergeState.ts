@@ -101,12 +101,12 @@ export const useRecordingMergeState = <T extends { id: number }>(
 
     const submitMerge = async () => {
         if (selectedOptions.value.length < 2) {
-            mergeModalError.value = '至少选择 2 条录音后才能合并。'
+            mergeModalError.value = '至少选择 2 条曲目后才能合并。'
             return
         }
 
         if (mergeTargetId.value === null) {
-            mergeModalError.value = '请选择一个目标录音。'
+            mergeModalError.value = '请选择一个目标曲目。'
             return
         }
 
@@ -115,7 +115,7 @@ export const useRecordingMergeState = <T extends { id: number }>(
             .filter((id) => id !== mergeTargetId.value)
 
         if (sourceIds.length === 0) {
-            mergeModalError.value = '请选择至少一条来源录音。'
+            mergeModalError.value = '请选择至少一条来源曲目。'
             return
         }
 
@@ -130,7 +130,7 @@ export const useRecordingMergeState = <T extends { id: number }>(
             resetState()
         } catch (error) {
             const message = options.parseError?.(error)
-            mergeModalError.value = message || options.fallbackErrorMessage || '合并录音失败'
+            mergeModalError.value = message || options.fallbackErrorMessage || '合并曲目失败'
         } finally {
             mergeSubmitting.value = false
         }

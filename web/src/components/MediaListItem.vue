@@ -80,7 +80,7 @@ const emit = defineEmits<{
         <button
             v-if="showEditButton"
             class="hover:text-[#C17D46] transition-colors cursor-pointer"
-            title="关于录音"
+            title="关于曲目"
             @click.stop="emit('edit')"
         >
             <Pencil :size="16" />

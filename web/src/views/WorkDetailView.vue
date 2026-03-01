@@ -91,7 +91,7 @@ const fetchWork = async (id: number) => {
         recordings.value = (data.recordings || [])
             .map((recording) => ({
                 id: recording.id,
-                title: recording.title || recording.comment || 'Untitled Recording',
+                title: recording.title || recording.comment || 'Untitled Track',
                 artist: recording.artists.map((artist) => artist.displayName).join(', '),
                 type: recording.kind,
                 label: recording.label || '',
@@ -181,8 +181,8 @@ const {
         })
         await fetchWork(workId)
     },
-    parseError: (error) => normalizeApiError(error).message ?? '合并录音失败',
-    fallbackErrorMessage: '合并录音失败',
+    parseError: (error) => normalizeApiError(error).message ?? '合并曲目失败',
+    fallbackErrorMessage: '合并曲目失败',
 })
 
 const openEditModal = () => {
@@ -345,7 +345,7 @@ const submitRecordingEdit = async () => {
         closeEditRecordingModal()
     } catch (error) {
         const normalized = normalizeApiError(error)
-        editRecordingError.value = normalized.message ?? '更新录音失败'
+        editRecordingError.value = normalized.message ?? '更新曲目失败'
     } finally {
         isEditingRecording.value = false
     }
@@ -415,7 +415,7 @@ watch(
             />
 
             <MediaListPanel
-                title="Recordings"
+                title="Tracks"
                 :items="recordings"
                 :playing-id="playingId"
                 enable-multi-select
@@ -486,12 +486,12 @@ watch(
 
         <MergeSelectModal
             :open="mergeModalOpen"
-            title="合并录音"
-            description="请选择保留的目标录音，其余已选录音将合并到该录音。"
+            title="合并曲目"
+            description="请选择保留的目标曲目，其余已选曲目将合并到该曲目。"
             :options="selectedRecordingOptions"
             :target-id="mergeTargetRecordingId"
             :error="mergeModalError"
-            :note="'来源录音的音频资源、专辑关联、歌单关联、艺人关联会并入目标录音，来源录音将被删除；Default 标记按后端结果保持原样。'"
+            :note="'来源曲目的音频资源、专辑关联、歌单关联、艺人关联会并入目标曲目，来源曲目将被删除；Default 标记按后端结果保持原样。'"
             :submitting="mergeSubmitting"
             :confirm-disabled="!canSubmitRecordingMerge"
             modal-test-id="recording-merge-modal"

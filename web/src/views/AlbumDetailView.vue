@@ -108,7 +108,7 @@ const fetchAlbum = async (id: number) => {
 
         recordings.value = (data.recordings || []).map((recording) => ({
             id: recording.id,
-            title: recording.title || recording.comment || 'Untitled Recording',
+            title: recording.title || recording.comment || 'Untitled Track',
             artist: recording.artists.map((artist) => artist.displayName).join(', ') || artistName,
             label: recording.label || '',
             cover: resolveCover(recording.cover?.id),
@@ -239,7 +239,7 @@ const submitRecordingEdit = async () => {
         closeEditRecordingModal()
     } catch (error) {
         const normalized = normalizeApiError(error)
-        editRecordingError.value = normalized.message ?? '更新录音失败'
+        editRecordingError.value = normalized.message ?? '更新曲目失败'
     } finally {
         isEditingRecording.value = false
     }
@@ -281,8 +281,8 @@ watch(
             />
 
             <MediaListPanel
-                title="Recordings"
-                :summary="`${recordings.length} Recordings`"
+                title="Tracks"
+                :summary="`${recordings.length} Tracks`"
                 :items="recordings"
                 :playing-id="playingId"
                 @item-double-click="onRecordingDoubleClick"

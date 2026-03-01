@@ -191,7 +191,7 @@ const performSearch = async (query: string) => {
                 type: 'work',
                 title: work.title || 'Untitled Work',
                 subtitle: mainRecording?.artists?.[0]?.displayName || 'Unknown Artist',
-                details: `${work.recordings?.length ?? 0} Recordings`,
+                details: `${work.recordings?.length ?? 0} Tracks`,
                 cover: resolveCover(mainRecording?.cover?.id),
                 stackedImages: work.recordings?.map((recording) => ({
                     id: recording.id,

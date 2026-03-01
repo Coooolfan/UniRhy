@@ -113,8 +113,8 @@ const submit = () => {
                         >
                             <Disc :size="24" class="text-[#C67C4E]" />
                         </div>
-                        <h3 class="font-serif text-2xl text-[#2B221B]">关于录音</h3>
-                        <p class="text-xs text-[#8A8A8A] mt-2 font-serif italic">About Recording</p>
+                        <h3 class="font-serif text-2xl text-[#2B221B]">关于曲目</h3>
+                        <p class="text-xs text-[#8A8A8A] mt-2 font-serif italic">About Track</p>
                     </div>
 
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -242,7 +242,7 @@ const submit = () => {
                                     type="text"
                                     maxlength="255"
                                     class="w-full bg-[#F7F5F0] border-b border-[#D6D1C4] p-3 text-[#3D3D3D] focus:outline-none focus:border-[#C67C4E] transition-colors font-serif placeholder:text-[#BDB9AE]"
-                                    placeholder="Recording Title"
+                                    placeholder="Track Title"
                                     :disabled="isSaving"
                                 />
                             </label>

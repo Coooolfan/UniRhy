@@ -136,7 +136,7 @@ describe('WorkDetailView', () => {
 
         await flushView()
 
-        const editButtons = wrapper.findAll('button[title="关于录音"]')
+        const editButtons = wrapper.findAll('button[title="关于曲目"]')
         expect(editButtons.length).toBeGreaterThan(1)
         const secondEditButton = editButtons[1]
         if (!secondEditButton) {
@@ -272,7 +272,7 @@ describe('WorkDetailView', () => {
 
     it('shows merge error and keeps selected recordings when merge fails', async () => {
         getWorkByIdMock.mockResolvedValue(buildWorkResponse())
-        mergeRecordingMock.mockRejectedValueOnce({ message: '合并录音失败（测试）' })
+        mergeRecordingMock.mockRejectedValueOnce({ message: '合并曲目失败（测试）' })
 
         const wrapper = mount(WorkDetailView, {
             global: {
@@ -305,7 +305,7 @@ describe('WorkDetailView', () => {
 
         expect(mergeRecordingMock).toHaveBeenCalledTimes(1)
         expect(getWorkByIdMock).toHaveBeenCalledTimes(1)
-        expect(wrapper.text()).toContain('合并录音失败（测试）')
+        expect(wrapper.text()).toContain('合并曲目失败（测试）')
         expect(wrapper.findAll('[data-testid="recording-select-checkbox"]:checked')).toHaveLength(2)
     })
 })

@@ -80,7 +80,7 @@ const fetchPlaylist = async (id: number) => {
 
         recordings.value = (data.recordings || []).map((recording) => ({
             id: recording.id,
-            title: recording.title || recording.comment || 'Untitled Recording',
+            title: recording.title || recording.comment || 'Untitled Track',
             artist:
                 recording.artists.map((artist) => artist.displayName).join(', ') ||
                 'Unknown Artist',
@@ -257,7 +257,7 @@ const confirmRemoveRecording = async () => {
         recordingPendingRemoval.value = null
     } catch (error) {
         const normalized = normalizeApiError(error)
-        removeRecordingError.value = normalized.message ?? '移除录音失败'
+        removeRecordingError.value = normalized.message ?? '移除曲目失败'
     } finally {
         isRemovingRecording.value = false
     }
@@ -355,15 +355,15 @@ watch(
             </div>
 
             <MediaListPanel
-                title="Recordings"
-                :summary="`${recordings.length} Recordings`"
+                title="Tracks"
+                :summary="`${recordings.length} Tracks`"
                 :items="recordings"
                 :playing-id="playingId"
                 @item-click="onRecordingClick"
                 @item-double-click="onRecordingDoubleClick"
                 @item-keydown="onRecordingKeydown"
             >
-                <template #empty> 前往 Work 或者 Album 详情页添加录音到您的歌单 </template>
+                <template #empty> 前往 Work 或者 Album 详情页添加曲目到您的歌单 </template>
 
                 <template #item="{ item }">
                     <MediaListItem

@@ -74,7 +74,7 @@ describe('RecordingEditModal', () => {
             },
         })
 
-        const titleInput = wrapper.find('input[placeholder="Recording Title"]')
+        const titleInput = wrapper.find('input[placeholder="Track Title"]')
         await titleInput.setValue('Updated Title')
 
         const events = wrapper.emitted('update:form')

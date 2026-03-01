@@ -96,7 +96,7 @@ const fetchWorks = async () => {
                 type: 'work',
                 title: work.title || 'Untitled Work',
                 subtitle: artistName,
-                details: `${work.recordings?.length ?? 0} Recordings`,
+                details: `${work.recordings?.length ?? 0} Tracks`,
                 cover: resolveCover(mainRecording?.cover?.id),
                 stackedImages: work.recordings?.map((recording) => ({
                     id: recording.id,

@@ -14,7 +14,7 @@ export class AlbumController {
     /**
      * 获取专辑详情
      * 
-     * 根据专辑 ID 获取完整专辑信息（包含曲目、资源、艺人和封面等）
+     * 根据专辑 ID 获取完整专辑信息（包含录音、资源、艺人和封面等）
      * 
      * @parameter {AlbumControllerOptions['getAlbum']} options
      * - id 专辑 ID

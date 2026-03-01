@@ -96,7 +96,7 @@ export class WorkController {
     /**
      * 合并作品
      * 
-     * 将多个作品合并为一个作品，将所有曲目合并到目标作品中，
+     * 将多个作品合并为一个作品，将所有录音合并到目标作品中，
      * 并删除其他作品。
      * 
      * @parameter {WorkControllerOptions['mergeWork']} options

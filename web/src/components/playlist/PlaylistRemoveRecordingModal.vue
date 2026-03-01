@@ -42,7 +42,7 @@ const emit = defineEmits<{
                         >
                             <Trash2 :size="22" class="text-[#B95D5D]" />
                         </div>
-                        <h3 class="font-serif text-2xl text-[#2B221B]">移除录音</h3>
+                        <h3 class="font-serif text-2xl text-[#2B221B]">移除曲目</h3>
                         <p class="text-sm text-[#8C857B] mt-3">
                             确认从当前歌单中移除「{{ recordingTitle }}」？
                         </p>
