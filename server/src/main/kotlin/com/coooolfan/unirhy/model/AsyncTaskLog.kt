@@ -1,10 +1,12 @@
 package com.coooolfan.unirhy.model
 
+import com.coooolfan.unirhy.config.jimmerResolver.AsyncTaskLogStatusResolver
 import com.coooolfan.unirhy.service.task.common.TaskType
 import org.babyfish.jimmer.sql.Entity
 import org.babyfish.jimmer.sql.GeneratedValue
 import org.babyfish.jimmer.sql.GenerationType
 import org.babyfish.jimmer.sql.Id
+import org.babyfish.jimmer.sql.Transient
 import java.time.Instant
 
 @Entity
@@ -22,4 +24,7 @@ interface AsyncTaskLog {
     val params: String
 
     val completedReason: String?
+
+    @Transient(AsyncTaskLogStatusResolver::class)
+    val running: Boolean
 }

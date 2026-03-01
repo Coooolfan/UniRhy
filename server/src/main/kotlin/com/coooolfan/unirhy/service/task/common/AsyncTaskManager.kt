@@ -1,12 +1,14 @@
 package com.coooolfan.unirhy.service.task.common
 
-import com.coooolfan.unirhy.model.*
+import com.coooolfan.unirhy.controller.TaskController.Companion.DEFAULT_ASYNC_TASK_LOG_FETCHER
+import com.coooolfan.unirhy.model.AsyncTaskLog
+import com.coooolfan.unirhy.model.completedAt
+import com.coooolfan.unirhy.model.completedReason
+import com.coooolfan.unirhy.model.id
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.babyfish.jimmer.sql.ast.mutation.SaveMode
 import org.babyfish.jimmer.sql.kt.KSqlClient
 import org.babyfish.jimmer.sql.kt.ast.expression.eq
-import org.babyfish.jimmer.sql.kt.ast.expression.valueIn
-import org.babyfish.jimmer.sql.kt.fetcher.newFetcher
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.http.HttpStatus
@@ -25,13 +27,11 @@ class AsyncTaskManager(
 ) {
 
     private val logger = LoggerFactory.getLogger(AsyncTaskManager::class.java)
-    private val runningTasks = ConcurrentHashMap<TaskType, RunningTaskState>()
+    private val runningTasks = ConcurrentHashMap<TaskType, Long>()
 
     fun submit(type: TaskType, params: Any, action: () -> Unit) {
         val startedAt = Instant.now()
-        val pendingRunning = RunningTaskState(logId = null)
-        val existing = runningTasks.putIfAbsent(type, pendingRunning)
-        if (existing != null) {
+        if (runningTasks.containsKey(type)) {
             throw ResponseStatusException(
                 HttpStatus.CONFLICT,
                 "Task already running: $type",
@@ -41,11 +41,10 @@ class AsyncTaskManager(
         val runningLog = try {
             createRunningLog(type, startedAt, params)
         } catch (ex: Throwable) {
-            runningTasks.remove(type, pendingRunning)
+            runningTasks.remove(type)
             throw ex
         }
-        val running = pendingRunning.copy(logId = runningLog.id)
-        runningTasks[type] = running
+        runningTasks[type] = runningLog.id
 
         try {
             executor.execute {
@@ -56,32 +55,18 @@ class AsyncTaskManager(
                     logger.error("Async task failed: {}", type, ex)
                     completeLog(runningLog.id, failureReason(ex))
                 } finally {
-                    runningTasks.remove(type, running)
+                    runningTasks.remove(type, runningLog.id)
                 }
             }
         } catch (ex: Throwable) {
-            runningTasks.remove(type, running)
+            runningTasks.remove(type, runningLog.id)
             completeLog(runningLog.id, failureReason(ex))
             throw ex
         }
     }
 
-    fun listRunning(): List<AsyncTaskLog> {
-        val runningLogIds = listRunningLogIds()
-        if (runningLogIds.isEmpty()) {
-            return emptyList()
-        }
-        return sql.createQuery(AsyncTaskLog::class) {
-            where(table.id valueIn runningLogIds)
-            orderBy(table.startedAt)
-            select(table)
-        }.execute()
-    }
-
     fun listRunningLogIds(): Set<Long> {
-        return runningTasks.values
-            .mapNotNull { it.logId }
-            .toSet()
+        return runningTasks.values.toSet()
     }
 
     private fun createRunningLog(type: TaskType, startedAt: Instant, params: Any): AsyncTaskLog {
@@ -93,7 +78,7 @@ class AsyncTaskManager(
                 this.params = paramsJson
             },
             SaveMode.INSERT_ONLY,
-        ).execute(ASYNC_TASK_LOG_FETCHER).modifiedEntity
+        ).execute(DEFAULT_ASYNC_TASK_LOG_FETCHER).modifiedEntity
     }
 
     private fun completeLog(logId: Long, reason: String) {
@@ -117,14 +102,4 @@ class AsyncTaskManager(
             "FAILED: $simpleName: $message"
         }
     }
-
-    companion object {
-        private val ASYNC_TASK_LOG_FETCHER = newFetcher(AsyncTaskLog::class).by {
-            allScalarFields()
-        }
-    }
 }
-
-private data class RunningTaskState(
-    val logId: Long?,
-)

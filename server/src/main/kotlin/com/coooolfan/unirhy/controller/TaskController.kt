@@ -2,22 +2,17 @@ package com.coooolfan.unirhy.controller
 
 import cn.dev33.satoken.annotation.SaCheckLogin
 import com.coooolfan.unirhy.model.AsyncTaskLog
-import com.coooolfan.unirhy.service.task.AsyncTaskLogPageRow
+import com.coooolfan.unirhy.model.by
 import com.coooolfan.unirhy.service.task.AsyncTaskLogService
-import com.coooolfan.unirhy.service.task.common.AsyncTaskManager
-import com.coooolfan.unirhy.service.task.common.AsyncTaskLogStatus
-import com.coooolfan.unirhy.service.task.common.TaskType
 import com.coooolfan.unirhy.service.task.ScanTaskRequest
 import com.coooolfan.unirhy.service.task.ScanTaskService
+import com.coooolfan.unirhy.service.task.common.AsyncTaskLogStatus
+import com.coooolfan.unirhy.service.task.common.TaskType
 import org.babyfish.jimmer.Page
+import org.babyfish.jimmer.client.FetchBy
+import org.babyfish.jimmer.sql.kt.fetcher.newFetcher
 import org.springframework.http.HttpStatus
-import org.springframework.web.bind.annotation.GetMapping
-import org.springframework.web.bind.annotation.PostMapping
-import org.springframework.web.bind.annotation.RequestBody
-import org.springframework.web.bind.annotation.RequestMapping
-import org.springframework.web.bind.annotation.RequestParam
-import org.springframework.web.bind.annotation.ResponseStatus
-import org.springframework.web.bind.annotation.RestController
+import org.springframework.web.bind.annotation.*
 
 /**
  * 任务管理接口
@@ -29,7 +24,6 @@ import org.springframework.web.bind.annotation.RestController
 @RequestMapping("/api/task")
 class TaskController(
     private val scanTaskService: ScanTaskService,
-    private val asyncTaskManager: AsyncTaskManager,
     private val asyncTaskLogService: AsyncTaskLogService,
 ) {
 
@@ -52,17 +46,6 @@ class TaskController(
     }
 
     /**
-     * 获取运行中的任务
-     *
-     * @api GET /api/task/running
-     * @permission 需要登录认证
-     */
-    @GetMapping("/running")
-    fun listRunningTasks(): List<AsyncTaskLog> {
-        return asyncTaskManager.listRunning()
-    }
-
-    /**
      * 分页查询任务日志
      *
      * @api GET /api/task/logs
@@ -74,12 +57,20 @@ class TaskController(
         @RequestParam(required = false) pageSize: Int?,
         @RequestParam(required = false) taskType: TaskType?,
         @RequestParam(required = false) status: AsyncTaskLogStatus?,
-    ): Page<AsyncTaskLogPageRow> {
+    ): Page<@FetchBy("DEFAULT_ASYNC_TASK_LOG_FETCHER") AsyncTaskLog> {
         return asyncTaskLogService.listLogs(
             pageIndex = pageIndex ?: 0,
             pageSize = pageSize ?: 10,
             taskType = taskType,
             status = status,
+            fetcher = DEFAULT_ASYNC_TASK_LOG_FETCHER,
         )
+    }
+
+    companion object {
+        val DEFAULT_ASYNC_TASK_LOG_FETCHER = newFetcher(AsyncTaskLog::class).by {
+            allScalarFields()
+            running()
+        }
     }
 }
