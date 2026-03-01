@@ -31,7 +31,6 @@ type SearchResultItem = {
     subtitle: string
     details: string
     cover: string
-    isEmoji?: boolean
     badge?: string
     stackedImages?: { id: number | string; cover?: string }[]
     playableTrack?: PlayableTrack
@@ -154,11 +153,6 @@ const submitMerge = async () => {
     }
 }
 
-const getRandomEmoji = () => {
-    const emojis = ['🎤', '🎹', '🎸', '🎻', '🎷', '🎺', '🎼', '🎧', '🎙️', '🥁']
-    return emojis[Math.floor(Math.random() * emojis.length)] ?? '🎤'
-}
-
 const performSearch = async (query: string) => {
     const keyword = query.trim()
     if (!keyword) {
@@ -212,8 +206,7 @@ const performSearch = async (query: string) => {
             title: artist.displayName || 'Unknown Artist',
             subtitle: artist.alias.length > 0 ? artist.alias.join(' / ') : '艺术家',
             details: artist.comment || '',
-            cover: getRandomEmoji(),
-            isEmoji: true,
+            cover: '',
         }))
     } catch (error) {
         console.error('Search failed:', error)
@@ -410,7 +403,70 @@ const playItem = async (item: SearchResultItem) => {
                             <div
                                 class="relative aspect-square mb-4 mx-auto w-32 h-32 md:w-40 md:h-40 rounded-full overflow-hidden shadow-md bg-[#EFEAE2] flex items-center justify-center text-6xl group-hover:scale-105 transition-transform duration-300"
                             >
-                                {{ item.cover }}
+                                <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    viewBox="0 0 400 400"
+                                    class="w-full h-full rounded-sm"
+                                >
+                                    <defs>
+                                        <path
+                                            :id="`vinyl-text-path-${item.id}`"
+                                            d="M 70, 200 A 130,130 0 1,1 330,200 A 130,130 0 1,1 70,200"
+                                        />
+                                    </defs>
+
+                                    <rect width="400" height="400" fill="#EAE7E0" />
+
+                                    <g stroke="#DFDCD6" stroke-width="1.2" fill="none">
+                                        <circle cx="200" cy="200" r="180" />
+                                        <circle cx="200" cy="200" r="155" />
+                                        <circle cx="200" cy="200" r="105" />
+                                        <circle cx="200" cy="200" r="80" />
+                                        <circle cx="200" cy="200" r="55" />
+                                    </g>
+
+                                    <g fill="#D1CECB">
+                                        <circle cx="200" cy="155" r="48" />
+                                        <path
+                                            d="M 80 400 C 80 280, 140 250, 200 250 C 260 250, 320 280, 320 400 Z"
+                                        />
+                                    </g>
+
+                                    <text
+                                        class="select-none pointer-events-none"
+                                        style="user-select: none"
+                                        font-family="ui-sans-serif, system-ui, -apple-system, sans-serif"
+                                        font-size="11"
+                                        font-weight="600"
+                                        fill="#A8A49C"
+                                        letter-spacing="6"
+                                    >
+                                        <textPath
+                                            :href="`#vinyl-text-path-${item.id}`"
+                                            startOffset="10"
+                                        >
+                                            UNKNOWN ARTIST • UNKNOWN ARTIST • UNKNOWN ARTIST •
+                                            UNKNOWN ARTIST • UNKNOWN ARTIST •
+                                        </textPath>
+                                    </text>
+
+                                    <path
+                                        d="M280 100 Q 280 115 295 115 Q 280 115 280 130 Q 280 115 265 115 Q 280 115 280 100 Z"
+                                        fill="#B56E46"
+                                    />
+                                    <circle cx="120" cy="280" r="3.5" fill="#B56E46" />
+
+                                    <rect
+                                        x="12"
+                                        y="12"
+                                        width="376"
+                                        height="376"
+                                        fill="none"
+                                        stroke="#DFDCD6"
+                                        stroke-width="1"
+                                        rx="2"
+                                    />
+                                </svg>
                             </div>
 
                             <h3
