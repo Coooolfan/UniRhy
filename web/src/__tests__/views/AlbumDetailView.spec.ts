@@ -54,7 +54,7 @@ const buildAlbumResponse = () => ({
             durationMs: 240000,
             defaultInWork: false,
             assets: [],
-            artists: [{ id: 101, name: 'Artist A', comment: '' }],
+            artists: [{ id: 101, displayName: 'Artist A', alias: [], comment: '' }],
             cover: undefined,
         },
     ],

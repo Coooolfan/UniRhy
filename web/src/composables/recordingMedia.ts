@@ -9,6 +9,8 @@ export type RecordingAsset = {
 }
 
 export type RecordingArtist = {
+    id?: number
+    displayName?: string
     name?: string
 }
 
@@ -28,7 +30,10 @@ export const resolveAudio = (assets: readonly RecordingAsset[]) => {
 }
 
 export const resolveArtistName = (artists?: ReadonlyArray<RecordingArtist>) => {
-    const names = artists?.map((artist) => artist.name).filter(Boolean) ?? []
+    const names =
+        artists
+            ?.map((artist) => artist.displayName || artist.name)
+            .filter((name): name is string => typeof name === 'string' && name.length > 0) ?? []
     if (names.length > 0) {
         return names.join(', ')
     }

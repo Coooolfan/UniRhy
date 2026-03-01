@@ -28,6 +28,8 @@ export type ApiErrors = {
     }, 
     'albumController': {
     }, 
+    'artistController': {
+    }, 
     'mediaFileController': {
     }, 
     'playlistController': {

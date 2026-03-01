@@ -95,7 +95,7 @@ const fetchAlbum = async (id: number) => {
         const releaseYear = data.releaseDate
             ? new Date(data.releaseDate).getFullYear().toString()
             : ''
-        const artistName = data.recordings?.[0]?.artists?.[0]?.name ?? 'Unknown Artist'
+        const artistName = data.recordings?.[0]?.artists?.[0]?.displayName ?? 'Unknown Artist'
 
         albumData.value = {
             title: data.title,
@@ -109,7 +109,7 @@ const fetchAlbum = async (id: number) => {
         recordings.value = (data.recordings || []).map((recording) => ({
             id: recording.id,
             title: recording.title || recording.comment || 'Untitled Recording',
-            artist: recording.artists.map((artist) => artist.name).join(', ') || artistName,
+            artist: recording.artists.map((artist) => artist.displayName).join(', ') || artistName,
             label: recording.label || '',
             cover: resolveCover(recording.cover?.id),
             audioSrc: resolveAudio((recording.assets || []) as readonly RecordingAsset[]),

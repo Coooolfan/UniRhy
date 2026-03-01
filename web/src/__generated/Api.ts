@@ -2,6 +2,7 @@ import type {Executor} from './';
 import {
     AccountController, 
     AlbumController, 
+    ArtistController, 
     FileSystemStorageController, 
     MediaFileController, 
     OssStorageController, 
@@ -18,6 +19,8 @@ export class Api {
     readonly accountController: AccountController
     
     readonly albumController: AlbumController
+    
+    readonly artistController: ArtistController
     
     readonly mediaFileController: MediaFileController
     
@@ -40,6 +43,7 @@ export class Api {
     constructor(executor: Executor) {
         this.accountController = new AccountController(executor);
         this.albumController = new AlbumController(executor);
+        this.artistController = new ArtistController(executor);
         this.mediaFileController = new MediaFileController(executor);
         this.playlistController = new PlaylistController(executor);
         this.recordingController = new RecordingController(executor);

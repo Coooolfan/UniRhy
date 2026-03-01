@@ -80,7 +80,7 @@ const fetchWork = async (id: number) => {
 
         const defaultRecording =
             data.recordings?.find((recording) => recording.defaultInWork) ?? data.recordings?.[0]
-        const artistName = defaultRecording?.artists?.[0]?.name ?? 'Unknown Artist'
+        const artistName = defaultRecording?.artists?.[0]?.displayName ?? 'Unknown Artist'
 
         workData.value = {
             title: data.title,
@@ -92,7 +92,7 @@ const fetchWork = async (id: number) => {
             .map((recording) => ({
                 id: recording.id,
                 title: recording.title || recording.comment || 'Untitled Recording',
-                artist: recording.artists.map((artist) => artist.name).join(', '),
+                artist: recording.artists.map((artist) => artist.displayName).join(', '),
                 type: recording.kind,
                 label: recording.label || '',
                 comment: recording.comment,

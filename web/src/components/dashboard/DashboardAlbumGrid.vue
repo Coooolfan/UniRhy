@@ -91,7 +91,7 @@ const playAlbum = async (album: AlbumCard) => {
             album.defaultRecordingId = targetTrack.id
             album.defaultTrackTitle = targetTrack.title || targetTrack.comment || detail.title
             album.defaultTrackArtist =
-                targetTrack.artists.map((artist) => artist.name).join(', ') || album.artist
+                targetTrack.artists.map((artist) => artist.displayName).join(', ') || album.artist
             album.defaultTrackCover = targetTrack.cover?.id
                 ? resolveCover(targetTrack.cover.id)
                 : album.cover

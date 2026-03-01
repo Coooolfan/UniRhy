@@ -14,7 +14,7 @@ export type RecordingAsset = {
 
 export type RecordingPreview = {
     cover: string
-    rawArtists: readonly { id: number; name: string }[]
+    rawArtists: readonly { id: number; displayName?: string; name?: string }[]
     assets: readonly RecordingAsset[]
 }
 
@@ -150,7 +150,10 @@ const submit = () => {
                                             <div class="text-[#2C2420] font-medium leading-snug">
                                                 {{
                                                     recording.rawArtists
-                                                        .map((artist) => artist.name)
+                                                        .map(
+                                                            (artist) =>
+                                                                artist.displayName || artist.name,
+                                                        )
                                                         .join(', ') || 'Unknown Artist'
                                                 }}
                                             </div>

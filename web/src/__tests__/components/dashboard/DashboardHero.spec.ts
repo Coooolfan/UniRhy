@@ -61,7 +61,7 @@ const buildPlayableWork = () => ({
                     },
                 },
             ],
-            artists: [{ id: 51, name: 'Artist A', comment: '' }],
+            artists: [{ id: 51, displayName: 'Artist A', alias: [], comment: '' }],
             cover: {
                 id: 61,
                 sha256: 'hash-cover',
@@ -98,7 +98,7 @@ const buildUnplayableWork = () => ({
                     },
                 },
             ],
-            artists: [{ id: 52, name: 'Artist B', comment: '' }],
+            artists: [{ id: 52, displayName: 'Artist B', alias: [], comment: '' }],
             cover: {
                 id: 62,
                 sha256: 'hash-cover-b',

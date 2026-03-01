@@ -89,7 +89,7 @@ const fetchWorks = async () => {
             const mainRecording =
                 work.recordings?.find((recording) => recording.defaultInWork) ??
                 work.recordings?.[0]
-            const artistName = mainRecording?.artists?.[0]?.name || 'Unknown Artist'
+            const artistName = mainRecording?.artists?.[0]?.displayName || 'Unknown Artist'
 
             return {
                 id: work.id,

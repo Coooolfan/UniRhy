@@ -1,5 +1,6 @@
 export {AccountController} from './AccountController';
 export {AlbumController} from './AlbumController';
+export {ArtistController} from './ArtistController';
 export {FileSystemStorageController} from './FileSystemStorageController';
 export {MediaFileController} from './MediaFileController';
 export {OssStorageController} from './OssStorageController';

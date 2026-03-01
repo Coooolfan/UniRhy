@@ -81,7 +81,9 @@ const fetchPlaylist = async (id: number) => {
         recordings.value = (data.recordings || []).map((recording) => ({
             id: recording.id,
             title: recording.title || recording.comment || 'Untitled Recording',
-            artist: recording.artists.map((artist) => artist.name).join(', ') || 'Unknown Artist',
+            artist:
+                recording.artists.map((artist) => artist.displayName).join(', ') ||
+                'Unknown Artist',
             label: recording.label || '',
             cover: resolveCover(recording.cover?.id),
             audioSrc: resolveAudio((recording.assets || []) as readonly RecordingAsset[]),

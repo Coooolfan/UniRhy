@@ -53,7 +53,7 @@ const buildWorkResponse = () => ({
             durationMs: 195000,
             defaultInWork: true,
             assets: [],
-            artists: [{ id: 1, name: 'Artist A', comment: '' }],
+            artists: [{ id: 1, displayName: 'Artist A', alias: [], comment: '' }],
             cover: undefined,
         },
         {
@@ -65,7 +65,7 @@ const buildWorkResponse = () => ({
             durationMs: 225000,
             defaultInWork: false,
             assets: [],
-            artists: [{ id: 2, name: 'Artist B', comment: '' }],
+            artists: [{ id: 2, displayName: 'Artist B', alias: [], comment: '' }],
             cover: undefined,
         },
     ],

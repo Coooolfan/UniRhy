@@ -154,10 +154,6 @@ const submitMerge = async () => {
     }
 }
 
-type Artist = {
-    name?: string
-}
-
 const getRandomEmoji = () => {
     const emojis = ['🎤', '🎹', '🎸', '🎻', '🎷', '🎺', '🎼', '🎧', '🎙️', '🥁']
     return emojis[Math.floor(Math.random() * emojis.length)] ?? '🎤'
@@ -175,12 +171,11 @@ const performSearch = async (query: string) => {
     isLoading.value = true
 
     try {
-        const [albumResults, workResults] = await Promise.all([
+        const [artistResults, albumResults, workResults] = await Promise.all([
+            api.artistController.getArtistByName({ name: keyword }),
             api.albumController.getAlbumByName({ name: keyword }),
             api.workController.getWorkByName({ name: keyword }),
         ])
-
-        const lowerKeyword = keyword.toLowerCase()
 
         albums.value = albumResults.map((album) => ({
             id: album.id,
@@ -201,7 +196,7 @@ const performSearch = async (query: string) => {
                 id: work.id,
                 type: 'work',
                 title: work.title || 'Untitled Work',
-                subtitle: mainRecording?.artists?.[0]?.name || 'Unknown Artist',
+                subtitle: mainRecording?.artists?.[0]?.displayName || 'Unknown Artist',
                 details: `${work.recordings?.length ?? 0} Recordings`,
                 cover: resolveCover(mainRecording?.cover?.id),
                 stackedImages: work.recordings?.map((recording) => ({
@@ -211,33 +206,15 @@ const performSearch = async (query: string) => {
             }
         })
 
-        const artistMap = new Map<string, SearchResultItem>()
-
-        const addArtist = (name: string) => {
-            if (!name || name === 'Unknown Artist' || artistMap.has(name)) {
-                return
-            }
-            if (!name.toLowerCase().includes(lowerKeyword)) {
-                return
-            }
-            artistMap.set(name, {
-                id: name,
-                type: 'artist',
-                title: name,
-                subtitle: 'Artist',
-                details: '',
-                cover: getRandomEmoji(),
-                isEmoji: true,
-            })
-        }
-
-        workResults.forEach((work) => {
-            work.recordings?.forEach((recording) => {
-                recording.artists?.forEach((artist: Artist) => addArtist(artist.name || ''))
-            })
-        })
-
-        artists.value = Array.from(artistMap.values())
+        artists.value = artistResults.map((artist) => ({
+            id: artist.id,
+            type: 'artist',
+            title: artist.displayName || 'Unknown Artist',
+            subtitle: artist.alias.length > 0 ? artist.alias.join(' / ') : '艺术家',
+            details: artist.comment || '',
+            cover: getRandomEmoji(),
+            isEmoji: true,
+        }))
     } catch (error) {
         console.error('Search failed:', error)
     } finally {

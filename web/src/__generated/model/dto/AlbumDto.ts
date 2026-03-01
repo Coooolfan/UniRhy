@@ -48,7 +48,8 @@ export type AlbumDto = {
             }>;
             readonly artists: ReadonlyArray<{
                 readonly id: number;
-                readonly name: string;
+                readonly displayName: string;
+                readonly alias: ReadonlyArray<string>;
                 readonly comment: string;
             }>;
             readonly cover?: {

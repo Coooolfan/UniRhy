@@ -19,6 +19,7 @@ type FeaturedStatus = 'loading' | 'ready' | 'empty'
 
 type WorkArtist = {
     id: number
+    displayName?: string
     name?: string
 }
 
@@ -28,7 +29,10 @@ const featuredStatus = ref<FeaturedStatus>('loading')
 const audioStore = useAudioStore()
 
 const resolveArtistName = (artists?: ReadonlyArray<WorkArtist>) => {
-    const names = artists?.map((artist) => artist.name).filter(Boolean) ?? []
+    const names =
+        artists
+            ?.map((artist) => artist.displayName || artist.name)
+            .filter((name): name is string => typeof name === 'string' && name.length > 0) ?? []
     if (names.length > 0) {
         return names.join(' / ')
     }
