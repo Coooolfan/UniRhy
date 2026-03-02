@@ -6,7 +6,7 @@ import DashboardSidebar from '@/components/dashboard/DashboardSidebar.vue'
 
 <template>
     <div
-        class="flex h-screen w-full bg-[#f2efe9] font-sans text-[#4A4A4A] overflow-hidden relative selection:bg-[#D4C5B0] selection:text-white"
+        class="flex h-screen w-full bg-dashboard-main font-sans text-[#4A4A4A] overflow-hidden relative selection:bg-[#D4C5B0] selection:text-white"
     >
         <!-- Noise Texture Overlay -->
         <NoiseTexture />

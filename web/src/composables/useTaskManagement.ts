@@ -1,6 +1,6 @@
 import { ref } from 'vue'
 import { api, normalizeApiError } from '@/ApiInstance'
-import type { RunningTaskView } from '@/__generated/model/static/RunningTaskView'
+import type { AsyncTaskLogDto } from '@/__generated/model/dto/AsyncTaskLogDto'
 import { type FileProviderType } from '@/__generated/model/enums/FileProviderType'
 
 export type TaskProviderOption = {
@@ -9,11 +9,21 @@ export type TaskProviderOption = {
     type: FileProviderType
 }
 
+type TaskLogItem = AsyncTaskLogDto['TaskController/DEFAULT_ASYNC_TASK_LOG_FETCHER']
+
+const RUNNING_TASK_PAGE_SIZE = 50
+const TASK_LOG_PAGE_SIZE = 5
+
 export const useTaskManagement = () => {
-    const runningTasks = ref<ReadonlyArray<RunningTaskView>>([])
+    const runningTasks = ref<ReadonlyArray<TaskLogItem>>([])
     const providerOptions = ref<TaskProviderOption[]>([])
+    const taskLogs = ref<ReadonlyArray<TaskLogItem>>([])
+    const taskLogPageIndex = ref(0)
+    const taskLogTotalPageCount = ref(0)
+    const taskLogTotalRowCount = ref(0)
 
     const isLoadingTasks = ref(false)
+    const isLoadingTaskLogs = ref(false)
     const isLoadingProviders = ref(false)
     const isSubmitting = ref(false)
 
@@ -25,12 +35,37 @@ export const useTaskManagement = () => {
         isLoadingTasks.value = true
         taskError.value = ''
         try {
-            runningTasks.value = await api.taskController.listRunningTasks()
+            const page = await api.taskController.listTaskLogs({
+                pageIndex: 0,
+                pageSize: RUNNING_TASK_PAGE_SIZE,
+                status: 'RUNNING',
+            })
+            runningTasks.value = page.rows
         } catch (error) {
             const normalized = normalizeApiError(error)
             taskError.value = normalized.message ?? '获取运行中任务失败'
         } finally {
             isLoadingTasks.value = false
+        }
+    }
+
+    const fetchTaskLogs = async (pageIndex = taskLogPageIndex.value) => {
+        isLoadingTaskLogs.value = true
+        taskError.value = ''
+        try {
+            const page = await api.taskController.listTaskLogs({
+                pageIndex,
+                pageSize: TASK_LOG_PAGE_SIZE,
+            })
+            taskLogs.value = page.rows
+            taskLogPageIndex.value = pageIndex
+            taskLogTotalPageCount.value = page.totalPageCount
+            taskLogTotalRowCount.value = page.totalRowCount
+        } catch (error) {
+            const normalized = normalizeApiError(error)
+            taskError.value = normalized.message ?? '获取任务日志失败'
+        } finally {
+            isLoadingTaskLogs.value = false
         }
     }
 
@@ -83,7 +118,7 @@ export const useTaskManagement = () => {
             submitSuccess.value = '扫描任务已提交'
             // Refresh running tasks after short delay
             setTimeout(() => {
-                fetchRunningTasks()
+                void Promise.all([fetchRunningTasks(), fetchTaskLogs(0)])
             }, 1000)
         } catch (error) {
             const normalized = normalizeApiError(error)
@@ -94,20 +129,26 @@ export const useTaskManagement = () => {
     }
 
     const init = () => {
-        fetchRunningTasks()
-        fetchProviders()
+        void Promise.all([fetchRunningTasks(), fetchProviders(), fetchTaskLogs(0)])
     }
 
     return {
         runningTasks,
         providerOptions,
+        taskLogs,
+        taskLogPageIndex,
+        taskLogTotalPageCount,
+        taskLogTotalRowCount,
+        taskLogPageSize: TASK_LOG_PAGE_SIZE,
         isLoadingTasks,
+        isLoadingTaskLogs,
         isLoadingProviders,
         isSubmitting,
         taskError,
         submitError,
         submitSuccess,
         fetchRunningTasks,
+        fetchTaskLogs,
         startScanTask,
         init,
     }

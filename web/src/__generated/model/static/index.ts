@@ -9,7 +9,6 @@ export type {PlaylistCreate} from './PlaylistCreate';
 export type {PlaylistUpdate} from './PlaylistUpdate';
 export type {RecordingMergeReq} from './RecordingMergeReq';
 export type {RecordingUpdate} from './RecordingUpdate';
-export type {RunningTaskView} from './RunningTaskView';
 export type {ScanTaskRequest} from './ScanTaskRequest';
 export type {SystemConfigUpdate} from './SystemConfigUpdate';
 export type {SystemInitReq} from './SystemInitReq';

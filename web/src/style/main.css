@@ -1,5 +1,9 @@
 @import 'tailwindcss';
 
+@theme {
+    --color-dashboard-main: #f2efe9;
+}
+
 input:-webkit-autofill,
 input:-webkit-autofill:hover,
 input:-webkit-autofill:focus,

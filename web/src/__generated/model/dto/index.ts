@@ -1,6 +1,7 @@
 export type {AccountDto} from './AccountDto';
 export type {AlbumDto} from './AlbumDto';
 export type {ArtistDto} from './ArtistDto';
+export type {AsyncTaskLogDto} from './AsyncTaskLogDto';
 export type {FileProviderFileSystemDto} from './FileProviderFileSystemDto';
 export type {FileProviderOssDto} from './FileProviderOssDto';
 export type {PlaylistDto} from './PlaylistDto';

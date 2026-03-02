@@ -176,12 +176,12 @@ onMounted(async () => {
                         <img
                             :src="album.cover"
                             alt="Album Cover"
-                            class="absolute inset-0 w-full h-full object-cover opacity-90 transition-transform duration-700 group-hover:scale-105"
+                            class="absolute inset-0 w-full h-full object-cover opacity-90"
                         />
 
                         <!-- Play Overlay -->
                         <div
-                            class="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                            class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-500 ease-out flex items-center justify-center"
                         >
                             <div
                                 class="w-14 h-14 bg-[#F5F2EB] rounded-full flex items-center justify-center shadow-lg transform translate-y-4 group-hover:translate-y-0 transition-all duration-300"

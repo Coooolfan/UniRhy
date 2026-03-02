@@ -41,7 +41,7 @@ onMounted(() => {
 
 <template>
     <div
-        class="min-h-screen bg-[#f2efe9] text-[#3D3D3D] font-sans selection:bg-[#C67C4E] selection:text-white pb-32"
+        class="min-h-screen text-[#3D3D3D] font-sans selection:bg-[#C67C4E] selection:text-white pb-32"
     >
         <DashboardTopBar />
 
