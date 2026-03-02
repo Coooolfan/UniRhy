@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import DashboardTopBar from '@/components/dashboard/DashboardTopBar.vue'
 import { useTaskManagement } from '@/composables/useTaskManagement'
 import type { AsyncTaskLogDto } from '@/__generated/model/dto/AsyncTaskLogDto'
@@ -40,7 +40,6 @@ const {
     isSubmitting,
     taskError,
     submitError,
-    submitSuccess,
     fetchRunningTasks,
     fetchTaskLogs,
     startScanTask,
@@ -48,6 +47,8 @@ const {
 } = useTaskManagement()
 
 const selectedProviderId = ref('')
+const isSubmitSuccessFlash = ref(false)
+let submitSuccessTimer: ReturnType<typeof setTimeout> | null = null
 
 const statusLabelMap: Record<TaskDisplayStatus, string> = {
     RUNNING: '运行中',
@@ -199,6 +200,13 @@ onMounted(() => {
     init()
 })
 
+onUnmounted(() => {
+    if (submitSuccessTimer) {
+        clearTimeout(submitSuccessTimer)
+        submitSuccessTimer = null
+    }
+})
+
 const handleScan = async () => {
     if (!selectedProviderId.value) {
         return
@@ -209,7 +217,19 @@ const handleScan = async () => {
     if (!provider) {
         return
     }
-    await startScanTask(provider.type, provider.id)
+    const submitOk = await startScanTask(provider.type, provider.id)
+    if (!submitOk) {
+        return
+    }
+
+    isSubmitSuccessFlash.value = true
+    if (submitSuccessTimer) {
+        clearTimeout(submitSuccessTimer)
+    }
+    submitSuccessTimer = setTimeout(() => {
+        isSubmitSuccessFlash.value = false
+        submitSuccessTimer = null
+    }, 2000)
 }
 
 const refreshAll = () => {
@@ -277,14 +297,6 @@ const goNextPage = () => {
                 <span>{{ taskError || submitError }}</span>
             </div>
 
-            <div
-                v-if="submitSuccess"
-                class="mb-6 p-4 bg-emerald-50 text-emerald-700 rounded border border-emerald-100 text-sm flex items-center"
-            >
-                <CheckCircle2 class="w-4 h-4 mr-2 shrink-0" />
-                <span>{{ submitSuccess }}</span>
-            </div>
-
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-10">
                 <div class="bg-white p-6 rounded shadow-sm border border-[#e5e2db] lg:col-span-1">
                     <h3 class="text-lg font-medium text-[#2c2c2c] mb-6">发起新任务</h3>
@@ -332,13 +344,27 @@ const goNextPage = () => {
                     </div>
 
                     <button
-                        class="w-full py-2.5 mt-2 border border-[#b86134] text-[#b86134] text-sm hover:bg-[#b86134] hover:text-white transition-all duration-300 flex items-center justify-center rounded-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-[#b86134]"
-                        :disabled="selectedProviderId === '' || isSubmitting || isLoadingProviders"
+                        class="w-full h-10 mt-2 border border-[#b86134] text-[#b86134] text-sm hover:bg-[#b86134] hover:text-white transition-colors duration-300 flex items-center justify-center rounded-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-[#b86134]"
+                        :disabled="
+                            selectedProviderId === '' ||
+                            isSubmitting ||
+                            isLoadingProviders ||
+                            isSubmitSuccessFlash
+                        "
                         @click="handleScan"
                     >
-                        <Loader2 v-if="isSubmitting" class="w-4 h-4 mr-2 animate-spin" />
-                        <Play v-else class="w-4 h-4 mr-2" />
-                        开始扫描
+                        <template v-if="isSubmitting">
+                            <Loader2 class="w-4 h-4 mr-2 animate-spin" />
+                            提交中...
+                        </template>
+                        <template v-else-if="isSubmitSuccessFlash">
+                            <CheckCircle2 class="w-4 h-4 mr-2" />
+                            任务已提交
+                        </template>
+                        <template v-else>
+                            <Play class="w-4 h-4 mr-2" />
+                            开始扫描
+                        </template>
                     </button>
                 </div>
 

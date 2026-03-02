@@ -120,9 +120,11 @@ export const useTaskManagement = () => {
             setTimeout(() => {
                 void Promise.all([fetchRunningTasks(), fetchTaskLogs(0)])
             }, 1000)
+            return true
         } catch (error) {
             const normalized = normalizeApiError(error)
             submitError.value = normalized.message ?? '提交任务失败'
+            return false
         } finally {
             isSubmitting.value = false
         }
