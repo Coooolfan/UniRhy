@@ -31,7 +31,8 @@ class AsyncTaskManager(
 
     fun submit(type: TaskType, params: Any, action: () -> Unit) {
         val startedAt = Instant.now()
-        if (runningTasks.containsKey(type)) {
+
+        if (runningTasks.putIfAbsent(type, -1L) != null) {
             throw ResponseStatusException(
                 HttpStatus.CONFLICT,
                 "Task already running: $type",
@@ -55,18 +56,18 @@ class AsyncTaskManager(
                     logger.error("Async task failed: {}", type, ex)
                     completeLog(runningLog.id, failureReason(ex))
                 } finally {
-                    runningTasks.remove(type, runningLog.id)
+                    runningTasks.remove(type)
                 }
             }
         } catch (ex: Throwable) {
-            runningTasks.remove(type, runningLog.id)
+            runningTasks.remove(type)
             completeLog(runningLog.id, failureReason(ex))
             throw ex
         }
     }
 
     fun listRunningLogIds(): Set<Long> {
-        return runningTasks.values.toSet()
+        return runningTasks.values.filter { it > 0 }.toSet()
     }
 
     private fun createRunningLog(type: TaskType, startedAt: Instant, params: Any): AsyncTaskLog {
