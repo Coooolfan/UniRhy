@@ -12,6 +12,7 @@ jAudioTagger = "3.0.1"
 
 # Spring Boot
 spring-boot-starter-webmvc = { module = "org.springframework.boot:spring-boot-starter-webmvc" }
+spring-boot-starter-websocket = { module = "org.springframework.boot:spring-boot-starter-websocket" }
 spring-boot-jackson2 = { module = "org.springframework.boot:spring-boot-jackson2" }
 spring-security-crypto = { module = "org.springframework.security:spring-security-crypto" }
 

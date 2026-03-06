@@ -6,6 +6,7 @@
 
 - 通道：`/ws/playback-sync`
 - 鉴权：复用 Sa-Token 登录态（cookie）
+- 握手阶段若缺少有效登录态，WebSocket 升级直接失败并返回 `401`；此时不会发送 `ERROR` 消息。
 - 线形态：所有 WebSocket 消息统一为
 
 ```json
@@ -68,6 +69,14 @@
 
 - `deviceId: String`
 - `clientVersion: String?`
+
+约束：
+
+- `deviceId` 必须为非空白字符串。
+- 连接建立后的首条业务消息必须是 `HELLO`。
+- 同一连接只允许发送一次 `HELLO`。
+- 同一 `accountId` 下，若新连接使用了已在线的 `deviceId`，服务端以新连接为准并关闭旧连接。
+- 阶段 1 中，除 `HELLO` 外的其他 C2S 消息暂不执行业务语义，服务端返回 `ERROR { code=UNSUPPORTED_MESSAGE }`。
 
 ### `NTP_REQUEST`
 
@@ -322,6 +331,11 @@
 
 - `devices: PlaybackSyncDevice[]`
 - `PlaybackSyncDevice.deviceId: String`
+
+说明：
+
+- `devices` 仅包含已完成 `HELLO` 注册的在线设备。
+- 当前阶段在以下时机广播：`HELLO` 成功后、已注册设备断开后、以及重复 `deviceId` 被新连接替换后。
 
 ### `ERROR`
 

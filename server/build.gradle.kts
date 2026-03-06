@@ -29,6 +29,7 @@ dependencies {
   implementation(libs.spring.boot.starter.webmvc) {
     exclude(group = "org.springframework.boot", module = "spring-boot-jackson")
   }
+  implementation(libs.spring.boot.starter.websocket)
   implementation(libs.spring.boot.jackson2)
   implementation(libs.spring.boot.starter.flyway)
 

@@ -7,6 +7,7 @@
 | 依赖库 | 版本 | 开源协议 | 描述 |
 |--------|------|----------|------|
 | Spring Boot Starter WebMvc | 4.0.1 | Apache-2.0 | Spring MVC Web 框架 |
+| Spring Boot Starter WebSocket | 4.0.1 | Apache-2.0 | 原生 WebSocket 接入与握手支持 |
 | Spring Boot Jackson2 | 4.0.1 | Apache-2.0 | JSON 序列化支持 |
 | Spring Boot Starter Flyway | 4.0.1 | Apache-2.0 | 数据库迁移工具集成 |
 | Spring Security Crypto | - | Apache-2.0 | 加密工具库 |
