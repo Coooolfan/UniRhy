@@ -29,7 +29,6 @@ export const useTaskManagement = () => {
 
     const taskError = ref('')
     const submitError = ref('')
-    const submitSuccess = ref('')
 
     const fetchRunningTasks = async () => {
         isLoadingTasks.value = true
@@ -107,7 +106,6 @@ export const useTaskManagement = () => {
     const startScanTask = async (providerType: FileProviderType, providerId: number) => {
         isSubmitting.value = true
         submitError.value = ''
-        submitSuccess.value = ''
         try {
             await api.taskController.executeScanTask({
                 body: {
@@ -115,7 +113,6 @@ export const useTaskManagement = () => {
                     providerId,
                 },
             })
-            submitSuccess.value = '扫描任务已提交'
             // Refresh running tasks after short delay
             setTimeout(() => {
                 void Promise.all([fetchRunningTasks(), fetchTaskLogs(0)])
@@ -148,7 +145,6 @@ export const useTaskManagement = () => {
         isSubmitting,
         taskError,
         submitError,
-        submitSuccess,
         fetchRunningTasks,
         fetchTaskLogs,
         startScanTask,

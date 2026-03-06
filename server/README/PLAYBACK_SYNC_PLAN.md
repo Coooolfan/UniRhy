@@ -1,6 +1,6 @@
 # UniRhy 同账号多设备听感同步方案
 
-参考 <https://github.com/freeman-jiang/beatsync>
+参考 <https://github.com/freeman-jiang/beatsync> or /Users/yang/Documents/code/beatsync
 
 ## 1. 目标与边界
 
@@ -344,35 +344,33 @@ data class DeviceRuntimeState(
 
 ---
 
-## 12. 交付计划（单人估算）
+## 12. 交付计划
 
-### 阶段 0（0.5 周）
+### 阶段 0
 
 - 协议冻结与日志字段定义
 
-### 阶段 0.5（0.5 周）
+### 阶段 0.5
 
 - 前端音频引擎迁移：HTMLAudioElement → AudioContext + AudioBuffer
 - 改动 `audio.ts` + `AudioPlayer.vue`，上层视图零改动
 - 验收：现有单设备播放功能不受影响
 
-### 阶段 1（1 周）
+### 阶段 1
 
 - WS 鉴权、连接注册、会话状态骨架
 
-### 阶段 2（1~1.5 周）
+### 阶段 2
 
 - NTP 校时链路、动态调度窗口、SCHEDULED_ACTION 执行
 
-### 阶段 3（1 周）
+### 阶段 3
 
 - 前端播放器接入、双设备联调
 
-### 阶段 4（0.5~1 周）
+### 阶段 4
 
 - 稳定性测试、弱网测试、指标采集
-
-总计：**4.5~5.5 周**
 
 ---
 

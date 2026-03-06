@@ -19,12 +19,15 @@ import {
 
 type TaskLogRecord = AsyncTaskLogDto['TaskController/DEFAULT_ASYNC_TASK_LOG_FETCHER']
 type TaskDisplayStatus = 'RUNNING' | 'SUCCESS' | 'FAILED'
+type SubmitFeedbackStatus = 'idle' | 'success' | 'error'
 
 type TaskLogRow = TaskLogRecord & {
     taskName: string
     paramsText: string
     status: TaskDisplayStatus
 }
+
+const SUBMIT_FEEDBACK_DURATION_MS = 4000
 
 const {
     runningTasks,
@@ -47,8 +50,8 @@ const {
 } = useTaskManagement()
 
 const selectedProviderId = ref('')
-const isSubmitSuccessFlash = ref(false)
-let submitSuccessTimer: ReturnType<typeof setTimeout> | null = null
+const submitFeedbackStatus = ref<SubmitFeedbackStatus>('idle')
+let submitFeedbackTimer: ReturnType<typeof setTimeout> | null = null
 
 const statusLabelMap: Record<TaskDisplayStatus, string> = {
     RUNNING: '运行中',
@@ -185,6 +188,29 @@ const canGoNext = computed(
     () => taskLogPageIndex.value < taskLogTotalPageCount.value - 1 && !isLoadingTaskLogs.value,
 )
 
+const hasSubmitFeedback = computed(() => submitFeedbackStatus.value !== 'idle')
+
+const submitButtonClass = computed(() => {
+    if (submitFeedbackStatus.value === 'success') {
+        return 'border-emerald-600 text-emerald-600 bg-emerald-50 disabled:opacity-100'
+    }
+    if (submitFeedbackStatus.value === 'error') {
+        return 'border-rose-500 text-rose-600 bg-rose-50 disabled:opacity-100'
+    }
+    return 'border-[#b86134] text-[#b86134] hover:bg-[#b86134] hover:text-white disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-[#b86134]'
+})
+
+const showSubmitFeedback = (status: Exclude<SubmitFeedbackStatus, 'idle'>) => {
+    if (submitFeedbackTimer) {
+        clearTimeout(submitFeedbackTimer)
+    }
+    submitFeedbackStatus.value = status
+    submitFeedbackTimer = setTimeout(() => {
+        submitFeedbackStatus.value = 'idle'
+        submitFeedbackTimer = null
+    }, SUBMIT_FEEDBACK_DURATION_MS)
+}
+
 watch(
     providerOptions,
     (options) => {
@@ -201,9 +227,9 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
-    if (submitSuccessTimer) {
-        clearTimeout(submitSuccessTimer)
-        submitSuccessTimer = null
+    if (submitFeedbackTimer) {
+        clearTimeout(submitFeedbackTimer)
+        submitFeedbackTimer = null
     }
 })
 
@@ -218,18 +244,11 @@ const handleScan = async () => {
         return
     }
     const submitOk = await startScanTask(provider.type, provider.id)
-    if (!submitOk) {
+    if (submitOk) {
+        showSubmitFeedback('success')
         return
     }
-
-    isSubmitSuccessFlash.value = true
-    if (submitSuccessTimer) {
-        clearTimeout(submitSuccessTimer)
-    }
-    submitSuccessTimer = setTimeout(() => {
-        isSubmitSuccessFlash.value = false
-        submitSuccessTimer = null
-    }, 2000)
+    showSubmitFeedback('error')
 }
 
 const refreshAll = () => {
@@ -290,11 +309,11 @@ const goNextPage = () => {
             </div>
 
             <div
-                v-if="taskError || submitError"
+                v-if="taskError"
                 class="mb-6 p-4 bg-rose-50 text-rose-600 rounded border border-rose-100 text-sm flex items-center"
             >
                 <AlertCircle class="w-4 h-4 mr-2 shrink-0" />
-                <span>{{ taskError || submitError }}</span>
+                <span>{{ taskError }}</span>
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-10">
@@ -344,12 +363,13 @@ const goNextPage = () => {
                     </div>
 
                     <button
-                        class="w-full h-10 mt-2 border border-[#b86134] text-[#b86134] text-sm hover:bg-[#b86134] hover:text-white transition-colors duration-300 flex items-center justify-center rounded-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-[#b86134]"
+                        class="w-full h-10 mt-2 px-3 border text-sm transition-colors duration-300 flex items-center justify-center rounded-sm disabled:cursor-not-allowed"
+                        :class="submitButtonClass"
                         :disabled="
                             selectedProviderId === '' ||
                             isSubmitting ||
                             isLoadingProviders ||
-                            isSubmitSuccessFlash
+                            hasSubmitFeedback
                         "
                         @click="handleScan"
                     >
@@ -357,9 +377,13 @@ const goNextPage = () => {
                             <Loader2 class="w-4 h-4 mr-2 animate-spin" />
                             提交中...
                         </template>
-                        <template v-else-if="isSubmitSuccessFlash">
+                        <template v-else-if="submitFeedbackStatus === 'success'">
                             <CheckCircle2 class="w-4 h-4 mr-2" />
-                            任务已提交
+                            <span class="truncate">任务已提交</span>
+                        </template>
+                        <template v-else-if="submitFeedbackStatus === 'error'">
+                            <XCircle class="w-4 h-4 mr-2 shrink-0" />
+                            <span class="truncate">{{ submitError || '提交失败，请重试' }}</span>
                         </template>
                         <template v-else>
                             <Play class="w-4 h-4 mr-2" />
@@ -375,7 +399,7 @@ const goNextPage = () => {
                         <FileMusic class="w-32 h-32" />
                     </div>
 
-                    <div class="relative z-10">
+                    <div class="relative z-10 pt-3">
                         <div v-if="isLoadingTasks" class="flex items-center text-[#b86134] mb-2">
                             <Loader2 class="w-5 h-5 mr-2 animate-spin" />
                             <span class="font-medium text-lg">正在同步后台任务状态</span>
