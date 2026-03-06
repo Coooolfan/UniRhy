@@ -2,6 +2,11 @@
 
 参考 <https://github.com/freeman-jiang/beatsync> or /Users/yang/Documents/code/beatsync
 
+阶段 0 已冻结的线级协议与日志字段见：
+
+- [PLAYBACK_SYNC_PROTOCOL.md](PLAYBACK_SYNC_PROTOCOL.md)
+- [PLAYBACK_SYNC_LOGGING.md](PLAYBACK_SYNC_LOGGING.md)
+
 ## 1. 目标与边界
 
 ### 1.1 目标
@@ -11,7 +16,7 @@
 - 播放（Play）
 - 暂停（Pause）
 - 跳转（Seek）
-- 切换曲目（Change Track）：语义等同于”发一个带新 trackId 的 PLAY”，不设独立消息类型
+- 切换曲目（Change Track）：语义等同于”发一个带新 recordingId 的 PLAY”，不设独立消息类型
 
 ### 1.2 边界
 
@@ -67,10 +72,10 @@ enum class PlaybackStatus { PLAYING, PAUSED }
 data class AccountPlaybackState(
     val accountId: Long,
     val status: PlaybackStatus,
-    val trackId: Long?,
+    val recordingId: Long?,
     val mediaFileId: Long?,
     val sourceUrl: String?,
-    val trackPositionSeconds: Double,
+    val positionSeconds: Double,
     val serverTimeToExecuteMs: Long,
     val version: Long,
     val updatedAtMs: Long,
@@ -78,10 +83,10 @@ data class AccountPlaybackState(
 ```
 
 说明：
-- `trackPositionSeconds + serverTimeToExecuteMs` 是播放锚点
+- `positionSeconds + serverTimeToExecuteMs` 是播放锚点
 - `version` 单调递增，由服务端在每次更新 `AccountPlaybackState` 时自增，客户端仅接受更高版本
 - `sourceUrl` 由服务端根据 `mediaFileId` 解析生成（可包含签名/CDN 路径），客户端不传 sourceUrl
-- 无播放状态用 `PAUSED + trackId=null` 表示，不设 STOPPED 状态
+- 无播放状态用 `PAUSED + recordingId=null` 表示，不设 STOPPED 状态
 
 ### 4.2 执行中临时态（每账号可空）
 
@@ -89,7 +94,7 @@ data class AccountPlaybackState(
 data class PendingPlayState(
     val commandId: String,
     val initiatorDeviceId: String,
-    val trackId: Long,
+    val recordingId: Long,
     val mediaFileId: Long,
     val sourceUrl: String,
     val clientsLoaded: MutableSet<String>,
@@ -102,7 +107,7 @@ data class PendingPlayState(
 - 对应 Beatsync 的 `pendingPlay`
 - 只在”切歌播放需预加载”阶段存在
 - `sourceUrl` 由服务端在创建 `PendingPlayState` 时根据 `mediaFileId` 解析填入
-- 当 `executeScheduledPlay()` 执行时，将 pending 中的 `trackId`/`mediaFileId`/`sourceUrl` 写入 `AccountPlaybackState`
+- 当 `executeScheduledPlay()` 执行时，将 pending 中的 `recordingId`/`mediaFileId`/`sourceUrl` 写入 `AccountPlaybackState`
 - 收到新 PLAY 时，先 `clearPendingPlay()`（取消超时定时器）再创建新的，即”后到覆盖”语义（与 Beatsync 一致）
 - `clientsLoaded` 初始化时自动包含 `initiatorDeviceId`（发起者视为已加载，与 Beatsync 一致）
 
@@ -156,37 +161,37 @@ data class DeviceRuntimeState(
 
 - `HELLO { deviceId, clientVersion }`
 - `NTP_REQUEST { t0, clientRttMs? }`
-- `PLAY { commandId, deviceId, trackId, mediaFileId, trackTimeSeconds }`
-- `PAUSE { commandId, deviceId, trackTimeSeconds }`
-- `SEEK { commandId, deviceId, trackTimeSeconds }`
-- `AUDIO_SOURCE_LOADED { commandId, deviceId, trackId }`
+- `PLAY { commandId, deviceId, recordingId, mediaFileId, positionSeconds }`
+- `PAUSE { commandId, deviceId, recordingId?, mediaFileId?, positionSeconds }`
+- `SEEK { commandId, deviceId, recordingId, mediaFileId, positionSeconds }`
+- `AUDIO_SOURCE_LOADED { commandId, deviceId, recordingId, mediaFileId }`
 - `SYNC { deviceId }`
 
 说明：
 - `PLAY` 不携带 `sourceUrl`，由服务端根据 `mediaFileId` 解析
-- 切歌 = 发一个带新 `trackId` 的 `PLAY`，不设独立 CHANGE_TRACK 消息
-- 无独立 STOP 消息；暂停并清空曲目由 `PAUSE + trackId=null` 语义覆盖
+- 切歌 = 发一个带新 `recordingId` 的 `PLAY`，不设独立 CHANGE_TRACK 消息
+- 无独立 STOP 消息；暂停并清空曲目由 `PAUSE + recordingId=null` 语义覆盖
 - `SYNC` 的前置条件：客户端必须先完成 NTP 初始化校时（`isSynced=true`）后才可发送
 
 ### 5.2 S2C
 
 - `NTP_RESPONSE { t0, t1, t2 }`
 - `SNAPSHOT { state, serverNowMs }`
-- `ROOM_EVENT:LOAD_AUDIO_SOURCE { commandId, trackId, sourceUrl }`
+- `ROOM_EVENT_LOAD_AUDIO_SOURCE { commandId, recordingId, mediaFileId, sourceUrl }`
 - `SCHEDULED_ACTION { commandId, serverTimeToExecuteMs, scheduledAction }`
-- `ROOM_EVENT:DEVICE_CHANGE { devices }`（可选）
+- `ROOM_EVENT_DEVICE_CHANGE { devices }`（可选）
 - `ERROR { code, message }`
 
 说明：
 - `SNAPSHOT` 在以下时机发送：①HELLO 响应；②断线重连后服务端自动下发（无需客户端主动 SYNC）
-- `LOAD_AUDIO_SOURCE` 中的 `sourceUrl` 由服务端解析生成
+- `ROOM_EVENT_LOAD_AUDIO_SOURCE` 中的 `sourceUrl` 由服务端解析生成
 
 ### 5.3 ACK 策略
 
 - 不设计“通用 ACK 消息类型”（与 Beatsync 一致）
 - 使用“业务型确认”代替：
   - `NTP_REQUEST -> NTP_RESPONSE`
-  - `LOAD_AUDIO_SOURCE -> AUDIO_SOURCE_LOADED`
+  - `ROOM_EVENT_LOAD_AUDIO_SOURCE -> AUDIO_SOURCE_LOADED`
 
 ---
 
@@ -201,19 +206,19 @@ data class DeviceRuntimeState(
 
 ### 6.2 PLAY（切歌场景）
 
-1. 设备 A 发 `PLAY { trackId, mediaFileId, trackTimeSeconds }`
+1. 设备 A 发 `PLAY { recordingId, mediaFileId, positionSeconds }`
 2. 服务端根据 `mediaFileId` 解析 `sourceUrl`
 3. 若已有 `PendingPlayState`，先 `clearPendingPlay()`（取消旧超时），再创建新的（后到覆盖语义）
 4. 创建 `PendingPlayState`，`clientsLoaded` 初始化为 `Set([发起者deviceId])`
-5. 广播 `LOAD_AUDIO_SOURCE { commandId, trackId, sourceUrl }`
+5. 广播 `ROOM_EVENT_LOAD_AUDIO_SOURCE { commandId, recordingId, mediaFileId, sourceUrl }`
 6. 各设备收到后执行 `fetch → decodeAudioData`，完成后发 `AUDIO_SOURCE_LOADED`
 7. 全部加载完成或 3 秒超时后，服务端执行 `executeScheduledPlay()`：
-   - 将 pending 中的 `trackId`/`mediaFileId`/`sourceUrl` 写入 `AccountPlaybackState`
+   - 将 pending 中的 `recordingId`/`mediaFileId`/`sourceUrl` 写入 `AccountPlaybackState`
    - 计算 `serverTimeToExecuteMs`
    - 广播 `SCHEDULED_ACTION(PLAY)`
 8. 客户端使用 `AudioBufferSourceNode.start(when, offset)` 精确调度：
    - `when = audioContext.currentTime + (serverTimeToExecuteMs - estimatedServerNowMs) / 1000`
-   - `offset = trackTimeSeconds`
+   - `offset = positionSeconds`
 
 ### 6.3 PAUSE / SEEK
 
@@ -268,7 +273,7 @@ data class DeviceRuntimeState(
 ### 8.1 对齐 Beatsync 风格
 
 - `clientsLoaded` 使用 `Set<deviceId>` 去重
-- 收到新 PLAY 时覆盖已有 `PendingPlayState`（后到覆盖），不做"同 track 去重"
+- 收到新 PLAY 时覆盖已有 `PendingPlayState`（后到覆盖），不做"同 recording 去重"
 - 客户端仅应用更高 `version` 的状态
 - PAUSE / SEEK 天然幂等（重复执行效果相同）
 
@@ -296,7 +301,7 @@ data class DeviceRuntimeState(
 
 并复用现有：
 - Sa-Token 登录态解析
-- 录音/媒体查询能力（校验 track 与 source）
+- 录音/媒体查询能力（校验 recording 与 source）
 
 ---
 
@@ -330,7 +335,7 @@ data class DeviceRuntimeState(
   - `suppressEcho`
 - 改造 `web/src/components/AudioPlayer.vue`：
   - 本地播放控制改为”发送控制命令 + 等待调度执行”
-  - 处理 `LOAD_AUDIO_SOURCE`：`fetch → decodeAudioData → 发送 AUDIO_SOURCE_LOADED`
+  - 处理 `ROOM_EVENT_LOAD_AUDIO_SOURCE`：`fetch → decodeAudioData → 发送 AUDIO_SOURCE_LOADED`
   - 处理 `SCHEDULED_ACTION`：计算 `audioContext.currentTime` 上的精确启动时刻
 
 ---

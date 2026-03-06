@@ -1,7 +1,6 @@
 package com.coooolfan.unirhy.service.task
 
 import com.coooolfan.unirhy.model.storage.FileProviderFileSystem
-import com.coooolfan.unirhy.service.task.cover.fetchCover
 import com.coooolfan.unirhy.utils.sha256
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
