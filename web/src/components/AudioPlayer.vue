@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, ref } from 'vue'
 import { useAudioStore } from '@/stores/audio'
 import {
     ChevronUp,
@@ -14,102 +14,10 @@ import {
 } from 'lucide-vue-next'
 
 const audioStore = useAudioStore()
-const audioRef = ref<HTMLAudioElement | null>(null)
 
-const syncAudioVolume = () => {
-    if (audioRef.value) {
-        audioRef.value.volume = audioStore.volume
-    }
-}
-
-// Handle audio events
-const onTimeUpdate = () => {
-    if (audioRef.value) {
-        audioStore.currentTime = audioRef.value.currentTime
-    }
-}
-
-const onLoadedMetadata = () => {
-    if (audioRef.value) {
-        audioStore.duration = audioRef.value.duration
-        audioStore.isLoading = false
-        syncAudioVolume()
-    }
-}
-
-const onEnded = () => {
-    audioStore.isPlaying = false
-    audioStore.currentTime = 0
-    if (audioRef.value) {
-        audioRef.value.currentTime = 0
-    }
-}
-
-const onError = (e: Event) => {
-    console.error('Audio playback error:', e)
-    audioStore.error = 'Unable to play audio'
-    audioStore.isLoading = false
-    audioStore.isPlaying = false
-}
-
-const onWaiting = () => {
-    audioStore.isLoading = true
-}
-
-const onCanPlay = () => {
-    audioStore.isLoading = false
-    if (audioStore.isPlaying) {
-        audioRef.value?.play().catch((e) => {
-            console.error('Play failed:', e)
-            audioStore.isPlaying = false
-        })
-    }
-}
-
-// Watch store state to control audio element
-watch(
-    () => audioStore.isPlaying,
-    (isPlaying) => {
-        if (!audioRef.value) return
-        if (isPlaying) {
-            audioRef.value.play().catch((e) => {
-                console.error('Play failed:', e)
-                audioStore.isPlaying = false
-            })
-        } else {
-            audioRef.value.pause()
-        }
-    },
-)
-
-watch(
-    () => audioStore.volume,
-    () => {
-        syncAudioVolume()
-    },
-    { immediate: true },
-)
-
-watch(
-    () => audioStore.currentTrack,
-    async (newTrack) => {
-        if (!newTrack) {
-            audioStore.showPlayer()
-            return
-        }
-        await nextTick()
-        syncAudioVolume()
-    },
-)
-
-// Progress bar interaction
 const seekTo = (e: Event) => {
     const target = e.target as HTMLInputElement
-    const time = parseFloat(target.value)
-    if (audioRef.value) {
-        audioRef.value.currentTime = time
-        audioStore.currentTime = time
-    }
+    audioStore.seek(parseFloat(target.value))
 }
 
 const formatTime = (seconds: number) => {
@@ -166,30 +74,18 @@ const onExpandedPlayerAfterLeave = () => {
 }
 
 const progressPercentage = computed(() => {
-    const duration = audioStore.duration
-    if (!Number.isFinite(duration) || duration <= 0) {
+    const totalDuration = audioStore.duration
+    if (!Number.isFinite(totalDuration) || totalDuration <= 0) {
         return 0
     }
 
-    const percentage = (audioStore.currentTime / duration) * 100
+    const percentage = (audioStore.currentTime / totalDuration) * 100
     return Math.min(100, Math.max(0, percentage))
 })
 </script>
 
 <template>
     <div v-if="audioStore.currentTrack">
-        <audio
-            ref="audioRef"
-            :src="audioStore.currentTrack.src"
-            @timeupdate="onTimeUpdate"
-            @loadedmetadata="onLoadedMetadata"
-            @ended="onEnded"
-            @error="onError"
-            @waiting="onWaiting"
-            @canplay="onCanPlay"
-            preload="auto"
-        ></audio>
-
         <Transition
             enter-active-class="transition-transform duration-320 ease-out"
             enter-from-class="translate-y-full"
@@ -213,7 +109,6 @@ const progressPercentage = computed(() => {
                             : 'translate-x-0 translate-y-0 opacity-100'
                     "
                 >
-                    <!-- Track Info -->
                     <div class="flex items-center gap-4 w-1/4 min-w-0">
                         <div
                             v-if="audioStore.currentTrack.cover"
@@ -235,7 +130,6 @@ const progressPercentage = computed(() => {
                         </div>
                     </div>
 
-                    <!-- Controls & Progress -->
                     <div class="flex flex-col items-center flex-1 max-w-2xl gap-1">
                         <div class="flex items-center gap-6">
                             <button
@@ -293,7 +187,6 @@ const progressPercentage = computed(() => {
                         </div>
                     </div>
 
-                    <!-- Volume & Close -->
                     <div class="flex items-center justify-end gap-4 w-1/4">
                         <div class="flex items-center gap-2 group">
                             <button
