@@ -73,26 +73,24 @@ const router = createRouter({
     ],
 })
 
-router.beforeEach(async (to, from, next) => {
+router.beforeEach(async (to) => {
     try {
         const status = await api.systemConfigController.isInitialized()
         if (!status.initialized) {
             if (to.path !== '/init') {
-                next('/init')
-                return
+                return '/init'
             }
         } else {
             if (to.path === '/init') {
-                next('/login')
-                return
+                return '/login'
             }
         }
-        next()
+        return true
     } catch (error) {
         console.error('Failed to check initialization status', error)
         // If check fails, maybe let them proceed or show error page?
         // For now let's proceed to avoid infinite loops if API is down
-        next()
+        return true
     }
 })
 

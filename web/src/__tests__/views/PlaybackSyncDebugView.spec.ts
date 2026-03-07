@@ -157,6 +157,12 @@ vi.mock('@/stores/audio', () => ({
     }),
 }))
 
+vi.mock('vue-echarts', () => ({
+    default: {
+        template: '<div data-test="debug-chart" />',
+    },
+}))
+
 vi.mock('@/components/dashboard/DashboardTopBar.vue', () => ({
     default: {
         template: '<div data-test="dashboard-top-bar" />',

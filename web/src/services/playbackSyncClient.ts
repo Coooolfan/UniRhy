@@ -6,6 +6,7 @@ import type {
     ServerPlaybackSyncMessage,
 } from '@/services/playbackSyncProtocol'
 import { nowClientMs } from '@/utils/time'
+import { average } from '@/utils/math'
 
 const DEVICE_ID_STORAGE_KEY = 'unirhy.playback-sync.device-id'
 const INITIAL_SAMPLE_COUNT = 20
@@ -92,8 +93,6 @@ export type PlaybackSyncClientCallbacks = {
     onDiagnosticsChange?: (snapshot: PlaybackSyncClientDiagnosticsSnapshot) => void
 }
 
-const average = (values: number[]) => values.reduce((sum, value) => sum + value, 0) / values.length
-
 const summarizeMeasurements = (measurements: readonly PlaybackSyncNtpMeasurement[]) => {
     if (measurements.length === 0) {
         return null
@@ -101,9 +100,16 @@ const summarizeMeasurements = (measurements: readonly PlaybackSyncNtpMeasurement
 
     const sortedByRtt = [...measurements].sort((left, right) => left.rttMs - right.rttMs)
     const selected = sortedByRtt.slice(0, Math.ceil(sortedByRtt.length / 2))
+    const clockOffsetMs = average(selected.map((item) => item.offsetMs))
+    const roundTripEstimateMs = average(selected.map((item) => item.rttMs))
+
+    if (clockOffsetMs === null || roundTripEstimateMs === null) {
+        return null
+    }
+
     return {
-        clockOffsetMs: average(selected.map((item) => item.offsetMs)),
-        roundTripEstimateMs: average(selected.map((item) => item.rttMs)),
+        clockOffsetMs,
+        roundTripEstimateMs,
     }
 }
 
