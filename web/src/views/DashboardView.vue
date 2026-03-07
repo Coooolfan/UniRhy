@@ -1,7 +1,19 @@
 <script setup lang="ts">
+import { onMounted, onUnmounted } from 'vue'
 import { RouterView } from 'vue-router'
 import NoiseTexture from '@/components/NoiseTexture.vue'
 import DashboardSidebar from '@/components/dashboard/DashboardSidebar.vue'
+import { useAudioStore } from '@/stores/audio'
+
+const audioStore = useAudioStore()
+
+onMounted(() => {
+    audioStore.connectPlaybackSync()
+})
+
+onUnmounted(() => {
+    audioStore.disconnectPlaybackSync()
+})
 </script>
 
 <template>

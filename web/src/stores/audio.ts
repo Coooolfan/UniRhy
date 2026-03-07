@@ -1,5 +1,13 @@
+import { computed, ref, shallowRef } from 'vue'
 import { defineStore } from 'pinia'
-import { ref, shallowRef } from 'vue'
+import { PlaybackSyncClient, type PlaybackSyncClientPhase } from '@/services/playbackSyncClient'
+import type {
+    LoadAudioSourcePayload,
+    PlaybackSyncStatePayload,
+    ScheduledActionPayload,
+    ServerPlaybackSyncMessage,
+    SnapshotPayload,
+} from '@/services/playbackSyncProtocol'
 
 export type AudioTrack = {
     id: number
@@ -7,7 +15,27 @@ export type AudioTrack = {
     artist: string
     cover?: string
     src: string
+    mediaFileId: number
     workId?: number
+}
+
+export type AudioSyncState =
+    | 'connecting'
+    | 'calibrating'
+    | 'ready'
+    | 'reconnecting'
+    | 'audio_locked'
+    | 'error'
+
+type QueuedPlayIntent = {
+    track: AudioTrack
+    positionSeconds: number
+}
+
+type BufferLoadState = {
+    token: number
+    track: AudioTrack
+    promise: Promise<AudioBuffer | null>
 }
 
 const VOLUME_STORAGE_KEY = 'unirhy.audio.volume'
@@ -60,6 +88,21 @@ const clampTime = (time: number, maxDuration?: number) => {
     return Math.min(time, maxDuration)
 }
 
+const isNil = (value: unknown): value is null | undefined => {
+    return value === null || value === undefined
+}
+
+const nowClientMs = () => {
+    if (typeof performance !== 'undefined') {
+        return performance.timeOrigin + performance.now()
+    }
+    return Date.now()
+}
+
+const cloneTrack = (track: AudioTrack): AudioTrack => ({
+    ...track,
+})
+
 export const useAudioStore = defineStore('audio', () => {
     const currentTrack = ref<AudioTrack | null>(null)
     const isPlaying = ref(false)
@@ -72,15 +115,89 @@ export const useAudioStore = defineStore('audio', () => {
 
     const audioContext = shallowRef<AudioContext | null>(null)
     const currentBuffer = shallowRef<AudioBuffer | null>(null)
+    const currentBufferTrack = shallowRef<AudioTrack | null>(null)
     const sourceNode = shallowRef<AudioBufferSourceNode | null>(null)
     const gainNode = shallowRef<GainNode | null>(null)
     const playbackStartContextTime = ref(0)
     const playbackOffsetSec = ref(0)
     const rafId = ref<number | null>(null)
+
+    const playbackSyncClient = shallowRef<PlaybackSyncClient | null>(null)
+    const clientPhase = ref<PlaybackSyncClientPhase>('connecting')
+    const clockOffsetMs = ref(0)
+    const roundTripEstimateMs = ref(0)
+    const latestSnapshot = ref<PlaybackSyncStatePayload | null>(null)
+    const lastAppliedVersion = ref(0)
+    const queuedPlayIntent = ref<QueuedPlayIntent | null>(null)
+    const awaitingSyncRecovery = ref(false)
+    const audioUnlockRequired = ref(false)
     const loadToken = ref(0)
-    const isStoppingSource = ref(false)
-    const resumeAttemptId = ref(0)
+    const activeLoad = shallowRef<BufferLoadState | null>(null)
+
+    const knownTracks = new Map<number, AudioTrack>()
+    const liveSourceNodes = new Set<AudioBufferSourceNode>()
+    const ignoredEndedNodes = new WeakSet<AudioBufferSourceNode>()
     const sourceEndedListeners = new WeakMap<AudioBufferSourceNode, EventListener>()
+
+    let commandSequence = 0
+    let scheduledPauseTimer: number | null = null
+    let scheduledStopTimer: number | null = null
+
+    const effectiveSyncState = computed<AudioSyncState>(() => {
+        if (clientPhase.value === 'error') {
+            return 'error'
+        }
+        if (clientPhase.value === 'reconnecting') {
+            return 'reconnecting'
+        }
+        if (clientPhase.value === 'calibrating') {
+            return 'calibrating'
+        }
+        if (clientPhase.value === 'ready') {
+            return audioUnlockRequired.value ? 'audio_locked' : 'ready'
+        }
+        return 'connecting'
+    })
+
+    const syncStatusText = computed(() => {
+        switch (effectiveSyncState.value) {
+            case 'connecting':
+                return '同步连接中'
+            case 'calibrating':
+                return '同步校时中'
+            case 'ready':
+                return '同步已就绪'
+            case 'reconnecting':
+                return '同步重连中'
+            case 'audio_locked':
+                return '等待启用音频'
+            case 'error':
+                return '同步连接失败'
+            default:
+                return '同步连接中'
+        }
+    })
+
+    const canSendRealtimeControl = computed(() => effectiveSyncState.value === 'ready')
+
+    const rememberTrack = (track: AudioTrack) => {
+        knownTracks.set(track.id, cloneTrack(track))
+    }
+
+    const getEstimatedServerNowMs = () => {
+        return nowClientMs() + clockOffsetMs.value
+    }
+
+    const clearScheduledTimers = () => {
+        if (scheduledPauseTimer !== null) {
+            window.clearTimeout(scheduledPauseTimer)
+            scheduledPauseTimer = null
+        }
+        if (scheduledStopTimer !== null) {
+            window.clearTimeout(scheduledStopTimer)
+            scheduledStopTimer = null
+        }
+    }
 
     const stopAnimationLoop = () => {
         if (rafId.value === null || typeof cancelAnimationFrame === 'undefined') {
@@ -158,81 +275,86 @@ export const useAudioStore = defineStore('audio', () => {
         return audioContext.value
     }
 
-    const handleResumeFailure = (attemptId: number) => {
-        if (resumeAttemptId.value !== attemptId || !isPlaying.value) {
-            return
-        }
-
-        isPlaying.value = false
-        isLoading.value = false
-        error.value = PLAYBACK_ERROR_MESSAGE
-        playbackStartContextTime.value = 0
-        stopAnimationLoop()
-        stopSourcePlayback()
-    }
-
-    const resumeAudioContext = () => {
+    const ensureAudioContextResumed = async () => {
         const context = ensureAudioContext()
         if (!context) {
-            return
+            error.value = PLAYBACK_ERROR_MESSAGE
+            return null
         }
 
-        const attemptId = resumeAttemptId.value + 1
-        resumeAttemptId.value = attemptId
+        if (context.state === 'running') {
+            audioUnlockRequired.value = false
+            return context
+        }
 
-        void context.resume().catch(() => {
-            handleResumeFailure(attemptId)
-        })
+        audioUnlockRequired.value = true
+
+        try {
+            await context.resume()
+        } catch {
+            audioUnlockRequired.value = true
+            isPlaying.value = false
+            stopAnimationLoop()
+            playbackStartContextTime.value = 0
+            return null
+        }
+
+        audioUnlockRequired.value = false
+        return context
     }
 
-    const detachSourceNode = (node: AudioBufferSourceNode | null) => {
-        if (!node) {
-            return
-        }
-
-        isStoppingSource.value = true
+    const cleanupSourceNode = (node: AudioBufferSourceNode) => {
         const endedListener = sourceEndedListeners.get(node)
         if (endedListener) {
             node.removeEventListener('ended', endedListener)
             sourceEndedListeners.delete(node)
         }
-        if (sourceNode.value === node) {
-            sourceNode.value = null
-        }
-
-        try {
-            node.stop()
-        } catch {
-            // Source nodes can only be stopped once.
-        }
+        liveSourceNodes.delete(node)
 
         try {
             node.disconnect()
         } catch {
             // Ignore already-disconnected nodes.
         }
-
-        isStoppingSource.value = false
     }
 
-    const stopSourcePlayback = () => {
-        detachSourceNode(sourceNode.value)
-    }
-
-    const clearLoadedBuffer = () => {
-        stopSourcePlayback()
-        currentBuffer.value = null
-        duration.value = 0
-        playbackStartContextTime.value = 0
-        updatePausedTime(0)
-    }
-
-    const handlePlaybackEnded = (node: AudioBufferSourceNode) => {
-        if (sourceNode.value !== node || isStoppingSource.value) {
+    const stopSourceNode = (node: AudioBufferSourceNode | null) => {
+        if (!node) {
             return
         }
 
+        ignoredEndedNodes.add(node)
+        try {
+            node.stop()
+        } catch {
+            cleanupSourceNode(node)
+        }
+    }
+
+    const stopAllSourceNodes = () => {
+        const nodes = [...liveSourceNodes]
+        nodes.forEach((node) => {
+            stopSourceNode(node)
+        })
         sourceNode.value = null
+    }
+
+    const handlePlaybackEnded = (node: AudioBufferSourceNode) => {
+        const isIgnored = ignoredEndedNodes.has(node)
+        if (isIgnored) {
+            ignoredEndedNodes.delete(node)
+        }
+
+        cleanupSourceNode(node)
+
+        if (sourceNode.value === node) {
+            sourceNode.value = null
+        }
+
+        if (isIgnored || sourceNode.value !== null) {
+            return
+        }
+
         stopAnimationLoop()
         isPlaying.value = false
         playbackStartContextTime.value = 0
@@ -240,152 +362,591 @@ export const useAudioStore = defineStore('audio', () => {
         currentTime.value = 0
     }
 
-    const createAndStartSource = (offsetSeconds: number) => {
+    const createSourceNode = (buffer: AudioBuffer) => {
         const context = ensureAudioContext()
-        const buffer = currentBuffer.value
         const gain = gainNode.value
-        if (!context || !buffer || !gain) {
-            return
+        if (!context || !gain) {
+            return null
         }
-
-        const normalizedOffset =
-            offsetSeconds >= buffer.duration && buffer.duration > 0
-                ? 0
-                : clampTime(offsetSeconds, buffer.duration)
-
-        stopSourcePlayback()
 
         const node = context.createBufferSource()
         node.buffer = buffer
         node.connect(gain)
+
         const endedListener: EventListener = () => {
             handlePlaybackEnded(node)
         }
         sourceEndedListeners.set(node, endedListener)
         node.addEventListener('ended', endedListener)
-
-        sourceNode.value = node
-        playbackOffsetSec.value = normalizedOffset
-        playbackStartContextTime.value = context.currentTime
-        currentTime.value = normalizedOffset
-        node.start(0, normalizedOffset)
-        startAnimationLoop()
+        liveSourceNodes.add(node)
+        return node
     }
 
-    const applyLoadedTrack = (track: AudioTrack, buffer: AudioBuffer, token: number) => {
-        if (loadToken.value !== token || currentTrack.value?.id !== track.id) {
-            return
-        }
+    const releaseLoadedBuffer = () => {
+        currentBuffer.value = null
+        currentBufferTrack.value = null
+        duration.value = 0
+    }
 
-        currentBuffer.value = buffer
-        duration.value = buffer.duration
-        updatePausedTime(playbackOffsetSec.value)
+    const clearTrackState = () => {
+        clearScheduledTimers()
+        stopAnimationLoop()
+        stopAllSourceNodes()
+        currentTrack.value = null
+        isPlaying.value = false
         isLoading.value = false
+        playbackStartContextTime.value = 0
+        playbackOffsetSec.value = 0
+        currentTime.value = 0
+        error.value = null
+        releaseLoadedBuffer()
+    }
 
-        if (isPlaying.value) {
-            resumeAudioContext()
-            createAndStartSource(playbackOffsetSec.value)
+    const createPlaceholderTrack = (
+        recordingId: number,
+        mediaFileId: number,
+        sourceUrl: string,
+    ): AudioTrack => {
+        const current = currentTrack.value?.id === recordingId ? currentTrack.value : null
+        const cached = knownTracks.get(recordingId)
+        const base = current ?? cached
+        const track: AudioTrack = {
+            id: recordingId,
+            title: base?.title ?? `Recording #${recordingId}`,
+            artist: base?.artist ?? 'Unknown Artist',
+            cover: base?.cover ?? '',
+            src: sourceUrl,
+            mediaFileId,
+            ...(base?.workId !== undefined ? { workId: base.workId } : {}),
+        }
+        rememberTrack(track)
+        return track
+    }
+
+    const resolveTrackFromState = (
+        state:
+            | PlaybackSyncStatePayload
+            | ScheduledActionPayload['scheduledAction']
+            | LoadAudioSourcePayload,
+    ) => {
+        if (isNil(state.recordingId) || isNil(state.mediaFileId) || isNil(state.sourceUrl)) {
+            return null
+        }
+        return createPlaceholderTrack(state.recordingId, state.mediaFileId, state.sourceUrl)
+    }
+
+    const primeTrackState = (track: AudioTrack, positionSeconds: number) => {
+        rememberTrack(track)
+        currentTrack.value = cloneTrack(track)
+        playbackOffsetSec.value = positionSeconds
+        currentTime.value = positionSeconds
+        error.value = null
+
+        if (currentBufferTrack.value?.mediaFileId === track.mediaFileId && currentBuffer.value) {
+            duration.value = currentBuffer.value.duration
+            updatePausedTime(positionSeconds)
+        } else {
+            duration.value = 0
         }
     }
 
-    const loadTrackBuffer = async (track: AudioTrack, token: number) => {
+    const ensureTrackBuffer = (track: AudioTrack) => {
+        rememberTrack(track)
+
+        if (currentBuffer.value && currentBufferTrack.value?.mediaFileId === track.mediaFileId) {
+            if (currentTrack.value?.mediaFileId === track.mediaFileId) {
+                duration.value = currentBuffer.value.duration
+            }
+            return currentBuffer.value
+        }
+
+        const existingLoad = activeLoad.value
+        if (existingLoad && existingLoad.track.mediaFileId === track.mediaFileId) {
+            return existingLoad.promise
+        }
+
         const context = ensureAudioContext()
         if (!context) {
-            isLoading.value = false
+            error.value = PLAYBACK_ERROR_MESSAGE
+            return null
+        }
+
+        const token = loadToken.value + 1
+        loadToken.value = token
+        isLoading.value = true
+        error.value = null
+
+        const promise = fetch(track.src)
+            .then(async (response) => {
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch audio: ${response.status}`)
+                }
+
+                const arrayBuffer = await response.arrayBuffer()
+                const buffer = await context.decodeAudioData(arrayBuffer)
+                if (loadToken.value !== token) {
+                    return null
+                }
+
+                currentBuffer.value = buffer
+                currentBufferTrack.value = cloneTrack(track)
+                if (currentTrack.value?.mediaFileId === track.mediaFileId) {
+                    duration.value = buffer.duration
+                    updatePausedTime(playbackOffsetSec.value)
+                }
+                isLoading.value = false
+                return buffer
+            })
+            .catch(() => {
+                if (loadToken.value === token) {
+                    isLoading.value = false
+                    error.value = PLAYBACK_ERROR_MESSAGE
+                }
+                return null
+            })
+            .finally(() => {
+                if (activeLoad.value?.token === token) {
+                    activeLoad.value = null
+                }
+            })
+
+        activeLoad.value = {
+            token,
+            track: cloneTrack(track),
+            promise,
+        }
+
+        return promise
+    }
+
+    const nextCommandId = (prefix: string) => {
+        commandSequence += 1
+        return `${prefix}-${Date.now()}-${commandSequence}`
+    }
+
+    const requestSyncRecovery = () => {
+        if (!playbackSyncClient.value) {
+            return
+        }
+        awaitingSyncRecovery.value = true
+        playbackSyncClient.value.requestSync()
+    }
+
+    const flushQueuedPlayIntent = () => {
+        const queued = queuedPlayIntent.value
+        if (!queued || !playbackSyncClient.value) {
             return
         }
 
-        const response = await fetch(track.src)
-        if (!response.ok) {
-            throw new Error(`Failed to fetch audio: ${response.status}`)
-        }
-
-        const arrayBuffer = await response.arrayBuffer()
-        const decodedBuffer = await context.decodeAudioData(arrayBuffer)
-        applyLoadedTrack(track, decodedBuffer, token)
-    }
-
-    const startTrackLoad = (track: AudioTrack) => {
-        const token = loadToken.value + 1
-        loadToken.value = token
-        error.value = null
-        isLoading.value = true
-        clearLoadedBuffer()
-
-        void loadTrackBuffer(track, token).catch(() => {
-            if (loadToken.value !== token || currentTrack.value?.id !== track.id) {
-                return
-            }
-
-            isLoading.value = false
-            isPlaying.value = false
-            error.value = PLAYBACK_ERROR_MESSAGE
+        queuedPlayIntent.value = null
+        awaitingSyncRecovery.value = false
+        playbackSyncClient.value.sendPlay({
+            commandId: nextCommandId('play'),
+            recordingId: queued.track.id,
+            mediaFileId: queued.track.mediaFileId,
+            positionSeconds: queued.positionSeconds,
         })
     }
 
-    function play(track: AudioTrack) {
-        if (currentTrack.value?.id === track.id) {
-            if (isPlaying.value) {
-                pause()
-            } else {
-                resume()
+    const handleClientReady = () => {
+        if (audioUnlockRequired.value) {
+            return
+        }
+
+        if (queuedPlayIntent.value) {
+            flushQueuedPlayIntent()
+            return
+        }
+
+        if (latestSnapshot.value) {
+            requestSyncRecovery()
+        }
+    }
+
+    const applyPausedState = (track: AudioTrack | null, positionSeconds: number) => {
+        stopAnimationLoop()
+        stopAllSourceNodes()
+        sourceNode.value = null
+        isPlaying.value = false
+        playbackStartContextTime.value = 0
+
+        if (track) {
+            rememberTrack(track)
+            currentTrack.value = cloneTrack(track)
+            if (
+                currentBufferTrack.value?.mediaFileId === track.mediaFileId &&
+                currentBuffer.value
+            ) {
+                duration.value = currentBuffer.value.duration
+            }
+            updatePausedTime(positionSeconds)
+            return
+        }
+
+        currentTrack.value = null
+        playbackOffsetSec.value = 0
+        currentTime.value = 0
+        releaseLoadedBuffer()
+    }
+
+    const schedulePauseState = (
+        track: AudioTrack | null,
+        positionSeconds: number,
+        executeAtMs: number,
+    ) => {
+        clearScheduledTimers()
+        const waitMs = Math.max(0, Math.round(executeAtMs - getEstimatedServerNowMs()))
+        if (waitMs === 0) {
+            applyPausedState(track, positionSeconds)
+            return
+        }
+
+        scheduledPauseTimer = window.setTimeout(() => {
+            scheduledPauseTimer = null
+            applyPausedState(track, positionSeconds)
+        }, waitMs)
+    }
+
+    const cancelPendingFutureSource = () => {
+        if (
+            audioContext.value &&
+            sourceNode.value &&
+            playbackStartContextTime.value > audioContext.value.currentTime
+        ) {
+            stopSourceNode(sourceNode.value)
+            sourceNode.value = null
+        }
+    }
+
+    const schedulePlayExecution = async (
+        payload: ScheduledActionPayload,
+        track: AudioTrack,
+        actionToken: number,
+    ) => {
+        primeTrackState(track, payload.scheduledAction.positionSeconds)
+        clearScheduledTimers()
+        cancelPendingFutureSource()
+
+        const buffer = await ensureTrackBuffer(track)
+        if (!buffer || actionToken !== lastAppliedVersion.value) {
+            return
+        }
+
+        const context = await ensureAudioContextResumed()
+        if (!context || actionToken !== lastAppliedVersion.value) {
+            return
+        }
+
+        const estimatedServerNowMs = getEstimatedServerNowMs()
+        const lateSeconds = Math.max(
+            0,
+            (estimatedServerNowMs - payload.serverTimeToExecuteMs) / 1_000,
+        )
+        const scheduledOffset = clampTime(
+            payload.scheduledAction.positionSeconds + lateSeconds,
+            buffer.duration,
+        )
+        if (buffer.duration > 0 && scheduledOffset >= buffer.duration) {
+            applyPausedState(track, buffer.duration)
+            return
+        }
+
+        const waitMs = Math.max(0, Math.round(payload.serverTimeToExecuteMs - estimatedServerNowMs))
+        const when = context.currentTime + waitMs / 1_000
+        const nextNode = createSourceNode(buffer)
+        if (!nextNode) {
+            error.value = PLAYBACK_ERROR_MESSAGE
+            return
+        }
+
+        const previousNodes = [...liveSourceNodes].filter((node) => node !== nextNode)
+        if (waitMs === 0) {
+            previousNodes.forEach((node) => {
+                stopSourceNode(node)
+            })
+        } else {
+            scheduledStopTimer = window.setTimeout(() => {
+                scheduledStopTimer = null
+                previousNodes.forEach((node) => {
+                    stopSourceNode(node)
+                })
+            }, waitMs)
+        }
+
+        sourceNode.value = nextNode
+        playbackOffsetSec.value = scheduledOffset
+        playbackStartContextTime.value = when
+        currentTime.value = scheduledOffset
+        isPlaying.value = true
+        nextNode.start(when, scheduledOffset)
+        startAnimationLoop()
+    }
+
+    const handleLoadAudioSource = async (payload: LoadAudioSourcePayload) => {
+        const track = resolveTrackFromState(payload)
+        if (!track || !playbackSyncClient.value) {
+            return
+        }
+
+        currentTrack.value = cloneTrack(track)
+        rememberTrack(track)
+
+        const buffer = await ensureTrackBuffer(track)
+        if (!buffer) {
+            return
+        }
+
+        playbackSyncClient.value.sendAudioSourceLoaded({
+            commandId: payload.commandId,
+            recordingId: payload.recordingId,
+            mediaFileId: payload.mediaFileId,
+        })
+    }
+
+    const handleSnapshot = (payload: SnapshotPayload) => {
+        latestSnapshot.value = payload.state
+        const track = resolveTrackFromState(payload.state)
+
+        if (!track) {
+            if (!isPlaying.value) {
+                applyPausedState(null, 0)
             }
             return
         }
 
-        currentTrack.value = track
-        isPlaying.value = true
-        currentTime.value = 0
-        playbackOffsetSec.value = 0
-        duration.value = 0
-        error.value = null
+        rememberTrack(track)
+        currentTrack.value = cloneTrack(track)
 
-        resumeAudioContext()
-        startTrackLoad(track)
+        const recoveredPosition =
+            payload.state.status === 'PLAYING'
+                ? payload.state.positionSeconds +
+                  Math.max(0, payload.serverNowMs - payload.state.serverTimeToExecuteMs) / 1_000
+                : payload.state.positionSeconds
+        updatePausedTime(recoveredPosition)
+
+        if (currentBufferTrack.value?.mediaFileId === track.mediaFileId && currentBuffer.value) {
+            duration.value = currentBuffer.value.duration
+        } else {
+            duration.value = 0
+        }
+    }
+
+    const handleScheduledAction = async (payload: ScheduledActionPayload) => {
+        const { scheduledAction } = payload
+
+        if (scheduledAction.version < lastAppliedVersion.value) {
+            return
+        }
+        if (scheduledAction.version === lastAppliedVersion.value && !awaitingSyncRecovery.value) {
+            return
+        }
+
+        awaitingSyncRecovery.value = false
+        lastAppliedVersion.value = scheduledAction.version
+        latestSnapshot.value = {
+            status: scheduledAction.status,
+            recordingId: scheduledAction.recordingId,
+            mediaFileId: scheduledAction.mediaFileId,
+            sourceUrl: scheduledAction.sourceUrl,
+            positionSeconds: scheduledAction.positionSeconds,
+            serverTimeToExecuteMs: payload.serverTimeToExecuteMs,
+            version: scheduledAction.version,
+            updatedAtMs: nowClientMs(),
+        }
+
+        const track = resolveTrackFromState(scheduledAction)
+        const actionToken = scheduledAction.version
+
+        if (scheduledAction.action === 'PAUSE') {
+            schedulePauseState(
+                track,
+                scheduledAction.positionSeconds,
+                payload.serverTimeToExecuteMs,
+            )
+            return
+        }
+
+        if (scheduledAction.action === 'SEEK' && scheduledAction.status === 'PAUSED') {
+            schedulePauseState(
+                track,
+                scheduledAction.positionSeconds,
+                payload.serverTimeToExecuteMs,
+            )
+            return
+        }
+
+        if (!track) {
+            applyPausedState(null, 0)
+            return
+        }
+
+        await schedulePlayExecution(payload, track, actionToken)
+    }
+
+    const handleServerMessage = async (message: ServerPlaybackSyncMessage) => {
+        switch (message.type) {
+            case 'SNAPSHOT':
+                handleSnapshot(message.payload)
+                break
+            case 'NTP_RESPONSE':
+                break
+            case 'ROOM_EVENT_LOAD_AUDIO_SOURCE':
+                await handleLoadAudioSource(message.payload)
+                break
+            case 'SCHEDULED_ACTION':
+                await handleScheduledAction(message.payload)
+                break
+            case 'ROOM_EVENT_DEVICE_CHANGE':
+            case 'ERROR':
+                if (message.type === 'ERROR') {
+                    error.value = message.payload.message
+                }
+                break
+            default:
+                break
+        }
+    }
+
+    const updateClientState = (phase: PlaybackSyncClientPhase, offsetMs: number, rttMs: number) => {
+        const previousPhase = clientPhase.value
+        clientPhase.value = phase
+        clockOffsetMs.value = offsetMs
+        roundTripEstimateMs.value = rttMs
+
+        if (previousPhase !== 'ready' && phase === 'ready') {
+            handleClientReady()
+        }
+    }
+
+    const ensureSyncClient = () => {
+        if (playbackSyncClient.value) {
+            return playbackSyncClient.value
+        }
+
+        const client = new PlaybackSyncClient({
+            onMessage: (message) => {
+                void handleServerMessage(message)
+            },
+            onStateChange: (state) => {
+                updateClientState(state.phase, state.clockOffsetMs, state.roundTripEstimateMs)
+            },
+        })
+        playbackSyncClient.value = client
+        const state = client.getState()
+        updateClientState(state.phase, state.clockOffsetMs, state.roundTripEstimateMs)
+        return client
+    }
+
+    const queuePlay = (track: AudioTrack, positionSeconds: number) => {
+        primeTrackState(track, positionSeconds)
+        queuedPlayIntent.value = {
+            track: cloneTrack(track),
+            positionSeconds,
+        }
+        isPlaying.value = false
+    }
+
+    const sendPlayCommand = (track: AudioTrack, positionSeconds: number) => {
+        primeTrackState(track, positionSeconds)
+        queuedPlayIntent.value = null
+        awaitingSyncRecovery.value = false
+        ensureSyncClient().sendPlay({
+            commandId: nextCommandId('play'),
+            recordingId: track.id,
+            mediaFileId: track.mediaFileId,
+            positionSeconds,
+        })
+    }
+
+    async function play(track: AudioTrack) {
+        rememberTrack(track)
+
+        const isSameTrack = currentTrack.value?.id === track.id
+        const targetPosition = isSameTrack ? currentTime.value : 0
+
+        if (isSameTrack && isPlaying.value) {
+            pause()
+            return
+        }
+
+        const client = ensureSyncClient()
+        client.connect()
+
+        if (effectiveSyncState.value === 'audio_locked') {
+            queuePlay(track, targetPosition)
+            const context = await ensureAudioContextResumed()
+            if (!context) {
+                return
+            }
+            if (canSendRealtimeControl.value) {
+                flushQueuedPlayIntent()
+            }
+            return
+        }
+
+        if (!canSendRealtimeControl.value) {
+            queuePlay(track, targetPosition)
+            return
+        }
+
+        sendPlayCommand(track, targetPosition)
     }
 
     function pause() {
-        if (!currentTrack.value) {
+        if (!currentTrack.value || !canSendRealtimeControl.value) {
             return
         }
 
-        syncCurrentTime()
-        isPlaying.value = false
-        playbackStartContextTime.value = 0
-        updatePausedTime(currentTime.value)
-        stopAnimationLoop()
-        stopSourcePlayback()
+        ensureSyncClient().sendPause({
+            commandId: nextCommandId('pause'),
+            recordingId: currentTrack.value.id,
+            mediaFileId: currentTrack.value.mediaFileId,
+            positionSeconds: currentTime.value,
+        })
     }
 
-    function resume() {
+    async function resume() {
         if (!currentTrack.value) {
             return
         }
 
-        error.value = null
-        isPlaying.value = true
-        resumeAudioContext()
-
-        if (!currentBuffer.value) {
-            if (!isLoading.value) {
-                startTrackLoad(currentTrack.value)
+        if (effectiveSyncState.value === 'audio_locked') {
+            const context = await ensureAudioContextResumed()
+            if (!context) {
+                return
             }
+            if (queuedPlayIntent.value) {
+                flushQueuedPlayIntent()
+                return
+            }
+            requestSyncRecovery()
             return
         }
 
-        createAndStartSource(playbackOffsetSec.value)
+        if (!canSendRealtimeControl.value) {
+            queuePlay(currentTrack.value, currentTime.value)
+            return
+        }
+
+        sendPlayCommand(currentTrack.value, currentTime.value)
     }
 
     function stop() {
-        resumeAttemptId.value += 1
-        loadToken.value += 1
-        isPlaying.value = false
-        isLoading.value = false
-        currentTrack.value = null
-        isPlayerHidden.value = false
-        error.value = null
-        stopAnimationLoop()
-        clearLoadedBuffer()
+        queuedPlayIntent.value = null
+        awaitingSyncRecovery.value = false
+
+        if (!canSendRealtimeControl.value) {
+            latestSnapshot.value = null
+            clearTrackState()
+            return
+        }
+
+        ensureSyncClient().sendPause({
+            commandId: nextCommandId('stop'),
+            recordingId: null,
+            mediaFileId: null,
+            positionSeconds: 0,
+        })
     }
 
     function hidePlayer() {
@@ -399,28 +960,18 @@ export const useAudioStore = defineStore('audio', () => {
     }
 
     function seek(time: number) {
+        if (!currentTrack.value || !canSendRealtimeControl.value) {
+            return
+        }
+
         const bufferDuration = currentBuffer.value?.duration ?? duration.value
         const nextTime = clampTime(time, bufferDuration)
-
-        if (!currentTrack.value) {
-            updatePausedTime(nextTime)
-            return
-        }
-
-        updatePausedTime(nextTime)
-
-        if (!currentBuffer.value || !isPlaying.value) {
-            return
-        }
-
-        if (currentBuffer.value.duration > 0 && nextTime >= currentBuffer.value.duration) {
-            pause()
-            updatePausedTime(currentBuffer.value.duration)
-            return
-        }
-
-        resumeAudioContext()
-        createAndStartSource(nextTime)
+        ensureSyncClient().sendSeek({
+            commandId: nextCommandId('seek'),
+            recordingId: currentTrack.value.id,
+            mediaFileId: currentTrack.value.mediaFileId,
+            positionSeconds: nextTime,
+        })
     }
 
     function setVolume(vol: number) {
@@ -433,6 +984,20 @@ export const useAudioStore = defineStore('audio', () => {
         }
     }
 
+    function connectPlaybackSync() {
+        const client = ensureSyncClient()
+        client.connect()
+    }
+
+    function disconnectPlaybackSync() {
+        playbackSyncClient.value?.disconnect()
+        playbackSyncClient.value = null
+        clientPhase.value = 'connecting'
+        clockOffsetMs.value = 0
+        roundTripEstimateMs.value = 0
+        awaitingSyncRecovery.value = false
+    }
+
     return {
         currentTrack,
         isPlaying,
@@ -442,6 +1007,9 @@ export const useAudioStore = defineStore('audio', () => {
         volume,
         isLoading,
         error,
+        syncState: effectiveSyncState,
+        syncStatusText,
+        canSendRealtimeControl,
         play,
         pause,
         resume,
@@ -450,5 +1018,7 @@ export const useAudioStore = defineStore('audio', () => {
         showPlayer,
         seek,
         setVolume,
+        connectPlaybackSync,
+        disconnectPlaybackSync,
     }
 })

@@ -135,7 +135,8 @@ describe('DashboardHero', () => {
         await playButton!.trigger('click')
 
         expect(audioStore.currentTrack?.id).toBe(21)
-        expect(audioStore.isPlaying).toBe(true)
+        expect(audioStore.currentTrack?.mediaFileId).toBe(41)
+        expect(audioStore.isPlaying).toBe(false)
         expect(pushMock).not.toHaveBeenCalled()
     })
 

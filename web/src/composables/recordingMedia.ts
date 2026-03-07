@@ -14,6 +14,11 @@ export type RecordingArtist = {
     name?: string
 }
 
+export type PlayableAudioSource = {
+    src: string
+    mediaFileId: number
+}
+
 export const resolveCover = (coverId?: number) => {
     if (coverId !== undefined) {
         return `/api/media/${coverId}`
@@ -21,12 +26,21 @@ export const resolveCover = (coverId?: number) => {
     return ''
 }
 
-export const resolveAudio = (assets: readonly RecordingAsset[]) => {
+export const resolvePlayableAudio = (
+    assets: readonly RecordingAsset[],
+): PlayableAudioSource | undefined => {
     const audioAsset = assets.find((asset) => asset.mediaFile.mimeType.startsWith('audio/'))
     if (audioAsset) {
-        return `/api/media/${audioAsset.mediaFile.id}`
+        return {
+            src: `/api/media/${audioAsset.mediaFile.id}`,
+            mediaFileId: audioAsset.mediaFile.id,
+        }
     }
     return undefined
+}
+
+export const resolveAudio = (assets: readonly RecordingAsset[]) => {
+    return resolvePlayableAudio(assets)?.src
 }
 
 export const resolveArtistName = (artists?: ReadonlyArray<RecordingArtist>) => {

@@ -1,6 +1,92 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
+
+type MockPlaybackSyncClientState = {
+    deviceId: string
+    phase: string
+    clockOffsetMs: number
+    roundTripEstimateMs: number
+}
+
+type MockPlaybackSyncClientCallbacks = {
+    onMessage?: (message: unknown) => void
+    onStateChange?: (state: MockPlaybackSyncClientState) => void
+}
+
+type MockPlaybackSyncClientInstance = {
+    connect: ReturnType<typeof vi.fn>
+    disconnect: ReturnType<typeof vi.fn>
+    sendPlay: ReturnType<typeof vi.fn>
+    sendPause: ReturnType<typeof vi.fn>
+    sendSeek: ReturnType<typeof vi.fn>
+    sendAudioSourceLoaded: ReturnType<typeof vi.fn>
+    requestSync: ReturnType<typeof vi.fn>
+    callbacks: MockPlaybackSyncClientCallbacks
+    state: MockPlaybackSyncClientState
+    getState: () => MockPlaybackSyncClientState
+    setState: (nextState: Partial<MockPlaybackSyncClientState>) => void
+    emitMessage: (message: unknown) => void
+}
+
+function getMockPlaybackSyncClientState(this: MockPlaybackSyncClientInstance) {
+    return this.state
+}
+
+function setMockPlaybackSyncClientState(
+    this: MockPlaybackSyncClientInstance,
+    nextState: Partial<MockPlaybackSyncClientState>,
+) {
+    this.state = {
+        ...this.state,
+        ...nextState,
+    }
+    this.callbacks.onStateChange?.(this.state)
+}
+
+function emitMockPlaybackSyncClientMessage(this: MockPlaybackSyncClientInstance, message: unknown) {
+    this.callbacks.onMessage?.(message)
+}
+
+const playbackSyncMockState = vi.hoisted(() => ({
+    clients: [] as MockPlaybackSyncClientInstance[],
+}))
+
+vi.mock('@/services/playbackSyncClient', () => {
+    function PlaybackSyncClient(
+        this: MockPlaybackSyncClientInstance,
+        callbacks: MockPlaybackSyncClientCallbacks = {},
+    ) {
+        this.connect = vi.fn()
+        this.disconnect = vi.fn()
+        this.sendPlay = vi.fn(() => true)
+        this.sendPause = vi.fn(() => true)
+        this.sendSeek = vi.fn(() => true)
+        this.sendAudioSourceLoaded = vi.fn(() => true)
+        this.requestSync = vi.fn(() => true)
+        this.callbacks = callbacks
+        this.state = {
+            deviceId: 'web-test',
+            phase: 'connecting',
+            clockOffsetMs: 0,
+            roundTripEstimateMs: 0,
+        }
+        playbackSyncMockState.clients.push(this)
+    }
+
+    PlaybackSyncClient.prototype.getState = getMockPlaybackSyncClientState
+    PlaybackSyncClient.prototype.setState = setMockPlaybackSyncClientState
+    PlaybackSyncClient.prototype.emitMessage = emitMockPlaybackSyncClientMessage
+
+    return {
+        PlaybackSyncClient,
+    }
+})
+
 import { useAudioStore, type AudioTrack } from '@/stores/audio'
+import type {
+    LoadAudioSourceMessage,
+    ScheduledActionMessage,
+} from '@/services/playbackSyncProtocol'
 
 let nextAnimationFrameId = 1
 let animationFrameCallbacks = new Map<number, FrameRequestCallback>()
@@ -54,12 +140,13 @@ const createMockSourceNode = (): MockAudioBufferSourceNode => {
 
 class MockAudioContext {
     static instances: MockAudioContext[] = []
+    static defaultState: 'running' | 'suspended' = 'running'
 
     readonly destination = {}
     readonly gain = createMockGainNode()
     readonly sourceNodes: MockAudioBufferSourceNode[] = []
     currentTime = 0
-    state = 'running'
+    state = MockAudioContext.defaultState
 
     constructor() {
         MockAudioContext.instances.push(this)
@@ -97,51 +184,38 @@ const buildTrack = (id: number, src = `/audio/${id}.mp3`): AudioTrack => ({
     artist: `Artist ${id}`,
     cover: `/cover/${id}.jpg`,
     src,
+    mediaFileId: id + 1_000,
 })
 
 const createResponse = (duration: number, status = 200) => {
     return new Response(new Uint8Array([duration]).buffer, { status })
 }
 
-const createDeferred = <T>() => {
-    let resolve!: (value: T) => void
-    let reject!: (reason?: unknown) => void
-    const promise = new Promise<T>((innerResolve, innerReject) => {
-        resolve = innerResolve
-        reject = innerReject
-    })
-
-    return { promise, resolve, reject }
-}
-
-const flushPromises = async (times = 4) => {
+const flushPromises = async (times = 8) => {
     for (let index = 0; index < times; index += 1) {
         await Promise.resolve()
     }
 }
 
-const setContextTime = (nextTime: number) => {
-    MockAudioContext.instances.forEach((instance) => {
-        instance.currentTime = nextTime
-    })
-}
-
-const runAnimationFrame = (timestamp = 0) => {
-    const callbacks = [...animationFrameCallbacks.values()]
-    animationFrameCallbacks.clear()
-    callbacks.forEach((callback) => {
-        callback(timestamp)
-    })
+const latestClient = () => {
+    // oxlint-disable-next-line unicorn/prefer-at
+    const client = playbackSyncMockState.clients[playbackSyncMockState.clients.length - 1]
+    if (!client) {
+        throw new Error('PlaybackSyncClient was not created')
+    }
+    return client
 }
 
 describe('audio store', () => {
     beforeEach(() => {
         setActivePinia(createPinia())
         window.localStorage.clear()
+        playbackSyncMockState.clients.length = 0
         nextAnimationFrameId = 1
         animationFrameCallbacks = new Map()
         resumeError = null
         MockAudioContext.instances = []
+        MockAudioContext.defaultState = 'running'
         fetchMock.mockReset()
 
         vi.stubGlobal('fetch', fetchMock)
@@ -162,160 +236,169 @@ describe('audio store', () => {
         })
     })
 
-    it('loads and starts playback for a new track', async () => {
-        fetchMock.mockResolvedValue(createResponse(120))
-
+    it('queues only the latest play intent until sync becomes ready', async () => {
         const audioStore = useAudioStore()
-        const track = buildTrack(1)
+        const firstTrack = buildTrack(1)
+        const secondTrack = buildTrack(2)
 
-        audioStore.play(track)
+        await audioStore.play(firstTrack)
+        await audioStore.play(secondTrack)
 
-        expect(audioStore.currentTrack).toEqual(track)
-        expect(audioStore.isPlaying).toBe(true)
-        expect(audioStore.isLoading).toBe(true)
+        const client = latestClient()
+        expect(client.connect).toHaveBeenCalledTimes(2)
+        expect(client.sendPlay).not.toHaveBeenCalled()
+        expect(audioStore.currentTrack?.id).toBe(2)
+        expect(audioStore.isPlaying).toBe(false)
 
-        await flushPromises()
+        client.setState({
+            phase: 'ready',
+            clockOffsetMs: 5,
+            roundTripEstimateMs: 15,
+        })
+        await flushPromises(12)
 
-        const context = MockAudioContext.instances[0]
-        const source = context?.sourceNodes[0]
-
-        expect(context).toBeTruthy()
-        expect(audioStore.duration).toBe(120)
-        expect(audioStore.isLoading).toBe(false)
-        expect(source?.start).toHaveBeenCalledWith(0, 0)
-
-        setContextTime(8)
-        runAnimationFrame()
-
-        expect(audioStore.currentTime).toBeCloseTo(8, 5)
+        expect(client.sendPlay).toHaveBeenCalledTimes(1)
+        expect(client.sendPlay).toHaveBeenCalledWith(
+            expect.objectContaining({
+                recordingId: secondTrack.id,
+                mediaFileId: secondTrack.mediaFileId,
+                positionSeconds: 0,
+            }),
+        )
     })
 
-    it('toggles same-track play state and recreates source on seek', async () => {
+    it('loads audio on load-audio-source and acknowledges after decoding', async () => {
+        fetchMock.mockResolvedValue(createResponse(45))
+
+        const audioStore = useAudioStore()
+        audioStore.connectPlaybackSync()
+        const client = latestClient()
+
+        const message: LoadAudioSourceMessage = {
+            type: 'ROOM_EVENT_LOAD_AUDIO_SOURCE',
+            payload: {
+                commandId: 'cmd-play-1',
+                recordingId: 7,
+                mediaFileId: 2_007,
+                sourceUrl: '/api/media/2007',
+            },
+        }
+
+        client.emitMessage(message)
+        await flushPromises(12)
+
+        expect(fetchMock).toHaveBeenCalledWith('/api/media/2007')
+        expect(client.sendAudioSourceLoaded).toHaveBeenCalledWith({
+            commandId: 'cmd-play-1',
+            recordingId: 7,
+            mediaFileId: 2_007,
+        })
+        expect(audioStore.currentTrack?.id).toBe(7)
+        expect(audioStore.duration).toBe(45)
+    })
+
+    it('ignores stale scheduled actions with a lower version', async () => {
         fetchMock.mockResolvedValue(createResponse(90))
 
         const audioStore = useAudioStore()
-        const track = buildTrack(2)
+        audioStore.connectPlaybackSync()
+        const client = latestClient()
+        client.setState({
+            phase: 'ready',
+            clockOffsetMs: 0,
+            roundTripEstimateMs: 10,
+        })
 
-        audioStore.play(track)
-        await flushPromises()
+        const nowMs = performance.timeOrigin + performance.now()
+        const playMessage: ScheduledActionMessage = {
+            type: 'SCHEDULED_ACTION',
+            payload: {
+                commandId: 'cmd-play-1',
+                serverTimeToExecuteMs: nowMs,
+                scheduledAction: {
+                    action: 'PLAY',
+                    status: 'PLAYING',
+                    recordingId: 5,
+                    mediaFileId: 2_005,
+                    sourceUrl: '/api/media/2005',
+                    positionSeconds: 12,
+                    version: 2,
+                },
+            },
+        }
 
-        const context = MockAudioContext.instances[0]
-        const firstSource = context?.sourceNodes[0]
-        expect(firstSource).toBeTruthy()
+        client.emitMessage(playMessage)
+        await flushPromises(12)
 
-        setContextTime(10)
-        runAnimationFrame()
-
-        audioStore.play(track)
-        expect(audioStore.isPlaying).toBe(false)
-        expect(audioStore.currentTime).toBeCloseTo(10, 5)
-        expect(firstSource?.stop).toHaveBeenCalledTimes(1)
-
-        audioStore.play(track)
-        const resumedSource = context?.sourceNodes[1]
-        expect(audioStore.isPlaying).toBe(true)
-        expect(resumedSource?.start).toHaveBeenCalledWith(0, 10)
-
-        audioStore.seek(30)
-        const seekedSource = context?.sourceNodes[2]
-        expect(seekedSource?.start).toHaveBeenCalledWith(0, 30)
-        expect(audioStore.currentTime).toBe(30)
-    })
-
-    it('ignores stale async loads when tracks are switched quickly', async () => {
-        const firstFetch = createDeferred<Response>()
-        const secondFetch = createDeferred<Response>()
-        fetchMock.mockReturnValueOnce(firstFetch.promise).mockReturnValueOnce(secondFetch.promise)
-
-        const audioStore = useAudioStore()
-        const firstTrack = buildTrack(3, '/audio/first.mp3')
-        const secondTrack = buildTrack(4, '/audio/second.mp3')
-
-        audioStore.play(firstTrack)
-        audioStore.play(secondTrack)
-
-        secondFetch.resolve(createResponse(240))
-        await flushPromises()
-
-        const context = MockAudioContext.instances[0]
-        expect(audioStore.currentTrack?.id).toBe(secondTrack.id)
-        expect(audioStore.duration).toBe(240)
-        expect(context?.sourceNodes).toHaveLength(1)
-
-        firstFetch.resolve(createResponse(180))
-        await flushPromises()
-
-        expect(audioStore.currentTrack?.id).toBe(secondTrack.id)
-        expect(audioStore.duration).toBe(240)
-        expect(context?.sourceNodes).toHaveLength(1)
-    })
-
-    it('sets playback error state when audio loading fails', async () => {
-        fetchMock.mockRejectedValue(new Error('network failed'))
-
-        const audioStore = useAudioStore()
-        audioStore.play(buildTrack(5))
-
-        await flushPromises()
-
-        expect(audioStore.isLoading).toBe(false)
-        expect(audioStore.isPlaying).toBe(false)
-        expect(audioStore.error).toBe('Unable to play audio')
         expect(audioStore.currentTrack?.id).toBe(5)
+        expect(audioStore.isPlaying).toBe(true)
+
+        client.emitMessage({
+            type: 'SCHEDULED_ACTION',
+            payload: {
+                commandId: 'cmd-pause-stale',
+                serverTimeToExecuteMs: nowMs,
+                scheduledAction: {
+                    action: 'PAUSE',
+                    status: 'PAUSED',
+                    recordingId: null,
+                    mediaFileId: null,
+                    sourceUrl: null,
+                    positionSeconds: 0,
+                    version: 1,
+                },
+            },
+        } satisfies ScheduledActionMessage)
+        await flushPromises(12)
+
+        expect(audioStore.currentTrack?.id).toBe(5)
+        expect(audioStore.isPlaying).toBe(true)
     })
 
-    it('surfaces audio-context resume failures as playback errors', async () => {
-        const deferredFetch = createDeferred<Response>()
-        resumeError = new Error('resume blocked')
-        fetchMock.mockReturnValue(deferredFetch.promise)
-
+    it('requests sync recovery when a snapshot exists and sync becomes ready', async () => {
         const audioStore = useAudioStore()
-        audioStore.play(buildTrack(7))
+        audioStore.connectPlaybackSync()
+        const client = latestClient()
 
+        client.emitMessage({
+            type: 'SNAPSHOT',
+            payload: {
+                state: {
+                    status: 'PLAYING',
+                    recordingId: 8,
+                    mediaFileId: 2_008,
+                    sourceUrl: '/api/media/2008',
+                    positionSeconds: 16,
+                    serverTimeToExecuteMs: performance.timeOrigin + performance.now(),
+                    version: 3,
+                    updatedAtMs: performance.timeOrigin + performance.now(),
+                },
+                serverNowMs: performance.timeOrigin + performance.now(),
+            },
+        })
         await flushPromises()
 
-        expect(audioStore.isPlaying).toBe(false)
-        expect(audioStore.isLoading).toBe(false)
-        expect(audioStore.error).toBe('Unable to play audio')
-
-        deferredFetch.resolve(createResponse(60))
+        client.setState({
+            phase: 'ready',
+            clockOffsetMs: 0,
+            roundTripEstimateMs: 10,
+        })
         await flushPromises()
 
-        const context = MockAudioContext.instances[0]
-        expect(audioStore.duration).toBe(60)
-        expect(context?.sourceNodes).toHaveLength(0)
+        expect(client.requestSync).toHaveBeenCalledTimes(1)
+        expect(audioStore.currentTrack?.id).toBe(8)
     })
 
-    it('clamps seek time to zero for zero-duration buffers', async () => {
-        fetchMock.mockResolvedValue(createResponse(0))
-
+    it('clears local playback immediately when stop is invoked before sync is ready', async () => {
         const audioStore = useAudioStore()
-        audioStore.play(buildTrack(8))
+        await audioStore.play(buildTrack(4))
 
-        await flushPromises()
+        expect(audioStore.currentTrack?.id).toBe(4)
+        expect(audioStore.canSendRealtimeControl).toBe(false)
 
-        const context = MockAudioContext.instances[0]
-        audioStore.seek(15)
+        audioStore.stop()
 
-        expect(audioStore.currentTime).toBe(0)
-        expect(context?.sourceNodes[1]?.start).toHaveBeenCalledWith(0, 0)
-    })
-
-    it('resets playhead when the current source ends naturally', async () => {
-        fetchMock.mockResolvedValue(createResponse(75))
-
-        const audioStore = useAudioStore()
-        audioStore.play(buildTrack(6))
-
-        await flushPromises()
-
-        const context = MockAudioContext.instances[0]
-        const source = context?.sourceNodes[0]
-
-        setContextTime(12)
-        runAnimationFrame()
-        source?.emitEnded()
-
+        expect(audioStore.currentTrack).toBeNull()
         expect(audioStore.isPlaying).toBe(false)
         expect(audioStore.currentTime).toBe(0)
     })

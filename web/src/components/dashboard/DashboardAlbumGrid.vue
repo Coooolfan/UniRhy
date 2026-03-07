@@ -19,6 +19,7 @@ type AlbumCard = {
     defaultTrackArtist?: string
     defaultTrackCover?: string
     defaultTrackSrc?: string
+    defaultTrackMediaFileId?: number
 }
 
 const albums = ref<AlbumCard[]>([])
@@ -50,10 +51,13 @@ type Asset = {
     }
 }
 
-const resolveAudio = (assets: readonly Asset[]) => {
+const resolvePlayableAudio = (assets: readonly Asset[]) => {
     const audioAsset = assets.find((asset) => asset.mediaFile.mimeType.startsWith('audio/'))
     if (audioAsset) {
-        return `/api/media/${audioAsset.mediaFile.id}`
+        return {
+            src: `/api/media/${audioAsset.mediaFile.id}`,
+            mediaFileId: audioAsset.mediaFile.id,
+        }
     }
     return undefined
 }
@@ -73,17 +77,22 @@ const playAlbum = async (album: AlbumCard) => {
 
     try {
         playLoadingAlbumId.value = album.id
-        if (!album.defaultTrackSrc || album.defaultRecordingId === undefined) {
+        if (
+            !album.defaultTrackSrc ||
+            album.defaultRecordingId === undefined ||
+            album.defaultTrackMediaFileId === undefined
+        ) {
             const detail = await api.albumController.getAlbum({ id: album.id })
             const defaultTrack = detail.recordings.find(
-                (recording) => recording.defaultInWork && resolveAudio(recording.assets || []),
+                (recording) =>
+                    recording.defaultInWork && resolvePlayableAudio(recording.assets || []),
             )
             const firstPlayableTrack = detail.recordings.find((recording) =>
-                resolveAudio(recording.assets || []),
+                resolvePlayableAudio(recording.assets || []),
             )
             const targetTrack = defaultTrack ?? firstPlayableTrack
-            const targetSrc = resolveAudio(targetTrack?.assets || [])
-            if (!targetTrack || !targetSrc) {
+            const targetAudio = resolvePlayableAudio(targetTrack?.assets || [])
+            if (!targetTrack || !targetAudio) {
                 console.warn('No playable track for album', album.id)
                 return
             }
@@ -95,10 +104,15 @@ const playAlbum = async (album: AlbumCard) => {
             album.defaultTrackCover = targetTrack.cover?.id
                 ? resolveCover(targetTrack.cover.id)
                 : album.cover
-            album.defaultTrackSrc = targetSrc
+            album.defaultTrackSrc = targetAudio.src
+            album.defaultTrackMediaFileId = targetAudio.mediaFileId
         }
 
-        if (!album.defaultTrackSrc || album.defaultRecordingId === undefined) {
+        if (
+            !album.defaultTrackSrc ||
+            album.defaultRecordingId === undefined ||
+            album.defaultTrackMediaFileId === undefined
+        ) {
             return
         }
 
@@ -108,6 +122,7 @@ const playAlbum = async (album: AlbumCard) => {
             artist: album.defaultTrackArtist || album.artist,
             cover: album.defaultTrackCover || album.cover,
             src: album.defaultTrackSrc,
+            mediaFileId: album.defaultTrackMediaFileId,
         })
     } catch (error) {
         console.error('Failed to play album:', error)

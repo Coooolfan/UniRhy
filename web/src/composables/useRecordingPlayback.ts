@@ -7,6 +7,7 @@ export type PlayableRecording = {
     artist: string
     cover: string
     audioSrc?: string
+    mediaFileId?: number
 }
 
 export type UseRecordingPlaybackOptions<T extends PlayableRecording> = {
@@ -47,7 +48,7 @@ export const useRecordingPlayback = <T extends PlayableRecording>(
         const targetRecording = options.recordings.value.find(
             (item) => item.id === targetRecordingId,
         )
-        if (!targetRecording?.audioSrc) {
+        if (!targetRecording?.audioSrc || targetRecording.mediaFileId === undefined) {
             console.warn('No audio source for recording', targetRecordingId)
             return
         }
@@ -61,6 +62,7 @@ export const useRecordingPlayback = <T extends PlayableRecording>(
             artist: targetRecording.artist,
             cover: targetRecording.cover || options.fallbackCover(),
             src: targetRecording.audioSrc,
+            mediaFileId: targetRecording.mediaFileId,
             ...trackExtra,
         })
     }

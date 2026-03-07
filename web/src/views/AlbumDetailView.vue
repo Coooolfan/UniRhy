@@ -13,8 +13,8 @@ import RecordingEditModal, {
 } from '@/components/recording/RecordingEditModal.vue'
 import {
     formatDurationMs,
-    resolveAudio,
     resolveCover,
+    resolvePlayableAudio,
     type RecordingAsset,
 } from '@/composables/recordingMedia'
 import { useRecordingPlayback } from '@/composables/useRecordingPlayback'
@@ -106,20 +106,27 @@ const fetchAlbum = async (id: number) => {
             cover: resolveCover(data.cover?.id),
         }
 
-        recordings.value = (data.recordings || []).map((recording) => ({
-            id: recording.id,
-            title: recording.title || recording.comment || 'Untitled Track',
-            artist: recording.artists.map((artist) => artist.displayName).join(', ') || artistName,
-            label: recording.label || '',
-            cover: resolveCover(recording.cover?.id),
-            audioSrc: resolveAudio((recording.assets || []) as readonly RecordingAsset[]),
-            type: recording.kind,
-            comment: recording.comment,
-            durationMs: recording.durationMs,
-            rawArtists: recording.artists || [],
-            assets: (recording.assets || []) as readonly RecordingAsset[],
-            isDefault: recording.defaultInWork,
-        }))
+        recordings.value = (data.recordings || []).map((recording) => {
+            const playableAudio = resolvePlayableAudio(
+                (recording.assets || []) as readonly RecordingAsset[],
+            )
+            return {
+                id: recording.id,
+                title: recording.title || recording.comment || 'Untitled Track',
+                artist:
+                    recording.artists.map((artist) => artist.displayName).join(', ') || artistName,
+                label: recording.label || '',
+                cover: resolveCover(recording.cover?.id),
+                audioSrc: playableAudio?.src,
+                mediaFileId: playableAudio?.mediaFileId,
+                type: recording.kind,
+                comment: recording.comment,
+                durationMs: recording.durationMs,
+                rawArtists: recording.artists || [],
+                assets: (recording.assets || []) as readonly RecordingAsset[],
+                isDefault: recording.defaultInWork,
+            }
+        })
 
         if (recordings.value.length > 0) {
             const firstPlayableRecording = recordings.value.find((recording) => recording.audioSrc)

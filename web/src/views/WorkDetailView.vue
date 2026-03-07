@@ -15,8 +15,8 @@ import WorkDetailHero from '@/components/work/WorkDetailHero.vue'
 import WorkTitleEditModal from '@/components/work/WorkTitleEditModal.vue'
 import {
     formatDurationMs,
-    resolveAudio,
     resolveCover,
+    resolvePlayableAudio,
     type RecordingAsset,
 } from '@/composables/recordingMedia'
 import { useRecordingMergeState } from '@/composables/useRecordingMergeState'
@@ -89,20 +89,26 @@ const fetchWork = async (id: number) => {
         }
 
         recordings.value = (data.recordings || [])
-            .map((recording) => ({
-                id: recording.id,
-                title: recording.title || recording.comment || 'Untitled Track',
-                artist: recording.artists.map((artist) => artist.displayName).join(', '),
-                type: recording.kind,
-                label: recording.label || '',
-                comment: recording.comment,
-                cover: resolveCover(recording.cover?.id),
-                isDefault: recording.defaultInWork,
-                audioSrc: resolveAudio((recording.assets || []) as readonly RecordingAsset[]),
-                durationMs: recording.durationMs,
-                assets: (recording.assets || []) as readonly RecordingAsset[],
-                rawArtists: recording.artists || [],
-            }))
+            .map((recording) => {
+                const playableAudio = resolvePlayableAudio(
+                    (recording.assets || []) as readonly RecordingAsset[],
+                )
+                return {
+                    id: recording.id,
+                    title: recording.title || recording.comment || 'Untitled Track',
+                    artist: recording.artists.map((artist) => artist.displayName).join(', '),
+                    type: recording.kind,
+                    label: recording.label || '',
+                    comment: recording.comment,
+                    cover: resolveCover(recording.cover?.id),
+                    isDefault: recording.defaultInWork,
+                    audioSrc: playableAudio?.src,
+                    mediaFileId: playableAudio?.mediaFileId,
+                    durationMs: recording.durationMs,
+                    assets: (recording.assets || []) as readonly RecordingAsset[],
+                    rawArtists: recording.artists || [],
+                }
+            })
             .sort((left, right) => {
                 if (left.isDefault === right.isDefault) {
                     return 0

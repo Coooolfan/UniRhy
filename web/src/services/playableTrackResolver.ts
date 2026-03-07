@@ -1,7 +1,7 @@
 import type { AlbumDto, WorkDto } from '@/__generated/model/dto'
 import { api } from '@/ApiInstance'
 import {
-    resolveAudio,
+    resolvePlayableAudio,
     resolveArtistName,
     resolveCover,
     type RecordingAsset,
@@ -17,6 +17,7 @@ export type PlayableTrack = {
     artist: string
     cover: string
     src: string
+    mediaFileId: number
     workId?: number
 }
 
@@ -29,13 +30,14 @@ export type PlayableTrackFallback = {
 const pickPlayableRecording = (recordings: readonly DetailRecording[]) => {
     const defaultTrack = recordings.find(
         (recording) =>
-            recording.defaultInWork && resolveAudio(recording.assets as readonly RecordingAsset[]),
+            recording.defaultInWork &&
+            resolvePlayableAudio(recording.assets as readonly RecordingAsset[]),
     )
     if (defaultTrack) {
         return defaultTrack
     }
     return recordings.find((recording) =>
-        resolveAudio(recording.assets as readonly RecordingAsset[]),
+        resolvePlayableAudio(recording.assets as readonly RecordingAsset[]),
     )
 }
 
@@ -44,8 +46,8 @@ const resolveTrack = (
     detailTitle: string,
     fallback: PlayableTrackFallback,
 ): Omit<PlayableTrack, 'workId'> | undefined => {
-    const src = resolveAudio(recording.assets as readonly RecordingAsset[])
-    if (!src) {
+    const playableAudio = resolvePlayableAudio(recording.assets as readonly RecordingAsset[])
+    if (!playableAudio) {
         return undefined
     }
 
@@ -59,7 +61,8 @@ const resolveTrack = (
             'Untitled Track',
         artist: resolveArtistName(recording.artists) || fallback.artist || 'Unknown Artist',
         cover: recording.cover?.id ? resolveCover(recording.cover.id) : fallback.cover || '',
-        src,
+        src: playableAudio.src,
+        mediaFileId: playableAudio.mediaFileId,
     }
 }
 

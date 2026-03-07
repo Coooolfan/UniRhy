@@ -14,10 +14,25 @@ import {
 } from 'lucide-vue-next'
 
 const audioStore = useAudioStore()
+const pendingSeekValue = ref<number | null>(null)
 
-const seekTo = (e: Event) => {
+const updateSeekPreview = (e: Event) => {
     const target = e.target as HTMLInputElement
-    audioStore.seek(parseFloat(target.value))
+    pendingSeekValue.value = parseFloat(target.value)
+}
+
+const commitSeek = () => {
+    if (pendingSeekValue.value === null || !audioStore.canSendRealtimeControl) {
+        pendingSeekValue.value = null
+        return
+    }
+
+    audioStore.seek(pendingSeekValue.value)
+    pendingSeekValue.value = null
+}
+
+const resetSeekPreview = () => {
+    pendingSeekValue.value = null
 }
 
 const formatTime = (seconds: number) => {
@@ -79,8 +94,34 @@ const progressPercentage = computed(() => {
         return 0
     }
 
-    const percentage = (audioStore.currentTime / totalDuration) * 100
+    const previewTime = pendingSeekValue.value ?? audioStore.currentTime
+    const percentage = (previewTime / totalDuration) * 100
     return Math.min(100, Math.max(0, percentage))
+})
+
+const displayedCurrentTime = computed(() => {
+    return pendingSeekValue.value ?? audioStore.currentTime
+})
+
+const transportDisabled = computed(() => {
+    return audioStore.isPlaying && !audioStore.canSendRealtimeControl
+})
+
+const seekDisabled = computed(() => {
+    return !audioStore.canSendRealtimeControl || audioStore.duration <= 0
+})
+
+const syncStatusClass = computed(() => {
+    switch (audioStore.syncState) {
+        case 'ready':
+            return 'bg-[#EDF5EC] text-[#42653F] border border-[#D5E5D3]'
+        case 'audio_locked':
+            return 'bg-[#FAF0E0] text-[#9A6231] border border-[#EBCFA9]'
+        case 'error':
+            return 'bg-[#FFF1F1] text-[#B15A5A] border border-[#F0D0D0]'
+        default:
+            return 'bg-[#F3EEE6] text-[#8C857B] border border-[#E8E0D4]'
+    }
 })
 </script>
 
@@ -127,6 +168,13 @@ const progressPercentage = computed(() => {
                             <div class="text-xs text-[#8C857B] truncate">
                                 {{ audioStore.currentTrack.artist }}
                             </div>
+                            <div
+                                data-test="sync-status"
+                                class="mt-1 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] tracking-wide"
+                                :class="syncStatusClass"
+                            >
+                                {{ audioStore.syncStatusText }}
+                            </div>
                         </div>
                     </div>
 
@@ -140,10 +188,17 @@ const progressPercentage = computed(() => {
                             </button>
 
                             <button
+                                data-test="transport-button"
                                 @click="
                                     audioStore.isPlaying ? audioStore.pause() : audioStore.resume()
                                 "
+                                :disabled="transportDisabled"
                                 class="w-10 h-10 flex items-center justify-center rounded-full bg-[#C17D46] text-white hover:bg-[#A66635] transition-colors shadow-sm"
+                                :class="
+                                    transportDisabled
+                                        ? 'opacity-50 cursor-not-allowed hover:bg-[#C17D46]'
+                                        : ''
+                                "
                             >
                                 <Pause v-if="audioStore.isPlaying" :size="20" fill="currentColor" />
                                 <Play v-else :size="20" fill="currentColor" class="ml-0.5" />
@@ -161,18 +216,25 @@ const progressPercentage = computed(() => {
                             class="w-full flex items-center gap-3 text-xs text-[#8C857B] font-medium tracking-wide"
                         >
                             <span class="w-10 text-right">{{
-                                formatTime(audioStore.currentTime)
+                                formatTime(displayedCurrentTime)
                             }}</span>
                             <div
-                                class="relative flex-1 h-1 bg-[#EFEBE4] rounded-full group cursor-pointer"
+                                class="relative flex-1 h-1 bg-[#EFEBE4] rounded-full group"
+                                :class="seekDisabled ? 'cursor-not-allowed' : 'cursor-pointer'"
                             >
                                 <input
+                                    data-test="seek-input"
                                     type="range"
                                     min="0"
                                     :max="audioStore.duration || 100"
-                                    :value="audioStore.currentTime"
-                                    @input="seekTo"
-                                    class="absolute inset-0 w-full h-full opacity-0 z-10 cursor-pointer"
+                                    :value="displayedCurrentTime"
+                                    :disabled="seekDisabled"
+                                    @input="updateSeekPreview"
+                                    @change="commitSeek"
+                                    @pointerup="commitSeek"
+                                    @pointercancel="resetSeekPreview"
+                                    class="absolute inset-0 w-full h-full opacity-0 z-10"
+                                    :class="seekDisabled ? 'cursor-not-allowed' : 'cursor-pointer'"
                                 />
                                 <div
                                     class="absolute top-0 left-0 h-full bg-[#C17D46] rounded-full pointer-events-none"

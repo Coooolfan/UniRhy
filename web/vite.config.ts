@@ -6,6 +6,7 @@ import vueDevTools from 'vite-plugin-vue-devtools'
 import tailwindcss from '@tailwindcss/vite'
 
 const devServer = 'http://localhost:8654'
+const devWebSocketServer = devServer.replace(/^http/i, 'ws')
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -19,6 +20,10 @@ export default defineConfig({
         proxy: {
             '/api': {
                 target: devServer,
+            },
+            '/ws': {
+                target: devWebSocketServer,
+                ws: true,
             },
         },
     },

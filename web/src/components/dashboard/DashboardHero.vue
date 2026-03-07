@@ -13,6 +13,7 @@ type Album = {
     artist: string
     cover: string
     audioSrc?: string
+    mediaFileId?: number
 }
 
 type FeaturedStatus = 'loading' | 'ready' | 'empty'
@@ -46,10 +47,13 @@ type Asset = {
     }
 }
 
-const resolveAudio = (assets: readonly Asset[]) => {
+const resolvePlayableAudio = (assets: readonly Asset[]) => {
     const audioAsset = assets.find((asset) => asset.mediaFile.mimeType.startsWith('audio/'))
     if (audioAsset) {
-        return `/api/media/${audioAsset.mediaFile.id}`
+        return {
+            src: `/api/media/${audioAsset.mediaFile.id}`,
+            mediaFileId: audioAsset.mediaFile.id,
+        }
     }
     return undefined
 }
@@ -93,8 +97,9 @@ const handleFeaturedAction = () => {
     const featuredAlbum = album.value
     const recordingId = featuredAlbum.recordingId
     const audioSrc = featuredAlbum.audioSrc
+    const mediaFileId = featuredAlbum.mediaFileId
 
-    if (recordingId === undefined || audioSrc === undefined) {
+    if (recordingId === undefined || audioSrc === undefined || mediaFileId === undefined) {
         return
     }
 
@@ -104,6 +109,7 @@ const handleFeaturedAction = () => {
         artist: featuredAlbum.artist,
         cover: featuredAlbum.cover,
         src: audioSrc,
+        mediaFileId,
         workId: featuredAlbum.workId,
     })
 }
@@ -122,9 +128,9 @@ onMounted(async () => {
 
         const defaultRecording = work.recordings?.find((recording) => recording.defaultInWork)
         const featuredRecording = defaultRecording ?? work.recordings?.[0]
-        const featuredAudioSrc = resolveAudio(featuredRecording?.assets || [])
+        const featuredAudio = resolvePlayableAudio(featuredRecording?.assets || [])
 
-        if (!featuredRecording || !featuredAudioSrc) {
+        if (!featuredRecording || !featuredAudio) {
             featuredStatus.value = 'empty'
             return
         }
@@ -139,7 +145,8 @@ onMounted(async () => {
             cover: featuredRecording.cover?.id
                 ? `/api/media/${featuredRecording.cover.id}`
                 : defaultFeaturedAlbum.cover,
-            audioSrc: featuredAudioSrc,
+            audioSrc: featuredAudio.src,
+            mediaFileId: featuredAudio.mediaFileId,
         }
         featuredStatus.value = 'ready'
     } catch (e) {

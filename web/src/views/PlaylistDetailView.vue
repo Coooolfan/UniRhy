@@ -8,7 +8,11 @@ import MediaListItem from '@/components/MediaListItem.vue'
 import MediaListPanel from '@/components/MediaListPanel.vue'
 import PlaylistEditModal from '@/components/playlist/PlaylistEditModal.vue'
 import PlaylistRemoveRecordingModal from '@/components/playlist/PlaylistRemoveRecordingModal.vue'
-import { resolveAudio, resolveCover, type RecordingAsset } from '@/composables/recordingMedia'
+import {
+    resolveCover,
+    resolvePlayableAudio,
+    type RecordingAsset,
+} from '@/composables/recordingMedia'
 import { useRecordingPlayback, type PlayableRecording } from '@/composables/useRecordingPlayback'
 import { usePlaylistStore } from '@/stores/playlist'
 
@@ -78,16 +82,22 @@ const fetchPlaylist = async (id: number) => {
             cover: firstCover ? resolveCover(firstCover.id) : '',
         }
 
-        recordings.value = (data.recordings || []).map((recording) => ({
-            id: recording.id,
-            title: recording.title || recording.comment || 'Untitled Track',
-            artist:
-                recording.artists.map((artist) => artist.displayName).join(', ') ||
-                'Unknown Artist',
-            label: recording.label || '',
-            cover: resolveCover(recording.cover?.id),
-            audioSrc: resolveAudio((recording.assets || []) as readonly RecordingAsset[]),
-        }))
+        recordings.value = (data.recordings || []).map((recording) => {
+            const playableAudio = resolvePlayableAudio(
+                (recording.assets || []) as readonly RecordingAsset[],
+            )
+            return {
+                id: recording.id,
+                title: recording.title || recording.comment || 'Untitled Track',
+                artist:
+                    recording.artists.map((artist) => artist.displayName).join(', ') ||
+                    'Unknown Artist',
+                label: recording.label || '',
+                cover: resolveCover(recording.cover?.id),
+                audioSrc: playableAudio?.src,
+                mediaFileId: playableAudio?.mediaFileId,
+            }
+        })
 
         if (recordings.value.length > 0) {
             const firstPlayableRecording = recordings.value.find((recording) => recording.audioSrc)
