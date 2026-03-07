@@ -264,7 +264,7 @@ onBeforeUnmount(() => {
                         </dl>
 
                         <div
-                            class="grid gap-2 rounded-[18px] border border-[#E7DED2] bg-[#F5EEE4] p-3 xl:grid-cols-3"
+                            class="grid gap-2 rounded-[18px] h-full border border-[#E7DED2] bg-[#F5EEE4] p-3 xl:grid-cols-3"
                         >
                             <div>
                                 <div class="text-xs text-[#8F8376]">Last NTP Request</div>
