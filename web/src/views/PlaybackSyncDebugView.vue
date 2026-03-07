@@ -29,6 +29,14 @@ const recentMeasurements = computed(() => {
     return reverseCopy(measurements).slice(0, 4)
 })
 
+const clockSyncUncertaintyMs = computed(() => {
+    const rttMs = debugSnapshot.value.roundTripEstimateMs
+    if (!Number.isFinite(rttMs) || rttMs < 0) {
+        return null
+    }
+    return rttMs / 2
+})
+
 const currentTrackLabel = computed(() => {
     const track = debugSnapshot.value.currentTrack
     if (!track) {
@@ -151,7 +159,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-    <div class="min-h-full bg-[#F7F3EC] text-[#3C342C]">
+    <div class="min-h-full bg-dashboard-main text-[#3C342C]">
         <DashboardTopBar />
 
         <div class="mx-auto w-full max-w-7xl px-6 py-4 pb-40 md:pb-44">
@@ -336,13 +344,12 @@ onBeforeUnmount(() => {
                                 </div>
                             </div>
                             <div class="rounded-2xl bg-[#FBF7F2] px-4 py-3">
-                                <div class="text-xs text-[#9A8E80]">Last Sample</div>
-                                <div class="mt-1 font-mono text-lg text-[#4E4034]">
-                                    {{
-                                        recentMeasurements.length > 0
-                                            ? formatMilliseconds(recentMeasurements[0]?.rttMs)
-                                            : '-'
-                                    }}
+                                <div class="text-xs text-[#9A8E80]">Clock Sync Uncertainty</div>
+                                <div
+                                    data-test="debug-clock-sync-uncertainty"
+                                    class="mt-1 font-mono text-lg text-[#4E4034]"
+                                >
+                                    {{ formatMilliseconds(clockSyncUncertaintyMs) }}
                                 </div>
                             </div>
                         </div>

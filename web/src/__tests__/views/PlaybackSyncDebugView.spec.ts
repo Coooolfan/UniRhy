@@ -188,6 +188,7 @@ describe('PlaybackSyncDebugView', () => {
 
         expect(wrapper.get('[data-test="debug-panel-overview"]').text()).toContain('同步已就绪')
         expect(wrapper.get('[data-test="debug-device-id"]').text()).toContain('web-test')
+        expect(wrapper.get('[data-test="debug-clock-sync-uncertainty"]').text()).toContain('9.0ms')
         expect(wrapper.get('[data-test="debug-panel-events"]').text()).toContain('SCHEDULED_ACTION')
         expect(wrapper.get('[data-test="debug-local-execution"]').text()).toContain('250ms')
     })
