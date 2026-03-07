@@ -5,6 +5,7 @@ import type {
     PlaybackControlPayload,
     ServerPlaybackSyncMessage,
 } from '@/services/playbackSyncProtocol'
+import { nowClientMs } from '@/utils/time'
 
 const DEVICE_ID_STORAGE_KEY = 'unirhy.playback-sync.device-id'
 const INITIAL_SAMPLE_COUNT = 20
@@ -46,13 +47,6 @@ export type PlaybackSyncClientState = {
 export type PlaybackSyncClientCallbacks = {
     onMessage?: (message: ServerPlaybackSyncMessage) => void
     onStateChange?: (state: PlaybackSyncClientState) => void
-}
-
-const nowClientMs = () => {
-    if (typeof performance !== 'undefined') {
-        return performance.timeOrigin + performance.now()
-    }
-    return Date.now()
 }
 
 const average = (values: number[]) => values.reduce((sum, value) => sum + value, 0) / values.length

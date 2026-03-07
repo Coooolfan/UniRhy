@@ -15,8 +15,9 @@ import WorkDetailHero from '@/components/work/WorkDetailHero.vue'
 import WorkTitleEditModal from '@/components/work/WorkTitleEditModal.vue'
 import {
     formatDurationMs,
+    normalizeRecordings,
+    pickInitialRecordingId,
     resolveCover,
-    resolvePlayableAudio,
     type RecordingAsset,
 } from '@/composables/recordingMedia'
 import { useRecordingMergeState } from '@/composables/useRecordingMergeState'
@@ -64,6 +65,10 @@ type Recording = RecordingPreview & {
     durationMs: number
 }
 
+type WorkRecordingDto = Awaited<
+    ReturnType<typeof api.workController.getWorkById>
+>['recordings'][number]
+
 const workData = ref<WorkData>({
     title: '',
     artist: '',
@@ -88,40 +93,28 @@ const fetchWork = async (id: number) => {
             cover: resolveCover(defaultRecording?.cover?.id),
         }
 
-        recordings.value = (data.recordings || [])
-            .map((recording) => {
-                const playableAudio = resolvePlayableAudio(
-                    (recording.assets || []) as readonly RecordingAsset[],
-                )
-                return {
-                    id: recording.id,
-                    title: recording.title || recording.comment || 'Untitled Track',
-                    artist: recording.artists.map((artist) => artist.displayName).join(', '),
+        recordings.value = normalizeRecordings(
+            (data.recordings || []) as readonly WorkRecordingDto[],
+            {
+                transform: (recording, base) => ({
+                    ...base,
                     type: recording.kind,
                     label: recording.label || '',
                     comment: recording.comment,
-                    cover: resolveCover(recording.cover?.id),
                     isDefault: recording.defaultInWork,
-                    audioSrc: playableAudio?.src,
-                    mediaFileId: playableAudio?.mediaFileId,
                     durationMs: recording.durationMs,
                     assets: (recording.assets || []) as readonly RecordingAsset[],
                     rawArtists: recording.artists || [],
-                }
-            })
-            .sort((left, right) => {
-                if (left.isDefault === right.isDefault) {
-                    return 0
-                }
-                return left.isDefault ? -1 : 1
-            })
+                }),
+            },
+        ).sort((left, right) => {
+            if (left.isDefault === right.isDefault) {
+                return 0
+            }
+            return left.isDefault ? -1 : 1
+        })
 
-        if (recordings.value.length > 0) {
-            const defaultRec = recordings.value.find((recording) => recording.isDefault)
-            currentRecordingId.value = defaultRec ? defaultRec.id : recordings.value[0]!.id
-        } else {
-            currentRecordingId.value = null
-        }
+        currentRecordingId.value = pickInitialRecordingId(recordings.value, 'default-first')
 
         resetMergeState()
     } catch (error) {

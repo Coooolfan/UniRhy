@@ -13,8 +13,10 @@ import RecordingEditModal, {
 } from '@/components/recording/RecordingEditModal.vue'
 import {
     formatDurationMs,
+    normalizeRecordings,
+    pickInitialRecordingId,
     resolveCover,
-    resolvePlayableAudio,
+    type NormalizedRecordingBase,
     type RecordingAsset,
 } from '@/composables/recordingMedia'
 import { useRecordingPlayback } from '@/composables/useRecordingPlayback'
@@ -58,6 +60,10 @@ type Recording = RecordingPreview & {
     isDefault: boolean
     durationMs: number
 }
+
+type AlbumRecordingDto = Awaited<
+    ReturnType<typeof api.albumController.getAlbum>
+>['recordings'][number]
 
 const albumData = ref<AlbumData>({
     title: '',
@@ -106,34 +112,23 @@ const fetchAlbum = async (id: number) => {
             cover: resolveCover(data.cover?.id),
         }
 
-        recordings.value = (data.recordings || []).map((recording) => {
-            const playableAudio = resolvePlayableAudio(
-                (recording.assets || []) as readonly RecordingAsset[],
-            )
-            return {
-                id: recording.id,
-                title: recording.title || recording.comment || 'Untitled Track',
-                artist:
-                    recording.artists.map((artist) => artist.displayName).join(', ') || artistName,
-                label: recording.label || '',
-                cover: resolveCover(recording.cover?.id),
-                audioSrc: playableAudio?.src,
-                mediaFileId: playableAudio?.mediaFileId,
-                type: recording.kind,
-                comment: recording.comment,
-                durationMs: recording.durationMs,
-                rawArtists: recording.artists || [],
-                assets: (recording.assets || []) as readonly RecordingAsset[],
-                isDefault: recording.defaultInWork,
-            }
-        })
-
-        if (recordings.value.length > 0) {
-            const firstPlayableRecording = recordings.value.find((recording) => recording.audioSrc)
-            currentRecordingId.value = firstPlayableRecording?.id ?? recordings.value[0]?.id ?? null
-        } else {
-            currentRecordingId.value = null
-        }
+        recordings.value = normalizeRecordings(
+            (data.recordings || []) as readonly AlbumRecordingDto[],
+            {
+                fallbackArtist: artistName,
+                transform: (recording: AlbumRecordingDto, base: NormalizedRecordingBase) => ({
+                    ...base,
+                    label: recording.label || '',
+                    type: recording.kind,
+                    comment: recording.comment,
+                    durationMs: recording.durationMs,
+                    rawArtists: recording.artists || [],
+                    assets: (recording.assets || []) as readonly RecordingAsset[],
+                    isDefault: recording.defaultInWork,
+                }),
+            },
+        )
+        currentRecordingId.value = pickInitialRecordingId(recordings.value, 'first-playable')
     } catch (error) {
         console.error('Failed to fetch album details:', error)
     } finally {

@@ -9,9 +9,9 @@ import MediaListPanel from '@/components/MediaListPanel.vue'
 import PlaylistEditModal from '@/components/playlist/PlaylistEditModal.vue'
 import PlaylistRemoveRecordingModal from '@/components/playlist/PlaylistRemoveRecordingModal.vue'
 import {
+    normalizeRecordings,
+    pickInitialRecordingId,
     resolveCover,
-    resolvePlayableAudio,
-    type RecordingAsset,
 } from '@/composables/recordingMedia'
 import { useRecordingPlayback, type PlayableRecording } from '@/composables/useRecordingPlayback'
 import { usePlaylistStore } from '@/stores/playlist'
@@ -43,6 +43,10 @@ type PlaylistData = {
 type Recording = PlayableRecording & {
     label: string
 }
+
+type PlaylistRecordingDto = Awaited<
+    ReturnType<typeof api.playlistController.getPlaylist>
+>['recordings'][number]
 
 const playlistData = ref<PlaylistData>({
     title: '',
@@ -82,29 +86,16 @@ const fetchPlaylist = async (id: number) => {
             cover: firstCover ? resolveCover(firstCover.id) : '',
         }
 
-        recordings.value = (data.recordings || []).map((recording) => {
-            const playableAudio = resolvePlayableAudio(
-                (recording.assets || []) as readonly RecordingAsset[],
-            )
-            return {
-                id: recording.id,
-                title: recording.title || recording.comment || 'Untitled Track',
-                artist:
-                    recording.artists.map((artist) => artist.displayName).join(', ') ||
-                    'Unknown Artist',
-                label: recording.label || '',
-                cover: resolveCover(recording.cover?.id),
-                audioSrc: playableAudio?.src,
-                mediaFileId: playableAudio?.mediaFileId,
-            }
-        })
-
-        if (recordings.value.length > 0) {
-            const firstPlayableRecording = recordings.value.find((recording) => recording.audioSrc)
-            currentRecordingId.value = firstPlayableRecording?.id ?? recordings.value[0]?.id ?? null
-        } else {
-            currentRecordingId.value = null
-        }
+        recordings.value = normalizeRecordings(
+            (data.recordings || []) as readonly PlaylistRecordingDto[],
+            {
+                transform: (recording, base) => ({
+                    ...base,
+                    label: recording.label || '',
+                }),
+            },
+        )
+        currentRecordingId.value = pickInitialRecordingId(recordings.value, 'first-playable')
     } catch (error) {
         console.error('Failed to fetch playlist details:', error)
     } finally {
@@ -252,8 +243,7 @@ const confirmRemoveRecording = async () => {
         recordings.value = nextRecordings
 
         if (currentRecordingId.value === recording.id) {
-            const firstPlayableRecording = nextRecordings.find((item) => item.audioSrc)
-            currentRecordingId.value = firstPlayableRecording?.id ?? nextRecordings[0]?.id ?? null
+            currentRecordingId.value = pickInitialRecordingId(nextRecordings, 'first-playable')
         }
 
         if (audioStore.currentTrack?.id === recording.id) {

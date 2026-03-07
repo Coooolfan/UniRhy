@@ -26,8 +26,10 @@ vi.mock('@/ApiInstance', async (importOriginal) => {
 
 import { api } from '@/ApiInstance'
 import DashboardAlbumGrid from '@/components/dashboard/DashboardAlbumGrid.vue'
+import { useAudioStore } from '@/stores/audio'
 
 const listAlbumsMock = vi.mocked(api.albumController.listAlbums)
+const getAlbumMock = vi.mocked(api.albumController.getAlbum)
 
 const flushView = async () => {
     await Promise.resolve()
@@ -55,6 +57,7 @@ describe('DashboardAlbumGrid', () => {
     beforeEach(() => {
         setActivePinia(createPinia())
         listAlbumsMock.mockReset()
+        getAlbumMock.mockReset()
         pushMock.mockReset()
     })
 
@@ -102,5 +105,102 @@ describe('DashboardAlbumGrid', () => {
         expect(wrapper.text()).toContain('Artist A')
         expect(wrapper.text()).not.toContain('唱片架空空如也')
         expect(listAlbumsMock).toHaveBeenCalledWith({ pageIndex: 0, pageSize: 10 })
+    })
+
+    it('prefers default playable recording when loading album playback details', async () => {
+        listAlbumsMock.mockResolvedValueOnce(buildAlbumPage())
+        getAlbumMock.mockResolvedValueOnce({
+            id: 101,
+            title: 'Album A',
+            kind: 'Album',
+            comment: 'Album Comment',
+            recordings: [
+                {
+                    id: 501,
+                    kind: 'Demo',
+                    title: 'Unplayable Default',
+                    comment: '',
+                    durationMs: 180000,
+                    defaultInWork: true,
+                    assets: [],
+                    artists: [{ id: 801, displayName: 'Artist A', alias: [], comment: '' }],
+                    cover: undefined,
+                },
+                {
+                    id: 502,
+                    kind: 'Studio',
+                    title: 'Playable Default',
+                    comment: '',
+                    durationMs: 200000,
+                    defaultInWork: true,
+                    assets: [
+                        {
+                            id: 901,
+                            comment: 'Audio 602',
+                            mediaFile: {
+                                id: 602,
+                                sha256: 'hash-602',
+                                mimeType: 'audio/mpeg',
+                                size: 123,
+                                objectKey: 'track-602.mp3',
+                            },
+                        },
+                    ],
+                    artists: [{ id: 802, displayName: 'Artist B', alias: [], comment: '' }],
+                    cover: {
+                        id: 702,
+                        sha256: 'cover-702',
+                        objectKey: 'cover-702.jpg',
+                        mimeType: 'image/jpeg',
+                        size: 456,
+                    },
+                },
+                {
+                    id: 503,
+                    kind: 'Live',
+                    title: 'Playable Fallback',
+                    comment: '',
+                    durationMs: 210000,
+                    defaultInWork: false,
+                    assets: [
+                        {
+                            id: 902,
+                            comment: 'Audio 603',
+                            mediaFile: {
+                                id: 603,
+                                sha256: 'hash-603',
+                                mimeType: 'audio/mpeg',
+                                size: 124,
+                                objectKey: 'track-603.mp3',
+                            },
+                        },
+                    ],
+                    artists: [{ id: 803, displayName: 'Artist C', alias: [], comment: '' }],
+                    cover: undefined,
+                },
+            ],
+        })
+
+        const wrapper = mount(DashboardAlbumGrid)
+        await flushView()
+
+        const playButtons = wrapper.findAll('button')
+        const albumPlayButton = playButtons.find((button) => button.attributes('type') === 'button')
+        expect(albumPlayButton).toBeTruthy()
+
+        await albumPlayButton!.trigger('click')
+        await flushView()
+
+        const audioStore = useAudioStore()
+        expect(audioStore.currentTrack).toEqual(
+            expect.objectContaining({
+                id: 502,
+                title: 'Playable Default',
+                artist: 'Artist B',
+                cover: '/api/media/702',
+                src: '/api/media/602',
+                mediaFileId: 602,
+            }),
+        )
     })
 })

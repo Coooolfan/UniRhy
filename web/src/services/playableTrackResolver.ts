@@ -1,10 +1,10 @@
 import type { AlbumDto, WorkDto } from '@/__generated/model/dto'
 import { api } from '@/ApiInstance'
 import {
+    pickPlayableRecordingEntry,
     resolvePlayableAudio,
     resolveArtistName,
     resolveCover,
-    type RecordingAsset,
 } from '@/composables/recordingMedia'
 
 type AlbumDetail = AlbumDto['AlbumController/DETAIL_ALBUM_FETCHER']
@@ -27,26 +27,12 @@ export type PlayableTrackFallback = {
     cover?: string
 }
 
-const pickPlayableRecording = (recordings: readonly DetailRecording[]) => {
-    const defaultTrack = recordings.find(
-        (recording) =>
-            recording.defaultInWork &&
-            resolvePlayableAudio(recording.assets as readonly RecordingAsset[]),
-    )
-    if (defaultTrack) {
-        return defaultTrack
-    }
-    return recordings.find((recording) =>
-        resolvePlayableAudio(recording.assets as readonly RecordingAsset[]),
-    )
-}
-
 const resolveTrack = (
     recording: DetailRecording,
     detailTitle: string,
     fallback: PlayableTrackFallback,
 ): Omit<PlayableTrack, 'workId'> | undefined => {
-    const playableAudio = resolvePlayableAudio(recording.assets as readonly RecordingAsset[])
+    const playableAudio = resolvePlayableAudio(recording.assets)
     if (!playableAudio) {
         return undefined
     }
@@ -71,11 +57,11 @@ export const resolveAlbumPlayableTrack = async (
     fallback: PlayableTrackFallback = {},
 ): Promise<PlayableTrack | undefined> => {
     const detail = await api.albumController.getAlbum({ id: albumId })
-    const recording = pickPlayableRecording(detail.recordings)
-    if (!recording) {
+    const playableEntry = pickPlayableRecordingEntry(detail.recordings)
+    if (!playableEntry) {
         return undefined
     }
-    return resolveTrack(recording, detail.title, fallback)
+    return resolveTrack(playableEntry.recording, detail.title, fallback)
 }
 
 export const resolveWorkPlayableTrack = async (
@@ -83,12 +69,12 @@ export const resolveWorkPlayableTrack = async (
     fallback: PlayableTrackFallback = {},
 ): Promise<PlayableTrack | undefined> => {
     const detail = await api.workController.getWorkById({ id: workId })
-    const recording = pickPlayableRecording(detail.recordings)
-    if (!recording) {
+    const playableEntry = pickPlayableRecordingEntry(detail.recordings)
+    if (!playableEntry) {
         return undefined
     }
 
-    const track = resolveTrack(recording, detail.title, fallback)
+    const track = resolveTrack(playableEntry.recording, detail.title, fallback)
     if (!track) {
         return undefined
     }

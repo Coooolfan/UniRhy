@@ -8,6 +8,7 @@ import type {
     ServerPlaybackSyncMessage,
     SnapshotPayload,
 } from '@/services/playbackSyncProtocol'
+import { nowClientMs } from '@/utils/time'
 
 export type AudioTrack = {
     id: number
@@ -33,13 +34,13 @@ type QueuedPlayIntent = {
 }
 
 type BufferLoadState = {
-    token: number
-    track: AudioTrack
+    mediaFileId: number
     promise: Promise<AudioBuffer | null>
 }
 
 const VOLUME_STORAGE_KEY = 'unirhy.audio.volume'
 const PLAYBACK_ERROR_MESSAGE = 'Unable to play audio'
+const MAX_KNOWN_TRACKS = 200
 
 const normalizeVolume = (volume: number) => {
     return Math.max(0, Math.min(1, volume))
@@ -92,13 +93,6 @@ const isNil = (value: unknown): value is null | undefined => {
     return value === null || value === undefined
 }
 
-const nowClientMs = () => {
-    if (typeof performance !== 'undefined') {
-        return performance.timeOrigin + performance.now()
-    }
-    return Date.now()
-}
-
 const cloneTrack = (track: AudioTrack): AudioTrack => ({
     ...track,
 })
@@ -131,7 +125,6 @@ export const useAudioStore = defineStore('audio', () => {
     const queuedPlayIntent = ref<QueuedPlayIntent | null>(null)
     const awaitingSyncRecovery = ref(false)
     const audioUnlockRequired = ref(false)
-    const loadToken = ref(0)
     const activeLoad = shallowRef<BufferLoadState | null>(null)
 
     const knownTracks = new Map<number, AudioTrack>()
@@ -181,7 +174,16 @@ export const useAudioStore = defineStore('audio', () => {
     const canSendRealtimeControl = computed(() => effectiveSyncState.value === 'ready')
 
     const rememberTrack = (track: AudioTrack) => {
+        if (knownTracks.has(track.id)) {
+            knownTracks.delete(track.id)
+        }
         knownTracks.set(track.id, cloneTrack(track))
+        if (knownTracks.size > MAX_KNOWN_TRACKS) {
+            const oldestKey = knownTracks.keys().next().value
+            if (oldestKey !== undefined) {
+                knownTracks.delete(oldestKey)
+            }
+        }
     }
 
     const getEstimatedServerNowMs = () => {
@@ -303,6 +305,13 @@ export const useAudioStore = defineStore('audio', () => {
         return context
     }
 
+    const isSameBufferTrack = (track: AudioTrack) => {
+        return (
+            currentBufferTrack.value?.mediaFileId === track.mediaFileId &&
+            currentBuffer.value !== null
+        )
+    }
+
     const cleanupSourceNode = (node: AudioBufferSourceNode) => {
         const endedListener = sourceEndedListeners.get(node)
         if (endedListener) {
@@ -327,8 +336,9 @@ export const useAudioStore = defineStore('audio', () => {
         try {
             node.stop()
         } catch {
-            cleanupSourceNode(node)
+            // Ignore stop failures and continue explicit cleanup below.
         }
+        cleanupSourceNode(node)
     }
 
     const stopAllSourceNodes = () => {
@@ -336,6 +346,7 @@ export const useAudioStore = defineStore('audio', () => {
         nodes.forEach((node) => {
             stopSourceNode(node)
         })
+        liveSourceNodes.clear()
         sourceNode.value = null
     }
 
@@ -374,12 +385,30 @@ export const useAudioStore = defineStore('audio', () => {
         node.connect(gain)
 
         const endedListener: EventListener = () => {
-            handlePlaybackEnded(node)
+            try {
+                handlePlaybackEnded(node)
+            } catch (caughtError) {
+                cleanupSourceNode(node)
+                if (sourceNode.value === node) {
+                    sourceNode.value = null
+                }
+                stopAnimationLoop()
+                isPlaying.value = false
+                playbackStartContextTime.value = 0
+                playbackOffsetSec.value = 0
+                currentTime.value = 0
+                console.error('Failed to finalize audio playback', caughtError)
+            }
         }
         sourceEndedListeners.set(node, endedListener)
         node.addEventListener('ended', endedListener)
         liveSourceNodes.add(node)
         return node
+    }
+
+    const invalidateActiveLoad = () => {
+        activeLoad.value = null
+        isLoading.value = false
     }
 
     const releaseLoadedBuffer = () => {
@@ -389,12 +418,12 @@ export const useAudioStore = defineStore('audio', () => {
     }
 
     const clearTrackState = () => {
+        invalidateActiveLoad()
         clearScheduledTimers()
         stopAnimationLoop()
         stopAllSourceNodes()
         currentTrack.value = null
         isPlaying.value = false
-        isLoading.value = false
         playbackStartContextTime.value = 0
         playbackOffsetSec.value = 0
         currentTime.value = 0
@@ -442,8 +471,8 @@ export const useAudioStore = defineStore('audio', () => {
         currentTime.value = positionSeconds
         error.value = null
 
-        if (currentBufferTrack.value?.mediaFileId === track.mediaFileId && currentBuffer.value) {
-            duration.value = currentBuffer.value.duration
+        if (isSameBufferTrack(track)) {
+            duration.value = currentBuffer.value!.duration
             updatePausedTime(positionSeconds)
         } else {
             duration.value = 0
@@ -453,15 +482,15 @@ export const useAudioStore = defineStore('audio', () => {
     const ensureTrackBuffer = (track: AudioTrack) => {
         rememberTrack(track)
 
-        if (currentBuffer.value && currentBufferTrack.value?.mediaFileId === track.mediaFileId) {
+        if (isSameBufferTrack(track)) {
             if (currentTrack.value?.mediaFileId === track.mediaFileId) {
-                duration.value = currentBuffer.value.duration
+                duration.value = currentBuffer.value!.duration
             }
             return currentBuffer.value
         }
 
         const existingLoad = activeLoad.value
-        if (existingLoad && existingLoad.track.mediaFileId === track.mediaFileId) {
+        if (existingLoad && existingLoad.mediaFileId === track.mediaFileId) {
             return existingLoad.promise
         }
 
@@ -471,10 +500,14 @@ export const useAudioStore = defineStore('audio', () => {
             return null
         }
 
-        const token = loadToken.value + 1
-        loadToken.value = token
+        invalidateActiveLoad()
         isLoading.value = true
         error.value = null
+
+        const loadState: BufferLoadState = {
+            mediaFileId: track.mediaFileId,
+            promise: Promise.resolve(null),
+        }
 
         const promise = fetch(track.src)
             .then(async (response) => {
@@ -484,7 +517,7 @@ export const useAudioStore = defineStore('audio', () => {
 
                 const arrayBuffer = await response.arrayBuffer()
                 const buffer = await context.decodeAudioData(arrayBuffer)
-                if (loadToken.value !== token) {
+                if (activeLoad.value !== loadState) {
                     return null
                 }
 
@@ -498,23 +531,20 @@ export const useAudioStore = defineStore('audio', () => {
                 return buffer
             })
             .catch(() => {
-                if (loadToken.value === token) {
+                if (activeLoad.value === loadState) {
                     isLoading.value = false
                     error.value = PLAYBACK_ERROR_MESSAGE
                 }
                 return null
             })
             .finally(() => {
-                if (activeLoad.value?.token === token) {
+                if (activeLoad.value === loadState) {
                     activeLoad.value = null
                 }
             })
 
-        activeLoad.value = {
-            token,
-            track: cloneTrack(track),
-            promise,
-        }
+        loadState.promise = promise
+        activeLoad.value = loadState
 
         return promise
     }
@@ -573,11 +603,8 @@ export const useAudioStore = defineStore('audio', () => {
         if (track) {
             rememberTrack(track)
             currentTrack.value = cloneTrack(track)
-            if (
-                currentBufferTrack.value?.mediaFileId === track.mediaFileId &&
-                currentBuffer.value
-            ) {
-                duration.value = currentBuffer.value.duration
+            if (isSameBufferTrack(track)) {
+                duration.value = currentBuffer.value!.duration
             }
             updatePausedTime(positionSeconds)
             return
@@ -724,8 +751,8 @@ export const useAudioStore = defineStore('audio', () => {
                 : payload.state.positionSeconds
         updatePausedTime(recoveredPosition)
 
-        if (currentBufferTrack.value?.mediaFileId === track.mediaFileId && currentBuffer.value) {
-            duration.value = currentBuffer.value.duration
+        if (isSameBufferTrack(track)) {
+            duration.value = currentBuffer.value!.duration
         } else {
             duration.value = 0
         }
@@ -989,13 +1016,35 @@ export const useAudioStore = defineStore('audio', () => {
         client.connect()
     }
 
+    const destroyAudioContext = () => {
+        const context = audioContext.value
+        audioContext.value = null
+        gainNode.value = null
+
+        if (!context || typeof context.close !== 'function') {
+            return
+        }
+
+        void context.close().catch(() => {
+            // Ignore close failures during teardown.
+        })
+    }
+
     function disconnectPlaybackSync() {
         playbackSyncClient.value?.disconnect()
         playbackSyncClient.value = null
+        queuedPlayIntent.value = null
+        latestSnapshot.value = null
+        lastAppliedVersion.value = 0
         clientPhase.value = 'connecting'
         clockOffsetMs.value = 0
         roundTripEstimateMs.value = 0
         awaitingSyncRecovery.value = false
+        audioUnlockRequired.value = false
+        isPlayerHidden.value = false
+        knownTracks.clear()
+        clearTrackState()
+        destroyAudioContext()
     }
 
     return {

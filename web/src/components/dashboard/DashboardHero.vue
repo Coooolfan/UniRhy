@@ -4,6 +4,7 @@ import { featuredAlbum as defaultFeaturedAlbum } from './data'
 import { computed, ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '@/ApiInstance'
+import { resolveArtistName, resolvePlayableAudio } from '@/composables/recordingMedia'
 import { useAudioStore } from '@/stores/audio'
 
 type Album = {
@@ -18,45 +19,10 @@ type Album = {
 
 type FeaturedStatus = 'loading' | 'ready' | 'empty'
 
-type WorkArtist = {
-    id: number
-    displayName?: string
-    name?: string
-}
-
 const router = useRouter()
 const album = ref<Album | null>(null)
 const featuredStatus = ref<FeaturedStatus>('loading')
 const audioStore = useAudioStore()
-
-const resolveArtistName = (artists?: ReadonlyArray<WorkArtist>) => {
-    const names =
-        artists
-            ?.map((artist) => artist.displayName || artist.name)
-            .filter((name): name is string => typeof name === 'string' && name.length > 0) ?? []
-    if (names.length > 0) {
-        return names.join(' / ')
-    }
-    return 'Unknown Artist'
-}
-
-type Asset = {
-    mediaFile: {
-        id: number
-        mimeType: string
-    }
-}
-
-const resolvePlayableAudio = (assets: readonly Asset[]) => {
-    const audioAsset = assets.find((asset) => asset.mediaFile.mimeType.startsWith('audio/'))
-    if (audioAsset) {
-        return {
-            src: `/api/media/${audioAsset.mediaFile.id}`,
-            mediaFileId: audioAsset.mediaFile.id,
-        }
-    }
-    return undefined
-}
 
 const isFeaturedPlaying = computed(() => {
     return (
@@ -139,9 +105,7 @@ onMounted(async () => {
             workId: work.id,
             recordingId: featuredRecording.id,
             title: work.title,
-            artist: resolveArtistName(
-                featuredRecording.artists as ReadonlyArray<WorkArtist> | undefined,
-            ),
+            artist: resolveArtistName(featuredRecording.artists),
             cover: featuredRecording.cover?.id
                 ? `/api/media/${featuredRecording.cover.id}`
                 : defaultFeaturedAlbum.cover,

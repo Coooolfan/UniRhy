@@ -3,6 +3,7 @@ import { Disc3, Pause, Play, Settings } from 'lucide-vue-next'
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '@/ApiInstance'
+import { pickPlayableRecordingEntry, resolveCover } from '@/composables/recordingMedia'
 import { useAudioStore } from '@/stores/audio'
 
 const router = useRouter()
@@ -29,37 +30,12 @@ const hasAlbumError = ref(false)
 
 const showAlbumEmptyNote = computed(() => !isLoadingAlbums.value && albums.value.length === 0)
 
-const resolveCover = (coverId?: number) => {
-    if (coverId !== undefined) {
-        return `/api/media/${coverId}`
-    }
-    return ''
-}
-
 const navigateToAlbum = (id: number) => {
     router.push({ name: 'album-detail', params: { id } })
 }
 
 const navigateToSettings = () => {
     router.push({ name: 'settings' })
-}
-
-type Asset = {
-    mediaFile: {
-        id: number
-        mimeType: string
-    }
-}
-
-const resolvePlayableAudio = (assets: readonly Asset[]) => {
-    const audioAsset = assets.find((asset) => asset.mediaFile.mimeType.startsWith('audio/'))
-    if (audioAsset) {
-        return {
-            src: `/api/media/${audioAsset.mediaFile.id}`,
-            mediaFileId: audioAsset.mediaFile.id,
-        }
-    }
-    return undefined
 }
 
 const isAlbumPlaying = (album: AlbumCard) => {
@@ -83,20 +59,13 @@ const playAlbum = async (album: AlbumCard) => {
             album.defaultTrackMediaFileId === undefined
         ) {
             const detail = await api.albumController.getAlbum({ id: album.id })
-            const defaultTrack = detail.recordings.find(
-                (recording) =>
-                    recording.defaultInWork && resolvePlayableAudio(recording.assets || []),
-            )
-            const firstPlayableTrack = detail.recordings.find((recording) =>
-                resolvePlayableAudio(recording.assets || []),
-            )
-            const targetTrack = defaultTrack ?? firstPlayableTrack
-            const targetAudio = resolvePlayableAudio(targetTrack?.assets || [])
-            if (!targetTrack || !targetAudio) {
+            const targetEntry = pickPlayableRecordingEntry(detail.recordings)
+            if (!targetEntry?.playableAudio) {
                 console.warn('No playable track for album', album.id)
                 return
             }
 
+            const targetTrack = targetEntry.recording
             album.defaultRecordingId = targetTrack.id
             album.defaultTrackTitle = targetTrack.title || targetTrack.comment || detail.title
             album.defaultTrackArtist =
@@ -104,8 +73,8 @@ const playAlbum = async (album: AlbumCard) => {
             album.defaultTrackCover = targetTrack.cover?.id
                 ? resolveCover(targetTrack.cover.id)
                 : album.cover
-            album.defaultTrackSrc = targetAudio.src
-            album.defaultTrackMediaFileId = targetAudio.mediaFileId
+            album.defaultTrackSrc = targetEntry.playableAudio.src
+            album.defaultTrackMediaFileId = targetEntry.playableAudio.mediaFileId
         }
 
         if (
