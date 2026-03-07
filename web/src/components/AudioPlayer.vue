@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { useAudioStore } from '@/stores/audio'
 import {
     ChevronUp,
@@ -14,6 +15,7 @@ import {
 } from 'lucide-vue-next'
 
 const audioStore = useAudioStore()
+const router = useRouter()
 const pendingSeekValue = ref<number | null>(null)
 
 const updateSeekPreview = (e: Event) => {
@@ -55,6 +57,10 @@ const hidePlayer = () => {
 
 const showPlayer = () => {
     audioStore.showPlayer()
+}
+
+const openPlaybackSyncDebug = () => {
+    void router.push({ name: 'playback-sync-debug' })
 }
 
 const togglePlayerVisibility = () => {
@@ -168,13 +174,17 @@ const syncStatusClass = computed(() => {
                             <div class="text-xs text-[#8C857B] truncate">
                                 {{ audioStore.currentTrack.artist }}
                             </div>
-                            <div
+                            <button
+                                type="button"
                                 data-test="sync-status"
-                                class="mt-1 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] tracking-wide"
+                                class="mt-1 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] tracking-wide transition-colors hover:brightness-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#C17D46]/40"
                                 :class="syncStatusClass"
+                                title="打开同步调试页面"
+                                aria-label="打开同步调试页面"
+                                @click="openPlaybackSyncDebug"
                             >
                                 {{ audioStore.syncStatusText }}
-                            </div>
+                            </button>
                         </div>
                     </div>
 

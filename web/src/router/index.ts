@@ -63,6 +63,11 @@ const router = createRouter({
                     name: 'tasks',
                     component: () => import('../views/TasksView.vue'),
                 },
+                {
+                    path: 'playback-sync-debug',
+                    name: 'playback-sync-debug',
+                    component: () => import('../views/PlaybackSyncDebugView.vue'),
+                },
             ],
         },
     ],

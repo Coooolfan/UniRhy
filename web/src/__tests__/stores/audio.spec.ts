@@ -11,6 +11,47 @@ type MockPlaybackSyncClientState = {
 type MockPlaybackSyncClientCallbacks = {
     onMessage?: (message: unknown) => void
     onStateChange?: (state: MockPlaybackSyncClientState) => void
+    onDiagnosticsChange?: (snapshot: MockPlaybackSyncClientDiagnosticsSnapshot) => void
+}
+
+type MockPlaybackSyncProtocolEvent = {
+    direction: 'in' | 'out'
+    type: string
+    rawType: string | null
+    atMs: number
+    payload: unknown
+}
+
+type MockPlaybackSyncClientDiagnosticsSnapshot = {
+    deviceId: string
+    phase: string
+    clockOffsetMs: number
+    roundTripEstimateMs: number
+    socketState: string
+    reconnectAttempt: number
+    snapshotReceived: boolean
+    initialCalibration: {
+        sampledCount: number
+        requiredSampleCount: number
+        settling: boolean
+    }
+    measurements: Array<{
+        offsetMs: number
+        rttMs: number
+        recordedAtMs: number
+    }>
+    lastNtpRequestAtMs: number | null
+    lastNtpResponseAtMs: number | null
+    lastInboundEvent: MockPlaybackSyncProtocolEvent | null
+    lastOutboundEvent: MockPlaybackSyncProtocolEvent | null
+    protocolEvents: MockPlaybackSyncProtocolEvent[]
+    lastError: {
+        atMs: number
+        code: string | null
+        message: string
+        rawType: string | null
+        rawMessage: string | null
+    } | null
 }
 
 type MockPlaybackSyncClientInstance = {
@@ -23,8 +64,11 @@ type MockPlaybackSyncClientInstance = {
     requestSync: ReturnType<typeof vi.fn>
     callbacks: MockPlaybackSyncClientCallbacks
     state: MockPlaybackSyncClientState
+    diagnostics: MockPlaybackSyncClientDiagnosticsSnapshot
     getState: () => MockPlaybackSyncClientState
+    getDiagnosticsSnapshot: () => MockPlaybackSyncClientDiagnosticsSnapshot
     setState: (nextState: Partial<MockPlaybackSyncClientState>) => void
+    setDiagnostics: (nextDiagnostics: Partial<MockPlaybackSyncClientDiagnosticsSnapshot>) => void
     emitMessage: (message: unknown) => void
 }
 
@@ -40,10 +84,105 @@ function setMockPlaybackSyncClientState(
         ...this.state,
         ...nextState,
     }
+    this.diagnostics = {
+        ...this.diagnostics,
+        deviceId: this.state.deviceId,
+        phase: this.state.phase,
+        clockOffsetMs: this.state.clockOffsetMs,
+        roundTripEstimateMs: this.state.roundTripEstimateMs,
+    }
     this.callbacks.onStateChange?.(this.state)
+    this.callbacks.onDiagnosticsChange?.(this.diagnostics)
+}
+
+function getMockPlaybackSyncClientDiagnostics(
+    this: MockPlaybackSyncClientInstance,
+): MockPlaybackSyncClientDiagnosticsSnapshot {
+    return this.diagnostics
+}
+
+function setMockPlaybackSyncClientDiagnostics(
+    this: MockPlaybackSyncClientInstance,
+    nextDiagnostics: Partial<MockPlaybackSyncClientDiagnosticsSnapshot>,
+) {
+    this.diagnostics = {
+        ...this.diagnostics,
+        ...nextDiagnostics,
+        initialCalibration: {
+            ...this.diagnostics.initialCalibration,
+            ...nextDiagnostics.initialCalibration,
+        },
+        measurements: nextDiagnostics.measurements
+            ? [...nextDiagnostics.measurements]
+            : this.diagnostics.measurements,
+        protocolEvents: nextDiagnostics.protocolEvents
+            ? [...nextDiagnostics.protocolEvents]
+            : this.diagnostics.protocolEvents,
+    }
+    this.callbacks.onDiagnosticsChange?.(this.diagnostics)
+}
+
+function appendMockProtocolEvent(
+    this: MockPlaybackSyncClientInstance,
+    eventInput: Pick<MockPlaybackSyncProtocolEvent, 'direction' | 'type' | 'payload'>,
+) {
+    const event = {
+        direction: eventInput.direction,
+        type: eventInput.type,
+        rawType: eventInput.type,
+        atMs: Date.now(),
+        payload: eventInput.payload,
+    } satisfies MockPlaybackSyncProtocolEvent
+    const protocolEvents = [...this.diagnostics.protocolEvents, event].slice(-30)
+    this.diagnostics = {
+        ...this.diagnostics,
+        protocolEvents,
+        lastInboundEvent: event.direction === 'in' ? event : this.diagnostics.lastInboundEvent,
+        lastOutboundEvent: event.direction === 'out' ? event : this.diagnostics.lastOutboundEvent,
+        lastNtpRequestAtMs:
+            event.direction === 'out' && event.type === 'NTP_REQUEST'
+                ? event.atMs
+                : this.diagnostics.lastNtpRequestAtMs,
+        lastNtpResponseAtMs:
+            event.direction === 'in' && event.type === 'NTP_RESPONSE'
+                ? event.atMs
+                : this.diagnostics.lastNtpResponseAtMs,
+        snapshotReceived:
+            event.direction === 'in' && event.type === 'SNAPSHOT'
+                ? true
+                : this.diagnostics.snapshotReceived,
+        lastError:
+            event.direction === 'in' &&
+            event.type === 'ERROR' &&
+            typeof event.payload === 'object' &&
+            event.payload !== null &&
+            'message' in event.payload
+                ? {
+                      atMs: event.atMs,
+                      code:
+                          'code' in event.payload && typeof event.payload.code === 'string'
+                              ? event.payload.code
+                              : null,
+                      message:
+                          typeof event.payload.message === 'string'
+                              ? event.payload.message
+                              : 'Unknown error',
+                      rawType: event.type,
+                      rawMessage: JSON.stringify(event.payload),
+                  }
+                : this.diagnostics.lastError,
+    }
+    this.callbacks.onDiagnosticsChange?.(this.diagnostics)
 }
 
 function emitMockPlaybackSyncClientMessage(this: MockPlaybackSyncClientInstance, message: unknown) {
+    if (typeof message === 'object' && message !== null && 'type' in message) {
+        appendMockProtocolEvent.call(this, {
+            direction: 'in',
+            type: typeof message.type === 'string' ? message.type : 'UNKNOWN',
+            payload: 'payload' in message ? message.payload : null,
+        })
+    }
     this.callbacks.onMessage?.(message)
 }
 
@@ -57,12 +196,6 @@ vi.mock('@/services/playbackSyncClient', () => {
         callbacks: MockPlaybackSyncClientCallbacks = {},
     ) {
         this.connect = vi.fn()
-        this.disconnect = vi.fn()
-        this.sendPlay = vi.fn(() => true)
-        this.sendPause = vi.fn(() => true)
-        this.sendSeek = vi.fn(() => true)
-        this.sendAudioSourceLoaded = vi.fn(() => true)
-        this.requestSync = vi.fn(() => true)
         this.callbacks = callbacks
         this.state = {
             deviceId: 'web-test',
@@ -70,11 +203,68 @@ vi.mock('@/services/playbackSyncClient', () => {
             clockOffsetMs: 0,
             roundTripEstimateMs: 0,
         }
+        this.diagnostics = {
+            deviceId: 'web-test',
+            phase: 'connecting',
+            clockOffsetMs: 0,
+            roundTripEstimateMs: 0,
+            socketState: 'idle',
+            reconnectAttempt: 0,
+            snapshotReceived: false,
+            initialCalibration: {
+                sampledCount: 0,
+                requiredSampleCount: 20,
+                settling: false,
+            },
+            measurements: [],
+            lastNtpRequestAtMs: null,
+            lastNtpResponseAtMs: null,
+            lastInboundEvent: null,
+            lastOutboundEvent: null,
+            protocolEvents: [],
+            lastError: null,
+        }
+        this.connect = vi.fn(() => {
+            setMockPlaybackSyncClientDiagnostics.call(this, { socketState: 'open' })
+        })
+        this.disconnect = vi.fn(() => {
+            setMockPlaybackSyncClientDiagnostics.call(this, { socketState: 'idle' })
+        })
+        this.sendPlay = vi.fn((payload: unknown) => {
+            appendMockProtocolEvent.call(this, { direction: 'out', type: 'PLAY', payload })
+            return true
+        })
+        this.sendPause = vi.fn((payload: unknown) => {
+            appendMockProtocolEvent.call(this, { direction: 'out', type: 'PAUSE', payload })
+            return true
+        })
+        this.sendSeek = vi.fn((payload: unknown) => {
+            appendMockProtocolEvent.call(this, { direction: 'out', type: 'SEEK', payload })
+            return true
+        })
+        this.sendAudioSourceLoaded = vi.fn((payload: unknown) => {
+            appendMockProtocolEvent.call(this, {
+                direction: 'out',
+                type: 'AUDIO_SOURCE_LOADED',
+                payload,
+            })
+            return true
+        })
+        this.requestSync = vi.fn(() => {
+            appendMockProtocolEvent.call(this, {
+                direction: 'out',
+                type: 'SYNC',
+                payload: { deviceId: this.state.deviceId },
+            })
+            return true
+        })
         playbackSyncMockState.clients.push(this)
     }
 
     PlaybackSyncClient.prototype.getState = getMockPlaybackSyncClientState
+    PlaybackSyncClient.prototype.getDiagnosticsSnapshot = getMockPlaybackSyncClientDiagnostics
     PlaybackSyncClient.prototype.setState = setMockPlaybackSyncClientState
+    PlaybackSyncClient.prototype.setDiagnostics = setMockPlaybackSyncClientDiagnostics
     PlaybackSyncClient.prototype.emitMessage = emitMockPlaybackSyncClientMessage
 
     return {
@@ -403,6 +593,170 @@ describe('audio store', () => {
 
         expect(client.requestSync).toHaveBeenCalledTimes(1)
         expect(audioStore.currentTrack?.id).toBe(8)
+        expect(audioStore.playbackSyncDebugSnapshot.awaitingSyncRecovery).toBe(true)
+    })
+
+    it('aggregates playback sync debug snapshot from diagnostics and inbound messages', async () => {
+        fetchMock.mockResolvedValue(createResponse(32))
+
+        const audioStore = useAudioStore()
+        audioStore.connectPlaybackSync()
+        const client = latestClient()
+
+        client.setDiagnostics({
+            socketState: 'open',
+            reconnectAttempt: 2,
+            measurements: [
+                {
+                    offsetMs: 5,
+                    rttMs: 18,
+                    recordedAtMs: nowClientMs(),
+                },
+            ],
+            lastNtpRequestAtMs: nowClientMs() - 500,
+            lastNtpResponseAtMs: nowClientMs() - 200,
+        })
+
+        client.emitMessage({
+            type: 'SNAPSHOT',
+            payload: {
+                state: {
+                    status: 'PAUSED',
+                    recordingId: 7,
+                    mediaFileId: 2_007,
+                    sourceUrl: '/api/media/2007',
+                    positionSeconds: 12,
+                    serverTimeToExecuteMs: nowClientMs(),
+                    version: 5,
+                    updatedAtMs: nowClientMs(),
+                },
+                serverNowMs: nowClientMs(),
+            },
+        })
+        client.emitMessage({
+            type: 'ROOM_EVENT_LOAD_AUDIO_SOURCE',
+            payload: {
+                commandId: 'cmd-load-debug',
+                recordingId: 7,
+                mediaFileId: 2_007,
+                sourceUrl: '/api/media/2007',
+            },
+        } satisfies LoadAudioSourceMessage)
+        await flushPromises(12)
+
+        client.emitMessage({
+            type: 'ROOM_EVENT_DEVICE_CHANGE',
+            payload: {
+                devices: [{ deviceId: 'web-test' }, { deviceId: 'web-phone' }],
+            },
+        })
+        client.emitMessage({
+            type: 'ERROR',
+            payload: {
+                code: 'INTERNAL_ERROR',
+                message: 'sync broken',
+            },
+        })
+        await flushPromises(12)
+
+        const debug = audioStore.playbackSyncDebugSnapshot
+        expect(debug.clientDiagnostics?.socketState).toBe('open')
+        expect(debug.clientDiagnostics?.reconnectAttempt).toBe(2)
+        expect(debug.latestSnapshot?.version).toBe(5)
+        expect(debug.latestSnapshotReceivedAtMs).not.toBeNull()
+        expect(debug.lastLoadAudioSource?.payload.commandId).toBe('cmd-load-debug')
+        expect(debug.lastDeviceChange?.payload.devices).toEqual([
+            { deviceId: 'web-test' },
+            { deviceId: 'web-phone' },
+        ])
+        expect(debug.clientDiagnostics?.lastInboundEvent?.type).toBe('ERROR')
+        expect(debug.error).toBe('sync broken')
+    })
+
+    it('records local execution diagnostics for scheduled playback', async () => {
+        fetchMock.mockResolvedValue(createResponse(25))
+
+        const audioStore = useAudioStore()
+        audioStore.connectPlaybackSync()
+        const client = latestClient()
+        client.setState({
+            phase: 'ready',
+            clockOffsetMs: 0,
+            roundTripEstimateMs: 10,
+        })
+
+        client.emitMessage({
+            type: 'SCHEDULED_ACTION',
+            payload: {
+                commandId: 'cmd-play-debug',
+                serverTimeToExecuteMs: nowClientMs() + 250,
+                scheduledAction: {
+                    action: 'PLAY',
+                    status: 'PLAYING',
+                    recordingId: 6,
+                    mediaFileId: 2_006,
+                    sourceUrl: '/api/media/2006',
+                    positionSeconds: 4,
+                    version: 6,
+                },
+            },
+        } satisfies ScheduledActionMessage)
+        await flushPromises(12)
+
+        const debug = audioStore.playbackSyncDebugSnapshot
+        expect(debug.lastScheduledAction?.payload.commandId).toBe('cmd-play-debug')
+        expect(debug.lastLocalExecution?.action).toBe('PLAY')
+        expect(debug.lastLocalExecution?.mediaFileId).toBe(2_006)
+        expect(debug.lastLocalExecution?.waitMs).toBeGreaterThanOrEqual(0)
+        expect(debug.lastLocalExecution?.scheduledOffset).toBe(4)
+        expect(debug.currentBuffer?.mediaFileId).toBe(2_006)
+    })
+
+    it('reflects queued play and disconnect in the debug snapshot', async () => {
+        const audioStore = useAudioStore()
+        const queuedTrack = buildTrack(11)
+
+        await audioStore.play(queuedTrack)
+
+        expect(audioStore.playbackSyncDebugSnapshot.queuedPlayIntent?.track.id).toBe(11)
+        expect(audioStore.playbackSyncDebugSnapshot.canSendRealtimeControl).toBe(false)
+
+        const client = latestClient()
+        client.emitMessage({
+            type: 'SNAPSHOT',
+            payload: {
+                state: {
+                    status: 'PLAYING',
+                    recordingId: 11,
+                    mediaFileId: 2_011,
+                    sourceUrl: '/api/media/2011',
+                    positionSeconds: 3,
+                    serverTimeToExecuteMs: nowClientMs(),
+                    version: 8,
+                    updatedAtMs: nowClientMs(),
+                },
+                serverNowMs: nowClientMs(),
+            },
+        })
+        await flushPromises()
+
+        client.setState({
+            phase: 'ready',
+            clockOffsetMs: 0,
+            roundTripEstimateMs: 12,
+        })
+        await flushPromises()
+
+        expect(audioStore.playbackSyncDebugSnapshot.awaitingSyncRecovery).toBe(false)
+        expect(client.sendPlay).toHaveBeenCalledTimes(1)
+
+        audioStore.disconnectPlaybackSync()
+
+        const debug = audioStore.playbackSyncDebugSnapshot
+        expect(debug.clientDiagnostics).toBeNull()
+        expect(debug.queuedPlayIntent).toBeNull()
+        expect(debug.latestSnapshot).toBeNull()
+        expect(debug.currentTrack).toBeNull()
     })
 
     it('clears local playback immediately when stop is invoked before sync is ready', async () => {

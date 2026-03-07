@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { reactive } from 'vue'
 import { mount } from '@vue/test-utils'
 
+const pushMock = vi.fn()
+
 const audioStore = reactive({
     currentTrack: {
         id: 1,
@@ -32,6 +34,12 @@ vi.mock('@/stores/audio', () => ({
     useAudioStore: () => audioStore,
 }))
 
+vi.mock('vue-router', () => ({
+    useRouter: () => ({
+        push: pushMock,
+    }),
+}))
+
 import AudioPlayer from '@/components/AudioPlayer.vue'
 
 describe('AudioPlayer', () => {
@@ -59,6 +67,7 @@ describe('AudioPlayer', () => {
         audioStore.setVolume.mockReset()
         audioStore.hidePlayer.mockReset()
         audioStore.showPlayer.mockReset()
+        pushMock.mockReset()
     })
 
     it('renders sync status and disables pause/seek while realtime control is unavailable', () => {
@@ -80,5 +89,13 @@ describe('AudioPlayer', () => {
         await wrapper.get('[data-test="transport-button"]').trigger('click')
 
         expect(audioStore.resume).toHaveBeenCalledTimes(1)
+    })
+
+    it('opens the playback sync debug page when the sync badge is clicked', async () => {
+        const wrapper = mount(AudioPlayer)
+
+        await wrapper.get('[data-test="sync-status"]').trigger('click')
+
+        expect(pushMock).toHaveBeenCalledWith({ name: 'playback-sync-debug' })
     })
 })

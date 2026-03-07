@@ -1,7 +1,12 @@
 import { computed, ref, shallowRef } from 'vue'
 import { defineStore } from 'pinia'
-import { PlaybackSyncClient, type PlaybackSyncClientPhase } from '@/services/playbackSyncClient'
+import {
+    PlaybackSyncClient,
+    type PlaybackSyncClientDiagnosticsSnapshot,
+    type PlaybackSyncClientPhase,
+} from '@/services/playbackSyncClient'
 import type {
+    DeviceChangePayload,
     LoadAudioSourcePayload,
     PlaybackSyncStatePayload,
     ScheduledActionPayload,
@@ -36,6 +41,60 @@ type QueuedPlayIntent = {
 type BufferLoadState = {
     mediaFileId: number
     promise: Promise<AudioBuffer | null>
+}
+
+export type TimestampedPayload<T> = {
+    atMs: number
+    payload: T
+}
+
+export type PlaybackSyncLocalExecutionSnapshot = {
+    atMs: number
+    action: ScheduledActionPayload['scheduledAction']['action']
+    commandId: string
+    version: number
+    estimatedServerNowMs: number
+    executeAtServerMs: number
+    waitMs: number
+    lateSeconds: number
+    scheduledOffset: number
+    whenContextTime: number
+    bufferDuration: number
+    recordingId: number | null
+    mediaFileId: number | null
+}
+
+export type PlaybackSyncDebugSnapshot = {
+    syncState: AudioSyncState
+    syncStatusText: string
+    canSendRealtimeControl: boolean
+    clockOffsetMs: number
+    roundTripEstimateMs: number
+    latestSnapshot: PlaybackSyncStatePayload | null
+    latestSnapshotReceivedAtMs: number | null
+    lastScheduledAction: TimestampedPayload<ScheduledActionPayload> | null
+    lastLoadAudioSource: TimestampedPayload<LoadAudioSourcePayload> | null
+    lastDeviceChange: TimestampedPayload<DeviceChangePayload> | null
+    queuedPlayIntent: QueuedPlayIntent | null
+    awaitingSyncRecovery: boolean
+    audioUnlockRequired: boolean
+    lastAppliedVersion: number
+    currentTrack: AudioTrack | null
+    isPlaying: boolean
+    currentTime: number
+    duration: number
+    currentBuffer: {
+        recordingId: number | null
+        mediaFileId: number | null
+        duration: number
+    } | null
+    activeLoad: {
+        mediaFileId: number
+        inFlight: boolean
+    } | null
+    lastLocalExecution: PlaybackSyncLocalExecutionSnapshot | null
+    clientDiagnostics: PlaybackSyncClientDiagnosticsSnapshot | null
+    error: string | null
 }
 
 const VOLUME_STORAGE_KEY = 'unirhy.audio.volume'
@@ -121,11 +180,17 @@ export const useAudioStore = defineStore('audio', () => {
     const clockOffsetMs = ref(0)
     const roundTripEstimateMs = ref(0)
     const latestSnapshot = ref<PlaybackSyncStatePayload | null>(null)
+    const latestSnapshotReceivedAtMs = ref<number | null>(null)
     const lastAppliedVersion = ref(0)
     const queuedPlayIntent = ref<QueuedPlayIntent | null>(null)
     const awaitingSyncRecovery = ref(false)
     const audioUnlockRequired = ref(false)
     const activeLoad = shallowRef<BufferLoadState | null>(null)
+    const clientDiagnostics = shallowRef<PlaybackSyncClientDiagnosticsSnapshot | null>(null)
+    const lastScheduledAction = shallowRef<TimestampedPayload<ScheduledActionPayload> | null>(null)
+    const lastLoadAudioSource = shallowRef<TimestampedPayload<LoadAudioSourcePayload> | null>(null)
+    const lastDeviceChange = shallowRef<TimestampedPayload<DeviceChangePayload> | null>(null)
+    const lastLocalExecution = shallowRef<PlaybackSyncLocalExecutionSnapshot | null>(null)
 
     const knownTracks = new Map<number, AudioTrack>()
     const liveSourceNodes = new Set<AudioBufferSourceNode>()
@@ -172,6 +237,73 @@ export const useAudioStore = defineStore('audio', () => {
     })
 
     const canSendRealtimeControl = computed(() => effectiveSyncState.value === 'ready')
+
+    const playbackSyncDebugSnapshot = computed<PlaybackSyncDebugSnapshot>(() => {
+        const queuedIntent = queuedPlayIntent.value
+        const bufferTrack = currentBufferTrack.value
+
+        return {
+            syncState: effectiveSyncState.value,
+            syncStatusText: syncStatusText.value,
+            canSendRealtimeControl: canSendRealtimeControl.value,
+            clockOffsetMs: clockOffsetMs.value,
+            roundTripEstimateMs: roundTripEstimateMs.value,
+            latestSnapshot: latestSnapshot.value ? { ...latestSnapshot.value } : null,
+            latestSnapshotReceivedAtMs: latestSnapshotReceivedAtMs.value,
+            lastScheduledAction: lastScheduledAction.value
+                ? {
+                      atMs: lastScheduledAction.value.atMs,
+                      payload: { ...lastScheduledAction.value.payload },
+                  }
+                : null,
+            lastLoadAudioSource: lastLoadAudioSource.value
+                ? {
+                      atMs: lastLoadAudioSource.value.atMs,
+                      payload: { ...lastLoadAudioSource.value.payload },
+                  }
+                : null,
+            lastDeviceChange: lastDeviceChange.value
+                ? {
+                      atMs: lastDeviceChange.value.atMs,
+                      payload: {
+                          devices: lastDeviceChange.value.payload.devices.map((device) => ({
+                              ...device,
+                          })),
+                      },
+                  }
+                : null,
+            queuedPlayIntent: queuedIntent
+                ? {
+                      track: cloneTrack(queuedIntent.track),
+                      positionSeconds: queuedIntent.positionSeconds,
+                  }
+                : null,
+            awaitingSyncRecovery: awaitingSyncRecovery.value,
+            audioUnlockRequired: audioUnlockRequired.value,
+            lastAppliedVersion: lastAppliedVersion.value,
+            currentTrack: currentTrack.value ? cloneTrack(currentTrack.value) : null,
+            isPlaying: isPlaying.value,
+            currentTime: currentTime.value,
+            duration: duration.value,
+            currentBuffer:
+                currentBuffer.value && bufferTrack
+                    ? {
+                          recordingId: bufferTrack.id,
+                          mediaFileId: bufferTrack.mediaFileId,
+                          duration: currentBuffer.value.duration,
+                      }
+                    : null,
+            activeLoad: activeLoad.value
+                ? {
+                      mediaFileId: activeLoad.value.mediaFileId,
+                      inFlight: true,
+                  }
+                : null,
+            lastLocalExecution: lastLocalExecution.value ? { ...lastLocalExecution.value } : null,
+            clientDiagnostics: clientDiagnostics.value,
+            error: error.value,
+        }
+    })
 
     const rememberTrack = (track: AudioTrack) => {
         if (knownTracks.has(track.id)) {
@@ -680,6 +812,21 @@ export const useAudioStore = defineStore('audio', () => {
 
         const waitMs = Math.max(0, Math.round(payload.serverTimeToExecuteMs - estimatedServerNowMs))
         const when = context.currentTime + waitMs / 1_000
+        lastLocalExecution.value = {
+            atMs: nowClientMs(),
+            action: payload.scheduledAction.action,
+            commandId: payload.commandId,
+            version: payload.scheduledAction.version,
+            estimatedServerNowMs,
+            executeAtServerMs: payload.serverTimeToExecuteMs,
+            waitMs,
+            lateSeconds,
+            scheduledOffset,
+            whenContextTime: when,
+            bufferDuration: buffer.duration,
+            recordingId: payload.scheduledAction.recordingId,
+            mediaFileId: payload.scheduledAction.mediaFileId,
+        }
         const nextNode = createSourceNode(buffer)
         if (!nextNode) {
             error.value = PLAYBACK_ERROR_MESSAGE
@@ -731,6 +878,7 @@ export const useAudioStore = defineStore('audio', () => {
     }
 
     const handleSnapshot = (payload: SnapshotPayload) => {
+        latestSnapshotReceivedAtMs.value = nowClientMs()
         latestSnapshot.value = payload.state
         const track = resolveTrackFromState(payload.state)
 
@@ -770,6 +918,7 @@ export const useAudioStore = defineStore('audio', () => {
 
         awaitingSyncRecovery.value = false
         lastAppliedVersion.value = scheduledAction.version
+        latestSnapshotReceivedAtMs.value = nowClientMs()
         latestSnapshot.value = {
             status: scheduledAction.status,
             recordingId: scheduledAction.recordingId,
@@ -811,6 +960,7 @@ export const useAudioStore = defineStore('audio', () => {
     }
 
     const handleServerMessage = async (message: ServerPlaybackSyncMessage) => {
+        const receivedAtMs = nowClientMs()
         switch (message.type) {
             case 'SNAPSHOT':
                 handleSnapshot(message.payload)
@@ -818,16 +968,29 @@ export const useAudioStore = defineStore('audio', () => {
             case 'NTP_RESPONSE':
                 break
             case 'ROOM_EVENT_LOAD_AUDIO_SOURCE':
+                lastLoadAudioSource.value = {
+                    atMs: receivedAtMs,
+                    payload: { ...message.payload },
+                }
                 await handleLoadAudioSource(message.payload)
                 break
             case 'SCHEDULED_ACTION':
+                lastScheduledAction.value = {
+                    atMs: receivedAtMs,
+                    payload: { ...message.payload },
+                }
                 await handleScheduledAction(message.payload)
                 break
             case 'ROOM_EVENT_DEVICE_CHANGE':
-            case 'ERROR':
-                if (message.type === 'ERROR') {
-                    error.value = message.payload.message
+                lastDeviceChange.value = {
+                    atMs: receivedAtMs,
+                    payload: {
+                        devices: message.payload.devices.map((device) => ({ ...device })),
+                    },
                 }
+                break
+            case 'ERROR':
+                error.value = message.payload.message
                 break
             default:
                 break
@@ -845,6 +1008,10 @@ export const useAudioStore = defineStore('audio', () => {
         }
     }
 
+    const updateClientDiagnostics = (snapshot: PlaybackSyncClientDiagnosticsSnapshot) => {
+        clientDiagnostics.value = snapshot
+    }
+
     const ensureSyncClient = () => {
         if (playbackSyncClient.value) {
             return playbackSyncClient.value
@@ -857,9 +1024,13 @@ export const useAudioStore = defineStore('audio', () => {
             onStateChange: (state) => {
                 updateClientState(state.phase, state.clockOffsetMs, state.roundTripEstimateMs)
             },
+            onDiagnosticsChange: (snapshot) => {
+                updateClientDiagnostics(snapshot)
+            },
         })
         playbackSyncClient.value = client
         const state = client.getState()
+        updateClientDiagnostics(client.getDiagnosticsSnapshot())
         updateClientState(state.phase, state.clockOffsetMs, state.roundTripEstimateMs)
         return client
     }
@@ -964,6 +1135,7 @@ export const useAudioStore = defineStore('audio', () => {
 
         if (!canSendRealtimeControl.value) {
             latestSnapshot.value = null
+            latestSnapshotReceivedAtMs.value = null
             clearTrackState()
             return
         }
@@ -1033,8 +1205,14 @@ export const useAudioStore = defineStore('audio', () => {
     function disconnectPlaybackSync() {
         playbackSyncClient.value?.disconnect()
         playbackSyncClient.value = null
+        clientDiagnostics.value = null
         queuedPlayIntent.value = null
         latestSnapshot.value = null
+        latestSnapshotReceivedAtMs.value = null
+        lastScheduledAction.value = null
+        lastLoadAudioSource.value = null
+        lastDeviceChange.value = null
+        lastLocalExecution.value = null
         lastAppliedVersion.value = 0
         clientPhase.value = 'connecting'
         clockOffsetMs.value = 0
@@ -1069,5 +1247,6 @@ export const useAudioStore = defineStore('audio', () => {
         setVolume,
         connectPlaybackSync,
         disconnectPlaybackSync,
+        playbackSyncDebugSnapshot,
     }
 })

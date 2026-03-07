@@ -49,6 +49,10 @@ class MockWebSocket {
         this.emit('close', new Event('close'))
     }
 
+    emitError() {
+        this.emit('error', new Event('error'))
+    }
+
     private emit(type: string, event: unknown) {
         for (const listener of this.listeners.get(type) ?? []) {
             listener(event)
@@ -56,13 +60,66 @@ class MockWebSocket {
     }
 }
 
+const decodeSentMessages = (socket: MockWebSocket | undefined) => {
+    return (socket?.sentMessages ?? []).map((message) => JSON.parse(message))
+}
+
+const emitSnapshot = (socket: MockWebSocket | undefined) => {
+    socket?.emitMessage(
+        JSON.stringify({
+            type: 'SNAPSHOT',
+            payload: {
+                state: {
+                    status: 'PAUSED',
+                    recordingId: null,
+                    mediaFileId: null,
+                    sourceUrl: null,
+                    positionSeconds: 0,
+                    serverTimeToExecuteMs: 0,
+                    version: 0,
+                    updatedAtMs: 0,
+                },
+                serverNowMs: Date.now(),
+            },
+        }),
+    )
+}
+
+const completeCalibration = (socket: MockWebSocket | undefined) => {
+    emitSnapshot(socket)
+    vi.advanceTimersByTime(600)
+
+    const ntpRequests = decodeSentMessages(socket).filter(
+        (message) => message.type === 'NTP_REQUEST',
+    )
+    ntpRequests.forEach((request, index) => {
+        vi.advanceTimersByTime(7)
+        socket?.emitMessage(
+            JSON.stringify({
+                type: 'NTP_RESPONSE',
+                payload: {
+                    t0: request.payload.t0,
+                    t1: request.payload.t0 + 12 + (index % 5) * 3,
+                    t2: request.payload.t0 + 15 + (index % 5) * 3,
+                },
+            }),
+        )
+    })
+    vi.advanceTimersByTime(100)
+}
+
 describe('playbackSyncClient', () => {
     beforeEach(() => {
         MockWebSocket.instances = []
         window.localStorage.clear()
         vi.useFakeTimers()
+        vi.setSystemTime(new Date('2026-03-07T00:00:00Z'))
         vi.stubGlobal('WebSocket', MockWebSocket)
-        vi.spyOn(performance, 'now').mockReturnValue(1_000)
+        Object.defineProperty(performance, 'timeOrigin', {
+            configurable: true,
+            value: 0,
+        })
+        vi.spyOn(performance, 'now').mockImplementation(() => Date.now())
         Object.defineProperty(window, 'location', {
             configurable: true,
             value: {
@@ -87,6 +144,7 @@ describe('playbackSyncClient', () => {
         const firstHello = JSON.parse(firstSocket?.sentMessages[0] ?? 'null')
         expect(firstHello.type).toBe('HELLO')
         expect(firstHello.payload.deviceId).toMatch(/^web-/)
+        expect(firstClient.getDiagnosticsSnapshot().lastOutboundEvent?.type).toBe('HELLO')
 
         firstClient.disconnect()
 
@@ -99,7 +157,7 @@ describe('playbackSyncClient', () => {
         expect(secondHello.payload.deviceId).toBe(firstHello.payload.deviceId)
     })
 
-    it('starts calibration after snapshot and becomes ready after enough NTP samples', () => {
+    it('records jittery calibration measurements and becomes ready', () => {
         const phases: string[] = []
         const client = new PlaybackSyncClient({
             onStateChange: (state) => {
@@ -111,46 +169,83 @@ describe('playbackSyncClient', () => {
         const socket = MockWebSocket.instances[0]
         socket?.emitOpen()
 
-        socket?.emitMessage(
-            JSON.stringify({
-                type: 'SNAPSHOT',
-                payload: {
-                    state: {
-                        status: 'PAUSED',
-                        recordingId: null,
-                        mediaFileId: null,
-                        sourceUrl: null,
-                        positionSeconds: 0,
-                        serverTimeToExecuteMs: 0,
-                        version: 0,
-                        updatedAtMs: 0,
-                    },
-                    serverNowMs: 2_000,
-                },
-            }),
-        )
-
-        const firstNtp = JSON.parse(socket?.sentMessages[1] ?? 'null')
-        socket?.emitMessage(
-            JSON.stringify({
-                type: 'NTP_RESPONSE',
-                payload: {
-                    t0: firstNtp.payload.t0,
-                    t1: firstNtp.payload.t0 + 10,
-                    t2: firstNtp.payload.t0 + 12,
-                },
-            }),
-        )
-
-        vi.advanceTimersByTime(700)
+        completeCalibration(socket)
 
         expect(client.getState().phase).toBe('ready')
         expect(client.getState().roundTripEstimateMs).toBeGreaterThanOrEqual(0)
         expect(phases).toContain('calibrating')
         expect(phases).toContain('ready')
+
+        const diagnostics = client.getDiagnosticsSnapshot()
+        expect(diagnostics.measurements).toHaveLength(20)
+        expect(diagnostics.snapshotReceived).toBe(true)
+        expect(diagnostics.lastOutboundEvent?.type).toBe('NTP_REQUEST')
+        expect(diagnostics.lastInboundEvent?.type).toBe('NTP_RESPONSE')
+        expect(diagnostics.protocolEvents).toHaveLength(30)
+        expect(diagnostics.protocolEvents.some((event) => event.type === 'NTP_REQUEST')).toBe(true)
     })
 
-    it('reconnects with backoff after an unexpected close', () => {
+    it('exposes stale response age and updates again after the next heartbeat response', () => {
+        const client = new PlaybackSyncClient()
+        client.connect()
+
+        const socket = MockWebSocket.instances[0]
+        socket?.emitOpen()
+        completeCalibration(socket)
+
+        const previousResponseAtMs = client.getDiagnosticsSnapshot().lastNtpResponseAtMs
+        expect(previousResponseAtMs).not.toBeNull()
+
+        vi.advanceTimersByTime(6_000)
+
+        expect(
+            Date.now() - (client.getDiagnosticsSnapshot().lastNtpResponseAtMs ?? 0),
+        ).toBeGreaterThanOrEqual(6_000)
+
+        const ntpRequests = decodeSentMessages(socket).filter(
+            (message) => message.type === 'NTP_REQUEST',
+        )
+        const [latestRequest] = ntpRequests.slice(-1)
+        socket?.emitMessage(
+            JSON.stringify({
+                type: 'NTP_RESPONSE',
+                payload: {
+                    t0: latestRequest?.payload.t0,
+                    t1: latestRequest?.payload.t0 + 20,
+                    t2: latestRequest?.payload.t0 + 22,
+                },
+            }),
+        )
+
+        expect(client.getDiagnosticsSnapshot().lastNtpResponseAtMs).toBeGreaterThan(
+            previousResponseAtMs ?? 0,
+        )
+    })
+
+    it('records invalid inbound message details when the payload shape is unsupported', () => {
+        const client = new PlaybackSyncClient()
+        client.connect()
+
+        const socket = MockWebSocket.instances[0]
+        socket?.emitOpen()
+        socket?.emitMessage(
+            JSON.stringify({
+                type: 'BOOM',
+                payload: {
+                    reason: 'unsupported',
+                },
+            }),
+        )
+
+        const diagnostics = client.getDiagnosticsSnapshot()
+        expect(client.getState().phase).toBe('error')
+        expect(diagnostics.lastInboundEvent?.type).toBe('INVALID_SERVER_MESSAGE')
+        expect(diagnostics.lastInboundEvent?.rawType).toBe('BOOM')
+        expect(diagnostics.lastError?.rawType).toBe('BOOM')
+        expect(diagnostics.lastError?.message).toBe('Invalid playback sync message')
+    })
+
+    it('reconnects with backoff after an unexpected close and tracks retry diagnostics', () => {
         const client = new PlaybackSyncClient()
         client.connect()
 
@@ -158,6 +253,8 @@ describe('playbackSyncClient', () => {
         socket?.emitClose()
 
         expect(client.getState().phase).toBe('reconnecting')
+        expect(client.getDiagnosticsSnapshot().reconnectAttempt).toBe(1)
+        expect(client.getDiagnosticsSnapshot().socketState).toBe('closed')
         expect(MockWebSocket.instances).toHaveLength(1)
 
         vi.advanceTimersByTime(999)
