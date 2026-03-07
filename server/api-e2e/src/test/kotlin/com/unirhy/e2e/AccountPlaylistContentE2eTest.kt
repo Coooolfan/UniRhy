@@ -139,6 +139,10 @@ class AccountPlaylistContentE2eTest {
             "[auth] search works should require login",
         )
         assertAuthenticationFailed(
+            api.get("/api/recordings/1"),
+            "[auth] get recording should require login",
+        )
+        assertAuthenticationFailed(
             api.put(
                 path = "/api/works/1",
                 json = mapOf("title" to "blocked-work"),
@@ -486,6 +490,37 @@ class AccountPlaylistContentE2eTest {
         )
         E2eAssert.status(updateRecordingResponse, 200, "[content] recording update should succeed")
 
+        val getRecordingResponse = state.api.get("/api/recordings/$sourceRecordingId")
+        E2eAssert.status(getRecordingResponse, 200, "[content] recording detail should succeed")
+        E2eAssert.jsonAt(
+            getRecordingResponse.body(),
+            "/id",
+            sourceRecordingId,
+            "[content] recording detail id should match",
+        )
+        E2eAssert.jsonAt(
+            getRecordingResponse.body(),
+            "/work/id",
+            sourceWorkId,
+            "[content] recording detail work id should match",
+        )
+        E2eAssert.jsonAt(
+            getRecordingResponse.body(),
+            "/title",
+            recordingUpdatePayload["title"],
+            "[content] recording detail title should match",
+        )
+        E2eAssert.jsonAt(
+            getRecordingResponse.body(),
+            "/comment",
+            recordingUpdatePayload["comment"],
+            "[content] recording detail comment should match",
+        )
+        assertTrue(
+            E2eJson.mapper.readTree(getRecordingResponse.body()).path("artists").isArray,
+            "[content] recording detail artists should be an array",
+        )
+
         val sourceDetailAfterRecordingUpdateResponse = state.api.get("/api/works/$sourceWorkId")
         E2eAssert.status(sourceDetailAfterRecordingUpdateResponse, 200, "[content] source work detail should succeed")
         val sourceRecordingNode = findRecordingNode(
@@ -545,6 +580,9 @@ class AccountPlaylistContentE2eTest {
             detailContainsRecordingId(targetAfterMergeResponse.body(), sourceRecordingId),
             "[content] merged target work should contain source recording",
         )
+
+        val missingRecordingResponse = state.api.get("/api/recordings/${Long.MAX_VALUE}")
+        E2eAssert.status(missingRecordingResponse, 404, "[content] missing recording detail should return 404")
     }
 
     private fun createAccountByAdmin(
@@ -678,9 +716,17 @@ class AccountPlaylistContentE2eTest {
         var emptyPolls = 0
 
         while (System.currentTimeMillis() <= deadline) {
-            val runningResponse = state.api.get("/api/task/running")
-            E2eAssert.status(runningResponse, 200, "[prepare] list running tasks should succeed")
-            if (containsScanTask(runningResponse.body())) {
+            val runningResponse = state.api.get(
+                path = "/api/task/logs",
+                query = mapOf(
+                    "pageIndex" to 0,
+                    "pageSize" to 50,
+                    "taskType" to "SCAN",
+                    "status" to "RUNNING",
+                ),
+            )
+            E2eAssert.status(runningResponse, 200, "[prepare] list running task logs should succeed")
+            if (containsScanTaskLog(runningResponse.body(), expectedStatus = "RUNNING")) {
                 observedRunning = true
                 emptyPolls = 0
             } else {
@@ -695,12 +741,10 @@ class AccountPlaylistContentE2eTest {
         fail("[prepare] scan task did not finish within timeout ${scanWaitTimeoutMillis()} ms")
     }
 
-    private fun containsScanTask(responseBody: String): Boolean {
-        val root = E2eJson.mapper.readTree(responseBody)
-        if (!root.isArray) {
-            return false
+    private fun containsScanTaskLog(responseBody: String, expectedStatus: String): Boolean {
+        return pageRows(responseBody, "[prepare] running task logs response").any { row ->
+            row.path("taskType").asText() == "SCAN" && row.path("status").asText() == expectedStatus
         }
-        return root.any { item -> item.path("taskType").asText() == "SCAN" }
     }
 
     private fun prepareScanFixture(scanWorkspace: Path) {

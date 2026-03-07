@@ -3,6 +3,7 @@ package com.coooolfan.unirhy.service
 import com.coooolfan.unirhy.model.*
 import com.coooolfan.unirhy.model.dto.RecordingMergeReq
 import org.babyfish.jimmer.sql.ast.mutation.SaveMode
+import org.babyfish.jimmer.sql.fetcher.Fetcher
 import org.babyfish.jimmer.sql.kt.KSqlClient
 import org.babyfish.jimmer.sql.kt.ast.expression.count
 import org.babyfish.jimmer.sql.kt.ast.expression.valueIn
@@ -17,6 +18,10 @@ class RecordingService(
     private val sql: KSqlClient,
     private val jdbc: NamedParameterJdbcTemplate,
 ) {
+    fun getRecording(id: Long, fetcher: Fetcher<Recording>): Recording {
+        return sql.findOneById(fetcher, id)
+    }
+
     fun updateRecording(input: Recording) {
         sql.saveCommand(input, SaveMode.UPDATE_ONLY).execute()
     }

@@ -98,4 +98,33 @@ describe('AudioPlayer', () => {
 
         expect(pushMock).toHaveBeenCalledWith({ name: 'playback-sync-debug' })
     })
+
+    it('reacts to passive metadata hydration updates from the store', async () => {
+        audioStore.currentTrack = {
+            id: 7,
+            title: 'Recording #7',
+            artist: 'Unknown Artist',
+            cover: '',
+            src: '/api/media/2007',
+            mediaFileId: 2_007,
+        }
+
+        const wrapper = mount(AudioPlayer)
+
+        expect(wrapper.text()).toContain('Recording #7')
+        expect(wrapper.text()).toContain('Unknown Artist')
+        expect(wrapper.find('img[alt="Cover"]').exists()).toBe(false)
+
+        audioStore.currentTrack = {
+            ...audioStore.currentTrack,
+            title: 'Hydrated Track 7',
+            artist: 'Hydrated Artist 7',
+            cover: '/api/media/30007',
+        }
+        await wrapper.vm.$nextTick()
+
+        expect(wrapper.text()).toContain('Hydrated Track 7')
+        expect(wrapper.text()).toContain('Hydrated Artist 7')
+        expect(wrapper.get('img[alt="Cover"]').attributes('src')).toBe('/api/media/30007')
+    })
 })

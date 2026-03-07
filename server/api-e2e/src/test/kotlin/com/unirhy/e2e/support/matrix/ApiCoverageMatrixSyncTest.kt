@@ -57,6 +57,6 @@ class ApiCoverageMatrixSyncTest {
     }
 
     companion object {
-        private const val EXPECTED_ENDPOINT_COUNT = 44
+        private const val EXPECTED_ENDPOINT_COUNT = 47
     }
 }

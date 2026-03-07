@@ -62,10 +62,6 @@ class TaskContentReadE2eTest {
         val api = E2eHttpClient(baseUrl())
 
         assertAuthenticationFailed(
-            api.get("/api/task/running"),
-            "[auth] get running tasks should require login",
-        )
-        assertAuthenticationFailed(
             api.get("/api/task/logs"),
             "[auth] get task logs should require login",
         )
@@ -400,30 +396,22 @@ class TaskContentReadE2eTest {
 
         while (System.currentTimeMillis() <= deadline) {
             pollCount += 1
-            val runningResponse = state.api.get("/api/task/running")
-            E2eAssert.status(runningResponse, 200, "[scan] list running tasks should succeed")
+            val runningResponse = state.api.get(
+                path = "/api/task/logs",
+                query = mapOf(
+                    "pageIndex" to 0,
+                    "pageSize" to 50,
+                    "taskType" to "SCAN",
+                    "status" to "RUNNING",
+                ),
+            )
+            E2eAssert.status(runningResponse, 200, "[scan] list running task logs should succeed")
             lastRunningBody = runningResponse.body()
 
-            if (containsScanTask(lastRunningBody)) {
+            if (containsScanTaskLog(lastRunningBody, expectedStatus = "RUNNING")) {
                 observedRunning = true
                 emptyPollsBeforeObservation = 0
-                if (!validatedRunningLogQuery) {
-                    val runningLogsResponse = state.api.get(
-                        path = "/api/task/logs",
-                        query = mapOf(
-                            "pageIndex" to 0,
-                            "pageSize" to 50,
-                            "taskType" to "SCAN",
-                            "status" to "RUNNING",
-                        ),
-                    )
-                    E2eAssert.status(runningLogsResponse, 200, "[scan] list running task logs should succeed")
-                    assertTrue(
-                        containsScanTaskLog(runningLogsResponse.body(), expectedStatus = "RUNNING"),
-                        "[scan] running task logs should include SCAN in RUNNING status",
-                    )
-                    validatedRunningLogQuery = true
-                }
+                validatedRunningLogQuery = true
                 if (!validatedDuplicateConflict) {
                     val duplicateSubmitResponse = state.api.post(
                         path = "/api/task/scan",
@@ -476,7 +464,7 @@ class TaskContentReadE2eTest {
         } else {
             assertTrue(
                 observedRunning,
-                "[scan] running task endpoint never observed SCAN task before timeout ${timeoutMillis}ms, last=$lastRunningBody",
+                "[scan] running task logs never observed SCAN task before timeout ${timeoutMillis}ms, last=$lastRunningBody",
             )
             assertTrue(
                 validatedRunningLogQuery,
@@ -488,14 +476,22 @@ class TaskContentReadE2eTest {
             )
             assertTrue(
                 finishedAfterRunning,
-                "[scan] scan task did not finish within timeout ${timeoutMillis}ms, last=$lastRunningBody",
+                "[scan] scan task logs did not leave RUNNING within timeout ${timeoutMillis}ms, last=$lastRunningBody",
             )
         }
 
-        val finalRunningResponse = state.api.get("/api/task/running")
-        E2eAssert.status(finalRunningResponse, 200, "[scan] running task endpoint should remain available")
+        val finalRunningResponse = state.api.get(
+            path = "/api/task/logs",
+            query = mapOf(
+                "pageIndex" to 0,
+                "pageSize" to 50,
+                "taskType" to "SCAN",
+                "status" to "RUNNING",
+            ),
+        )
+        E2eAssert.status(finalRunningResponse, 200, "[scan] running task log query should remain available")
         assertFalse(
-            containsScanTask(finalRunningResponse.body()),
+            containsScanTaskLog(finalRunningResponse.body(), expectedStatus = "RUNNING"),
             "[scan] no SCAN task should remain after lifecycle wait",
         )
 
@@ -629,14 +625,6 @@ class TaskContentReadE2eTest {
                 copyFailure,
             )
         }
-    }
-
-    private fun containsScanTask(responseBody: String): Boolean {
-        val root = E2eJson.mapper.readTree(responseBody)
-        if (!root.isArray) {
-            return false
-        }
-        return root.any { item -> item.path("taskType").asText() == "SCAN" }
     }
 
     private fun containsScanTaskLog(responseBody: String, expectedStatus: String): Boolean {

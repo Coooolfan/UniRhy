@@ -112,6 +112,12 @@ object ApiCoverageRegistry {
             note = "auth: $ACCOUNT_PLAYLIST_CONTENT_AUTH_REQUIRED_CASE; idempotent add; ownership: non-owner returns 404",
         ),
         full(
+            "GET",
+            "/api/recordings/{id}",
+            testRef = CONTENT_SEARCH_UPDATE_MERGE_CASE,
+            note = "auth: $ACCOUNT_PLAYLIST_CONTENT_AUTH_REQUIRED_CASE; missing resource returns 404",
+        ),
+        full(
             "PUT",
             "/api/recordings/{id}",
             testRef = CONTENT_SEARCH_UPDATE_MERGE_CASE,
@@ -183,12 +189,6 @@ object ApiCoverageRegistry {
         full("PUT", "/api/system/config", testRef = SYSTEM_AUTH_FLOW_CASE),
         full("POST", "/api/tokens", testRef = DUPLICATE_INIT_AND_WRONG_LOGIN_CASE),
         full("DELETE", "/api/tokens/current", testRef = SYSTEM_AUTH_FLOW_CASE),
-        full(
-            "GET",
-            "/api/task/running",
-            testRef = TASK_SCAN_LIFECYCLE_CASE,
-            note = "auth: $TASK_CONTENT_AUTH_REQUIRED_CASE",
-        ),
         full(
             "GET",
             "/api/task/logs",

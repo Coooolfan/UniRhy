@@ -1,5 +1,7 @@
 import { computed, ref, shallowRef } from 'vue'
 import { defineStore } from 'pinia'
+import { api } from '@/ApiInstance'
+import { resolveCover } from '@/composables/recordingMedia'
 import {
     PlaybackSyncClient,
     type PlaybackSyncClientDiagnosticsSnapshot,
@@ -97,6 +99,8 @@ export type PlaybackSyncDebugSnapshot = {
     error: string | null
 }
 
+type PlaybackRecordingMetadata = Awaited<ReturnType<typeof api.recordingController.getRecording>>
+
 const VOLUME_STORAGE_KEY = 'unirhy.audio.volume'
 const PLAYBACK_ERROR_MESSAGE = 'Unable to play audio'
 const MAX_KNOWN_TRACKS = 200
@@ -152,6 +156,28 @@ const isNil = (value: unknown): value is null | undefined => {
     return value === null || value === undefined
 }
 
+const pickFirstNonBlank = (...values: Array<string | null | undefined>) => {
+    for (const value of values) {
+        if (typeof value === 'string' && value.trim().length > 0) {
+            return value
+        }
+    }
+    return null
+}
+
+const resolveMetadataArtistLabel = (
+    artists: PlaybackRecordingMetadata['artists'] | null | undefined,
+) => {
+    const names =
+        artists
+            ?.map((artist) => artist.displayName?.trim())
+            .filter((name): name is string => typeof name === 'string' && name.length > 0) ?? []
+    if (names.length === 0) {
+        return null
+    }
+    return names.join(', ')
+}
+
 const cloneTrack = (track: AudioTrack): AudioTrack => ({
     ...track,
 })
@@ -193,6 +219,8 @@ export const useAudioStore = defineStore('audio', () => {
     const lastLocalExecution = shallowRef<PlaybackSyncLocalExecutionSnapshot | null>(null)
 
     const knownTracks = new Map<number, AudioTrack>()
+    const hydratedTrackIds = new Set<number>()
+    const trackMetadataRequests = new Map<number, Promise<void>>()
     const liveSourceNodes = new Set<AudioBufferSourceNode>()
     const ignoredEndedNodes = new WeakSet<AudioBufferSourceNode>()
     const sourceEndedListeners = new WeakMap<AudioBufferSourceNode, EventListener>()
@@ -200,6 +228,7 @@ export const useAudioStore = defineStore('audio', () => {
     let commandSequence = 0
     let scheduledPauseTimer: number | null = null
     let scheduledStopTimer: number | null = null
+    let trackMetadataGeneration = 0
 
     const effectiveSyncState = computed<AudioSyncState>(() => {
         if (clientPhase.value === 'error') {
@@ -305,7 +334,7 @@ export const useAudioStore = defineStore('audio', () => {
         }
     })
 
-    const rememberTrack = (track: AudioTrack) => {
+    const cacheTrack = (track: AudioTrack) => {
         if (knownTracks.has(track.id)) {
             knownTracks.delete(track.id)
         }
@@ -316,6 +345,85 @@ export const useAudioStore = defineStore('audio', () => {
                 knownTracks.delete(oldestKey)
             }
         }
+    }
+
+    const rememberHydratedTrack = (track: AudioTrack) => {
+        cacheTrack(track)
+        hydratedTrackIds.add(track.id)
+    }
+
+    const applyRecordingMetadata = (
+        track: AudioTrack,
+        metadata: PlaybackRecordingMetadata,
+    ): AudioTrack => {
+        const title =
+            pickFirstNonBlank(
+                metadata.title,
+                metadata.comment,
+                metadata.work?.title,
+                track.title,
+            ) ?? `Recording #${track.id}`
+        const artist =
+            pickFirstNonBlank(resolveMetadataArtistLabel(metadata.artists), track.artist) ??
+            'Unknown Artist'
+        const cover = metadata.cover?.id ? resolveCover(metadata.cover.id) : (track.cover ?? '')
+        let workId = track.workId
+        if (metadata.work?.id !== undefined) {
+            workId = metadata.work.id
+        }
+
+        return {
+            ...track,
+            title,
+            artist,
+            cover,
+            ...(workId !== undefined ? { workId } : {}),
+        }
+    }
+
+    const hydrateTrackMetadata = (track: AudioTrack) => {
+        if (hydratedTrackIds.has(track.id)) {
+            return Promise.resolve()
+        }
+
+        const existingRequest = trackMetadataRequests.get(track.id)
+        if (existingRequest) {
+            return existingRequest
+        }
+
+        const generation = trackMetadataGeneration
+        const request = api.recordingController
+            .getRecording({ id: track.id })
+            .then((metadata) => {
+                if (generation !== trackMetadataGeneration) {
+                    return
+                }
+
+                const hydratedTrack = applyRecordingMetadata(track, metadata)
+                rememberHydratedTrack(hydratedTrack)
+
+                if (currentTrack.value?.id === track.id) {
+                    currentTrack.value = applyRecordingMetadata(currentTrack.value, metadata)
+                }
+
+                if (currentBufferTrack.value?.id === track.id) {
+                    currentBufferTrack.value = applyRecordingMetadata(
+                        currentBufferTrack.value,
+                        metadata,
+                    )
+                }
+            })
+            .catch(() => {
+                // Metadata enrichment is best-effort and must not interrupt sync playback.
+            })
+            .finally(() => {
+                if (trackMetadataRequests.get(track.id) === request) {
+                    trackMetadataRequests.delete(track.id)
+                }
+            })
+
+        trackMetadataRequests.set(track.id, request)
+        return request
     }
 
     const getEstimatedServerNowMs = () => {
@@ -580,7 +688,7 @@ export const useAudioStore = defineStore('audio', () => {
             mediaFileId,
             ...(base?.workId !== undefined ? { workId: base.workId } : {}),
         }
-        rememberTrack(track)
+        cacheTrack(track)
         return track
     }
 
@@ -597,7 +705,7 @@ export const useAudioStore = defineStore('audio', () => {
     }
 
     const primeTrackState = (track: AudioTrack, positionSeconds: number) => {
-        rememberTrack(track)
+        cacheTrack(track)
         currentTrack.value = cloneTrack(track)
         playbackOffsetSec.value = positionSeconds
         currentTime.value = positionSeconds
@@ -612,7 +720,7 @@ export const useAudioStore = defineStore('audio', () => {
     }
 
     const ensureTrackBuffer = (track: AudioTrack) => {
-        rememberTrack(track)
+        cacheTrack(track)
 
         if (isSameBufferTrack(track)) {
             if (currentTrack.value?.mediaFileId === track.mediaFileId) {
@@ -733,7 +841,7 @@ export const useAudioStore = defineStore('audio', () => {
         playbackStartContextTime.value = 0
 
         if (track) {
-            rememberTrack(track)
+            cacheTrack(track)
             currentTrack.value = cloneTrack(track)
             if (isSameBufferTrack(track)) {
                 duration.value = currentBuffer.value!.duration
@@ -863,7 +971,8 @@ export const useAudioStore = defineStore('audio', () => {
         }
 
         currentTrack.value = cloneTrack(track)
-        rememberTrack(track)
+        cacheTrack(track)
+        void hydrateTrackMetadata(track)
 
         const buffer = await ensureTrackBuffer(track)
         if (!buffer) {
@@ -889,8 +998,9 @@ export const useAudioStore = defineStore('audio', () => {
             return
         }
 
-        rememberTrack(track)
+        cacheTrack(track)
         currentTrack.value = cloneTrack(track)
+        void hydrateTrackMetadata(track)
 
         const recoveredPosition =
             payload.state.status === 'PLAYING'
@@ -932,6 +1042,9 @@ export const useAudioStore = defineStore('audio', () => {
 
         const track = resolveTrackFromState(scheduledAction)
         const actionToken = scheduledAction.version
+        if (track) {
+            void hydrateTrackMetadata(track)
+        }
 
         if (scheduledAction.action === 'PAUSE') {
             schedulePauseState(
@@ -1057,7 +1170,7 @@ export const useAudioStore = defineStore('audio', () => {
     }
 
     async function play(track: AudioTrack) {
-        rememberTrack(track)
+        rememberHydratedTrack(track)
 
         const isSameTrack = currentTrack.value?.id === track.id
         const targetPosition = isSameTrack ? currentTime.value : 0
@@ -1220,6 +1333,9 @@ export const useAudioStore = defineStore('audio', () => {
         awaitingSyncRecovery.value = false
         audioUnlockRequired.value = false
         isPlayerHidden.value = false
+        trackMetadataGeneration += 1
+        trackMetadataRequests.clear()
+        hydratedTrackIds.clear()
         knownTracks.clear()
         clearTrackState()
         destroyAudioContext()

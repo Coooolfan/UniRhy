@@ -5,5 +5,6 @@ export type {AsyncTaskLogDto} from './AsyncTaskLogDto';
 export type {FileProviderFileSystemDto} from './FileProviderFileSystemDto';
 export type {FileProviderOssDto} from './FileProviderOssDto';
 export type {PlaylistDto} from './PlaylistDto';
+export type {RecordingDto} from './RecordingDto';
 export type {SystemConfigDto} from './SystemConfigDto';
 export type {WorkDto} from './WorkDto';

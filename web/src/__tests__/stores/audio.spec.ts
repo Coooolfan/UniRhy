@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 
+const apiMockState = vi.hoisted(() => ({
+    getRecording: vi.fn(),
+}))
+
 type MockPlaybackSyncClientState = {
     deviceId: string
     phase: string
@@ -190,6 +194,14 @@ const playbackSyncMockState = vi.hoisted(() => ({
     clients: [] as MockPlaybackSyncClientInstance[],
 }))
 
+vi.mock('@/ApiInstance', () => ({
+    api: {
+        recordingController: {
+            getRecording: apiMockState.getRecording,
+        },
+    },
+}))
+
 vi.mock('@/services/playbackSyncClient', () => {
     function PlaybackSyncClient(
         this: MockPlaybackSyncClientInstance,
@@ -273,11 +285,18 @@ vi.mock('@/services/playbackSyncClient', () => {
 })
 
 import { useAudioStore, type AudioTrack } from '@/stores/audio'
+import { api } from '@/ApiInstance'
 import type {
     LoadAudioSourceMessage,
     ScheduledActionMessage,
 } from '@/services/playbackSyncProtocol'
 import { nowClientMs } from '@/utils/time'
+
+const getRecordingMock = vi.mocked(api.recordingController.getRecording)
+type RecordingMetadata = Awaited<ReturnType<typeof api.recordingController.getRecording>>
+type RecordingMetadataOverrides = Partial<Omit<RecordingMetadata, 'cover'>> & {
+    cover?: RecordingMetadata['cover'] | null
+}
 
 let nextAnimationFrameId = 1
 let animationFrameCallbacks = new Map<number, FrameRequestCallback>()
@@ -383,6 +402,43 @@ const buildTrack = (id: number, src = `/audio/${id}.mp3`): AudioTrack => ({
     mediaFileId: id + 1_000,
 })
 
+const buildRecordingMetadata = (
+    id: number,
+    overrides: RecordingMetadataOverrides = {},
+): RecordingMetadata => {
+    const { cover, ...rest } = overrides
+
+    return {
+        id,
+        kind: rest.kind ?? 'CD',
+        label: rest.label ?? `Label ${id}`,
+        work: rest.work ?? { id: id + 10_000, title: `Work ${id}` },
+        title: rest.title ?? `Hydrated Track ${id}`,
+        comment: rest.comment ?? `Comment ${id}`,
+        durationMs: rest.durationMs ?? id * 1_000,
+        defaultInWork: rest.defaultInWork ?? false,
+        artists: rest.artists ?? [
+            {
+                id: id + 20_000,
+                displayName: `Hydrated Artist ${id}`,
+                alias: [],
+                comment: '',
+            },
+        ],
+        ...(cover === null
+            ? {}
+            : {
+                  cover: cover ?? {
+                      id: id + 30_000,
+                      sha256: `sha-${id}`,
+                      objectKey: `cover/${id}`,
+                      mimeType: 'image/jpeg',
+                      size: 1_024,
+                  },
+              }),
+    }
+}
+
 const createResponse = (duration: number, status = 200) => {
     return new Response(new Uint8Array([duration]).buffer, { status })
 }
@@ -423,6 +479,8 @@ describe('audio store', () => {
         MockAudioContext.instances = []
         MockAudioContext.defaultState = 'running'
         fetchMock.mockReset()
+        getRecordingMock.mockReset()
+        getRecordingMock.mockRejectedValue(new Error('metadata unavailable'))
 
         vi.stubGlobal('fetch', fetchMock)
         vi.stubGlobal('AudioContext', MockAudioContext)
@@ -814,6 +872,237 @@ describe('audio store', () => {
             mediaFileId: 2_007,
         })
         expect(audioStore.duration).toBe(45)
+    })
+
+    it('hydrates placeholder metadata after passive load-audio-source without delaying preload ack', async () => {
+        fetchMock.mockResolvedValue(createResponse(45))
+        const recordingDeferred = createDeferred<ReturnType<typeof buildRecordingMetadata>>()
+        getRecordingMock.mockReturnValueOnce(recordingDeferred.promise)
+
+        const audioStore = useAudioStore()
+        audioStore.connectPlaybackSync()
+        const client = latestClient()
+
+        client.emitMessage({
+            type: 'ROOM_EVENT_LOAD_AUDIO_SOURCE',
+            payload: {
+                commandId: 'cmd-preload-metadata',
+                recordingId: 7,
+                mediaFileId: 2_007,
+                sourceUrl: '/api/media/2007',
+            },
+        } satisfies LoadAudioSourceMessage)
+        await flushPromises(12)
+
+        expect(getRecordingMock).toHaveBeenCalledWith({ id: 7 })
+        expect(audioStore.currentTrack).toEqual(
+            expect.objectContaining({
+                id: 7,
+                title: 'Recording #7',
+                artist: 'Unknown Artist',
+                cover: '',
+            }),
+        )
+        expect(client.sendAudioSourceLoaded).toHaveBeenCalledWith({
+            commandId: 'cmd-preload-metadata',
+            recordingId: 7,
+            mediaFileId: 2_007,
+        })
+
+        recordingDeferred.resolve(buildRecordingMetadata(7))
+        await flushPromises(12)
+
+        expect(audioStore.currentTrack).toEqual(
+            expect.objectContaining({
+                id: 7,
+                title: 'Hydrated Track 7',
+                artist: 'Hydrated Artist 7',
+                cover: '/api/media/30007',
+                workId: 10007,
+            }),
+        )
+    })
+
+    it('dedupes metadata requests across snapshot and scheduled action for the same passive track', async () => {
+        const recordingDeferred = createDeferred<ReturnType<typeof buildRecordingMetadata>>()
+        getRecordingMock.mockReturnValueOnce(recordingDeferred.promise)
+
+        const audioStore = useAudioStore()
+        audioStore.connectPlaybackSync()
+        const client = latestClient()
+
+        client.emitMessage({
+            type: 'SNAPSHOT',
+            payload: {
+                state: {
+                    status: 'PAUSED',
+                    recordingId: 12,
+                    mediaFileId: 2_012,
+                    sourceUrl: '/api/media/2012',
+                    positionSeconds: 1,
+                    serverTimeToExecuteMs: nowClientMs(),
+                    version: 1,
+                    updatedAtMs: nowClientMs(),
+                },
+                serverNowMs: nowClientMs(),
+            },
+        })
+        await flushPromises(12)
+
+        client.emitMessage({
+            type: 'SCHEDULED_ACTION',
+            payload: {
+                commandId: 'cmd-pause-12',
+                serverTimeToExecuteMs: nowClientMs(),
+                scheduledAction: {
+                    action: 'PAUSE',
+                    status: 'PAUSED',
+                    recordingId: 12,
+                    mediaFileId: 2_012,
+                    sourceUrl: '/api/media/2012',
+                    positionSeconds: 1,
+                    version: 2,
+                },
+            },
+        } satisfies ScheduledActionMessage)
+        await flushPromises(12)
+
+        expect(getRecordingMock).toHaveBeenCalledTimes(1)
+
+        recordingDeferred.resolve(buildRecordingMetadata(12))
+        await flushPromises(12)
+
+        expect(audioStore.currentTrack).toEqual(
+            expect.objectContaining({
+                id: 12,
+                title: 'Hydrated Track 12',
+                artist: 'Hydrated Artist 12',
+                cover: '/api/media/30012',
+            }),
+        )
+    })
+
+    it('retries metadata hydration on later sync messages after a failed request', async () => {
+        fetchMock.mockResolvedValue(createResponse(33))
+        getRecordingMock
+            .mockRejectedValueOnce(new Error('metadata unavailable'))
+            .mockResolvedValueOnce(buildRecordingMetadata(14, { cover: null }))
+
+        const audioStore = useAudioStore()
+        audioStore.connectPlaybackSync()
+        const client = latestClient()
+
+        client.emitMessage({
+            type: 'SNAPSHOT',
+            payload: {
+                state: {
+                    status: 'PAUSED',
+                    recordingId: 14,
+                    mediaFileId: 2_014,
+                    sourceUrl: '/api/media/2014',
+                    positionSeconds: 0,
+                    serverTimeToExecuteMs: nowClientMs(),
+                    version: 1,
+                    updatedAtMs: nowClientMs(),
+                },
+                serverNowMs: nowClientMs(),
+            },
+        })
+        await flushPromises(12)
+
+        expect(audioStore.currentTrack?.title).toBe('Recording #14')
+
+        client.emitMessage({
+            type: 'ROOM_EVENT_LOAD_AUDIO_SOURCE',
+            payload: {
+                commandId: 'cmd-retry-metadata',
+                recordingId: 14,
+                mediaFileId: 2_014,
+                sourceUrl: '/api/media/2014',
+            },
+        } satisfies LoadAudioSourceMessage)
+        await flushPromises(12)
+
+        expect(getRecordingMock).toHaveBeenCalledTimes(2)
+        expect(audioStore.currentTrack).toEqual(
+            expect.objectContaining({
+                id: 14,
+                title: 'Hydrated Track 14',
+                artist: 'Hydrated Artist 14',
+                cover: '',
+            }),
+        )
+    })
+
+    it('ignores late metadata responses after the current passive track changes', async () => {
+        const firstDeferred = createDeferred<ReturnType<typeof buildRecordingMetadata>>()
+        const secondDeferred = createDeferred<ReturnType<typeof buildRecordingMetadata>>()
+        getRecordingMock
+            .mockReturnValueOnce(firstDeferred.promise)
+            .mockReturnValueOnce(secondDeferred.promise)
+
+        const audioStore = useAudioStore()
+        audioStore.connectPlaybackSync()
+        const client = latestClient()
+
+        client.emitMessage({
+            type: 'SNAPSHOT',
+            payload: {
+                state: {
+                    status: 'PAUSED',
+                    recordingId: 21,
+                    mediaFileId: 2_021,
+                    sourceUrl: '/api/media/2021',
+                    positionSeconds: 0,
+                    serverTimeToExecuteMs: nowClientMs(),
+                    version: 1,
+                    updatedAtMs: nowClientMs(),
+                },
+                serverNowMs: nowClientMs(),
+            },
+        })
+        await flushPromises(12)
+
+        client.emitMessage({
+            type: 'SNAPSHOT',
+            payload: {
+                state: {
+                    status: 'PAUSED',
+                    recordingId: 22,
+                    mediaFileId: 2_022,
+                    sourceUrl: '/api/media/2022',
+                    positionSeconds: 0,
+                    serverTimeToExecuteMs: nowClientMs(),
+                    version: 2,
+                    updatedAtMs: nowClientMs(),
+                },
+                serverNowMs: nowClientMs(),
+            },
+        })
+        await flushPromises(12)
+
+        firstDeferred.resolve(buildRecordingMetadata(21))
+        await flushPromises(12)
+
+        expect(audioStore.currentTrack).toEqual(
+            expect.objectContaining({
+                id: 22,
+                title: 'Recording #22',
+                artist: 'Unknown Artist',
+            }),
+        )
+
+        secondDeferred.resolve(buildRecordingMetadata(22))
+        await flushPromises(12)
+
+        expect(audioStore.currentTrack).toEqual(
+            expect.objectContaining({
+                id: 22,
+                title: 'Hydrated Track 22',
+                artist: 'Hydrated Artist 22',
+                cover: '/api/media/30022',
+            }),
+        )
     })
 
     it('evicts the oldest known track once the track cache exceeds capacity', async () => {

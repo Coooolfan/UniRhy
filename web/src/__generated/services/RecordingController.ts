@@ -1,4 +1,5 @@
 import type {Executor} from '../';
+import type {RecordingDto} from '../model/dto/';
 import type {RecordingMergeReq, RecordingUpdate} from '../model/static/';
 
 /**
@@ -9,6 +10,25 @@ import type {RecordingMergeReq, RecordingUpdate} from '../model/static/';
 export class RecordingController {
     
     constructor(private executor: Executor) {}
+    
+    /**
+     * 获取指定录音
+     * 
+     * 此接口用于根据录音 ID 获取播放器展示所需的最小录音信息。
+     * 需要用户登录认证才能访问
+     * 
+     * @parameter {RecordingControllerOptions['getRecording']} options
+     * - id Recording ID
+     * @return Recording 返回录音信息（使用 PLAYBACK_RECORDING_FETCHER）
+     * 
+     */
+    readonly getRecording: (options: RecordingControllerOptions['getRecording']) => Promise<
+        RecordingDto['RecordingController/PLAYBACK_RECORDING_FETCHER']
+    > = async(options) => {
+        let _uri = '/api/recordings/';
+        _uri += encodeURIComponent(options.id);
+        return (await this.executor({uri: _uri, method: 'GET'})) as Promise<RecordingDto['RecordingController/PLAYBACK_RECORDING_FETCHER']>;
+    }
     
     /**
      * 录音合并接口
@@ -48,6 +68,12 @@ export class RecordingController {
 }
 
 export type RecordingControllerOptions = {
+    'getRecording': {
+        /**
+         * Recording ID
+         */
+        readonly id: number
+    }, 
     'updateRecording': {
         /**
          * Recording ID
