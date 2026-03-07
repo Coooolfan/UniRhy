@@ -1,0 +1,109 @@
+package com.coooolfan.unirhy.sync.service
+
+import com.coooolfan.unirhy.sync.log.PlaybackSyncLogWriter
+import com.coooolfan.unirhy.sync.support.TestPlaybackSyncTimeProvider
+import com.coooolfan.unirhy.sync.support.TestWebSocketSession
+import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Test
+import org.springframework.web.socket.handler.ConcurrentWebSocketSessionDecorator
+import java.util.concurrent.Executors
+import java.util.concurrent.ScheduledExecutorService
+import kotlin.test.assertEquals
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
+
+class PlaybackSyncStaleConnectionJanitorTest {
+    private lateinit var timeProvider: TestPlaybackSyncTimeProvider
+    private lateinit var schedulerExecutor: ScheduledExecutorService
+    private lateinit var deviceRuntimeService: DeviceRuntimeService
+    private lateinit var playbackSessionService: PlaybackSessionService
+    private lateinit var playbackSchedulerService: PlaybackSchedulerService
+    private lateinit var coordinator: PlaybackSyncSessionRemovalCoordinator
+    private lateinit var janitor: PlaybackSyncStaleConnectionJanitor
+    private lateinit var staleSession: TestWebSocketSession
+
+    @BeforeEach
+    fun setUp() {
+        timeProvider = TestPlaybackSyncTimeProvider(1_000L)
+        schedulerExecutor = Executors.newSingleThreadScheduledExecutor()
+        val lockManager = PlaybackAccountLockManager()
+        deviceRuntimeService = DeviceRuntimeService(lockManager, timeProvider)
+        playbackSessionService = PlaybackSessionService(lockManager, timeProvider)
+        playbackSchedulerService = PlaybackSchedulerService(
+            deviceRuntimeService = deviceRuntimeService,
+            timeProvider = timeProvider,
+            scheduler = schedulerExecutor,
+        )
+        val messageSender = PlaybackSyncMessageSender(
+            objectMapper = jacksonObjectMapper(),
+            deviceRuntimeService = deviceRuntimeService,
+        )
+        coordinator = PlaybackSyncSessionRemovalCoordinator(
+            playbackSessionService = playbackSessionService,
+            playbackSchedulerService = playbackSchedulerService,
+            messageSender = messageSender,
+            logWriter = PlaybackSyncLogWriter(),
+        )
+        janitor = PlaybackSyncStaleConnectionJanitor(
+            deviceRuntimeService = deviceRuntimeService,
+            playbackSchedulerService = playbackSchedulerService,
+            sessionRemovalCoordinator = coordinator,
+        )
+        staleSession = registerHello("session-1", "web-a")
+    }
+
+    @AfterEach
+    fun tearDown() {
+        schedulerExecutor.shutdownNow()
+    }
+
+    @Test
+    fun `stale sweep clears pending play when last device is removed`() {
+        deviceRuntimeService.recordNtpResponse(
+            accountId = 42L,
+            deviceId = "web-a",
+            clientRttMs = 20.0,
+            nowMs = 1_000L,
+        )
+        playbackSessionService.createPendingPlay(
+            accountId = 42L,
+            commandId = "cmd-play-001",
+            initiatorDeviceId = "web-a",
+            recordingId = 1001L,
+            mediaFileId = 2001L,
+            sourceUrl = "/api/media/2001",
+            positionSeconds = 12.5,
+            nowMs = 1_000L,
+            timeoutAtMs = 4_000L,
+        )
+
+        timeProvider.setNowMs(5_000L)
+        janitor.sweepStaleConnections()
+
+        assertEquals("stale_connection", staleSession.closeStatus?.reason)
+        assertTrue(deviceRuntimeService.listDeviceIds(42L).isEmpty())
+        assertNull(playbackSessionService.getPendingPlay(42L))
+    }
+
+    private fun registerHello(
+        sessionId: String,
+        deviceId: String,
+    ): TestWebSocketSession {
+        val session = TestWebSocketSession(sessionId = sessionId, accountId = 42L)
+        deviceRuntimeService.registerConnection(
+            accountId = 42L,
+            tokenValue = "token-$sessionId",
+            sessionId = sessionId,
+            session = ConcurrentWebSocketSessionDecorator(session, 10_000, 512 * 1024),
+        )
+        deviceRuntimeService.registerHello(
+            accountId = 42L,
+            sessionId = sessionId,
+            deviceId = deviceId,
+            clientVersion = "web@0.1.0",
+        )
+        return session
+    }
+}

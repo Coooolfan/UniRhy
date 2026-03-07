@@ -2,8 +2,16 @@ package com.coooolfan.unirhy.sync.service
 
 import com.coooolfan.unirhy.sync.protocol.DeviceChangeMessage
 import com.coooolfan.unirhy.sync.protocol.DeviceChangePayload
+import com.coooolfan.unirhy.sync.protocol.LoadAudioSourceMessage
+import com.coooolfan.unirhy.sync.protocol.LoadAudioSourcePayload
+import com.coooolfan.unirhy.sync.protocol.NtpResponseMessage
+import com.coooolfan.unirhy.sync.protocol.NtpResponsePayload
 import com.coooolfan.unirhy.sync.protocol.PlaybackSyncDevice
+import com.coooolfan.unirhy.sync.protocol.ScheduledActionMessage
+import com.coooolfan.unirhy.sync.protocol.ScheduledActionPayload
 import com.coooolfan.unirhy.sync.protocol.ServerPlaybackSyncMessage
+import com.coooolfan.unirhy.sync.protocol.SnapshotMessage
+import com.coooolfan.unirhy.sync.protocol.SnapshotPayload
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
@@ -20,31 +28,91 @@ class PlaybackSyncMessageSender(
         context: PlaybackConnectionContext,
         message: ServerPlaybackSyncMessage,
     ) {
-        if (!context.session.isOpen) {
-            return
-        }
+        sendSerialized(context, serialize(message))
+    }
 
-        val payload = objectMapper.writeValueAsString(message)
-        context.session.sendMessage(TextMessage(payload))
+    fun sendNtpResponse(
+        context: PlaybackConnectionContext,
+        payload: NtpResponsePayload,
+    ) {
+        send(context, NtpResponseMessage(payload = payload))
+    }
+
+    fun sendSnapshot(
+        context: PlaybackConnectionContext,
+        payload: SnapshotPayload,
+    ) {
+        send(context, SnapshotMessage(payload = payload))
+    }
+
+    fun sendScheduledAction(
+        context: PlaybackConnectionContext,
+        payload: ScheduledActionPayload,
+    ) {
+        send(context, ScheduledActionMessage(payload = payload))
+    }
+
+    fun broadcastLoadAudioSource(
+        accountId: Long,
+        payload: LoadAudioSourcePayload,
+    ) {
+        broadcast(
+            accountId = accountId,
+            message = LoadAudioSourceMessage(payload = payload),
+        )
+    }
+
+    fun broadcastScheduledAction(
+        accountId: Long,
+        payload: ScheduledActionPayload,
+    ) {
+        broadcast(
+            accountId = accountId,
+            message = ScheduledActionMessage(payload = payload),
+        )
     }
 
     fun broadcastDeviceChange(
         accountId: Long,
         deviceIds: List<String>,
     ) {
-        val message = DeviceChangeMessage(
-            payload = DeviceChangePayload(
-                devices = deviceIds.map { PlaybackSyncDevice(deviceId = it) },
+        broadcast(
+            accountId = accountId,
+            message = DeviceChangeMessage(
+                payload = DeviceChangePayload(
+                    devices = deviceIds.map { PlaybackSyncDevice(deviceId = it) },
+                ),
             ),
         )
+    }
 
+    private fun broadcast(
+        accountId: Long,
+        message: ServerPlaybackSyncMessage,
+    ) {
+        val textMessage = serialize(message)
         deviceRuntimeService.listHelloCompletedConnections(accountId)
             .forEach { context ->
                 try {
-                    send(context, message)
+                    sendSerialized(context, textMessage)
                 } catch (ex: Exception) {
-                    logger.warn("Failed to broadcast playback sync device change to sessionId={}", context.sessionId, ex)
+                    logger.warn("Failed to broadcast playback sync message to sessionId={}", context.sessionId, ex)
                 }
             }
+    }
+
+    private fun sendSerialized(
+        context: PlaybackConnectionContext,
+        message: TextMessage,
+    ) {
+        if (!context.session.isOpen) {
+            return
+        }
+
+        context.session.sendMessage(message)
+    }
+
+    private fun serialize(message: ServerPlaybackSyncMessage): TextMessage {
+        return TextMessage(objectMapper.writeValueAsString(message))
     }
 }

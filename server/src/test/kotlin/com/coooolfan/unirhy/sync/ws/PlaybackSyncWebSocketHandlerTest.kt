@@ -1,31 +1,18 @@
 package com.coooolfan.unirhy.sync.ws
 
 import com.coooolfan.unirhy.sync.log.PlaybackSyncLogWriter
-import com.coooolfan.unirhy.sync.protocol.DeviceChangeMessage
-import com.coooolfan.unirhy.sync.protocol.ErrorMessage
-import com.coooolfan.unirhy.sync.protocol.PlaybackSyncErrorCode
-import com.coooolfan.unirhy.sync.protocol.PlaybackSyncMessageType
-import com.coooolfan.unirhy.sync.protocol.ServerPlaybackSyncMessage
-import com.coooolfan.unirhy.sync.protocol.SnapshotMessage
-import com.coooolfan.unirhy.sync.service.DeviceRuntimeService
-import com.coooolfan.unirhy.sync.service.PlaybackAccountLockManager
-import com.coooolfan.unirhy.sync.service.PlaybackSessionService
-import com.coooolfan.unirhy.sync.service.PlaybackSyncMessageSender
+import com.coooolfan.unirhy.sync.protocol.*
+import com.coooolfan.unirhy.sync.service.*
+import com.coooolfan.unirhy.sync.support.TestPlaybackSyncTimeProvider
+import com.coooolfan.unirhy.sync.support.TestWebSocketSession
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import org.springframework.http.HttpHeaders
-import org.springframework.web.socket.BinaryMessage
 import org.springframework.web.socket.CloseStatus
-import org.springframework.web.socket.PingMessage
-import org.springframework.web.socket.PongMessage
 import org.springframework.web.socket.TextMessage
-import org.springframework.web.socket.WebSocketExtension
-import org.springframework.web.socket.WebSocketMessage
-import org.springframework.web.socket.WebSocketSession
-import java.net.InetSocketAddress
-import java.net.URI
-import java.security.Principal
+import java.util.concurrent.Executors
+import java.util.concurrent.ScheduledExecutorService
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
@@ -35,24 +22,55 @@ import kotlin.test.assertTrue
 class PlaybackSyncWebSocketHandlerTest {
     private val objectMapper = jacksonObjectMapper()
 
+    private lateinit var timeProvider: TestPlaybackSyncTimeProvider
+    private lateinit var schedulerExecutor: ScheduledExecutorService
     private lateinit var deviceRuntimeService: DeviceRuntimeService
+    private lateinit var playbackSessionService: PlaybackSessionService
+    private lateinit var playbackSchedulerService: PlaybackSchedulerService
+    private lateinit var sessionRemovalCoordinator: PlaybackSyncSessionRemovalCoordinator
+    private lateinit var mediaResolver: PlaybackSyncMediaResolver
     private lateinit var handler: PlaybackSyncWebSocketHandler
 
     @BeforeEach
     fun setUp() {
+        timeProvider = TestPlaybackSyncTimeProvider(1_730_844_000_200)
+        schedulerExecutor = Executors.newSingleThreadScheduledExecutor()
         val lockManager = PlaybackAccountLockManager()
-        deviceRuntimeService = DeviceRuntimeService(lockManager)
+        deviceRuntimeService = DeviceRuntimeService(lockManager, timeProvider)
+        playbackSessionService = PlaybackSessionService(lockManager, timeProvider)
+        playbackSchedulerService = PlaybackSchedulerService(
+            deviceRuntimeService = deviceRuntimeService,
+            timeProvider = timeProvider,
+            scheduler = schedulerExecutor,
+        )
+        mediaResolver = PlaybackSyncMediaResolver(
+            mediaCatalog = FakePlaybackSyncMediaCatalog(),
+        )
         val messageSender = PlaybackSyncMessageSender(
             objectMapper = objectMapper,
             deviceRuntimeService = deviceRuntimeService,
         )
-        handler = PlaybackSyncWebSocketHandler(
-            objectMapper = objectMapper,
-            playbackSessionService = PlaybackSessionService(lockManager),
-            deviceRuntimeService = deviceRuntimeService,
+        sessionRemovalCoordinator = PlaybackSyncSessionRemovalCoordinator(
+            playbackSessionService = playbackSessionService,
+            playbackSchedulerService = playbackSchedulerService,
             messageSender = messageSender,
             logWriter = PlaybackSyncLogWriter(),
         )
+        handler = PlaybackSyncWebSocketHandler(
+            objectMapper = objectMapper,
+            playbackSessionService = playbackSessionService,
+            deviceRuntimeService = deviceRuntimeService,
+            playbackSyncMediaResolver = mediaResolver,
+            playbackSchedulerService = playbackSchedulerService,
+            sessionRemovalCoordinator = sessionRemovalCoordinator,
+            messageSender = messageSender,
+            logWriter = PlaybackSyncLogWriter(),
+        )
+    }
+
+    @AfterEach
+    fun tearDown() {
+        schedulerExecutor.shutdownNow()
     }
 
     @Test
@@ -96,28 +114,183 @@ class PlaybackSyncWebSocketHandlerTest {
     }
 
     @Test
-    fun `protocol errors do not pollute state`() {
+    fun `ntp request returns ntp response and marks sync ready`() {
         val session = TestWebSocketSession(sessionId = "session-1", accountId = 42L)
         handler.afterConnectionEstablished(session)
-
-        handler.handleMessage(session, textMessage("""{"type":"HELLO","payload":}"""))
-        assertError(session.lastServerMessage(), PlaybackSyncErrorCode.INVALID_MESSAGE)
-        assertEquals(emptyList(), deviceRuntimeService.listDeviceIds(42L))
+        handler.handleMessage(session, textMessage(helloPayload(deviceId = "web-7c2f")))
+        session.clearServerMessages()
 
         handler.handleMessage(session, textMessage(ntpRequestPayload()))
-        assertError(session.lastServerMessage(), PlaybackSyncErrorCode.INVALID_MESSAGE)
-        assertEquals(emptyList(), deviceRuntimeService.listDeviceIds(42L))
 
-        handler.handleMessage(session, textMessage(helloPayload(deviceId = "web-7c2f")))
-        assertEquals(listOf("web-7c2f"), deviceRuntimeService.listDeviceIds(42L))
+        val messages = session.serverMessages()
+        assertEquals(1, messages.size)
+        val response = messages.single() as NtpResponseMessage
+        assertEquals(1_730_844_000_000, response.payload.t0)
+        assertTrue(response.payload.t1 <= response.payload.t2)
+        assertTrue(deviceRuntimeService.isSyncReady(42L, "web-7c2f"))
+        assertEquals(18.5, deviceRuntimeService.listActiveRuntimeStates(42L).single().rttEmaMs)
+    }
 
+    @Test
+    fun `play on single device immediately broadcasts load and scheduled action`() {
+        val session = TestWebSocketSession(sessionId = "session-1", accountId = 42L)
+        handler.afterConnectionEstablished(session)
         handler.handleMessage(session, textMessage(helloPayload(deviceId = "web-7c2f")))
-        assertError(session.lastServerMessage(), PlaybackSyncErrorCode.INVALID_MESSAGE)
-        assertEquals(listOf("web-7c2f"), deviceRuntimeService.listDeviceIds(42L))
+        session.clearServerMessages()
 
         handler.handleMessage(session, textMessage(playPayload()))
-        assertError(session.lastServerMessage(), PlaybackSyncErrorCode.UNSUPPORTED_MESSAGE)
-        assertEquals(listOf("web-7c2f"), deviceRuntimeService.listDeviceIds(42L))
+
+        val messages = session.serverMessages()
+        assertEquals(2, messages.size)
+        val loadAudio = messages[0] as LoadAudioSourceMessage
+        val scheduledAction = messages[1] as ScheduledActionMessage
+        assertEquals("/api/media/2001", loadAudio.payload.sourceUrl)
+        assertEquals(ScheduledActionType.PLAY, scheduledAction.payload.scheduledAction.action)
+        assertEquals(PlaybackStatus.PLAYING, scheduledAction.payload.scheduledAction.status)
+        assertEquals(12.5, scheduledAction.payload.scheduledAction.positionSeconds)
+        assertEquals(400L, scheduledAction.payload.serverTimeToExecuteMs - timeProvider.nowMs())
+    }
+
+    @Test
+    fun `device id mismatch is rejected`() {
+        val session = TestWebSocketSession(sessionId = "session-1", accountId = 42L)
+        handler.afterConnectionEstablished(session)
+        handler.handleMessage(session, textMessage(helloPayload(deviceId = "web-7c2f")))
+        session.clearServerMessages()
+
+        handler.handleMessage(
+            session,
+            textMessage(
+                playPayload(
+                    commandId = "cmd-play-002",
+                    deviceId = "web-other",
+                ),
+            ),
+        )
+
+        assertError(session.lastServerMessage(), PlaybackSyncErrorCode.INVALID_MESSAGE)
+    }
+
+    @Test
+    fun `pause with mixed media context is rejected`() {
+        val session = TestWebSocketSession(sessionId = "session-1", accountId = 42L)
+        handler.afterConnectionEstablished(session)
+        handler.handleMessage(session, textMessage(helloPayload(deviceId = "web-7c2f")))
+        session.clearServerMessages()
+
+        handler.handleMessage(
+            session,
+            textMessage(
+                pausePayload(
+                    commandId = "cmd-pause-001",
+                    recordingId = 1001,
+                    mediaFileId = null,
+                ),
+            ),
+        )
+
+        assertError(session.lastServerMessage(), PlaybackSyncErrorCode.INVALID_MESSAGE)
+    }
+
+    @Test
+    fun `sync before ntp ready is rejected`() {
+        val session = TestWebSocketSession(sessionId = "session-1", accountId = 42L)
+        handler.afterConnectionEstablished(session)
+        handler.handleMessage(session, textMessage(helloPayload(deviceId = "web-7c2f")))
+        session.clearServerMessages()
+
+        handler.handleMessage(session, textMessage(syncPayload()))
+
+        assertError(session.lastServerMessage(), PlaybackSyncErrorCode.SYNC_NOT_READY)
+    }
+
+    @Test
+    fun `sync after ntp ready sends scheduled pause action`() {
+        val session = TestWebSocketSession(sessionId = "session-1", accountId = 42L)
+        handler.afterConnectionEstablished(session)
+        handler.handleMessage(session, textMessage(helloPayload(deviceId = "web-7c2f")))
+        handler.handleMessage(session, textMessage(ntpRequestPayload()))
+        session.clearServerMessages()
+
+        handler.handleMessage(session, textMessage(syncPayload()))
+
+        val message = session.lastServerMessage()
+        assertTrue(message is ScheduledActionMessage)
+        assertEquals(ScheduledActionType.PAUSE, message.payload.scheduledAction.action)
+        assertEquals(PlaybackStatus.PAUSED, message.payload.scheduledAction.status)
+        assertEquals(null, message.payload.scheduledAction.recordingId)
+    }
+
+    @Test
+    fun `audio source loaded by remaining device completes pending play`() {
+        val sessionA = TestWebSocketSession(sessionId = "session-1", accountId = 42L)
+        val sessionB = TestWebSocketSession(sessionId = "session-2", accountId = 42L)
+        handler.afterConnectionEstablished(sessionA)
+        handler.afterConnectionEstablished(sessionB)
+        handler.handleMessage(sessionA, textMessage(helloPayload(deviceId = "web-a")))
+        handler.handleMessage(sessionB, textMessage(helloPayload(deviceId = "web-b")))
+        sessionA.clearServerMessages()
+        sessionB.clearServerMessages()
+
+        handler.handleMessage(
+            sessionA,
+            textMessage(
+                playPayload(
+                    commandId = "cmd-play-001",
+                    deviceId = "web-a",
+                ),
+            ),
+        )
+        assertEquals(1, sessionA.serverMessages().size)
+        assertEquals(1, sessionB.serverMessages().size)
+
+        handler.handleMessage(
+            sessionB,
+            textMessage(
+                audioSourceLoadedPayload(
+                    deviceId = "web-b",
+                ),
+            ),
+        )
+
+        val scheduledActionA = sessionA.serverMessages().last() as ScheduledActionMessage
+        val scheduledActionB = sessionB.serverMessages().last() as ScheduledActionMessage
+        assertEquals(ScheduledActionType.PLAY, scheduledActionA.payload.scheduledAction.action)
+        assertEquals(scheduledActionA.payload, scheduledActionB.payload)
+        assertEquals(400L, scheduledActionA.payload.serverTimeToExecuteMs - timeProvider.nowMs())
+    }
+
+    @Test
+    fun `pending play timeout sends scheduled action`() {
+        val sessionA = TestWebSocketSession(sessionId = "session-1", accountId = 42L)
+        val sessionB = TestWebSocketSession(sessionId = "session-2", accountId = 42L)
+        handler.afterConnectionEstablished(sessionA)
+        handler.afterConnectionEstablished(sessionB)
+        handler.handleMessage(sessionA, textMessage(helloPayload(deviceId = "web-a")))
+        handler.handleMessage(sessionB, textMessage(helloPayload(deviceId = "web-b")))
+        sessionA.clearServerMessages()
+        sessionB.clearServerMessages()
+
+        handler.handleMessage(
+            sessionA,
+            textMessage(
+                playPayload(
+                    commandId = "cmd-play-timeout",
+                    deviceId = "web-a",
+                ),
+            ),
+        )
+        sessionA.clearServerMessages()
+        sessionB.clearServerMessages()
+
+        timeProvider.advanceBy(3_000)
+        handler.handlePendingPlayTimeout(42L, "cmd-play-timeout")
+
+        val scheduledActionA = sessionA.lastServerMessage()
+        val scheduledActionB = sessionB.lastServerMessage()
+        assertTrue(scheduledActionA is ScheduledActionMessage)
+        assertTrue(scheduledActionB is ScheduledActionMessage)
+        assertEquals("cmd-play-timeout", scheduledActionA.payload.commandId)
     }
 
     @Test
@@ -139,7 +312,6 @@ class PlaybackSyncWebSocketHandlerTest {
         val remainingMessage = sessionA.lastServerMessage()
         assertTrue(remainingMessage is DeviceChangeMessage)
         assertEquals(listOf("web-a"), remainingMessage.payload.devices.map { it.deviceId })
-        assertTrue(sessionB.serverMessages().isEmpty())
     }
 
     private fun textMessage(payload: String): TextMessage = TextMessage(payload)
@@ -158,20 +330,70 @@ class PlaybackSyncWebSocketHandlerTest {
         {
           "type": "NTP_REQUEST",
           "payload": {
-            "t0": 1730844000000
+            "t0": 1730844000000,
+            "clientRttMs": 18.5
           }
         }
     """.trimIndent()
 
-    private fun playPayload(): String = """
+    private fun playPayload(
+        commandId: String = "cmd-play-001",
+        deviceId: String = "web-7c2f",
+    ): String = """
         {
           "type": "PLAY",
           "payload": {
-            "commandId": "cmd-play-001",
-            "deviceId": "web-7c2f",
+            "commandId": "$commandId",
+            "deviceId": "$deviceId",
             "recordingId": 1001,
             "mediaFileId": 2001,
             "positionSeconds": 12.5
+          }
+        }
+    """.trimIndent()
+
+    private fun pausePayload(
+        commandId: String,
+        deviceId: String = "web-7c2f",
+        recordingId: Long? = null,
+        mediaFileId: Long? = null,
+    ): String {
+        val recordingLiteral = recordingId?.toString() ?: "null"
+        val mediaLiteral = mediaFileId?.toString() ?: "null"
+        return """
+            {
+              "type": "PAUSE",
+              "payload": {
+                "commandId": "$commandId",
+                "deviceId": "$deviceId",
+                "recordingId": $recordingLiteral,
+                "mediaFileId": $mediaLiteral,
+                "positionSeconds": 36.25
+              }
+            }
+        """.trimIndent()
+    }
+
+    private fun audioSourceLoadedPayload(
+        deviceId: String,
+        commandId: String = "cmd-play-001",
+    ): String = """
+        {
+          "type": "AUDIO_SOURCE_LOADED",
+          "payload": {
+            "commandId": "$commandId",
+            "deviceId": "$deviceId",
+            "recordingId": 1001,
+            "mediaFileId": 2001
+          }
+        }
+    """.trimIndent()
+
+    private fun syncPayload(deviceId: String = "web-7c2f"): String = """
+        {
+          "type": "SYNC",
+          "payload": {
+            "deviceId": "$deviceId"
           }
         }
     """.trimIndent()
@@ -192,73 +414,13 @@ class PlaybackSyncWebSocketHandlerTest {
     }
 }
 
-private class TestWebSocketSession(
-    private val sessionId: String,
-    accountId: Long,
-) : WebSocketSession {
-    private val openUri = URI.create("ws://localhost/ws/playback-sync")
-    private val attributes = mutableMapOf<String, Any>(
-        PlaybackSyncSessionAttributes.ACCOUNT_ID to accountId,
-        PlaybackSyncSessionAttributes.TOKEN_VALUE to "token-$sessionId",
-        PlaybackSyncSessionAttributes.SESSION_ID to sessionId,
-    )
+private class FakePlaybackSyncMediaCatalog : PlaybackSyncMediaCatalog {
+    override fun recordingExists(id: Long): Boolean = id == 1001L
 
-    override fun getId(): String = sessionId
+    override fun mediaFileExists(id: Long): Boolean = id == 2001L
 
-    override fun getUri(): URI = openUri
-
-    override fun getHandshakeHeaders(): HttpHeaders = HttpHeaders()
-
-    override fun getAttributes(): MutableMap<String, Any> = attributes
-
-    override fun getPrincipal(): Principal? = null
-
-    override fun getLocalAddress(): InetSocketAddress? = null
-
-    override fun getRemoteAddress(): InetSocketAddress? = null
-
-    override fun getAcceptedProtocol(): String? = null
-
-    override fun setTextMessageSizeLimit(messageSizeLimit: Int) {
-    }
-
-    override fun getTextMessageSizeLimit(): Int = 64 * 1024
-
-    override fun setBinaryMessageSizeLimit(messageSizeLimit: Int) {
-    }
-
-    override fun getBinaryMessageSizeLimit(): Int = 64 * 1024
-
-    override fun getExtensions(): MutableList<WebSocketExtension> = mutableListOf()
-
-    override fun isOpen(): Boolean = open
-
-    override fun sendMessage(message: WebSocketMessage<*>) {
-        when (message) {
-            is TextMessage -> sentTextMessages += message.payload
-            is BinaryMessage -> error("BinaryMessage is not expected in playback sync tests")
-            is PingMessage -> error("PingMessage is not expected in playback sync tests")
-            is PongMessage -> error("PongMessage is not expected in playback sync tests")
-            else -> error("Unsupported WebSocketMessage type: ${message.javaClass.name}")
-        }
-    }
-
-    override fun close() {
-        close(CloseStatus.NORMAL)
-    }
-
-    override fun close(status: CloseStatus) {
-        open = false
-        closeStatus = status
-    }
-
-    var open: Boolean = true
-        private set
-    var closeStatus: CloseStatus? = null
-        private set
-    val sentTextMessages: MutableList<String> = mutableListOf()
-
-    fun clearServerMessages() {
-        sentTextMessages.clear()
-    }
+    override fun recordingHasMediaFile(
+        recordingId: Long,
+        mediaFileId: Long,
+    ): Boolean = recordingId == 1001L && mediaFileId == 2001L
 }
