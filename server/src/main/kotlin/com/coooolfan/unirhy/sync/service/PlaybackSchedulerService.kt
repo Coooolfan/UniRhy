@@ -13,13 +13,10 @@ import kotlin.math.roundToLong
 @Service
 class PlaybackSchedulerService(
     private val deviceRuntimeService: DeviceRuntimeService,
-    private val timeProvider: PlaybackSyncTimeProvider,
     @Qualifier("playbackSyncScheduledExecutor")
     private val scheduler: ScheduledExecutorService,
 ) {
     private val pendingPlayTimeouts = ConcurrentHashMap<Long, ScheduledFuture<*>>()
-
-    fun nowMs(): Long = timeProvider.nowMs()
 
     fun calculateScheduleDelayMs(accountId: Long): Long {
         return calculateScheduleDelayMs(

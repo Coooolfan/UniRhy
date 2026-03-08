@@ -3,15 +3,21 @@ package com.coooolfan.unirhy.sync.log
 import com.coooolfan.unirhy.sync.protocol.ScheduledActionPayload
 import com.coooolfan.unirhy.sync.service.PlaybackConnectionContext
 
+internal fun PlaybackConnectionContext.toBaseLogFields(): Array<Pair<String, Any?>> {
+    return arrayOf(
+        PlaybackSyncLogFields.ACCOUNT_ID to accountId,
+        PlaybackSyncLogFields.DEVICE_ID to deviceId,
+        PlaybackSyncLogFields.SESSION_ID to sessionId,
+    )
+}
+
 internal fun PlaybackSyncLogWriter.logConnectionClosed(
     context: PlaybackConnectionContext,
     reason: String,
 ) {
     info(
-        event = PlaybackSyncLogEvents.CONNECTION_CLOSED,
-        PlaybackSyncLogFields.ACCOUNT_ID to context.accountId,
-        PlaybackSyncLogFields.DEVICE_ID to context.deviceId,
-        PlaybackSyncLogFields.SESSION_ID to context.sessionId,
+        PlaybackSyncLogEvents.CONNECTION_CLOSED,
+        *context.toBaseLogFields(),
         PlaybackSyncLogFields.RESULT to "completed",
         PlaybackSyncLogFields.REASON to reason,
     )
@@ -24,7 +30,7 @@ internal fun PlaybackSyncLogWriter.logScheduledActionSent(
     nowMs: Long,
 ) {
     info(
-        event = PlaybackSyncLogEvents.SCHEDULED_ACTION_SENT,
+        PlaybackSyncLogEvents.SCHEDULED_ACTION_SENT,
         PlaybackSyncLogFields.ACCOUNT_ID to accountId,
         PlaybackSyncLogFields.DEVICE_ID to deviceId,
         PlaybackSyncLogFields.COMMAND_ID to payload.commandId,

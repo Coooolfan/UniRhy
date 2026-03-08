@@ -2,13 +2,13 @@ package com.coooolfan.unirhy.sync.service
 
 import com.coooolfan.unirhy.sync.log.PlaybackSyncLogWriter
 import com.coooolfan.unirhy.sync.log.logConnectionClosed
-import com.coooolfan.unirhy.sync.log.logScheduledActionSent
 import org.springframework.stereotype.Service
 
 @Service
 class PlaybackSyncSessionRemovalCoordinator(
     private val playbackSessionService: PlaybackSessionService,
     private val playbackSchedulerService: PlaybackSchedulerService,
+    private val scheduledActionDispatcher: PlaybackSyncScheduledActionDispatcher,
     private val messageSender: PlaybackSyncMessageSender,
     private val logWriter: PlaybackSyncLogWriter,
 ) {
@@ -43,8 +43,7 @@ class PlaybackSyncSessionRemovalCoordinator(
 
         if (scheduledAction != null) {
             playbackSchedulerService.cancelPendingPlayTimeout(accountId)
-            messageSender.broadcastScheduledAction(accountId, scheduledAction)
-            logWriter.logScheduledActionSent(accountId, removal.context.deviceId, scheduledAction, nowMs)
+            scheduledActionDispatcher.broadcastAndLog(accountId, removal.context.deviceId, scheduledAction, nowMs)
         } else if (removal.remainingDeviceIds.isEmpty()) {
             abandonPendingPlay(accountId)
         }

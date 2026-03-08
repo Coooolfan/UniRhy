@@ -11,6 +11,7 @@ import java.util.concurrent.ScheduledFuture
 class PlaybackSyncStaleConnectionJanitor(
     private val deviceRuntimeService: DeviceRuntimeService,
     private val playbackSchedulerService: PlaybackSchedulerService,
+    private val timeProvider: PlaybackSyncTimeProvider,
     private val sessionRemovalCoordinator: PlaybackSyncSessionRemovalCoordinator,
 ) {
     private val logger = LoggerFactory.getLogger(PlaybackSyncStaleConnectionJanitor::class.java)
@@ -32,7 +33,7 @@ class PlaybackSyncStaleConnectionJanitor(
 
     fun sweepStaleConnections() {
         runCatching {
-            val nowMs = playbackSchedulerService.nowMs()
+            val nowMs = timeProvider.nowMs()
             deviceRuntimeService.cleanupStaleConnections(
                 nowMs = nowMs,
                 staleThresholdMs = PlaybackSchedulerService.STALE_THRESHOLD_MS,

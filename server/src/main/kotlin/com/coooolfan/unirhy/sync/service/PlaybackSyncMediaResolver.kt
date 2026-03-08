@@ -6,6 +6,7 @@ import com.coooolfan.unirhy.model.Recording
 import com.coooolfan.unirhy.model.id
 import com.coooolfan.unirhy.model.mediaFileId
 import com.coooolfan.unirhy.model.recordingId
+import com.coooolfan.unirhy.controller.MediaFileRoutes
 import com.coooolfan.unirhy.sync.protocol.PlaybackSyncErrorCode
 import org.babyfish.jimmer.sql.kt.KSqlClient
 import org.babyfish.jimmer.sql.kt.ast.expression.count
@@ -34,9 +35,19 @@ interface PlaybackSyncMediaCatalog {
 class JimmerPlaybackSyncMediaCatalog(
     private val sql: KSqlClient,
 ) : PlaybackSyncMediaCatalog {
-    override fun recordingExists(id: Long): Boolean = sql.findById(Recording::class, id) != null
+    override fun recordingExists(id: Long): Boolean {
+        return sql.createQuery(Recording::class) {
+            where(table.id eq id)
+            select(count(table.id))
+        }.execute().first() > 0
+    }
 
-    override fun mediaFileExists(id: Long): Boolean = sql.findById(MediaFile::class, id) != null
+    override fun mediaFileExists(id: Long): Boolean {
+        return sql.createQuery(MediaFile::class) {
+            where(table.id eq id)
+            select(count(table.id))
+        }.execute().first() > 0
+    }
 
     override fun recordingHasMediaFile(
         recordingId: Long,
@@ -62,7 +73,7 @@ class PlaybackSyncMediaResolver(
             return PlaybackSyncResolvedMedia(
                 recordingId = recordingId,
                 mediaFileId = mediaFileId,
-                sourceUrl = "/api/media/$mediaFileId",
+                sourceUrl = MediaFileRoutes.mediaFilePath(mediaFileId),
             )
         }
 
@@ -70,7 +81,7 @@ class PlaybackSyncMediaResolver(
             throw PlaybackSyncProtocolException(
                 code = PlaybackSyncErrorCode.RECORDING_NOT_FOUND,
                 message = "Recording $recordingId not found",
-                reason = "recording_not_found",
+                reason = PlaybackSyncErrorReason.RECORDING_NOT_FOUND,
             )
         }
 
@@ -78,13 +89,13 @@ class PlaybackSyncMediaResolver(
             throw PlaybackSyncProtocolException(
                 code = PlaybackSyncErrorCode.MEDIA_FILE_NOT_FOUND,
                 message = "Media file $mediaFileId not found",
-                reason = "media_file_not_found",
+                reason = PlaybackSyncErrorReason.MEDIA_FILE_NOT_FOUND,
             )
         }
         throw PlaybackSyncProtocolException(
             code = PlaybackSyncErrorCode.RECORDING_NOT_PLAYABLE,
             message = "Recording $recordingId has no playable audio asset for media file $mediaFileId",
-            reason = "recording_not_playable",
+            reason = PlaybackSyncErrorReason.RECORDING_NOT_PLAYABLE,
         )
     }
 }

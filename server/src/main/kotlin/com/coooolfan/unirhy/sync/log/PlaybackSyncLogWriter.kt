@@ -42,7 +42,12 @@ class PlaybackSyncLogWriter {
         return builder.toString()
     }
 
-    private fun sanitize(value: Any): String = value.toString().replace(WHITESPACE_REGEX, "_")
+    private fun sanitize(value: Any): String {
+        return when (value) {
+            is String -> value.replace(WHITESPACE_REGEX, "_")
+            else -> value.toString()
+        }
+    }
 
     private companion object {
         private val WHITESPACE_REGEX = "\\s+".toRegex()

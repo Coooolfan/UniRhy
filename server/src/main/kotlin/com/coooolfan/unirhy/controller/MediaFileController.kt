@@ -30,7 +30,7 @@ import java.time.format.DateTimeFormatter
  */
 @SaCheckLogin
 @RestController
-@RequestMapping("/api/media")
+@RequestMapping(MediaFileRoutes.MEDIA_API_BASE_PATH)
 class MediaFileController(
     private val service: MediaFileResolver,
 ) {
@@ -46,7 +46,7 @@ class MediaFileController(
      * @permission 需要登录认证
      * @description 根据媒体文件ID返回对应的二进制内容
      */
-    @GetMapping("/{id}", headers = ["!Range"])
+    @GetMapping(MediaFileRoutes.MEDIA_FILE_PATH_PATTERN, headers = ["!Range"])
     @ApiIgnore
     fun getMedia(
         @PathVariable id: Long,
@@ -65,7 +65,7 @@ class MediaFileController(
         return fullResponse(resolved, resource, mediaType, etag, lastModified)
     }
 
-    @RequestMapping("/{id}", method = [RequestMethod.HEAD], headers = ["!Range"])
+    @RequestMapping(MediaFileRoutes.MEDIA_FILE_PATH_PATTERN, method = [RequestMethod.HEAD], headers = ["!Range"])
     @ApiIgnore
     fun headMedia(
         @PathVariable id: Long,
@@ -89,7 +89,7 @@ class MediaFileController(
             .build()
     }
 
-    @GetMapping("/{id}", headers = ["Range"])
+    @GetMapping(MediaFileRoutes.MEDIA_FILE_PATH_PATTERN, headers = ["Range"])
     @ApiIgnore
     fun getMediaWithRange(
         @PathVariable id: Long,

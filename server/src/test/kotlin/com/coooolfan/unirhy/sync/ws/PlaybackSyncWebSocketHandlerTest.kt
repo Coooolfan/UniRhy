@@ -1,5 +1,6 @@
 package com.coooolfan.unirhy.sync.ws
 
+import com.coooolfan.unirhy.controller.MediaFileRoutes
 import com.coooolfan.unirhy.sync.log.PlaybackSyncLogWriter
 import com.coooolfan.unirhy.sync.protocol.*
 import com.coooolfan.unirhy.sync.service.*
@@ -28,6 +29,7 @@ class PlaybackSyncWebSocketHandlerTest {
     private lateinit var playbackSessionService: PlaybackSessionService
     private lateinit var playbackSchedulerService: PlaybackSchedulerService
     private lateinit var sessionRemovalCoordinator: PlaybackSyncSessionRemovalCoordinator
+    private lateinit var scheduledActionDispatcher: PlaybackSyncScheduledActionDispatcher
     private lateinit var mediaResolver: PlaybackSyncMediaResolver
     private lateinit var handler: PlaybackSyncWebSocketHandler
 
@@ -40,7 +42,6 @@ class PlaybackSyncWebSocketHandlerTest {
         playbackSessionService = PlaybackSessionService(lockManager, timeProvider)
         playbackSchedulerService = PlaybackSchedulerService(
             deviceRuntimeService = deviceRuntimeService,
-            timeProvider = timeProvider,
             scheduler = schedulerExecutor,
         )
         mediaResolver = PlaybackSyncMediaResolver(
@@ -50,9 +51,14 @@ class PlaybackSyncWebSocketHandlerTest {
             objectMapper = objectMapper,
             deviceRuntimeService = deviceRuntimeService,
         )
+        scheduledActionDispatcher = PlaybackSyncScheduledActionDispatcher(
+            messageSender = messageSender,
+            logWriter = PlaybackSyncLogWriter(),
+        )
         sessionRemovalCoordinator = PlaybackSyncSessionRemovalCoordinator(
             playbackSessionService = playbackSessionService,
             playbackSchedulerService = playbackSchedulerService,
+            scheduledActionDispatcher = scheduledActionDispatcher,
             messageSender = messageSender,
             logWriter = PlaybackSyncLogWriter(),
         )
@@ -62,7 +68,9 @@ class PlaybackSyncWebSocketHandlerTest {
             deviceRuntimeService = deviceRuntimeService,
             playbackSyncMediaResolver = mediaResolver,
             playbackSchedulerService = playbackSchedulerService,
+            timeProvider = timeProvider,
             sessionRemovalCoordinator = sessionRemovalCoordinator,
+            scheduledActionDispatcher = scheduledActionDispatcher,
             messageSender = messageSender,
             logWriter = PlaybackSyncLogWriter(),
         )
@@ -144,7 +152,7 @@ class PlaybackSyncWebSocketHandlerTest {
         assertEquals(2, messages.size)
         val loadAudio = messages[0] as LoadAudioSourceMessage
         val scheduledAction = messages[1] as ScheduledActionMessage
-        assertEquals("/api/media/2001", loadAudio.payload.sourceUrl)
+        assertEquals(MediaFileRoutes.mediaFilePath(2001L), loadAudio.payload.sourceUrl)
         assertEquals(ScheduledActionType.PLAY, scheduledAction.payload.scheduledAction.action)
         assertEquals(PlaybackStatus.PLAYING, scheduledAction.payload.scheduledAction.status)
         assertEquals(12.5, scheduledAction.payload.scheduledAction.positionSeconds)

@@ -1,5 +1,6 @@
 package com.coooolfan.unirhy.sync.service
 
+import com.coooolfan.unirhy.controller.MediaFileRoutes
 import com.coooolfan.unirhy.sync.protocol.PlaybackSyncErrorCode
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
@@ -17,7 +18,7 @@ class PlaybackSyncMediaResolverTest {
 
         val resolved = resolver.resolve(1001L, 2001L)
 
-        assertEquals("/api/media/2001", resolved.sourceUrl)
+        assertEquals(MediaFileRoutes.mediaFilePath(2001L), resolved.sourceUrl)
         assertEquals(0, catalog.recordingExistsCallCount)
         assertEquals(0, catalog.mediaFileExistsCallCount)
         assertEquals(1, catalog.recordingHasMediaFileCallCount)

@@ -1,8 +1,8 @@
 package com.coooolfan.unirhy.sync.model
 
-import com.coooolfan.unirhy.sync.protocol.AccountPlaybackState as ProtocolAccountPlaybackState
+import com.coooolfan.unirhy.sync.protocol.AccountPlaybackStateDto
 
-fun AccountPlaybackState.toProtocolState(): ProtocolAccountPlaybackState = ProtocolAccountPlaybackState(
+fun AccountPlaybackState.toProtocolState(): AccountPlaybackStateDto = AccountPlaybackStateDto(
     status = status,
     recordingId = recordingId,
     mediaFileId = mediaFileId,

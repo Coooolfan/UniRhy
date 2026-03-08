@@ -1,5 +1,6 @@
 package com.coooolfan.unirhy.sync.service
 
+import com.coooolfan.unirhy.controller.MediaFileRoutes
 import com.coooolfan.unirhy.sync.log.PlaybackSyncLogWriter
 import com.coooolfan.unirhy.sync.protocol.DeviceChangeMessage
 import com.coooolfan.unirhy.sync.protocol.ScheduledActionMessage
@@ -28,6 +29,7 @@ class PlaybackSyncSessionRemovalCoordinatorTest {
     private lateinit var playbackSessionService: PlaybackSessionService
     private lateinit var playbackSchedulerService: PlaybackSchedulerService
     private lateinit var messageSender: PlaybackSyncMessageSender
+    private lateinit var scheduledActionDispatcher: PlaybackSyncScheduledActionDispatcher
     private lateinit var coordinator: PlaybackSyncSessionRemovalCoordinator
 
     @BeforeEach
@@ -39,13 +41,17 @@ class PlaybackSyncSessionRemovalCoordinatorTest {
         playbackSessionService = PlaybackSessionService(lockManager, timeProvider)
         playbackSchedulerService = PlaybackSchedulerService(
             deviceRuntimeService = deviceRuntimeService,
-            timeProvider = timeProvider,
             scheduler = schedulerExecutor,
         )
         messageSender = PlaybackSyncMessageSender(objectMapper, deviceRuntimeService)
+        scheduledActionDispatcher = PlaybackSyncScheduledActionDispatcher(
+            messageSender = messageSender,
+            logWriter = PlaybackSyncLogWriter(),
+        )
         coordinator = PlaybackSyncSessionRemovalCoordinator(
             playbackSessionService = playbackSessionService,
             playbackSchedulerService = playbackSchedulerService,
+            scheduledActionDispatcher = scheduledActionDispatcher,
             messageSender = messageSender,
             logWriter = PlaybackSyncLogWriter(),
         )
@@ -65,7 +71,7 @@ class PlaybackSyncSessionRemovalCoordinatorTest {
             initiatorDeviceId = "web-a",
             recordingId = 1001L,
             mediaFileId = 2001L,
-            sourceUrl = "/api/media/2001",
+            sourceUrl = MediaFileRoutes.mediaFilePath(2001L),
             positionSeconds = 12.5,
             nowMs = 1_000L,
             timeoutAtMs = 4_000L,
@@ -87,7 +93,7 @@ class PlaybackSyncSessionRemovalCoordinatorTest {
             initiatorDeviceId = "web-a",
             recordingId = 1001L,
             mediaFileId = 2001L,
-            sourceUrl = "/api/media/2001",
+            sourceUrl = MediaFileRoutes.mediaFilePath(2001L),
             positionSeconds = 12.5,
             nowMs = 1_000L,
             timeoutAtMs = 4_000L,
@@ -121,7 +127,7 @@ class PlaybackSyncSessionRemovalCoordinatorTest {
             initiatorDeviceId = "web-a",
             recordingId = 1001L,
             mediaFileId = 2001L,
-            sourceUrl = "/api/media/2001",
+            sourceUrl = MediaFileRoutes.mediaFilePath(2001L),
             positionSeconds = 12.5,
             nowMs = 1_000L,
             timeoutAtMs = 4_000L,

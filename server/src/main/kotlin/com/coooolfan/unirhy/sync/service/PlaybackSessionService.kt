@@ -132,21 +132,18 @@ class PlaybackSessionService(
         executeAtMs: Long,
     ): ScheduledActionPayload {
         return lockManager.withAccountLock(accountId) {
-            val currentState = getOrCreateStateLocked(accountId)
-            val nextState = currentState.copy(
-                status = PlaybackStatus.PAUSED,
+            updateAndSchedule(
+                currentState = getOrCreateStateLocked(accountId),
+                accountId = accountId,
+                commandId = commandId,
+                action = ScheduledActionType.PAUSE,
+                statusOverride = PlaybackStatus.PAUSED,
                 recordingId = recordingId,
                 mediaFileId = mediaFileId,
                 sourceUrl = sourceUrl,
                 positionSeconds = positionSeconds,
-                serverTimeToExecuteMs = executeAtMs,
-                version = currentState.version + 1,
-                updatedAtMs = nowMs,
-            )
-            states[accountId] = nextState
-            nextState.toScheduledActionPayload(
-                commandId = commandId,
-                action = ScheduledActionType.PAUSE,
+                nowMs = nowMs,
+                executeAtMs = executeAtMs,
             )
         }
     }
@@ -162,20 +159,18 @@ class PlaybackSessionService(
         executeAtMs: Long,
     ): ScheduledActionPayload {
         return lockManager.withAccountLock(accountId) {
-            val currentState = getOrCreateStateLocked(accountId)
-            val nextState = currentState.copy(
+            updateAndSchedule(
+                currentState = getOrCreateStateLocked(accountId),
+                accountId = accountId,
+                commandId = commandId,
+                action = ScheduledActionType.SEEK,
+                statusOverride = null,
                 recordingId = recordingId,
                 mediaFileId = mediaFileId,
                 sourceUrl = sourceUrl,
                 positionSeconds = positionSeconds,
-                serverTimeToExecuteMs = executeAtMs,
-                version = currentState.version + 1,
-                updatedAtMs = nowMs,
-            )
-            states[accountId] = nextState
-            nextState.toScheduledActionPayload(
-                commandId = commandId,
-                action = ScheduledActionType.SEEK,
+                nowMs = nowMs,
+                executeAtMs = executeAtMs,
             )
         }
     }
@@ -259,6 +254,36 @@ class PlaybackSessionService(
             return positionSeconds
         }
         return positionSeconds + (nowMs - serverTimeToExecuteMs).coerceAtLeast(0L) / 1_000.0
+    }
+
+    private fun updateAndSchedule(
+        currentState: AccountPlaybackState,
+        accountId: Long,
+        commandId: String,
+        action: ScheduledActionType,
+        statusOverride: PlaybackStatus?,
+        recordingId: Long?,
+        mediaFileId: Long?,
+        sourceUrl: String?,
+        positionSeconds: Double,
+        nowMs: Long,
+        executeAtMs: Long,
+    ): ScheduledActionPayload {
+        val nextState = currentState.copy(
+            status = statusOverride ?: currentState.status,
+            recordingId = recordingId,
+            mediaFileId = mediaFileId,
+            sourceUrl = sourceUrl,
+            positionSeconds = positionSeconds,
+            serverTimeToExecuteMs = executeAtMs,
+            version = currentState.version + 1,
+            updatedAtMs = nowMs,
+        )
+        states[accountId] = nextState
+        return nextState.toScheduledActionPayload(
+            commandId = commandId,
+            action = action,
+        )
     }
 
     private fun commitPendingPlayLocked(

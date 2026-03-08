@@ -1,5 +1,6 @@
 package com.coooolfan.unirhy.sync.service
 
+import com.coooolfan.unirhy.controller.MediaFileRoutes
 import com.coooolfan.unirhy.sync.protocol.PlaybackStatus
 import com.coooolfan.unirhy.sync.protocol.ScheduledActionType
 import com.coooolfan.unirhy.sync.support.TestPlaybackSyncTimeProvider
@@ -29,7 +30,7 @@ class PlaybackSessionServiceTest {
             initiatorDeviceId = "web-a",
             recordingId = 1001L,
             mediaFileId = 2001L,
-            sourceUrl = "/api/media/2001",
+            sourceUrl = MediaFileRoutes.mediaFilePath(2001L),
             positionSeconds = 12.5,
             nowMs = 1_000L,
             timeoutAtMs = 4_000L,
@@ -64,7 +65,7 @@ class PlaybackSessionServiceTest {
             initiatorDeviceId = "web-a",
             recordingId = 1001L,
             mediaFileId = 2001L,
-            sourceUrl = "/api/media/2001",
+            sourceUrl = MediaFileRoutes.mediaFilePath(2001L),
             positionSeconds = 12.5,
             nowMs = 1_000L,
             timeoutAtMs = 4_000L,
@@ -98,7 +99,7 @@ class PlaybackSessionServiceTest {
             initiatorDeviceId = "web-a",
             recordingId = 1001L,
             mediaFileId = 2001L,
-            sourceUrl = "/api/media/2001",
+            sourceUrl = MediaFileRoutes.mediaFilePath(2001L),
             positionSeconds = 12.5,
             nowMs = 1_000L,
             timeoutAtMs = 4_000L,
@@ -131,7 +132,7 @@ class PlaybackSessionServiceTest {
             initiatorDeviceId = "web-a",
             recordingId = 1001L,
             mediaFileId = 2001L,
-            sourceUrl = "/api/media/2001",
+            sourceUrl = MediaFileRoutes.mediaFilePath(2001L),
             positionSeconds = 12.5,
             nowMs = 1_000L,
             timeoutAtMs = 4_000L,
@@ -147,5 +148,34 @@ class PlaybackSessionServiceTest {
 
         assertNull(scheduledAction)
         assertNull(service.getPendingPlay(42L))
+    }
+
+    @Test
+    fun `schedule seek preserves paused status`() {
+        service.schedulePause(
+            accountId = 42L,
+            commandId = "cmd-pause-001",
+            recordingId = 1001L,
+            mediaFileId = 2001L,
+            sourceUrl = MediaFileRoutes.mediaFilePath(2001L),
+            positionSeconds = 12.5,
+            nowMs = 1_100L,
+            executeAtMs = 1_500L,
+        )
+
+        val scheduledAction = service.scheduleSeek(
+            accountId = 42L,
+            commandId = "cmd-seek-001",
+            recordingId = 1001L,
+            mediaFileId = 2001L,
+            sourceUrl = MediaFileRoutes.mediaFilePath(2001L),
+            positionSeconds = 20.0,
+            nowMs = 1_200L,
+            executeAtMs = 1_600L,
+        )
+
+        assertEquals(ScheduledActionType.SEEK, scheduledAction.scheduledAction.action)
+        assertEquals(PlaybackStatus.PAUSED, scheduledAction.scheduledAction.status)
+        assertEquals(PlaybackStatus.PAUSED, service.getOrCreateState(42L).status)
     }
 }

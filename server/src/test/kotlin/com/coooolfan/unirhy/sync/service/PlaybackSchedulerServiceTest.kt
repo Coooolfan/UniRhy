@@ -27,7 +27,6 @@ class PlaybackSchedulerServiceTest {
         schedulerExecutor = Executors.newSingleThreadScheduledExecutor()
         schedulerService = PlaybackSchedulerService(
             deviceRuntimeService = deviceRuntimeService,
-            timeProvider = timeProvider,
             scheduler = schedulerExecutor,
         )
     }

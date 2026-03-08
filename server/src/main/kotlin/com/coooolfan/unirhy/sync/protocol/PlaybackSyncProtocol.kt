@@ -77,7 +77,7 @@ data class NtpResponsePayload(
     val t2: Long,
 )
 
-data class AccountPlaybackState(
+data class AccountPlaybackStateDto(
     val status: PlaybackStatus,
     val recordingId: Long? = null,
     val mediaFileId: Long? = null,
@@ -89,7 +89,7 @@ data class AccountPlaybackState(
 )
 
 data class SnapshotPayload(
-    val state: AccountPlaybackState,
+    val state: AccountPlaybackStateDto,
     val serverNowMs: Long,
 )
 

@@ -238,7 +238,7 @@ class PlaybackSyncProtocolSerializationTest {
         ServerSample(
             message = SnapshotMessage(
                 payload = SnapshotPayload(
-                    state = AccountPlaybackState(
+                    state = AccountPlaybackStateDto(
                         status = PlaybackStatus.PLAYING,
                         recordingId = 1001,
                         mediaFileId = 2001,
