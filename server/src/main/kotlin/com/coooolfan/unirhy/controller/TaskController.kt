@@ -3,9 +3,7 @@ package com.coooolfan.unirhy.controller
 import cn.dev33.satoken.annotation.SaCheckLogin
 import com.coooolfan.unirhy.model.AsyncTaskLog
 import com.coooolfan.unirhy.model.by
-import com.coooolfan.unirhy.service.task.AsyncTaskLogService
-import com.coooolfan.unirhy.service.task.ScanTaskRequest
-import com.coooolfan.unirhy.service.task.ScanTaskService
+import com.coooolfan.unirhy.service.task.*
 import com.coooolfan.unirhy.service.task.common.AsyncTaskLogStatus
 import com.coooolfan.unirhy.service.task.common.TaskType
 import org.babyfish.jimmer.Page
@@ -24,6 +22,7 @@ import org.springframework.web.bind.annotation.*
 @RequestMapping("/api/task")
 class TaskController(
     private val scanTaskService: ScanTaskService,
+    private val codecTaskService: CodecTaskService,
     private val asyncTaskLogService: AsyncTaskLogService,
 ) {
 
@@ -43,6 +42,24 @@ class TaskController(
     @ResponseStatus(HttpStatus.ACCEPTED)
     fun executeScanTask(@RequestBody request: ScanTaskRequest) {
         scanTaskService.submit(request)
+    }
+
+    /**
+     * 触发编码任务
+     *
+     * 此接口用于提交媒体编码任务，非幂等操作
+     * 需要用户登录认证才能访问
+     *
+     * @param request 编码任务请求参数
+     *
+     * @api POST /api/task/codec
+     * @permission 需要登录认证
+     * @description 调用CodecTaskService.submit()方法执行编码任务
+     */
+    @PostMapping("/codec")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    fun executeCodecTask(@RequestBody request: CodecTaskRequest) {
+        codecTaskService.submit(request)
     }
 
     /**

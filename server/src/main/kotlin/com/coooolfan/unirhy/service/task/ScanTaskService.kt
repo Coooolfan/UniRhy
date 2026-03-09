@@ -5,6 +5,7 @@ import com.coooolfan.unirhy.model.storage.FileProviderFileSystem
 import com.coooolfan.unirhy.model.storage.FileProviderType
 import com.coooolfan.unirhy.model.storage.readonly
 import com.coooolfan.unirhy.service.task.common.AsyncTaskManager
+import com.coooolfan.unirhy.service.task.common.TaskService
 import com.coooolfan.unirhy.service.task.common.TaskType
 import com.coooolfan.unirhy.utils.sha256
 import org.babyfish.jimmer.sql.ast.mutation.AssociatedSaveMode
@@ -24,18 +25,15 @@ import kotlin.io.path.Path
 @Service
 class ScanTaskService(
     private val sql: KSqlClient,
-    private val asyncTaskManager: AsyncTaskManager,
+    asyncTaskManager: AsyncTaskManager,
+) : TaskService<ScanTaskRequest>(
+    asyncTaskManager
 ) {
+    override val type: TaskType = TaskType.SCAN
 
     private val logger = LoggerFactory.getLogger(ScanTaskService::class.java)
 
-    fun submit(request: ScanTaskRequest) {
-        asyncTaskManager.submit(TaskType.SCAN, request) {
-            executeInternal(request)
-        }
-    }
-
-    private fun executeInternal(request: ScanTaskRequest) {
+    override fun execute(request: ScanTaskRequest) {
         if (request.providerType != FileProviderType.FILE_SYSTEM) {
             error("Unsupported provider type: ${request.providerType}")
         }
