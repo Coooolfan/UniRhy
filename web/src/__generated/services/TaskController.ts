@@ -1,7 +1,7 @@
 import type {Executor} from '../';
 import type {AsyncTaskLogDto} from '../model/dto/';
 import type {AsyncTaskLogStatus, TaskType} from '../model/enums/';
-import type {Page, ScanTaskRequest} from '../model/static/';
+import type {CodecTaskRequest, Page, ScanTaskRequest} from '../model/static/';
 
 /**
  * 任务管理接口
@@ -11,6 +11,23 @@ import type {Page, ScanTaskRequest} from '../model/static/';
 export class TaskController {
     
     constructor(private executor: Executor) {}
+    
+    /**
+     * 触发编码任务
+     * 
+     * 此接口用于提交媒体编码任务，非幂等操作
+     * 需要用户登录认证才能访问
+     * 
+     * @parameter {TaskControllerOptions['executeCodecTask']} options
+     * - request 编码任务请求参数
+     * 
+     */
+    readonly executeCodecTask: (options: TaskControllerOptions['executeCodecTask']) => Promise<
+        void
+    > = async(options) => {
+        let _uri = '/api/task/codec';
+        return (await this.executor({uri: _uri, method: 'POST', body: options.body})) as Promise<void>;
+    }
     
     /**
      * 触发扫描任务
@@ -78,6 +95,13 @@ export type TaskControllerOptions = {
          * 
          */
         readonly body: ScanTaskRequest
+    }, 
+    'executeCodecTask': {
+        /**
+         * 编码任务请求参数
+         * 
+         */
+        readonly body: CodecTaskRequest
     }, 
     'listTaskLogs': {
         readonly pageIndex?: number | undefined, 

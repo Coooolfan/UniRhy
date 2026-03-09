@@ -1,25 +1,27 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import DashboardTopBar from '@/components/dashboard/DashboardTopBar.vue'
-import { useTaskManagement } from '@/composables/useTaskManagement'
+import TaskSubmissionModal from '@/components/tasks/TaskSubmissionModal.vue'
 import type { AsyncTaskLogDto } from '@/__generated/model/dto/AsyncTaskLogDto'
+import type { TaskType } from '@/__generated/model/enums/TaskType'
+import type { CodecTaskRequest, ScanTaskRequest } from '@/__generated/model/static'
+import { TASK_TYPE_LABEL_MAP, useTaskManagement } from '@/composables/useTaskManagement'
 import {
     AlertCircle,
+    ArrowRight,
     CheckCircle2,
-    ChevronDown,
     ChevronLeft,
     ChevronRight,
     Clock,
     FileMusic,
     Loader2,
-    Play,
     RefreshCw,
     XCircle,
 } from 'lucide-vue-next'
 
 type TaskLogRecord = AsyncTaskLogDto['TaskController/DEFAULT_ASYNC_TASK_LOG_FETCHER']
 type TaskDisplayStatus = 'RUNNING' | 'SUCCESS' | 'FAILED'
-type SubmitFeedbackStatus = 'idle' | 'success' | 'error'
+type SubmitFeedbackStatus = 'idle' | 'success'
 
 type TaskLogRow = TaskLogRecord & {
     taskName: string
@@ -45,11 +47,14 @@ const {
     submitError,
     fetchRunningTasks,
     fetchTaskLogs,
+    fetchProviders,
     startScanTask,
+    startCodecTask,
+    clearSubmitError,
     init,
 } = useTaskManagement()
 
-const selectedProviderId = ref('')
+const isTaskModalOpen = ref(false)
 const submitFeedbackStatus = ref<SubmitFeedbackStatus>('idle')
 let submitFeedbackTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -60,7 +65,7 @@ const statusLabelMap: Record<TaskDisplayStatus, string> = {
 }
 
 const statusTextClassMap: Record<TaskDisplayStatus, string> = {
-    RUNNING: 'text-[#B86134]',
+    RUNNING: 'text-[#C67C4E]',
     SUCCESS: 'text-emerald-600',
     FAILED: 'text-rose-600',
 }
@@ -68,14 +73,7 @@ const statusTextClassMap: Record<TaskDisplayStatus, string> = {
 const failureReasonPattern =
     /(timeout|timed out|fail|error|exception|abort|aborted|denied|invalid|not found|超时|失败|异常|中止|终止)/i
 
-const getTaskName = (taskType: string) => {
-    switch (taskType) {
-        case 'SCAN':
-            return '媒体库扫描'
-        default:
-            return taskType
-    }
-}
+const getTaskName = (taskType: string) => TASK_TYPE_LABEL_MAP[taskType as TaskType] ?? taskType
 
 const parseParamsText = (params: string) => {
     try {
@@ -145,11 +143,11 @@ const runningTaskCount = computed(() => runningTasks.value.length)
 
 const runningSummaryText = computed(() => {
     if (runningTaskCount.value === 0) {
-        return '当前没有运行中的任务，发起扫描后可在此实时查看后台执行状态。'
+        return '当前没有运行中的任务，发起扫描或转码任务后可在此实时查看后台执行状态。'
     }
     const current = runningTasks.value[0]
     if (!current) {
-        return '当前没有运行中的任务，发起扫描后可在此实时查看后台执行状态。'
+        return '当前没有运行中的任务，发起扫描或转码任务后可在此实时查看后台执行状态。'
     }
     return `系统正在执行「${getTaskName(current.taskType)}」，可在下方日志查看参数与反馈。`
 })
@@ -188,67 +186,63 @@ const canGoNext = computed(
     () => taskLogPageIndex.value < taskLogTotalPageCount.value - 1 && !isLoadingTaskLogs.value,
 )
 
-const hasSubmitFeedback = computed(() => submitFeedbackStatus.value !== 'idle')
+const clearSubmitFeedbackTimer = () => {
+    if (!submitFeedbackTimer) {
+        return
+    }
+    clearTimeout(submitFeedbackTimer)
+    submitFeedbackTimer = null
+}
 
-const submitButtonClass = computed(() => {
-    if (submitFeedbackStatus.value === 'success') {
-        return 'border-emerald-600 text-emerald-600 bg-emerald-50 disabled:opacity-100'
-    }
-    if (submitFeedbackStatus.value === 'error') {
-        return 'border-rose-500 text-rose-600 bg-rose-50 disabled:opacity-100'
-    }
-    return 'border-[#b86134] text-[#b86134] hover:bg-[#b86134] hover:text-white disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-[#b86134]'
-})
-
-const showSubmitFeedback = (status: Exclude<SubmitFeedbackStatus, 'idle'>) => {
-    if (submitFeedbackTimer) {
-        clearTimeout(submitFeedbackTimer)
-    }
-    submitFeedbackStatus.value = status
+const showSubmitFeedback = () => {
+    clearSubmitFeedbackTimer()
+    submitFeedbackStatus.value = 'success'
     submitFeedbackTimer = setTimeout(() => {
         submitFeedbackStatus.value = 'idle'
         submitFeedbackTimer = null
     }, SUBMIT_FEEDBACK_DURATION_MS)
 }
 
-watch(
-    providerOptions,
-    (options) => {
-        const firstOption = options[0]
-        if (selectedProviderId.value === '' && firstOption) {
-            selectedProviderId.value = String(firstOption.id)
-        }
-    },
-    { immediate: true },
-)
-
 onMounted(() => {
     init()
 })
 
 onUnmounted(() => {
-    if (submitFeedbackTimer) {
-        clearTimeout(submitFeedbackTimer)
-        submitFeedbackTimer = null
-    }
+    clearSubmitFeedbackTimer()
 })
 
-const handleScan = async () => {
-    if (!selectedProviderId.value) {
+const openTaskModal = () => {
+    clearSubmitFeedbackTimer()
+    submitFeedbackStatus.value = 'idle'
+    clearSubmitError()
+    isTaskModalOpen.value = true
+    void fetchProviders()
+}
+
+const closeTaskModal = () => {
+    if (isSubmitting.value) {
         return
     }
-    const provider = providerOptions.value.find(
-        (item) => String(item.id) === selectedProviderId.value,
-    )
-    if (!provider) {
+    isTaskModalOpen.value = false
+    clearSubmitError()
+}
+
+const handleScanSubmit = async (payload: ScanTaskRequest) => {
+    const submitOk = await startScanTask(payload.providerType, payload.providerId)
+    if (!submitOk) {
         return
     }
-    const submitOk = await startScanTask(provider.type, provider.id)
-    if (submitOk) {
-        showSubmitFeedback('success')
+    closeTaskModal()
+    showSubmitFeedback()
+}
+
+const handleCodecSubmit = async (payload: CodecTaskRequest) => {
+    const submitOk = await startCodecTask(payload)
+    if (!submitOk) {
         return
     }
-    showSubmitFeedback('error')
+    closeTaskModal()
+    showSubmitFeedback()
 }
 
 const refreshAll = () => {
@@ -283,20 +277,20 @@ const goNextPage = () => {
 
 <template>
     <div
-        class="min-h-screen text-[#4a4a4a] font-sans selection:bg-[#b86134] selection:text-white pb-32"
+        class="min-h-screen pb-32 font-sans text-[#5A524A] selection:bg-[#C67C4E] selection:text-white"
     >
         <DashboardTopBar />
 
         <div class="w-full max-w-5xl mx-auto px-8 pt-6 pb-12">
-            <div class="flex items-end justify-between mb-8 pb-4 border-b border-[#e5e2db]">
+            <div class="mb-8 flex items-end justify-between border-b border-[#EAE6DE] pb-4">
                 <div>
-                    <h2 class="text-3xl font-serif text-[#2c2c2c] mb-1">任务管理</h2>
-                    <p class="text-sm text-gray-500 font-serif italic">
+                    <h2 class="mb-1 font-serif text-3xl text-[#2B221B]">任务管理</h2>
+                    <p class="font-serif text-sm italic text-[#8A8A8A]">
                         System Tasks & Background Jobs
                     </p>
                 </div>
                 <button
-                    class="text-gray-500 hover:text-[#b86134] transition-colors disabled:opacity-50"
+                    class="text-[#8A8A8A] transition-colors hover:text-[#C67C4E] disabled:opacity-50"
                     :disabled="isLoadingTasks || isLoadingTaskLogs"
                     title="刷新任务状态"
                     @click="refreshAll"
@@ -310,131 +304,73 @@ const goNextPage = () => {
 
             <div
                 v-if="taskError"
-                class="mb-6 p-4 bg-rose-50 text-rose-600 rounded border border-rose-100 text-sm flex items-center"
+                class="mb-6 flex items-center border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700"
             >
                 <AlertCircle class="w-4 h-4 mr-2 shrink-0" />
                 <span>{{ taskError }}</span>
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-10">
-                <div class="bg-white p-6 rounded shadow-sm border border-[#e5e2db] lg:col-span-1">
-                    <h3 class="text-lg font-medium text-[#2c2c2c] mb-6">发起新任务</h3>
-
-                    <div class="mb-6">
-                        <label class="block text-sm font-medium mb-1">媒体库扫描</label>
-                        <p class="text-xs text-gray-400 font-serif italic mb-3">
-                            Update media library index from storage
-                        </p>
-
-                        <div
-                            v-if="isLoadingProviders"
-                            class="text-sm text-gray-500 py-2 flex items-center"
-                        >
-                            <Loader2 class="w-4 h-4 mr-2 animate-spin" />
-                            加载存储节点...
-                        </div>
-
-                        <p
-                            v-else-if="providerOptions.length === 0"
-                            class="text-sm text-gray-500 py-2 italic"
-                        >
-                            暂无可用存储节点
-                        </p>
-
-                        <div
-                            v-else
-                            class="relative border-b border-[#e5e2db] pb-2 cursor-pointer flex justify-between items-center group"
-                        >
-                            <select
-                                v-model="selectedProviderId"
-                                class="w-full appearance-none bg-transparent text-sm pr-6 outline-none cursor-pointer group-hover:text-[#b86134] transition-colors"
-                            >
-                                <option disabled value="">选择存储节点</option>
-                                <option
-                                    v-for="option in providerOptions"
-                                    :key="option.id"
-                                    :value="String(option.id)"
-                                >
-                                    {{ option.name }}
-                                </option>
-                            </select>
-                            <ChevronDown class="w-4 h-4 text-gray-400 pointer-events-none" />
-                        </div>
-                    </div>
+                <div class="border border-[#EAE6DE] bg-[#fffcf5] p-6 shadow-sm lg:col-span-1">
+                    <h3 class="font-serif text-2xl text-[#2B221B]">发起新任务</h3>
+                    <p class="mt-2 text-sm leading-relaxed text-[#6B635B]">
+                        媒体库扫描、转码等后台任务入口。
+                    </p>
 
                     <button
-                        class="w-full h-10 mt-2 px-3 border text-sm transition-colors duration-300 flex items-center justify-center rounded-sm disabled:cursor-not-allowed"
-                        :class="submitButtonClass"
-                        :disabled="
-                            selectedProviderId === '' ||
-                            isSubmitting ||
-                            isLoadingProviders ||
-                            hasSubmitFeedback
-                        "
-                        @click="handleScan"
+                        type="button"
+                        class="mt-6 flex w-full items-center justify-center gap-2 bg-[#C67C4E] px-4 py-3 text-sm uppercase tracking-[0.18em] text-[#F7F5F0] shadow-md transition-colors hover:bg-[#B46B3A] disabled:cursor-not-allowed disabled:opacity-60"
+                        :disabled="isSubmitting"
+                        @click="openTaskModal"
                     >
-                        <template v-if="isSubmitting">
-                            <Loader2 class="w-4 h-4 mr-2 animate-spin" />
-                            提交中...
-                        </template>
-                        <template v-else-if="submitFeedbackStatus === 'success'">
-                            <CheckCircle2 class="w-4 h-4 mr-2" />
-                            <span class="truncate">任务已提交</span>
-                        </template>
-                        <template v-else-if="submitFeedbackStatus === 'error'">
-                            <XCircle class="w-4 h-4 mr-2 shrink-0" />
-                            <span class="truncate">{{ submitError || '提交失败，请重试' }}</span>
-                        </template>
-                        <template v-else>
-                            <Play class="w-4 h-4 mr-2" />
-                            开始扫描
-                        </template>
+                        <span>发起新任务</span>
+                        <ArrowRight class="h-4 w-4" />
                     </button>
                 </div>
 
                 <div
-                    class="bg-gradient-to-br from-[#f8f6f0] to-white p-6 rounded shadow-sm border border-[#e5e2db] lg:col-span-2 relative overflow-hidden min-h-[196px]"
+                    class="relative min-h-[196px] overflow-hidden border border-[#EAE6DE] bg-gradient-to-br from-[#F8F5EE] to-white p-6 shadow-sm lg:col-span-2"
                 >
                     <div class="absolute top-0 right-0 p-8 opacity-5">
                         <FileMusic class="w-32 h-32" />
                     </div>
 
                     <div class="relative z-10 pt-3">
-                        <div v-if="isLoadingTasks" class="flex items-center text-[#b86134] mb-2">
+                        <div v-if="isLoadingTasks" class="mb-2 flex items-center text-[#C67C4E]">
                             <Loader2 class="w-5 h-5 mr-2 animate-spin" />
                             <span class="font-medium text-lg">正在同步后台任务状态</span>
                         </div>
                         <div
                             v-else-if="runningTaskCount > 0"
-                            class="flex items-center text-[#b86134] mb-2"
+                            class="mb-2 flex items-center text-[#C67C4E]"
                         >
                             <RefreshCw class="w-5 h-5 mr-2 animate-spin" />
                             <span class="font-medium text-lg"
                                 >{{ runningTaskCount }} 个任务正在后台运行</span
                             >
                         </div>
-                        <div v-else class="flex items-center text-gray-500 mb-2">
+                        <div v-else class="mb-2 flex items-center text-[#8A8A8A]">
                             <Clock class="w-5 h-5 mr-2" />
                             <span class="font-medium text-lg">当前无运行中任务</span>
                         </div>
-                        <p class="text-sm text-gray-500 mt-2 max-w-md leading-relaxed">
+                        <p class="mt-2 max-w-md text-sm leading-relaxed text-[#6B635B]">
                             {{ runningSummaryText }}
                         </p>
                     </div>
                 </div>
             </div>
 
-            <div class="bg-white rounded shadow-sm border border-[#e5e2db]">
+            <div class="border border-[#EAE6DE] bg-white shadow-sm">
                 <div
-                    class="px-6 py-4 border-b border-[#e5e2db] flex justify-between items-center bg-[#faf9f7]"
+                    class="flex items-center justify-between border-b border-[#EAE6DE] bg-[#FAF9F6] px-6 py-4"
                 >
-                    <h3 class="font-medium text-[#2c2c2c]">执行日志</h3>
-                    <span class="text-xs text-gray-400 font-serif">Task History Logs</span>
+                    <h3 class="font-medium text-[#2B221B]">执行日志</h3>
+                    <span class="font-serif text-xs text-[#8A8A8A]">Task History Logs</span>
                 </div>
 
                 <div
                     v-if="isLoadingTaskLogs && taskLogRows.length === 0"
-                    class="py-14 text-gray-500 text-sm flex items-center justify-center"
+                    class="flex items-center justify-center py-14 text-sm text-[#6B635B]"
                 >
                     <Loader2 class="w-4 h-4 mr-2 animate-spin" />
                     加载任务日志...
@@ -442,16 +378,16 @@ const goNextPage = () => {
 
                 <div
                     v-else-if="taskLogRows.length === 0"
-                    class="py-14 text-gray-500 text-sm flex items-center justify-center"
+                    class="flex items-center justify-center py-14 text-sm text-[#6B635B]"
                 >
                     暂无任务日志
                 </div>
 
-                <div v-else class="divide-y divide-[#f0ece5]">
+                <div v-else class="divide-y divide-[#F2EEE6]">
                     <div
                         v-for="row in taskLogRows"
                         :key="row.id"
-                        class="p-6 hover:bg-[#faf9f7] transition-colors flex flex-col sm:flex-row sm:items-start justify-between group"
+                        class="group flex flex-col justify-between p-6 transition-colors hover:bg-[#FAF9F6] sm:flex-row sm:items-start"
                     >
                         <div class="flex-1 pr-6">
                             <div class="flex items-center flex-wrap mb-2">
@@ -470,35 +406,35 @@ const goNextPage = () => {
                                     <XCircle v-else class="w-4 h-4 mr-1.5" />
                                     {{ statusLabelMap[row.status] }}
                                 </span>
-                                <span class="mx-3 text-gray-300">|</span>
-                                <span class="text-sm font-medium text-[#2c2c2c]">{{
+                                <span class="mx-3 text-[#D6D1C4]">|</span>
+                                <span class="text-sm font-medium text-[#2B221B]">{{
                                     row.taskName
                                 }}</span>
                                 <span
-                                    class="ml-3 text-xs text-gray-400 font-mono bg-gray-100 px-1.5 py-0.5 rounded"
+                                    class="ml-3 rounded bg-[#F2F0E9] px-1.5 py-0.5 font-mono text-xs text-[#8A8A8A]"
                                     >#{{ row.id }}</span
                                 >
                             </div>
 
                             <div class="mt-2 space-y-1">
-                                <div class="text-xs text-gray-500 flex items-start">
-                                    <span class="w-12 text-gray-400 shrink-0">参数:</span>
+                                <div class="flex items-start text-xs text-[#6B635B]">
+                                    <span class="w-12 shrink-0 text-[#8A8A8A]">参数:</span>
                                     <span
-                                        class="font-mono bg-[#f4f2ed] px-1 py-0.5 rounded text-gray-600 break-all"
+                                        class="break-all rounded bg-[#F4F2ED] px-1 py-0.5 font-mono text-[#5A524A]"
                                     >
                                         {{ row.paramsText }}
                                     </span>
                                 </div>
                                 <div
                                     v-if="row.completedReason"
-                                    class="text-xs flex items-start mt-1"
+                                    class="mt-1 flex items-start text-xs"
                                 >
-                                    <span class="w-12 text-gray-400 shrink-0">反馈:</span>
+                                    <span class="w-12 shrink-0 text-[#8A8A8A]">反馈:</span>
                                     <span
                                         :class="
                                             row.status === 'FAILED'
                                                 ? 'text-rose-600'
-                                                : 'text-gray-600'
+                                                : 'text-[#5A524A]'
                                         "
                                     >
                                         <AlertCircle
@@ -512,12 +448,12 @@ const goNextPage = () => {
                         </div>
 
                         <div class="mt-4 sm:mt-0 text-right shrink-0">
-                            <div class="text-xs text-gray-500 mb-1">
-                                <span class="text-gray-400 mr-2">启动:</span>
+                            <div class="mb-1 text-xs text-[#6B635B]">
+                                <span class="mr-2 text-[#8A8A8A]">启动:</span>
                                 <span class="font-mono">{{ formatTime(row.startedAt) }}</span>
                             </div>
-                            <div class="text-xs text-gray-500">
-                                <span class="text-gray-400 mr-2">结束:</span>
+                            <div class="text-xs text-[#6B635B]">
+                                <span class="mr-2 text-[#8A8A8A]">结束:</span>
                                 <span class="font-mono">{{ formatTime(row.completedAt) }}</span>
                             </div>
                         </div>
@@ -525,12 +461,12 @@ const goNextPage = () => {
                 </div>
 
                 <div
-                    class="px-6 py-4 border-t border-[#e5e2db] flex items-center justify-between bg-[#faf9f7]"
+                    class="flex items-center justify-between border-t border-[#EAE6DE] bg-[#FAF9F6] px-6 py-4"
                 >
-                    <span class="text-xs text-gray-500">{{ displayRangeText }}</span>
+                    <span class="text-xs text-[#6B635B]">{{ displayRangeText }}</span>
                     <div v-if="paginationItems.length > 0" class="flex space-x-1">
                         <button
-                            class="p-1 text-gray-400 hover:text-[#b86134] disabled:opacity-50"
+                            class="p-1 text-[#8A8A8A] hover:text-[#C67C4E] disabled:opacity-50"
                             :disabled="!canGoPrev"
                             @click="goPrevPage"
                         >
@@ -542,8 +478,8 @@ const goNextPage = () => {
                             class="w-7 h-7 flex items-center justify-center text-xs rounded transition-colors"
                             :class="[
                                 page === currentPage
-                                    ? 'bg-[#b86134] text-white'
-                                    : 'text-gray-600 hover:bg-[#e5e2db]',
+                                    ? 'bg-[#C67C4E] text-white'
+                                    : 'text-[#5A524A] hover:bg-[#EAE6DE]',
                                 page === '...' ? 'cursor-default hover:bg-transparent' : '',
                             ]"
                             :disabled="page === '...'"
@@ -552,7 +488,7 @@ const goNextPage = () => {
                             {{ page }}
                         </button>
                         <button
-                            class="p-1 text-gray-400 hover:text-[#b86134] disabled:opacity-50"
+                            class="p-1 text-[#8A8A8A] hover:text-[#C67C4E] disabled:opacity-50"
                             :disabled="!canGoNext"
                             @click="goNextPage"
                         >
@@ -562,5 +498,16 @@ const goNextPage = () => {
                 </div>
             </div>
         </div>
+
+        <TaskSubmissionModal
+            :open="isTaskModalOpen"
+            :provider-options="providerOptions"
+            :is-loading-providers="isLoadingProviders"
+            :is-submitting="isSubmitting"
+            :submit-error="submitError"
+            @close="closeTaskModal"
+            @submit-scan="handleScanSubmit"
+            @submit-codec="handleCodecSubmit"
+        />
     </div>
 </template>

@@ -2,11 +2,18 @@ import { ref } from 'vue'
 import { api, normalizeApiError } from '@/ApiInstance'
 import type { AsyncTaskLogDto } from '@/__generated/model/dto/AsyncTaskLogDto'
 import { type FileProviderType } from '@/__generated/model/enums/FileProviderType'
+import type { TaskType } from '@/__generated/model/enums/TaskType'
+import type { CodecTaskRequest, ScanTaskRequest } from '@/__generated/model/static'
 
 export type TaskProviderOption = {
     id: number
     name: string
     type: FileProviderType
+}
+
+export const TASK_TYPE_LABEL_MAP: Record<TaskType, string> = {
+    SCAN: '媒体库扫描',
+    CODEC: '媒体转码',
 }
 
 type TaskLogItem = AsyncTaskLogDto['TaskController/DEFAULT_ASYNC_TASK_LOG_FETCHER']
@@ -29,6 +36,28 @@ export const useTaskManagement = () => {
 
     const taskError = ref('')
     const submitError = ref('')
+
+    const refreshSubmittedTaskData = () => {
+        setTimeout(() => {
+            void Promise.all([fetchRunningTasks(), fetchTaskLogs(0)])
+        }, 1000)
+    }
+
+    const executeTask = async (executor: () => Promise<void>) => {
+        isSubmitting.value = true
+        submitError.value = ''
+        try {
+            await executor()
+            refreshSubmittedTaskData()
+            return true
+        } catch (error) {
+            const normalized = normalizeApiError(error)
+            submitError.value = normalized.message ?? '提交任务失败'
+            return false
+        } finally {
+            isSubmitting.value = false
+        }
+    }
 
     const fetchRunningTasks = async () => {
         isLoadingTasks.value = true
@@ -103,32 +132,28 @@ export const useTaskManagement = () => {
         }
     }
 
-    const startScanTask = async (providerType: FileProviderType, providerId: number) => {
-        isSubmitting.value = true
-        submitError.value = ''
-        try {
-            await api.taskController.executeScanTask({
-                body: {
-                    providerType,
-                    providerId,
-                },
-            })
-            // Refresh running tasks after short delay
-            setTimeout(() => {
-                void Promise.all([fetchRunningTasks(), fetchTaskLogs(0)])
-            }, 1000)
-            return true
-        } catch (error) {
-            const normalized = normalizeApiError(error)
-            submitError.value = normalized.message ?? '提交任务失败'
-            return false
-        } finally {
-            isSubmitting.value = false
-        }
+    const startScanTask = (providerType: FileProviderType, providerId: number) => {
+        const request: ScanTaskRequest = { providerType, providerId }
+        return executeTask(() =>
+            api.taskController.executeScanTask({
+                body: request,
+            }),
+        )
     }
+
+    const startCodecTask = (request: CodecTaskRequest) =>
+        executeTask(() =>
+            api.taskController.executeCodecTask({
+                body: request,
+            }),
+        )
 
     const init = () => {
         void Promise.all([fetchRunningTasks(), fetchProviders(), fetchTaskLogs(0)])
+    }
+
+    const clearSubmitError = () => {
+        submitError.value = ''
     }
 
     return {
@@ -147,7 +172,10 @@ export const useTaskManagement = () => {
         submitError,
         fetchRunningTasks,
         fetchTaskLogs,
+        fetchProviders,
         startScanTask,
+        startCodecTask,
+        clearSubmitError,
         init,
     }
 }

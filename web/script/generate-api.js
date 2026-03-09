@@ -5,7 +5,7 @@ import { v4 as uuidv4 } from 'uuid'
 import tempDir from 'temp-dir'
 import AdmZip from 'adm-zip'
 
-const sourceUrl = 'http://localhost:8080/api/openapi.zip'
+const sourceUrl = 'http://localhost:8654/api/openapi.zip'
 const tmpFilePath = tempDir + '/' + uuidv4() + '.zip'
 const generatePath = 'src/__generated'
 
