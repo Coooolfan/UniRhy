@@ -17,8 +17,8 @@ object ApiCoverageRegistry {
         "com.unirhy.e2e.StorageConfigE2eTest#system config should enforce storage linkage constraints"
     private const val TASK_CONTENT_AUTH_REQUIRED_CASE =
         "com.unirhy.e2e.TaskContentReadE2eTest#task and content endpoints should reject unauthenticated access"
-    private const val TASK_TRANSCODE_FAILURE_CASE =
-        "com.unirhy.e2e.TaskContentReadE2eTest#transcode task should create failed task log until implementation is available"
+    private const val TASK_TRANSCODE_SUCCESS_CASE =
+        "com.unirhy.e2e.TaskContentReadE2eTest#transcode task should complete successfully and write opus files"
     private const val TASK_SCAN_LIFECYCLE_CASE =
         "com.unirhy.e2e.TaskContentReadE2eTest#scan task should expose running lifecycle and reject duplicate submission"
     private const val WORK_ALBUM_READ_CASE =
@@ -206,8 +206,8 @@ object ApiCoverageRegistry {
         full(
             "POST",
             "/api/task/transcode",
-            testRef = TASK_TRANSCODE_FAILURE_CASE,
-            note = "auth: $TASK_CONTENT_AUTH_REQUIRED_CASE; status: completed log reason starts with FAILED: until implementation is available",
+            testRef = TASK_TRANSCODE_SUCCESS_CASE,
+            note = "auth: $TASK_CONTENT_AUTH_REQUIRED_CASE; status: completed log reason is SUCCESS; output: writes opus files for prepared fixture",
         ),
         full(
             "GET",

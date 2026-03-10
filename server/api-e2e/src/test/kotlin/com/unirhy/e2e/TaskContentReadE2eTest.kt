@@ -126,9 +126,10 @@ class TaskContentReadE2eTest {
 
     @Test
     @Order(2)
-    fun `transcode task should create failed task log until implementation is available`() {
+    fun `transcode task should complete successfully and write opus files`() {
         val state = bootstrapAdminSession(baseUrl())
-        awaitTranscodeTaskFailure(state)
+        val fixture = prepareScanFixture(state.runtime.scanWorkspace)
+        awaitTranscodeTaskSuccess(state, fixture)
     }
 
     @Test
@@ -551,7 +552,11 @@ class TaskContentReadE2eTest {
         assertTrue(abortedRow.path("completedReason").isNull, "[scan] aborted task log should keep completedReason null")
     }
 
-    private fun awaitTranscodeTaskFailure(state: E2eAdminSession) {
+    private fun awaitTranscodeTaskSuccess(state: E2eAdminSession, fixture: FixtureInfo) {
+        val expectedOpusCount = countFilesWithExtensions(fixture.fixtureRoot, ACCEPT_EXTENSIONS)
+        assertTrue(expectedOpusCount > 0, "[transcode] fixture should contain audio files: ${fixture.fixtureRoot}")
+        val existingOpusCount = countFilesWithExtensions(state.runtime.scanWorkspace, setOf("opus"))
+
         val submitResponse = state.api.post(
             path = "/api/task/transcode",
             json = transcodeRequestBody(state),
@@ -584,9 +589,16 @@ class TaskContentReadE2eTest {
                     "[transcode] completed task log should contain completedAt",
                 )
                 val completedReason = completedRow.path("completedReason").asText("")
-                assertTrue(
-                    completedReason.startsWith("FAILED:"),
-                    "[transcode] completed task log reason should start with FAILED:, actual=$completedReason",
+                assertEquals(
+                    "SUCCESS",
+                    completedReason,
+                    "[transcode] completed task log reason should be SUCCESS, actual=$completedReason",
+                )
+                val actualOpusCount = countFilesWithExtensions(state.runtime.scanWorkspace, setOf("opus")) - existingOpusCount
+                assertEquals(
+                    expectedOpusCount,
+                    actualOpusCount,
+                    "[transcode] expected opus output count to match fixture file count, fixture=${fixture.fixtureRoot}",
                 )
                 return
             }
@@ -774,6 +786,15 @@ class TaskContentReadE2eTest {
 
     private fun extensionPriority(extension: String): Int {
         return PREFERRED_EXTENSIONS.indexOf(extension).let { if (it >= 0) it else PREFERRED_EXTENSIONS.size }
+    }
+
+    private fun countFilesWithExtensions(root: Path, extensions: Set<String>): Int {
+        return Files.walk(root).use { paths ->
+            paths.filter { Files.isRegularFile(it) }
+                .filter { fileExtension(it) in extensions }
+                .count()
+                .toInt()
+        }
     }
 
     private fun scanWaitTimeoutMillis(): Long {

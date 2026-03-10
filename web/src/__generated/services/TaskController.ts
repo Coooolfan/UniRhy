@@ -13,23 +13,6 @@ export class TaskController {
     constructor(private executor: Executor) {}
     
     /**
-     * 触发转码任务
-     * 
-     * 此接口用于提交媒体转码任务，非幂等操作
-     * 需要用户登录认证才能访问
-     * 
-     * @parameter {TaskControllerOptions['executeTranscodeTask']} options
-     * - request 转码任务请求参数
-     * 
-     */
-    readonly executeTranscodeTask: (options: TaskControllerOptions['executeTranscodeTask']) => Promise<
-        void
-    > = async(options) => {
-        let _uri = '/api/task/transcode';
-        return (await this.executor({uri: _uri, method: 'POST', body: options.body})) as Promise<void>;
-    }
-    
-    /**
      * 触发扫描任务
      * 
      * 此接口用于提交媒体扫描任务，对同一存储节点的请求是幂等的
@@ -43,6 +26,23 @@ export class TaskController {
         void
     > = async(options) => {
         let _uri = '/api/task/scan';
+        return (await this.executor({uri: _uri, method: 'POST', body: options.body})) as Promise<void>;
+    }
+    
+    /**
+     * 触发转码任务
+     * 
+     * 此接口用于提交媒体转码任务，非幂等操作
+     * 需要用户登录认证才能访问
+     * 
+     * @parameter {TaskControllerOptions['executeTranscodeTask']} options
+     * - request 转码任务请求参数
+     * 
+     */
+    readonly executeTranscodeTask: (options: TaskControllerOptions['executeTranscodeTask']) => Promise<
+        void
+    > = async(options) => {
+        let _uri = '/api/task/transcode';
         return (await this.executor({uri: _uri, method: 'POST', body: options.body})) as Promise<void>;
     }
     

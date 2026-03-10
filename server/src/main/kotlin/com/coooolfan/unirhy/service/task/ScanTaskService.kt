@@ -7,6 +7,7 @@ import com.coooolfan.unirhy.model.storage.readonly
 import com.coooolfan.unirhy.service.task.common.AsyncTaskManager
 import com.coooolfan.unirhy.service.task.common.TaskService
 import com.coooolfan.unirhy.service.task.common.TaskType
+import com.coooolfan.unirhy.service.task.common.findAudioFilesRecursively
 import com.coooolfan.unirhy.utils.sha256
 import org.babyfish.jimmer.sql.ast.mutation.AssociatedSaveMode
 import org.babyfish.jimmer.sql.ast.mutation.SaveMode
@@ -117,21 +118,7 @@ class ScanTaskService(
             }
         }
     }
-
-    private fun findAudioFilesRecursively(rootDir: File): List<File> {
-        if (!rootDir.exists() || !rootDir.isDirectory) {
-            logger.warn("Directory not found or is not a directory: ${rootDir.absolutePath}")
-            return emptyList()
-        }
-
-        return rootDir.walk()
-            .filter { it.isFile }
-            .filter { file -> file.extension.lowercase() in ACCEPT_FILE_EXTENSIONS }
-            .toList()
-    }
 }
-
-private val ACCEPT_FILE_EXTENSIONS = hashSetOf("mp3", "wav", "ogg", "flac", "aac", "wma", "m4a")
 
 private val COVER_EXTENSIONS = hashSetOf("jpg", "jpeg", "png", "gif")
 
