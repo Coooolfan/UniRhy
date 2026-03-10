@@ -53,23 +53,23 @@ describe('TaskSubmissionModal', () => {
         ])
     })
 
-    it('switches to codec mode and emits a codec payload', async () => {
+    it('switches to transcode mode and emits a transcode payload', async () => {
         const wrapper = mountModal()
 
-        await wrapper.get('[data-test="task-type-codec"]').trigger('click')
-        await wrapper.get('[data-test="codec-source-select"]').setValue('FILE_SYSTEM:1')
-        await wrapper.get('[data-test="codec-destination-select"]').setValue('OSS:2')
-        await wrapper.get('[data-test="codec-type-select"]').setValue('AAC')
+        await wrapper.get('[data-test="task-type-transcode"]').trigger('click')
+        await wrapper.get('[data-test="transcode-source-select"]').setValue('FILE_SYSTEM:1')
+        await wrapper.get('[data-test="transcode-destination-select"]').setValue('OSS:2')
+        await wrapper.get('[data-test="target-codec-select"]').setValue('AAC')
         await wrapper.get('[data-test="task-submit-button"]').trigger('click')
 
-        expect(wrapper.emitted('submit-codec')).toEqual([
+        expect(wrapper.emitted('submit-transcode')).toEqual([
             [
                 {
                     srcProviderType: 'FILE_SYSTEM',
                     srcProviderId: 1,
                     dstProviderType: 'OSS',
                     dstProviderId: 2,
-                    codecType: 'AAC',
+                    targetCodec: 'AAC',
                 },
             ],
         ])

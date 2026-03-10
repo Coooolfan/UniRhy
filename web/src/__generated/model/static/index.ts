@@ -1,6 +1,5 @@
 export type {AccountCreate} from './AccountCreate';
 export type {AccountUpdate} from './AccountUpdate';
-export type {CodecTaskRequest} from './CodecTaskRequest';
 export type {FileProviderFileSystemCreate} from './FileProviderFileSystemCreate';
 export type {FileProviderFileSystemUpdate} from './FileProviderFileSystemUpdate';
 export type {FileProviderOssCreate} from './FileProviderOssCreate';
@@ -15,5 +14,6 @@ export type {SystemConfigUpdate} from './SystemConfigUpdate';
 export type {SystemInitReq} from './SystemInitReq';
 export type {SystemStatus} from './SystemStatus';
 export type {TokenLoginRequest} from './TokenLoginRequest';
+export type {TranscodeTaskRequest} from './TranscodeTaskRequest';
 export type {WorkMergeReq} from './WorkMergeReq';
 export type {WorkUpdate} from './WorkUpdate';

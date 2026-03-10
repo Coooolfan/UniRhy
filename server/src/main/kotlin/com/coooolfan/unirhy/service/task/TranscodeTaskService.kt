@@ -9,27 +9,27 @@ import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 
 @Service
-class CodecTaskService(
+class TranscodeTaskService(
     private val sql: KSqlClient,
     asyncTaskManager: AsyncTaskManager,
-) : TaskService<CodecTaskRequest>(
+) : TaskService<TranscodeTaskRequest>(
     asyncTaskManager
 ) {
-    override val type: TaskType = TaskType.CODEC
+    override val type: TaskType = TaskType.TRANSCODE
 
-    private val logger = LoggerFactory.getLogger(CodecTaskService::class.java)
+    private val logger = LoggerFactory.getLogger(TranscodeTaskService::class.java)
 
-    override fun execute(request: CodecTaskRequest) {
+    override fun execute(request: TranscodeTaskRequest) {
         TODO("Not yet implemented")
     }
 }
 
-data class CodecTaskRequest(
+data class TranscodeTaskRequest(
     val srcProviderType: FileProviderType,
     val srcProviderId: Long,
     val dstProviderType: FileProviderType,
     val dstProviderId: Long,
-    val codecType: CodecType = CodecType.OPUS,
+    val targetCodec: CodecType = CodecType.OPUS,
 )
 
 enum class CodecType {

@@ -4,7 +4,7 @@ import DashboardTopBar from '@/components/dashboard/DashboardTopBar.vue'
 import TaskSubmissionModal from '@/components/tasks/TaskSubmissionModal.vue'
 import type { AsyncTaskLogDto } from '@/__generated/model/dto/AsyncTaskLogDto'
 import type { TaskType } from '@/__generated/model/enums/TaskType'
-import type { CodecTaskRequest, ScanTaskRequest } from '@/__generated/model/static'
+import type { ScanTaskRequest, TranscodeTaskRequest } from '@/__generated/model/static'
 import { TASK_TYPE_LABEL_MAP, useTaskManagement } from '@/composables/useTaskManagement'
 import {
     AlertCircle,
@@ -49,7 +49,7 @@ const {
     fetchTaskLogs,
     fetchProviders,
     startScanTask,
-    startCodecTask,
+    startTranscodeTask,
     clearSubmitError,
     init,
 } = useTaskManagement()
@@ -236,8 +236,8 @@ const handleScanSubmit = async (payload: ScanTaskRequest) => {
     showSubmitFeedback()
 }
 
-const handleCodecSubmit = async (payload: CodecTaskRequest) => {
-    const submitOk = await startCodecTask(payload)
+const handleTranscodeSubmit = async (payload: TranscodeTaskRequest) => {
+    const submitOk = await startTranscodeTask(payload)
     if (!submitOk) {
         return
     }
@@ -507,7 +507,7 @@ const goNextPage = () => {
             :submit-error="submitError"
             @close="closeTaskModal"
             @submit-scan="handleScanSubmit"
-            @submit-codec="handleCodecSubmit"
+            @submit-transcode="handleTranscodeSubmit"
         />
     </div>
 </template>

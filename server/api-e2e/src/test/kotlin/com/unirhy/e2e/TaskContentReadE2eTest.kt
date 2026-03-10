@@ -73,6 +73,14 @@ class TaskContentReadE2eTest {
             ),
             "[auth] submit scan task should require login",
         )
+        assertAuthenticationFailed(
+            api.post(
+                path = "/api/task/transcode",
+                // This payload is only for auth gate assertion; business validation is out of scope for this test.
+                json = transcodeRequestBodyForUnauth(),
+            ),
+            "[auth] submit transcode task should require login",
+        )
 
         assertAuthenticationFailed(
             api.get("/api/works"),
@@ -118,13 +126,20 @@ class TaskContentReadE2eTest {
 
     @Test
     @Order(2)
+    fun `transcode task should create failed task log until implementation is available`() {
+        val state = bootstrapAdminSession(baseUrl())
+        awaitTranscodeTaskFailure(state)
+    }
+
+    @Test
+    @Order(3)
     fun `scan task should expose running lifecycle and reject duplicate submission`() {
         val state = bootstrapAdminSession(baseUrl())
         preparedData = executeScanAndPrepareData(state)
     }
 
     @Test
-    @Order(3)
+    @Order(4)
     fun `media endpoint should support full range head and error branches`() {
         val state = bootstrapAdminSession(baseUrl())
         val data = ensurePreparedData(state, caller = "media")
@@ -169,7 +184,7 @@ class TaskContentReadE2eTest {
     }
 
     @Test
-    @Order(4)
+    @Order(5)
     fun `works and albums should support read random and delete flow`() {
         val state = bootstrapAdminSession(baseUrl())
         val data = ensurePreparedData(state, caller = "works-albums")
@@ -507,7 +522,7 @@ class TaskContentReadE2eTest {
         E2eAssert.status(completedLogsResponse, 200, "[scan] list completed task logs should succeed")
         val completedRows = pageRows(completedLogsResponse.body(), "[scan] completed task logs response")
         val completedRow = completedRows.firstOrNull { row ->
-            row.path("taskType").asText() == "SCAN" && row.path("status").asText() == "COMPLETED"
+            row.path("taskType").asText() == "SCAN" && taskLogStatus(row) == "COMPLETED"
         } ?: fail("[scan] completed task logs should contain at least one SCAN row")
         assertTrue(completedRow.path("completedAt").isTextual, "[scan] completed task log should contain completedAt")
         val completedReason = completedRow.path("completedReason").asText("")
@@ -531,9 +546,55 @@ class TaskContentReadE2eTest {
         val abortedRow = abortedRows.firstOrNull { row ->
             row.path("id").isIntegralNumber && row.path("id").longValue() == abortedId
         } ?: fail("[scan] aborted task logs should contain inserted aborted row id=$abortedId")
-        assertEquals("ABORTED", abortedRow.path("status").asText(), "[scan] inserted aborted task log status should be ABORTED")
+        assertEquals("ABORTED", taskLogStatus(abortedRow), "[scan] inserted aborted task log status should be ABORTED")
         assertTrue(abortedRow.path("completedAt").isNull, "[scan] aborted task log should keep completedAt null")
         assertTrue(abortedRow.path("completedReason").isNull, "[scan] aborted task log should keep completedReason null")
+    }
+
+    private fun awaitTranscodeTaskFailure(state: E2eAdminSession) {
+        val submitResponse = state.api.post(
+            path = "/api/task/transcode",
+            json = transcodeRequestBody(state),
+        )
+        E2eAssert.status(submitResponse, 202, "[transcode] submit transcode task should return accepted")
+
+        val timeoutMillis = scanWaitTimeoutMillis()
+        val deadline = System.currentTimeMillis() + timeoutMillis
+        var lastCompletedBody = """{"rows":[]}"""
+
+        while (System.currentTimeMillis() <= deadline) {
+            val completedLogsResponse = state.api.get(
+                path = "/api/task/logs",
+                query = mapOf(
+                    "pageIndex" to 0,
+                    "pageSize" to 50,
+                    "taskType" to "TRANSCODE",
+                    "status" to "COMPLETED",
+                ),
+            )
+            E2eAssert.status(completedLogsResponse, 200, "[transcode] list completed transcode task logs should succeed")
+            lastCompletedBody = completedLogsResponse.body()
+
+            val completedRow = pageRows(lastCompletedBody, "[transcode] completed task logs response").firstOrNull { row ->
+                row.path("taskType").asText() == "TRANSCODE" && taskLogStatus(row) == "COMPLETED"
+            }
+            if (completedRow != null) {
+                assertTrue(
+                    completedRow.path("completedAt").isTextual,
+                    "[transcode] completed task log should contain completedAt",
+                )
+                val completedReason = completedRow.path("completedReason").asText("")
+                assertTrue(
+                    completedReason.startsWith("FAILED:"),
+                    "[transcode] completed task log reason should start with FAILED:, actual=$completedReason",
+                )
+                return
+            }
+
+            Thread.sleep(100L)
+        }
+
+        fail("[transcode] completed task log was not observed before timeout ${timeoutMillis}ms, last=$lastCompletedBody")
     }
 
     private fun pollIntervalMillis(pollCount: Int): Long {
@@ -629,8 +690,18 @@ class TaskContentReadE2eTest {
 
     private fun containsScanTaskLog(responseBody: String, expectedStatus: String): Boolean {
         return pageRows(responseBody, "[scan] running task logs response").any { row ->
-            row.path("taskType").asText() == "SCAN" && row.path("status").asText() == expectedStatus
+            row.path("taskType").asText() == "SCAN" && taskLogStatus(row) == expectedStatus
         }
+    }
+
+    private fun taskLogStatus(row: JsonNode): String {
+        if (row.path("running").asBoolean(false)) {
+            return "RUNNING"
+        }
+        if (row.path("completedAt").isTextual) {
+            return "COMPLETED"
+        }
+        return "ABORTED"
     }
 
     private fun insertAbortedScanLog(state: E2eAdminSession): Long {
@@ -724,11 +795,32 @@ class TaskContentReadE2eTest {
         )
     }
 
+    private fun transcodeRequestBodyForUnauth(): Map<String, Any> {
+        return linkedMapOf(
+            "srcProviderType" to "FILE_SYSTEM",
+            "srcProviderId" to 0L,
+            "dstProviderType" to "FILE_SYSTEM",
+            "dstProviderId" to 0L,
+            "targetCodec" to "OPUS",
+        )
+    }
+
     private fun scanRequestBody(state: E2eAdminSession): Map<String, Any> {
         val fsProviderId = resolveSystemFsProviderId(state)
         return linkedMapOf(
             "providerType" to "FILE_SYSTEM",
             "providerId" to fsProviderId,
+        )
+    }
+
+    private fun transcodeRequestBody(state: E2eAdminSession): Map<String, Any> {
+        val fsProviderId = resolveSystemFsProviderId(state)
+        return linkedMapOf(
+            "srcProviderType" to "FILE_SYSTEM",
+            "srcProviderId" to fsProviderId,
+            "dstProviderType" to "FILE_SYSTEM",
+            "dstProviderId" to fsProviderId,
+            "targetCodec" to "OPUS",
         )
     }
 

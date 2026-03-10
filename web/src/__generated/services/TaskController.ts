@@ -1,7 +1,7 @@
 import type {Executor} from '../';
 import type {AsyncTaskLogDto} from '../model/dto/';
 import type {AsyncTaskLogStatus, TaskType} from '../model/enums/';
-import type {CodecTaskRequest, Page, ScanTaskRequest} from '../model/static/';
+import type {Page, ScanTaskRequest, TranscodeTaskRequest} from '../model/static/';
 
 /**
  * 任务管理接口
@@ -13,19 +13,19 @@ export class TaskController {
     constructor(private executor: Executor) {}
     
     /**
-     * 触发编码任务
+     * 触发转码任务
      * 
-     * 此接口用于提交媒体编码任务，非幂等操作
+     * 此接口用于提交媒体转码任务，非幂等操作
      * 需要用户登录认证才能访问
      * 
-     * @parameter {TaskControllerOptions['executeCodecTask']} options
-     * - request 编码任务请求参数
+     * @parameter {TaskControllerOptions['executeTranscodeTask']} options
+     * - request 转码任务请求参数
      * 
      */
-    readonly executeCodecTask: (options: TaskControllerOptions['executeCodecTask']) => Promise<
+    readonly executeTranscodeTask: (options: TaskControllerOptions['executeTranscodeTask']) => Promise<
         void
     > = async(options) => {
-        let _uri = '/api/task/codec';
+        let _uri = '/api/task/transcode';
         return (await this.executor({uri: _uri, method: 'POST', body: options.body})) as Promise<void>;
     }
     
@@ -96,12 +96,12 @@ export type TaskControllerOptions = {
          */
         readonly body: ScanTaskRequest
     }, 
-    'executeCodecTask': {
+    'executeTranscodeTask': {
         /**
-         * 编码任务请求参数
+         * 转码任务请求参数
          * 
          */
-        readonly body: CodecTaskRequest
+        readonly body: TranscodeTaskRequest
     }, 
     'listTaskLogs': {
         readonly pageIndex?: number | undefined, 

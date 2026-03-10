@@ -1,9 +1,9 @@
 import type {CodecType, FileProviderType} from '../enums/';
 
-export interface CodecTaskRequest {
+export interface TranscodeTaskRequest {
     readonly srcProviderType: FileProviderType;
     readonly srcProviderId: number;
     readonly dstProviderType: FileProviderType;
     readonly dstProviderId: number;
-    readonly codecType: CodecType;
+    readonly targetCodec: CodecType;
 }

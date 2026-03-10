@@ -22,7 +22,7 @@ import org.springframework.web.bind.annotation.*
 @RequestMapping("/api/task")
 class TaskController(
     private val scanTaskService: ScanTaskService,
-    private val codecTaskService: CodecTaskService,
+    private val transcodeTaskService: TranscodeTaskService,
     private val asyncTaskLogService: AsyncTaskLogService,
 ) {
 
@@ -45,21 +45,21 @@ class TaskController(
     }
 
     /**
-     * 触发编码任务
+     * 触发转码任务
      *
-     * 此接口用于提交媒体编码任务，非幂等操作
+     * 此接口用于提交媒体转码任务，非幂等操作
      * 需要用户登录认证才能访问
      *
-     * @param request 编码任务请求参数
+     * @param request 转码任务请求参数
      *
-     * @api POST /api/task/codec
+     * @api POST /api/task/transcode
      * @permission 需要登录认证
-     * @description 调用CodecTaskService.submit()方法执行编码任务
+     * @description 调用TranscodeTaskService.submit()方法执行转码任务
      */
-    @PostMapping("/codec")
+    @PostMapping("/transcode")
     @ResponseStatus(HttpStatus.ACCEPTED)
-    fun executeCodecTask(@RequestBody request: CodecTaskRequest) {
-        codecTaskService.submit(request)
+    fun executeTranscodeTask(@RequestBody request: TranscodeTaskRequest) {
+        transcodeTaskService.submit(request)
     }
 
     /**

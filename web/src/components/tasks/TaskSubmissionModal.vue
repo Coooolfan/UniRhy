@@ -14,7 +14,7 @@ import {
 import type { CodecType } from '@/__generated/model/enums/CodecType'
 import { type FileProviderType } from '@/__generated/model/enums/FileProviderType'
 import type { TaskType } from '@/__generated/model/enums/TaskType'
-import type { CodecTaskRequest } from '@/__generated/model/static'
+import type { TranscodeTaskRequest } from '@/__generated/model/static'
 import { TASK_TYPE_LABEL_MAP, type TaskProviderOption } from '@/composables/useTaskManagement'
 
 type TaskKind = TaskType
@@ -44,7 +44,7 @@ const props = defineProps<Props>()
 const emit = defineEmits<{
     (event: 'close'): void
     (event: 'submit-scan', payload: ProviderSelectionPayload): void
-    (event: 'submit-codec', payload: CodecTaskRequest): void
+    (event: 'submit-transcode', payload: TranscodeTaskRequest): void
 }>()
 
 const TASK_OPTIONS: TaskDefinition[] = [
@@ -55,14 +55,14 @@ const TASK_OPTIONS: TaskDefinition[] = [
         icon: FolderSearch,
     },
     {
-        id: 'CODEC',
-        name: TASK_TYPE_LABEL_MAP.CODEC,
+        id: 'TRANSCODE',
+        name: TASK_TYPE_LABEL_MAP.TRANSCODE,
         desc: '跨节点转换音频编码格式',
         icon: FileAudio,
     },
 ]
 
-const CODEC_OPTIONS: Array<{ value: CodecType; label: string; hint: string }> = [
+const TARGET_CODEC_OPTIONS: Array<{ value: CodecType; label: string; hint: string }> = [
     { value: 'OPUS', label: 'Opus', hint: '高压缩率，推荐流媒体播放' },
     { value: 'MP3', label: 'MP3', hint: '兼容性最好，适合通用分发' },
     { value: 'AAC', label: 'AAC', hint: '苹果生态与移动端兼容较好' },
@@ -80,9 +80,9 @@ const PROVIDER_TYPE_ICON_MAP: Record<FileProviderType, Component> = {
 
 const activeTask = ref<TaskKind>('SCAN')
 const scanProviderValue = ref('')
-const codecSourceProviderValue = ref('')
-const codecDestinationProviderValue = ref('')
-const codecType = ref<CodecType>('OPUS')
+const transcodeSourceProviderValue = ref('')
+const transcodeDestinationProviderValue = ref('')
+const targetCodec = ref<CodecType>('OPUS')
 
 const optionValueOf = (provider: TaskProviderOption) => `${provider.type}:${provider.id}`
 
@@ -98,12 +98,12 @@ const syncProviderSelections = (options: TaskProviderOption[]) => {
         scanProviderValue.value = getDefaultProviderValue(options)
     }
 
-    if (!validValues.has(codecSourceProviderValue.value)) {
-        codecSourceProviderValue.value = getDefaultProviderValue(options)
+    if (!validValues.has(transcodeSourceProviderValue.value)) {
+        transcodeSourceProviderValue.value = getDefaultProviderValue(options)
     }
 
-    if (!validValues.has(codecDestinationProviderValue.value)) {
-        codecDestinationProviderValue.value = getDefaultProviderValue(options, 1)
+    if (!validValues.has(transcodeDestinationProviderValue.value)) {
+        transcodeDestinationProviderValue.value = getDefaultProviderValue(options, 1)
     }
 }
 
@@ -122,7 +122,7 @@ watch(
             return
         }
         activeTask.value = 'SCAN'
-        codecType.value = 'OPUS'
+        targetCodec.value = 'OPUS'
         syncProviderSelections(props.providerOptions)
     },
 )
@@ -135,9 +135,11 @@ const resolveProvider = (value: string) =>
     props.providerOptions.find((provider) => optionValueOf(provider) === value)
 
 const selectedScanProvider = computed(() => resolveProvider(scanProviderValue.value))
-const selectedCodecSourceProvider = computed(() => resolveProvider(codecSourceProviderValue.value))
-const selectedCodecDestinationProvider = computed(() =>
-    resolveProvider(codecDestinationProviderValue.value),
+const selectedTranscodeSourceProvider = computed(() =>
+    resolveProvider(transcodeSourceProviderValue.value),
+)
+const selectedTranscodeDestinationProvider = computed(() =>
+    resolveProvider(transcodeDestinationProviderValue.value),
 )
 
 const canSubmit = computed(() => {
@@ -149,7 +151,9 @@ const canSubmit = computed(() => {
         return Boolean(selectedScanProvider.value)
     }
 
-    return Boolean(selectedCodecSourceProvider.value && selectedCodecDestinationProvider.value)
+    return Boolean(
+        selectedTranscodeSourceProvider.value && selectedTranscodeDestinationProvider.value,
+    )
 })
 
 const submitButtonLabel = computed(() =>
@@ -182,18 +186,18 @@ const submit = () => {
         return
     }
 
-    const source = selectedCodecSourceProvider.value
-    const destination = selectedCodecDestinationProvider.value
+    const source = selectedTranscodeSourceProvider.value
+    const destination = selectedTranscodeDestinationProvider.value
     if (!source || !destination) {
         return
     }
 
-    emit('submit-codec', {
+    emit('submit-transcode', {
         srcProviderType: source.type,
         srcProviderId: source.id,
         dstProviderType: destination.type,
         dstProviderId: destination.id,
-        codecType: codecType.value,
+        targetCodec: targetCodec.value,
     })
 }
 </script>
@@ -410,8 +414,8 @@ const submit = () => {
                                             </span>
                                             <div class="relative">
                                                 <select
-                                                    v-model="codecSourceProviderValue"
-                                                    data-test="codec-source-select"
+                                                    v-model="transcodeSourceProviderValue"
+                                                    data-test="transcode-source-select"
                                                     class="w-full appearance-none bg-[#F7F5F0] border-b border-[#D6D1C4] p-3 pr-10 text-sm text-[#2C2C2C] outline-none transition-colors focus:border-[#C27E46]"
                                                 >
                                                     <option
@@ -428,7 +432,10 @@ const submit = () => {
                                             </div>
                                         </label>
 
-                                        <div v-if="selectedCodecSourceProvider" class="px-1 py-1">
+                                        <div
+                                            v-if="selectedTranscodeSourceProvider"
+                                            class="px-1 py-1"
+                                        >
                                             <div
                                                 class="text-[11px] uppercase tracking-[0.24em] text-[#8A8A8A]"
                                             >
@@ -440,19 +447,19 @@ const submit = () => {
                                                 <component
                                                     :is="
                                                         PROVIDER_TYPE_ICON_MAP[
-                                                            selectedCodecSourceProvider.type
+                                                            selectedTranscodeSourceProvider.type
                                                         ]
                                                     "
                                                     class="h-4 w-4 text-[#C27E46]"
                                                 />
                                                 <span class="text-sm">{{
                                                     PROVIDER_TYPE_LABEL_MAP[
-                                                        selectedCodecSourceProvider.type
+                                                        selectedTranscodeSourceProvider.type
                                                     ]
                                                 }}</span>
                                                 <span class="text-[#D6D1C4]">/</span>
                                                 <span class="font-mono text-sm"
-                                                    >#{{ selectedCodecSourceProvider.id }}</span
+                                                    >#{{ selectedTranscodeSourceProvider.id }}</span
                                                 >
                                             </div>
                                         </div>
@@ -487,8 +494,8 @@ const submit = () => {
                                             </span>
                                             <div class="relative">
                                                 <select
-                                                    v-model="codecDestinationProviderValue"
-                                                    data-test="codec-destination-select"
+                                                    v-model="transcodeDestinationProviderValue"
+                                                    data-test="transcode-destination-select"
                                                     class="w-full appearance-none bg-[#F7F5F0] border-b border-[#D6D1C4] p-3 pr-10 text-sm text-[#2C2C2C] outline-none transition-colors focus:border-[#C27E46]"
                                                 >
                                                     <option
@@ -506,7 +513,7 @@ const submit = () => {
                                         </label>
 
                                         <div
-                                            v-if="selectedCodecDestinationProvider"
+                                            v-if="selectedTranscodeDestinationProvider"
                                             class="px-1 py-1"
                                         >
                                             <div
@@ -520,20 +527,21 @@ const submit = () => {
                                                 <component
                                                     :is="
                                                         PROVIDER_TYPE_ICON_MAP[
-                                                            selectedCodecDestinationProvider.type
+                                                            selectedTranscodeDestinationProvider
+                                                                .type
                                                         ]
                                                     "
                                                     class="h-4 w-4 text-[#C27E46]"
                                                 />
                                                 <span class="text-sm">{{
                                                     PROVIDER_TYPE_LABEL_MAP[
-                                                        selectedCodecDestinationProvider.type
+                                                        selectedTranscodeDestinationProvider.type
                                                     ]
                                                 }}</span>
                                                 <span class="text-[#D6D1C4]">/</span>
                                                 <span class="font-mono text-sm"
                                                     >#{{
-                                                        selectedCodecDestinationProvider.id
+                                                        selectedTranscodeDestinationProvider.id
                                                     }}</span
                                                 >
                                             </div>
@@ -549,12 +557,12 @@ const submit = () => {
                                     </span>
                                     <div class="relative">
                                         <select
-                                            v-model="codecType"
-                                            data-test="codec-type-select"
+                                            v-model="targetCodec"
+                                            data-test="target-codec-select"
                                             class="w-full appearance-none bg-[#F7F5F0] border-b border-[#D6D1C4] p-3 pr-10 text-sm text-[#2C2C2C] outline-none transition-colors focus:border-[#C27E46]"
                                         >
                                             <option
-                                                v-for="option in CODEC_OPTIONS"
+                                                v-for="option in TARGET_CODEC_OPTIONS"
                                                 :key="option.value"
                                                 :value="option.value"
                                             >
@@ -569,8 +577,8 @@ const submit = () => {
                                         <Music4 class="mt-0.5 h-4 w-4 shrink-0 text-[#C27E46]" />
                                         <span>
                                             {{
-                                                CODEC_OPTIONS.find(
-                                                    (option) => option.value === codecType,
+                                                TARGET_CODEC_OPTIONS.find(
+                                                    (option) => option.value === targetCodec,
                                                 )?.hint
                                             }}
                                         </span>

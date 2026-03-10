@@ -3,7 +3,7 @@ import { api, normalizeApiError } from '@/ApiInstance'
 import type { AsyncTaskLogDto } from '@/__generated/model/dto/AsyncTaskLogDto'
 import { type FileProviderType } from '@/__generated/model/enums/FileProviderType'
 import type { TaskType } from '@/__generated/model/enums/TaskType'
-import type { CodecTaskRequest, ScanTaskRequest } from '@/__generated/model/static'
+import type { ScanTaskRequest, TranscodeTaskRequest } from '@/__generated/model/static'
 
 export type TaskProviderOption = {
     id: number
@@ -13,7 +13,7 @@ export type TaskProviderOption = {
 
 export const TASK_TYPE_LABEL_MAP: Record<TaskType, string> = {
     SCAN: '媒体库扫描',
-    CODEC: '媒体转码',
+    TRANSCODE: '媒体转码',
 }
 
 type TaskLogItem = AsyncTaskLogDto['TaskController/DEFAULT_ASYNC_TASK_LOG_FETCHER']
@@ -141,9 +141,9 @@ export const useTaskManagement = () => {
         )
     }
 
-    const startCodecTask = (request: CodecTaskRequest) =>
+    const startTranscodeTask = (request: TranscodeTaskRequest) =>
         executeTask(() =>
-            api.taskController.executeCodecTask({
+            api.taskController.executeTranscodeTask({
                 body: request,
             }),
         )
@@ -174,7 +174,7 @@ export const useTaskManagement = () => {
         fetchTaskLogs,
         fetchProviders,
         startScanTask,
-        startCodecTask,
+        startTranscodeTask,
         clearSubmitError,
         init,
     }
