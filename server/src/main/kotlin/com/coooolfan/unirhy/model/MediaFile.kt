@@ -22,6 +22,7 @@ interface MediaFile {
 
     val mimeType: String
 
+    // 字节
     val size: Long
 
     val width: Int?

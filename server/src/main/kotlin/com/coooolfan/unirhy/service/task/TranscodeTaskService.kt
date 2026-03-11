@@ -1,12 +1,15 @@
 package com.coooolfan.unirhy.service.task
 
+import com.coooolfan.unirhy.model.*
 import com.coooolfan.unirhy.model.storage.FileProviderFileSystem
 import com.coooolfan.unirhy.model.storage.FileProviderType
 import com.coooolfan.unirhy.service.task.common.AsyncTaskManager
 import com.coooolfan.unirhy.service.task.common.TaskService
 import com.coooolfan.unirhy.service.task.common.TaskType
-import com.coooolfan.unirhy.service.task.common.findAudioFilesRecursively
+import org.babyfish.jimmer.sql.ast.mutation.AssociatedSaveMode
+import org.babyfish.jimmer.sql.ast.mutation.SaveMode
 import org.babyfish.jimmer.sql.kt.KSqlClient
+import org.babyfish.jimmer.sql.kt.ast.expression.eq
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import java.io.File
@@ -31,8 +34,24 @@ class TranscodeTaskService(
 
         val srcRoot = File(srcProvider.parentPath)
         val dstRoot = ensureDestinationRoot(dstProvider)
-        val audioFiles = findAudioFilesRecursively(srcRoot)
-        if (audioFiles.isEmpty()) {
+//        val audioFiles = findAudioFilesRecursively(srcRoot)
+//        val audioFiles = sql.executeQuery(MediaFile::class) {
+//            where(table.fsProvider eq srcProvider)
+//            select(table.objectKey,table.)
+//        }.map { File(srcRoot, it) }
+
+        val audioFiles = sql.executeQuery(Asset::class) {
+            where(table.mediaFile.fsProviderId eq srcProvider.id)
+            select(table.recordingId, table.mediaFile.objectKey)
+        }
+
+        // TODO: 这里需要考虑单个 Recording 下在同一个 Provider 下有多个 Asset 的情况
+        val recordingAssetMap = mutableMapOf<Long, String>()
+        for ((recordingId, objectKey) in audioFiles) {
+            recordingAssetMap[recordingId] = objectKey
+        }
+
+        if (recordingAssetMap.isEmpty()) {
             logger.info(
                 "No audio files found for transcode task, srcProviderId={}, srcRoot={}, dstRoot={}",
                 srcProvider.id,
@@ -43,12 +62,16 @@ class TranscodeTaskService(
         }
 
         // libopus 本身已经几乎可以把 CPU 占满，所以这里不需要并发执行 ffmpeg 命令
-        for ((index, file) in audioFiles.withIndex()) {
+        for ((index, entry) in recordingAssetMap.entries.withIndex()) {
+            val recordingId = entry.key
+            val srcObjectKey = entry.value
+
+            val file = File(srcRoot, srcObjectKey)
             val outputFile = File(dstRoot, "${UUID.randomUUID()}.opus")
             logger.info(
                 "Transcoding file {}/{}: src={}, dst={}",
                 index + 1,
-                audioFiles.size,
+                recordingAssetMap.size,
                 file.relativeTo(srcRoot).path,
                 outputFile.name,
             )
@@ -57,13 +80,32 @@ class TranscodeTaskService(
                 srcFile = file,
                 outputFile = outputFile,
             )
+
+            sql.saveCommand(Asset {
+                recording = Recording { id = recordingId }
+                mediaFile {
+                    sha256 = "mocked-sha256"
+                    objectKey = outputFile.toString()
+                    mimeType = "audio/opus"
+                    size = outputFile.length()
+                    width = null
+                    height = null
+                    ossProvider = null
+                    fsProvider = dstProvider
+                }
+                comment = "transcoded from ${srcObjectKey} at ${srcProvider.name}"
+            }) {
+                setMode(SaveMode.INSERT_ONLY)
+                setAssociatedMode(Asset::recording, AssociatedSaveMode.APPEND_IF_ABSENT)
+                setAssociatedMode(MediaFile::fsProvider, AssociatedSaveMode.APPEND_IF_ABSENT)
+            }.execute()
         }
 
         logger.info(
             "Transcode task completed, srcProviderId={}, dstProviderId={}, totalFiles={}, dstRoot={}",
             srcProvider.id,
             dstProvider.id,
-            audioFiles.size,
+            recordingAssetMap.size,
             dstRoot.absolutePath,
         )
     }
