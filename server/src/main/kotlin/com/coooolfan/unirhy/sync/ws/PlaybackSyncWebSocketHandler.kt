@@ -191,7 +191,7 @@ class PlaybackSyncWebSocketHandler(
         requireHelloDevice(context)
         validateClientRtt(payload.clientRttMs)
 
-        logWriter.info(
+        logWriter.debug(
             PlaybackSyncLogEvents.NTP_REQUEST_RECEIVED,
             *context.toBaseLogFields(),
             PlaybackSyncLogFields.RTT_MS to payload.clientRttMs,
@@ -215,7 +215,7 @@ class PlaybackSyncWebSocketHandler(
             ),
         )
 
-        logWriter.info(
+        logWriter.debug(
             PlaybackSyncLogEvents.NTP_RESPONSE_SENT,
             *context.toBaseLogFields(),
             PlaybackSyncLogFields.RTT_MS to payload.clientRttMs,
@@ -454,7 +454,13 @@ class PlaybackSyncWebSocketHandler(
             executeAtMs = executeAtMs,
         )
         messageSender.sendScheduledAction(context, scheduledAction)
-        logWriter.logScheduledActionSent(context.accountId, context.deviceId, scheduledAction, nowMs)
+        logWriter.logScheduledActionSent(
+            accountId = context.accountId,
+            deviceId = context.deviceId,
+            payload = scheduledAction,
+            nowMs = nowMs,
+            useDebugLevel = true,
+        )
     }
 
     internal fun handlePendingPlayTimeout(

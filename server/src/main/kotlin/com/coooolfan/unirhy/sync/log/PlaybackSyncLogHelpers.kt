@@ -28,9 +28,9 @@ internal fun PlaybackSyncLogWriter.logScheduledActionSent(
     deviceId: String?,
     payload: ScheduledActionPayload,
     nowMs: Long,
+    useDebugLevel: Boolean = false,
 ) {
-    info(
-        PlaybackSyncLogEvents.SCHEDULED_ACTION_SENT,
+    val fields = arrayOf(
         PlaybackSyncLogFields.ACCOUNT_ID to accountId,
         PlaybackSyncLogFields.DEVICE_ID to deviceId,
         PlaybackSyncLogFields.COMMAND_ID to payload.commandId,
@@ -39,5 +39,17 @@ internal fun PlaybackSyncLogWriter.logScheduledActionSent(
         PlaybackSyncLogFields.EXECUTE_AT_MS to payload.serverTimeToExecuteMs,
         PlaybackSyncLogFields.SCHEDULE_DELAY_MS to (payload.serverTimeToExecuteMs - nowMs),
         PlaybackSyncLogFields.RESULT to "completed",
+    )
+    if (useDebugLevel) {
+        debug(
+            PlaybackSyncLogEvents.SCHEDULED_ACTION_SENT,
+            *fields,
+        )
+        return
+    }
+
+    info(
+        PlaybackSyncLogEvents.SCHEDULED_ACTION_SENT,
+        *fields,
     )
 }

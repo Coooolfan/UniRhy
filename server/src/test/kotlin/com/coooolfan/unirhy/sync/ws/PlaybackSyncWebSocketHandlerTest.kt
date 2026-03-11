@@ -1,6 +1,11 @@
 package com.coooolfan.unirhy.sync.ws
 
+import ch.qos.logback.classic.Level
+import ch.qos.logback.classic.Logger
+import ch.qos.logback.classic.spi.ILoggingEvent
+import ch.qos.logback.core.read.ListAppender
 import com.coooolfan.unirhy.controller.MediaFileRoutes
+import com.coooolfan.unirhy.sync.log.PlaybackSyncLogEvents
 import com.coooolfan.unirhy.sync.log.PlaybackSyncLogWriter
 import com.coooolfan.unirhy.sync.protocol.*
 import com.coooolfan.unirhy.sync.service.*
@@ -10,6 +15,7 @@ import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.slf4j.LoggerFactory
 import org.springframework.web.socket.CloseStatus
 import org.springframework.web.socket.TextMessage
 import java.util.concurrent.Executors
@@ -32,9 +38,21 @@ class PlaybackSyncWebSocketHandlerTest {
     private lateinit var scheduledActionDispatcher: PlaybackSyncScheduledActionDispatcher
     private lateinit var mediaResolver: PlaybackSyncMediaResolver
     private lateinit var handler: PlaybackSyncWebSocketHandler
+    private lateinit var logWriterLogger: Logger
+    private lateinit var logAppender: ListAppender<ILoggingEvent>
+    private var originalLogLevel: Level? = null
+    private var originalAdditive = true
 
     @BeforeEach
     fun setUp() {
+        logWriterLogger = LoggerFactory.getLogger(PlaybackSyncLogWriter::class.java) as Logger
+        originalLogLevel = logWriterLogger.level
+        originalAdditive = logWriterLogger.isAdditive
+        logAppender = ListAppender<ILoggingEvent>().apply { start() }
+        logWriterLogger.level = Level.DEBUG
+        logWriterLogger.isAdditive = false
+        logWriterLogger.addAppender(logAppender)
+
         timeProvider = TestPlaybackSyncTimeProvider(1_730_844_000_200)
         schedulerExecutor = Executors.newSingleThreadScheduledExecutor()
         val lockManager = PlaybackAccountLockManager()
@@ -78,6 +96,10 @@ class PlaybackSyncWebSocketHandlerTest {
 
     @AfterEach
     fun tearDown() {
+        logWriterLogger.detachAppender(logAppender)
+        logWriterLogger.level = originalLogLevel
+        logWriterLogger.isAdditive = originalAdditive
+        logAppender.stop()
         schedulerExecutor.shutdownNow()
     }
 
@@ -127,6 +149,7 @@ class PlaybackSyncWebSocketHandlerTest {
         handler.afterConnectionEstablished(session)
         handler.handleMessage(session, textMessage(helloPayload(deviceId = "web-7c2f")))
         session.clearServerMessages()
+        clearCapturedLogs()
 
         handler.handleMessage(session, textMessage(ntpRequestPayload()))
 
@@ -137,6 +160,8 @@ class PlaybackSyncWebSocketHandlerTest {
         assertTrue(response.payload.t1 <= response.payload.t2)
         assertTrue(deviceRuntimeService.isSyncReady(42L, "web-7c2f"))
         assertEquals(18.5, deviceRuntimeService.listActiveRuntimeStates(42L).single().rttEmaMs)
+        assertEventLogLevel(PlaybackSyncLogEvents.NTP_REQUEST_RECEIVED, Level.DEBUG)
+        assertEventLogLevel(PlaybackSyncLogEvents.NTP_RESPONSE_SENT, Level.DEBUG)
     }
 
     @Test
@@ -145,6 +170,7 @@ class PlaybackSyncWebSocketHandlerTest {
         handler.afterConnectionEstablished(session)
         handler.handleMessage(session, textMessage(helloPayload(deviceId = "web-7c2f")))
         session.clearServerMessages()
+        clearCapturedLogs()
 
         handler.handleMessage(session, textMessage(playPayload()))
 
@@ -157,6 +183,53 @@ class PlaybackSyncWebSocketHandlerTest {
         assertEquals(PlaybackStatus.PLAYING, scheduledAction.payload.scheduledAction.status)
         assertEquals(12.5, scheduledAction.payload.scheduledAction.positionSeconds)
         assertEquals(400L, scheduledAction.payload.serverTimeToExecuteMs - timeProvider.nowMs())
+        assertEventLogLevel(PlaybackSyncLogEvents.PLAY_REQUEST, Level.INFO)
+        assertEventLogLevel(PlaybackSyncLogEvents.PENDING_PLAY_CREATED, Level.INFO)
+        assertEventLogLevel(PlaybackSyncLogEvents.SCHEDULED_ACTION_SENT, Level.INFO)
+    }
+
+    @Test
+    fun `pause request keeps info logging`() {
+        val session = TestWebSocketSession(sessionId = "session-1", accountId = 42L)
+        handler.afterConnectionEstablished(session)
+        handler.handleMessage(session, textMessage(helloPayload(deviceId = "web-7c2f")))
+        session.clearServerMessages()
+        clearCapturedLogs()
+
+        handler.handleMessage(
+            session,
+            textMessage(
+                pausePayload(commandId = "cmd-pause-001"),
+            ),
+        )
+
+        val message = session.lastServerMessage()
+        assertTrue(message is ScheduledActionMessage)
+        assertEquals(ScheduledActionType.PAUSE, message.payload.scheduledAction.action)
+        assertEventLogLevel(PlaybackSyncLogEvents.PAUSE_REQUEST, Level.INFO)
+        assertEventLogLevel(PlaybackSyncLogEvents.SCHEDULED_ACTION_SENT, Level.INFO)
+    }
+
+    @Test
+    fun `seek request keeps info logging`() {
+        val session = TestWebSocketSession(sessionId = "session-1", accountId = 42L)
+        handler.afterConnectionEstablished(session)
+        handler.handleMessage(session, textMessage(helloPayload(deviceId = "web-7c2f")))
+        session.clearServerMessages()
+        clearCapturedLogs()
+
+        handler.handleMessage(
+            session,
+            textMessage(
+                seekPayload(commandId = "cmd-seek-001"),
+            ),
+        )
+
+        val message = session.lastServerMessage()
+        assertTrue(message is ScheduledActionMessage)
+        assertEquals(ScheduledActionType.SEEK, message.payload.scheduledAction.action)
+        assertEventLogLevel(PlaybackSyncLogEvents.SEEK_REQUEST, Level.INFO)
+        assertEventLogLevel(PlaybackSyncLogEvents.SCHEDULED_ACTION_SENT, Level.INFO)
     }
 
     @Test
@@ -219,6 +292,7 @@ class PlaybackSyncWebSocketHandlerTest {
         handler.handleMessage(session, textMessage(helloPayload(deviceId = "web-7c2f")))
         handler.handleMessage(session, textMessage(ntpRequestPayload()))
         session.clearServerMessages()
+        clearCapturedLogs()
 
         handler.handleMessage(session, textMessage(syncPayload()))
 
@@ -227,6 +301,7 @@ class PlaybackSyncWebSocketHandlerTest {
         assertEquals(ScheduledActionType.PAUSE, message.payload.scheduledAction.action)
         assertEquals(PlaybackStatus.PAUSED, message.payload.scheduledAction.status)
         assertEquals(null, message.payload.scheduledAction.recordingId)
+        assertEventLogLevel(PlaybackSyncLogEvents.SCHEDULED_ACTION_SENT, Level.DEBUG)
     }
 
     @Test
@@ -397,6 +472,22 @@ class PlaybackSyncWebSocketHandlerTest {
         }
     """.trimIndent()
 
+    private fun seekPayload(
+        commandId: String,
+        deviceId: String = "web-7c2f",
+    ): String = """
+        {
+          "type": "SEEK",
+          "payload": {
+            "commandId": "$commandId",
+            "deviceId": "$deviceId",
+            "recordingId": 1001,
+            "mediaFileId": 2001,
+            "positionSeconds": 24.75
+          }
+        }
+    """.trimIndent()
+
     private fun syncPayload(deviceId: String = "web-7c2f"): String = """
         {
           "type": "SYNC",
@@ -419,6 +510,18 @@ class PlaybackSyncWebSocketHandlerTest {
         assertTrue(message is ErrorMessage)
         assertEquals(PlaybackSyncMessageType.ERROR, message.type)
         assertEquals(code, message.payload.code)
+    }
+
+    private fun clearCapturedLogs() {
+        logAppender.list.clear()
+    }
+
+    private fun assertEventLogLevel(
+        event: String,
+        level: Level,
+    ) {
+        val logEvent = logAppender.list.single { it.formattedMessage.startsWith("event=$event") }
+        assertEquals(level, logEvent.level)
     }
 }
 

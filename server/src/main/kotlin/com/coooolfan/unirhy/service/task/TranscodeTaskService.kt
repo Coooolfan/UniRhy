@@ -34,11 +34,6 @@ class TranscodeTaskService(
 
         val srcRoot = File(srcProvider.parentPath)
         val dstRoot = ensureDestinationRoot(dstProvider)
-//        val audioFiles = findAudioFilesRecursively(srcRoot)
-//        val audioFiles = sql.executeQuery(MediaFile::class) {
-//            where(table.fsProvider eq srcProvider)
-//            select(table.objectKey,table.)
-//        }.map { File(srcRoot, it) }
 
         val audioFiles = sql.executeQuery(Asset::class) {
             where(table.mediaFile.fsProviderId eq srcProvider.id)

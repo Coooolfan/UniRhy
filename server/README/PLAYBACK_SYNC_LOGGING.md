@@ -60,3 +60,5 @@ event=playback_sync_play_request accountId=42 deviceId=web-7c2f commandId=cmd-pl
 - `reason` 用于描述拒绝原因或分支原因，例如 `sync_not_ready`、`unsupported_message_type`。
 - `result` 建议统一使用小写英文值，避免同义词分叉。
 - 事件名固定使用小写蛇形，且必须与代码常量完全一致。
+- 高频校时链路默认使用 `debug`：`playback_sync_ntp_request_received`、`playback_sync_ntp_response_sent`，以及 `SYNC` 恢复路径产生的 `playback_sync_scheduled_action_sent`。
+- 其他关键业务事件默认使用 `info`；事件名与字段契约保持不变。

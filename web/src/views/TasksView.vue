@@ -312,9 +312,9 @@ const goNextPage = () => {
 
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-10">
                 <div class="border border-[#EAE6DE] bg-[#fffcf5] p-6 shadow-sm lg:col-span-1">
-                    <h3 class="font-serif text-2xl text-[#2B221B]">发起新任务</h3>
+                    <h3 class="font-serif text-2xl text-[#2B221B]">异步任务</h3>
                     <p class="mt-2 text-sm leading-relaxed text-[#6B635B]">
-                        媒体库扫描、转码等后台任务入口。
+                        媒体库扫描、转码等长耗时任务
                     </p>
 
                     <button

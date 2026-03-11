@@ -7,6 +7,13 @@ import org.springframework.stereotype.Component
 class PlaybackSyncLogWriter {
     private val logger = LoggerFactory.getLogger(PlaybackSyncLogWriter::class.java)
 
+    fun debug(
+        event: String,
+        vararg fields: Pair<String, Any?>,
+    ) {
+        logger.debug(buildMessage(event, fields.asList()))
+    }
+
     fun info(
         event: String,
         vararg fields: Pair<String, Any?>,
