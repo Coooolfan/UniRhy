@@ -711,29 +711,25 @@ class AccountPlaylistContentE2eTest {
     }
 
     private fun awaitScanTaskFinished(state: E2eAdminSession) {
+        val baselineStats = fetchTaskStats(state, "[prepare] baseline task stats")
+        val baselinePending = taskCount(baselineStats, "SCAN", "PENDING")
+        val baselineCompleted = taskCount(baselineStats, "SCAN", "COMPLETED")
+        val baselineFailed = taskCount(baselineStats, "SCAN", "FAILED")
         val deadline = System.currentTimeMillis() + scanWaitTimeoutMillis()
-        var observedRunning = false
-        var emptyPolls = 0
+        var observedPending = false
 
         while (System.currentTimeMillis() <= deadline) {
-            val runningResponse = state.api.get(
-                path = "/api/task/logs",
-                query = mapOf(
-                    "pageIndex" to 0,
-                    "pageSize" to 50,
-                    "taskType" to "SCAN",
-                    "status" to "RUNNING",
-                ),
-            )
-            E2eAssert.status(runningResponse, 200, "[prepare] list running task logs should succeed")
-            if (containsScanTaskLog(runningResponse.body(), expectedStatus = "RUNNING")) {
-                observedRunning = true
-                emptyPolls = 0
-            } else {
-                emptyPolls += 1
-                if (observedRunning || emptyPolls >= FAST_COMPLETE_EMPTY_POLLS_THRESHOLD) {
-                    return
-                }
+            val statsRows = fetchTaskStats(state, "[prepare] scan task stats")
+            val pending = taskCount(statsRows, "SCAN", "PENDING")
+            val completed = taskCount(statsRows, "SCAN", "COMPLETED")
+            val failed = taskCount(statsRows, "SCAN", "FAILED")
+
+            if (pending > baselinePending) {
+                observedPending = true
+            }
+            if (pending <= baselinePending && (completed > baselineCompleted || failed > baselineFailed)) {
+                assertTrue(observedPending || completed > baselineCompleted, "[prepare] scan task stats should advance before finishing")
+                return
             }
             Thread.sleep(POLL_INTERVAL_MILLIS)
         }
@@ -741,10 +737,18 @@ class AccountPlaylistContentE2eTest {
         fail("[prepare] scan task did not finish within timeout ${scanWaitTimeoutMillis()} ms")
     }
 
-    private fun containsScanTaskLog(responseBody: String, expectedStatus: String): Boolean {
-        return pageRows(responseBody, "[prepare] running task logs response").any { row ->
-            row.path("taskType").asText() == "SCAN" && row.path("status").asText() == expectedStatus
-        }
+    private fun fetchTaskStats(state: E2eAdminSession, step: String): List<JsonNode> {
+        val response = state.api.get("/api/task/logs")
+        E2eAssert.status(response, 200, "$step should succeed")
+        val root = E2eJson.mapper.readTree(response.body())
+        assertTrue(root.isArray, "$step expected root array")
+        return root.toList()
+    }
+
+    private fun taskCount(rows: List<JsonNode>, taskType: String, status: String): Long {
+        return rows.firstOrNull { row ->
+            row.path("taskType").asText() == taskType && row.path("status").asText() == status
+        }?.path("count")?.longValue() ?: 0L
     }
 
     private fun prepareScanFixture(scanWorkspace: Path) {

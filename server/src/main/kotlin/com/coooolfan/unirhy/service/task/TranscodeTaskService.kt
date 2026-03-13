@@ -3,15 +3,18 @@ package com.coooolfan.unirhy.service.task
 import com.coooolfan.unirhy.model.*
 import com.coooolfan.unirhy.model.storage.FileProviderFileSystem
 import com.coooolfan.unirhy.model.storage.FileProviderType
-import com.coooolfan.unirhy.service.task.common.AsyncTaskManager
-import com.coooolfan.unirhy.service.task.common.TaskService
+import com.coooolfan.unirhy.service.task.common.AsyncTaskQueueStore
+import com.coooolfan.unirhy.service.task.common.TaskStatus
 import com.coooolfan.unirhy.service.task.common.TaskType
+import com.coooolfan.unirhy.service.task.common.failureReason
+import com.fasterxml.jackson.databind.ObjectMapper
 import org.babyfish.jimmer.sql.ast.mutation.AssociatedSaveMode
 import org.babyfish.jimmer.sql.ast.mutation.SaveMode
 import org.babyfish.jimmer.sql.kt.KSqlClient
 import org.babyfish.jimmer.sql.kt.ast.expression.eq
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
+import org.springframework.transaction.support.TransactionTemplate
 import java.io.File
 import java.io.IOException
 import java.util.*
@@ -19,100 +22,73 @@ import java.util.*
 @Service
 class TranscodeTaskService(
     private val sql: KSqlClient,
-    asyncTaskManager: AsyncTaskManager,
-) : TaskService<TranscodeTaskRequest>(
-    asyncTaskManager
+    private val objectMapper: ObjectMapper,
+    private val queueStore: AsyncTaskQueueStore,
+    private val transactionTemplate: TransactionTemplate,
 ) {
-    override val type: TaskType = TaskType.TRANSCODE
 
     private val logger = LoggerFactory.getLogger(TranscodeTaskService::class.java)
+    private val consumerEnabled = detectFfmpegAvailability()
 
-    override fun execute(request: TranscodeTaskRequest) {
-        val (srcProvider, dstProvider) = resolveAndValidateProviders(request)
+    fun isConsumerEnabled(): Boolean = consumerEnabled
 
-        validateFfmpeg()
-
-        val srcRoot = File(srcProvider.parentPath)
-        val dstRoot = ensureDestinationRoot(dstProvider)
-
-        val audioFiles = sql.executeQuery(Asset::class) {
+    fun submit(request: TranscodeTaskRequest) {
+        val (srcProvider, _) = resolveAndValidateProviders(request)
+        val audioFiles = sql.createQuery(Asset::class) {
             where(table.mediaFile.fsProviderId eq srcProvider.id)
+            orderBy(table.recordingId, table.mediaFile.objectKey, table.id)
             select(table.recordingId, table.mediaFile.objectKey)
-        }
+        }.execute()
 
-        // TODO: 这里需要考虑单个 Recording 下在同一个 Provider 下有多个 Asset 的情况
-        val recordingAssetMap = mutableMapOf<Long, String>()
+        val recordingAssetMap = linkedMapOf<Long, String>()
         for ((recordingId, objectKey) in audioFiles) {
-            recordingAssetMap[recordingId] = objectKey
+            recordingAssetMap.putIfAbsent(recordingId, objectKey)
         }
 
-        if (recordingAssetMap.isEmpty()) {
-            logger.info(
-                "No audio files found for transcode task, srcProviderId={}, srcRoot={}, dstRoot={}",
-                srcProvider.id,
-                srcRoot.absolutePath,
-                dstRoot.absolutePath,
+        val payloads = recordingAssetMap.entries.map { entry ->
+            TranscodeTaskPayload(
+                recordingId = entry.key,
+                srcObjectKey = entry.value,
+                srcProviderId = srcProvider.id,
+                dstProviderId = request.dstProviderId,
+                targetCodec = request.targetCodec,
             )
-            return
         }
-
-        // libopus 本身已经几乎可以把 CPU 占满，所以这里不需要并发执行 ffmpeg 命令
-        for ((index, entry) in recordingAssetMap.entries.withIndex()) {
-            val recordingId = entry.key
-            val srcObjectKey = entry.value
-
-            val file = File(srcRoot, srcObjectKey)
-            val outputFile = File(dstRoot, "${UUID.randomUUID()}.opus")
-            logger.info(
-                "Transcoding file {}/{}: src={}, dst={}",
-                index + 1,
-                recordingAssetMap.size,
-                file.relativeTo(srcRoot).path,
-                outputFile.name,
-            )
-            executeFfmpegCommand(
-                command = buildFfmpegCommand(file, outputFile),
-                srcFile = file,
-                outputFile = outputFile,
-            )
-
-            sql.saveCommand(Asset {
-                recording = Recording { id = recordingId }
-                mediaFile {
-                    sha256 = "mocked-sha256"
-                    objectKey = outputFile.toString()
-                    mimeType = "audio/opus"
-                    size = outputFile.length()
-                    width = null
-                    height = null
-                    ossProvider = null
-                    fsProvider = dstProvider
-                }
-                comment = "transcoded from ${srcObjectKey} at ${srcProvider.name}"
-            }) {
-                setMode(SaveMode.INSERT_ONLY)
-                setAssociatedMode(Asset::recording, AssociatedSaveMode.APPEND_IF_ABSENT)
-                setAssociatedMode(MediaFile::fsProvider, AssociatedSaveMode.APPEND_IF_ABSENT)
-            }.execute()
-        }
-
-        logger.info(
-            "Transcode task completed, srcProviderId={}, dstProviderId={}, totalFiles={}, dstRoot={}",
-            srcProvider.id,
-            dstProvider.id,
-            recordingAssetMap.size,
-            dstRoot.absolutePath,
-        )
+        val paramsJsonList = payloads.map(objectMapper::writeValueAsString)
+        queueStore.enqueue(TaskType.TRANSCODE, paramsJsonList)
     }
 
-    private fun validateFfmpeg() {
+    fun consumePendingTask() {
+        if (!consumerEnabled) {
+            return
+        }
+        try {
+            transactionTemplate.executeWithoutResult {
+                val claimedTask = queueStore.claimNext(TaskType.TRANSCODE) ?: return@executeWithoutResult
+                val payload = objectMapper.readValue(claimedTask.paramsJson, TranscodeTaskPayload::class.java)
+                try {
+                    execute(payload)
+                    queueStore.completeTask(claimedTask.id, TaskStatus.COMPLETED, "SUCCESS")
+                } catch (ex: Throwable) {
+                    logger.error("Transcode task failed, logId={}", claimedTask.id, ex)
+                    queueStore.completeTask(claimedTask.id, TaskStatus.FAILED, failureReason(ex))
+                }
+            }
+        } catch (ex: Throwable) {
+            logger.error("Failed to consume pending transcode task", ex)
+        }
+    }
+
+    private fun detectFfmpegAvailability(): Boolean {
         val result = try {
             runProcess(listOf("ffmpeg", "-version"))
         } catch (ex: IOException) {
-            throw IllegalStateException("ffmpeg is unavailable or not in PATH", ex)
+            logger.error("ffmpeg is unavailable or not in PATH", ex)
+            return false
         } catch (ex: InterruptedException) {
             Thread.currentThread().interrupt()
-            throw IllegalStateException("ffmpeg is unavailable or not in PATH", ex)
+            logger.error("ffmpeg availability check interrupted", ex)
+            return false
         }
         if (result.first != 0) {
             logger.error(
@@ -120,8 +96,45 @@ class TranscodeTaskService(
                 result.first,
                 result.second.ifBlank { "<empty>" },
             )
-            error("ffmpeg is unavailable or not in PATH")
+            return false
         }
+        return true
+    }
+
+    private fun execute(payload: TranscodeTaskPayload) {
+        if (payload.targetCodec != CodecType.OPUS) {
+            error("Unsupported target codec: ${payload.targetCodec}")
+        }
+        val (srcProvider, dstProvider) = resolveProviders(payload.srcProviderId, payload.dstProviderId)
+        val srcRoot = File(srcProvider.parentPath)
+        val dstRoot = ensureDestinationRoot(dstProvider)
+        val srcFile = File(srcRoot, payload.srcObjectKey)
+        val outputFile = File(dstRoot, "${UUID.randomUUID()}.opus")
+
+        executeFfmpegCommand(
+            command = buildFfmpegCommand(srcFile, outputFile),
+            srcFile = srcFile,
+            outputFile = outputFile,
+        )
+
+        sql.saveCommand(Asset {
+            recording = Recording { id = payload.recordingId }
+            mediaFile {
+                sha256 = "mocked-sha256"
+                objectKey = outputFile.toString()
+                mimeType = "audio/opus"
+                size = outputFile.length()
+                width = null
+                height = null
+                ossProvider = null
+                fsProvider = dstProvider
+            }
+            comment = "transcoded from ${payload.srcObjectKey} at ${srcProvider.name}"
+        }) {
+            setMode(SaveMode.INSERT_ONLY)
+            setAssociatedMode(Asset::recording, AssociatedSaveMode.APPEND_IF_ABSENT)
+            setAssociatedMode(MediaFile::fsProvider, AssociatedSaveMode.APPEND_IF_ABSENT)
+        }.execute()
     }
 
     private fun resolveAndValidateProviders(request: TranscodeTaskRequest): Pair<FileProviderFileSystem, FileProviderFileSystem> {
@@ -148,6 +161,19 @@ class TranscodeTaskService(
         return Pair(srcProvider, dstProvider)
     }
 
+    private fun resolveProviders(
+        srcProviderId: Long,
+        dstProviderId: Long,
+    ): Pair<FileProviderFileSystem, FileProviderFileSystem> {
+        val srcDstProviders = sql.findByIds(FileProviderFileSystem::class, listOf(srcProviderId, dstProviderId))
+        val srcProvider = srcDstProviders.find { it.id == srcProviderId } ?: error("Source provider not found")
+        val dstProvider = srcDstProviders.find { it.id == dstProviderId } ?: error("Destination provider not found")
+        if (dstProvider.readonly) {
+            error("Destination provider is readonly")
+        }
+        return Pair(srcProvider, dstProvider)
+    }
+
     private fun ensureDestinationRoot(provider: FileProviderFileSystem): File {
         val dstRoot = File(provider.parentPath)
         if (dstRoot.exists() && !dstRoot.isDirectory) {
@@ -168,22 +194,22 @@ class TranscodeTaskService(
     ): List<String> {
         return listOf(
             "ffmpeg",
-            "-nostdin",
-            "-v", "error",
+            "-nostdin", // 禁止从标准输入读取
+            "-v", "error", // 只输出 error 级别日志
             "-i", srcFile.absolutePath,
-            "-map", "0:a:0",
-            "-vn",
-            "-sn",
-            "-dn",
-            "-c:a", "libopus",
-            "-b:a", "128k",
-            "-vbr", "on",
-            "-application", "audio",
-            "-compression_level", "10",
-            "-frame_duration", "20",
-            "-map_metadata", "-1",
-            "-map_metadata:s", "-1",
-            "-map_chapters", "-1",
+            "-map", "0:a:0", // 只选择第一路音频流作为转码输入
+            "-vn", // 丢弃所有视频流
+            "-sn", // 丢弃所有字幕流
+            "-dn", // 丢弃所有 data 流
+            "-c:a", "libopus", // 音频编码器固定使用 libopus
+            "-b:a", "128k", // 目标平均码率 128 kbps
+            "-vbr", "on", // 启用可变码率
+            "-application", "audio", // 按音乐/通用音频场景优化 Opus 编码
+            "-compression_level", "10", // 固定 20ms 帧长，兼顾兼容性与压缩效率
+            "-frame_duration", "20", // 去掉容器级元数据
+            "-map_metadata", "-1", // 去掉流级元数据
+            "-map_metadata:s", "-1", // 去掉章节信息
+            "-map_chapters", "-1", // 指定输出文件路径
             outputFile.absolutePath,
         )
     }
@@ -263,6 +289,14 @@ data class TranscodeTaskRequest(
     val srcProviderType: FileProviderType,
     val srcProviderId: Long,
     val dstProviderType: FileProviderType,
+    val dstProviderId: Long,
+    val targetCodec: CodecType = CodecType.OPUS,
+)
+
+data class TranscodeTaskPayload(
+    val recordingId: Long,
+    val srcObjectKey: String,
+    val srcProviderId: Long,
     val dstProviderId: Long,
     val targetCodec: CodecType = CodecType.OPUS,
 )

@@ -4,11 +4,9 @@ import com.coooolfan.unirhy.model.*
 import com.coooolfan.unirhy.model.storage.FileProviderFileSystem
 import com.coooolfan.unirhy.model.storage.FileProviderType
 import com.coooolfan.unirhy.model.storage.readonly
-import com.coooolfan.unirhy.service.task.common.AsyncTaskManager
-import com.coooolfan.unirhy.service.task.common.TaskService
-import com.coooolfan.unirhy.service.task.common.TaskType
-import com.coooolfan.unirhy.service.task.common.findAudioFilesRecursively
+import com.coooolfan.unirhy.service.task.common.*
 import com.coooolfan.unirhy.utils.sha256
+import com.fasterxml.jackson.databind.ObjectMapper
 import org.babyfish.jimmer.sql.ast.mutation.AssociatedSaveMode
 import org.babyfish.jimmer.sql.ast.mutation.SaveMode
 import org.babyfish.jimmer.sql.kt.KSqlClient
@@ -17,7 +15,11 @@ import org.jaudiotagger.audio.AudioFileIO
 import org.jaudiotagger.tag.FieldKey
 import org.jaudiotagger.tag.images.Artwork
 import org.slf4j.LoggerFactory
+import org.springframework.dao.DataIntegrityViolationException
+import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
+import org.springframework.transaction.support.TransactionTemplate
+import org.springframework.web.server.ResponseStatusException
 import java.io.File
 import java.nio.file.Files
 import java.security.MessageDigest
@@ -26,19 +28,53 @@ import kotlin.io.path.Path
 @Service
 class ScanTaskService(
     private val sql: KSqlClient,
-    asyncTaskManager: AsyncTaskManager,
-) : TaskService<ScanTaskRequest>(
-    asyncTaskManager
+    private val objectMapper: ObjectMapper,
+    private val queueStore: AsyncTaskQueueStore,
+    private val transactionTemplate: TransactionTemplate,
 ) {
-    override val type: TaskType = TaskType.SCAN
 
     private val logger = LoggerFactory.getLogger(ScanTaskService::class.java)
 
-    override fun execute(request: ScanTaskRequest) {
+    fun submit(request: ScanTaskRequest) {
+        // TODO: 这里可以改成扫描，每个文件的解析元数据可以作为单条任务入队
+        validateRequest(request)
+        val paramsJson = objectMapper.writeValueAsString(request)
+        try {
+            queueStore.enqueue(TaskType.SCAN, listOf(paramsJson))
+        } catch (ex: DataIntegrityViolationException) {
+            throw ResponseStatusException(
+                HttpStatus.CONFLICT,
+                "Scan task already pending or running for provider ${request.providerType}:${request.providerId}",
+            )
+        }
+    }
+
+    fun consumePendingTask() {
+        try {
+            transactionTemplate.executeWithoutResult {
+                val claimedTask = queueStore.claimNext(TaskType.SCAN) ?: return@executeWithoutResult
+                val request = objectMapper.readValue(claimedTask.paramsJson, ScanTaskRequest::class.java)
+                try {
+                    execute(request)
+                    queueStore.completeTask(claimedTask.id, TaskStatus.COMPLETED, "SUCCESS")
+                } catch (ex: Throwable) {
+                    logger.error("Scan task failed, logId={}", claimedTask.id, ex)
+                    queueStore.completeTask(claimedTask.id, TaskStatus.FAILED, failureReason(ex))
+                }
+            }
+        } catch (ex: Throwable) {
+            logger.error("Failed to consume pending scan task", ex)
+        }
+    }
+
+    private fun validateRequest(request: ScanTaskRequest) {
         if (request.providerType != FileProviderType.FILE_SYSTEM) {
             error("Unsupported provider type: ${request.providerType}")
         }
+        sql.findOneById(FileProviderFileSystem::class, request.providerId)
+    }
 
+    private fun execute(request: ScanTaskRequest) {
         val provider = sql.findOneById(FileProviderFileSystem::class, request.providerId)
         val writeableProvider = sql.executeQuery(FileProviderFileSystem::class) {
             where(table.readonly eq false)
@@ -107,15 +143,13 @@ class ScanTaskService(
             })
         }
 
-        sql.transaction {
-            sql.saveEntities(works) {
-                setMode(SaveMode.INSERT_ONLY)
-                setAssociatedModeAll(AssociatedSaveMode.APPEND)
-                setAssociatedMode(Asset::mediaFile, AssociatedSaveMode.APPEND_IF_ABSENT)
-                setAssociatedMode(MediaFile::fsProvider, AssociatedSaveMode.APPEND_IF_ABSENT)
-                setAssociatedMode(Album::cover, AssociatedSaveMode.APPEND_IF_ABSENT)
-                setAssociatedMode(Recording::cover, AssociatedSaveMode.APPEND_IF_ABSENT)
-            }
+        sql.saveEntities(works) {
+            setMode(SaveMode.INSERT_ONLY)
+            setAssociatedModeAll(AssociatedSaveMode.APPEND)
+            setAssociatedMode(Asset::mediaFile, AssociatedSaveMode.APPEND_IF_ABSENT)
+            setAssociatedMode(MediaFile::fsProvider, AssociatedSaveMode.APPEND_IF_ABSENT)
+            setAssociatedMode(Album::cover, AssociatedSaveMode.APPEND_IF_ABSENT)
+            setAssociatedMode(Recording::cover, AssociatedSaveMode.APPEND_IF_ABSENT)
         }
     }
 }

@@ -1,0 +1,109 @@
+package com.coooolfan.unirhy.service.task.common
+
+import com.coooolfan.unirhy.model.*
+import com.coooolfan.unirhy.service.task.AsyncTaskLogCountRow
+import org.babyfish.jimmer.sql.ast.mutation.SaveMode
+import org.babyfish.jimmer.sql.kt.KSqlClient
+import org.babyfish.jimmer.sql.kt.ast.expression.count
+import org.babyfish.jimmer.sql.kt.ast.expression.eq
+import org.springframework.jdbc.core.namedparam.MapSqlParameterSource
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate
+import org.springframework.stereotype.Service
+import java.time.Instant
+
+@Service
+class AsyncTaskQueueStore(
+    private val sql: KSqlClient,
+    private val jdbc: NamedParameterJdbcTemplate,
+) {
+
+    fun enqueue(taskType: TaskType, paramsJsonList: List<String>) {
+        if (paramsJsonList.isEmpty()) {
+            return
+        }
+        val now = Instant.now()
+        sql.saveEntities(
+            paramsJsonList.map { paramsJson ->
+                AsyncTaskLog {
+                    this.taskType = taskType
+                    createdAt = now
+                    startedAt = null
+                    completedAt = null
+                    params = paramsJson
+                    completedReason = null
+                    status = TaskStatus.PENDING
+                }
+            }
+        ) {
+            setMode(SaveMode.INSERT_ONLY)
+        }
+    }
+
+    fun claimNext(taskType: TaskType): ClaimedAsyncTask? {
+        val sql = """
+            WITH grabbed_tasks AS (
+                SELECT id
+                FROM public.async_task_log
+                WHERE task_type = :taskType
+                  AND status = :pendingStatus
+                ORDER BY created_at ASC, id ASC
+                LIMIT 1
+                FOR UPDATE SKIP LOCKED
+            )
+            UPDATE public.async_task_log task
+            SET status = :runningStatus,
+                started_at = now()
+            WHERE task.id IN (SELECT id FROM grabbed_tasks)
+            RETURNING task.id, task.params
+        """.trimIndent()
+        val params = MapSqlParameterSource()
+            .addValue("taskType", taskType.name)
+            .addValue("pendingStatus", TaskStatus.PENDING.name)
+            .addValue("runningStatus", TaskStatus.RUNNING.name)
+        return jdbc.query(sql, params) { rs, _ ->
+            ClaimedAsyncTask(
+                id = rs.getLong("id"),
+                paramsJson = rs.getString("params"),
+            )
+        }.firstOrNull()
+    }
+
+    fun completeTask(logId: Long, status: TaskStatus, reason: String) {
+        sql.createUpdate(AsyncTaskLog::class) {
+            set(table.status, status)
+            set(table.completedAt, Instant.now())
+            set(table.completedReason, reason)
+            where(table.id eq logId)
+        }.execute()
+    }
+
+    fun listCounts(): List<AsyncTaskLogCountRow> {
+        val actualCounts = sql.createQuery(AsyncTaskLog::class) {
+            groupBy(table.taskType, table.status)
+            select(
+                table.taskType,
+                table.status,
+                count(table.id),
+            )
+        }.execute().associate { tuple ->
+            val taskType = tuple._1
+            val status = tuple._2
+            (taskType to status) to tuple._3
+        }
+
+        return TaskType.entries.flatMap { taskType ->
+            TaskStatus.entries.map { status ->
+                AsyncTaskLogCountRow(
+                    taskType = taskType,
+                    status = status,
+                    count = actualCounts[taskType to status] ?: 0L,
+                )
+            }
+        }
+    }
+
+    data class ClaimedAsyncTask(
+        val id: Long,
+        val paramsJson: String,
+    )
+}

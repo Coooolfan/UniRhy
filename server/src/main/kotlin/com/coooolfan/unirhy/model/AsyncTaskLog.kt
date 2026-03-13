@@ -1,12 +1,11 @@
 package com.coooolfan.unirhy.model
 
-import com.coooolfan.unirhy.config.jimmerResolver.AsyncTaskLogStatusResolver
+import com.coooolfan.unirhy.service.task.common.TaskStatus
 import com.coooolfan.unirhy.service.task.common.TaskType
 import org.babyfish.jimmer.sql.Entity
 import org.babyfish.jimmer.sql.GeneratedValue
 import org.babyfish.jimmer.sql.GenerationType
 import org.babyfish.jimmer.sql.Id
-import org.babyfish.jimmer.sql.Transient
 import java.time.Instant
 
 @Entity
@@ -17,7 +16,9 @@ interface AsyncTaskLog {
 
     val taskType: TaskType
 
-    val startedAt: Instant
+    val createdAt: Instant
+
+    val startedAt: Instant?
 
     val completedAt: Instant?
 
@@ -25,6 +26,7 @@ interface AsyncTaskLog {
 
     val completedReason: String?
 
-    @Transient(AsyncTaskLogStatusResolver::class)
-    val running: Boolean
+    val status: TaskStatus
+
+    // TODO: 加个字段用于标记现在在哪个节点上被消费
 }

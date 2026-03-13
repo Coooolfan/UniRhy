@@ -20,7 +20,7 @@ object ApiCoverageRegistry {
     private const val TASK_TRANSCODE_SUCCESS_CASE =
         "com.unirhy.e2e.TaskContentReadE2eTest#transcode task should complete successfully and write opus files"
     private const val TASK_SCAN_LIFECYCLE_CASE =
-        "com.unirhy.e2e.TaskContentReadE2eTest#scan task should expose running lifecycle and reject duplicate submission"
+        "com.unirhy.e2e.TaskContentReadE2eTest#scan task should report stats and reject duplicate submission"
     private const val WORK_ALBUM_READ_CASE =
         "com.unirhy.e2e.TaskContentReadE2eTest#works and albums should support read random and delete flow"
     private const val MEDIA_READ_CASE =
@@ -195,19 +195,19 @@ object ApiCoverageRegistry {
             "GET",
             "/api/task/logs",
             testRef = TASK_SCAN_LIFECYCLE_CASE,
-            note = "auth: $TASK_CONTENT_AUTH_REQUIRED_CASE; status: supports RUNNING/COMPLETED/ABORTED filters",
+            note = "auth: $TASK_CONTENT_AUTH_REQUIRED_CASE; stats: returns taskType/status counts without pagination",
         ),
         full(
             "POST",
             "/api/task/scan",
             testRef = TASK_SCAN_LIFECYCLE_CASE,
-            note = "auth: $TASK_CONTENT_AUTH_REQUIRED_CASE; conflict: duplicate submission returns 409 when running state is observable",
+            note = "auth: $TASK_CONTENT_AUTH_REQUIRED_CASE; conflict: duplicate submission returns 409 while same provider task is pending or running",
         ),
         full(
             "POST",
             "/api/task/transcode",
             testRef = TASK_TRANSCODE_SUCCESS_CASE,
-            note = "auth: $TASK_CONTENT_AUTH_REQUIRED_CASE; status: completed log reason is SUCCESS; output: writes opus files for prepared fixture",
+            note = "auth: $TASK_CONTENT_AUTH_REQUIRED_CASE; stats: pending count drains into completed or failed; output: writes opus files for prepared fixture",
         ),
         full(
             "GET",

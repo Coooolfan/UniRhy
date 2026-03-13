@@ -1,14 +1,7 @@
 package com.coooolfan.unirhy.controller
 
 import cn.dev33.satoken.annotation.SaCheckLogin
-import com.coooolfan.unirhy.model.AsyncTaskLog
-import com.coooolfan.unirhy.model.by
 import com.coooolfan.unirhy.service.task.*
-import com.coooolfan.unirhy.service.task.common.AsyncTaskLogStatus
-import com.coooolfan.unirhy.service.task.common.TaskType
-import org.babyfish.jimmer.Page
-import org.babyfish.jimmer.client.FetchBy
-import org.babyfish.jimmer.sql.kt.fetcher.newFetcher
 import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.*
 
@@ -63,31 +56,13 @@ class TaskController(
     }
 
     /**
-     * 分页查询任务日志
+     * 查询任务状态统计
      *
      * @api GET /api/task/logs
      * @permission 需要登录认证
      */
     @GetMapping("/logs")
-    fun listTaskLogs(
-        @RequestParam(required = false) pageIndex: Int?,
-        @RequestParam(required = false) pageSize: Int?,
-        @RequestParam(required = false) taskType: TaskType?,
-        @RequestParam(required = false) status: AsyncTaskLogStatus?,
-    ): Page<@FetchBy("DEFAULT_ASYNC_TASK_LOG_FETCHER") AsyncTaskLog> {
-        return asyncTaskLogService.listLogs(
-            pageIndex = pageIndex ?: 0,
-            pageSize = pageSize ?: 10,
-            taskType = taskType,
-            status = status,
-            fetcher = DEFAULT_ASYNC_TASK_LOG_FETCHER,
-        )
-    }
-
-    companion object {
-        val DEFAULT_ASYNC_TASK_LOG_FETCHER = newFetcher(AsyncTaskLog::class).by {
-            allScalarFields()
-            running()
-        }
+    fun listTaskLogs(): List<AsyncTaskLogCountRow> {
+        return asyncTaskLogService.listCounts()
     }
 }

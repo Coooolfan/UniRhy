@@ -26,7 +26,6 @@ import java.net.http.HttpResponse
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
-import java.sql.DriverManager
 import java.util.UUID
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -134,7 +133,7 @@ class TaskContentReadE2eTest {
 
     @Test
     @Order(3)
-    fun `scan task should expose running lifecycle and reject duplicate submission`() {
+    fun `scan task should report stats and reject duplicate submission`() {
         val state = bootstrapAdminSession(baseUrl())
         preparedData = executeScanAndPrepareData(state)
     }
@@ -399,163 +398,75 @@ class TaskContentReadE2eTest {
     }
 
     private fun awaitScanTaskLifecycle(state: E2eAdminSession, scanRequestBody: Map<String, Any>) {
+        val baselineStats = fetchTaskStats(state, "[scan] baseline task stats")
+        val baselinePending = taskCount(baselineStats, "SCAN", "PENDING")
+        val baselineCompleted = taskCount(baselineStats, "SCAN", "COMPLETED")
+        val baselineFailed = taskCount(baselineStats, "SCAN", "FAILED")
+
+        val duplicateSubmitResponse = state.api.post(
+            path = "/api/task/scan",
+            json = scanRequestBody,
+        )
+        E2eAssert.status(
+            duplicateSubmitResponse,
+            409,
+            "[scan] duplicate submit while pending should return conflict",
+        )
+
         val timeoutMillis = scanWaitTimeoutMillis()
         val deadline = System.currentTimeMillis() + timeoutMillis
-        var observedRunning = false
-        var validatedRunningLogQuery = false
-        var validatedDuplicateConflict = false
-        var finishedAfterRunning = false
-        var fastCompletedBeforeObservation = false
-        var emptyPollsBeforeObservation = 0
-        var lastRunningBody = "[]"
+        var observedPending = false
+        var observedCompletion = false
+        var lastStatsBody = """{"rows":[]}"""
         var pollCount = 0
 
         while (System.currentTimeMillis() <= deadline) {
             pollCount += 1
-            val runningResponse = state.api.get(
-                path = "/api/task/logs",
-                query = mapOf(
-                    "pageIndex" to 0,
-                    "pageSize" to 50,
-                    "taskType" to "SCAN",
-                    "status" to "RUNNING",
-                ),
-            )
-            E2eAssert.status(runningResponse, 200, "[scan] list running task logs should succeed")
-            lastRunningBody = runningResponse.body()
+            val statsRows = fetchTaskStats(state, "[scan] task stats")
+            val pending = taskCount(statsRows, "SCAN", "PENDING")
+            val completed = taskCount(statsRows, "SCAN", "COMPLETED")
+            val failed = taskCount(statsRows, "SCAN", "FAILED")
+            lastStatsBody = taskStatsBody(statsRows)
 
-            if (containsScanTaskLog(lastRunningBody, expectedStatus = "RUNNING")) {
-                observedRunning = true
-                emptyPollsBeforeObservation = 0
-                validatedRunningLogQuery = true
-                if (!validatedDuplicateConflict) {
-                    val duplicateSubmitResponse = state.api.post(
-                        path = "/api/task/scan",
-                        json = scanRequestBody,
-                    )
-                    when (duplicateSubmitResponse.statusCode()) {
-                        409 -> {
-                            validatedDuplicateConflict = true
-                        }
+            if (pending > baselinePending) {
+                observedPending = true
+            }
+            if (completed > baselineCompleted || failed > baselineFailed) {
+                observedCompletion = true
+            }
 
-                        202 -> {
-                            logger.info(
-                                "[scan] duplicate submit returned 202 after observing running task, treat as race and continue polling",
-                            )
-                        }
-
-                        else -> {
-                            E2eAssert.status(
-                                duplicateSubmitResponse,
-                                409,
-                                "[scan] duplicate submit while running should return conflict when running state is observable",
-                            )
-                        }
-                    }
-                }
-            } else if (observedRunning) {
-                finishedAfterRunning = true
+            if (pending <= baselinePending && observedCompletion) {
                 break
-            } else {
-                emptyPollsBeforeObservation += 1
-                if (emptyPollsBeforeObservation >= FAST_COMPLETE_EMPTY_POLLS_THRESHOLD) {
-                    fastCompletedBeforeObservation = true
-                    logger.info(
-                        "[scan] scan task likely completed before observation window, emptyPolls={}, threshold={}, last={}",
-                        emptyPollsBeforeObservation,
-                        FAST_COMPLETE_EMPTY_POLLS_THRESHOLD,
-                        lastRunningBody,
-                    )
-                    break
-                }
             }
 
             Thread.sleep(pollIntervalMillis(pollCount))
         }
 
-        if (fastCompletedBeforeObservation) {
-            logger.info(
-                "[scan] skip strict running/duplicate assertions because task may have finished before observation",
-            )
-        } else {
-            assertTrue(
-                observedRunning,
-                "[scan] running task logs never observed SCAN task before timeout ${timeoutMillis}ms, last=$lastRunningBody",
-            )
-            assertTrue(
-                validatedRunningLogQuery,
-                "[scan] task log endpoint never observed SCAN running logs before completion",
-            )
-            assertTrue(
-                validatedDuplicateConflict,
-                "[scan] duplicate submit conflict was not observed while SCAN task was running",
-            )
-            assertTrue(
-                finishedAfterRunning,
-                "[scan] scan task logs did not leave RUNNING within timeout ${timeoutMillis}ms, last=$lastRunningBody",
-            )
-        }
-
-        val finalRunningResponse = state.api.get(
-            path = "/api/task/logs",
-            query = mapOf(
-                "pageIndex" to 0,
-                "pageSize" to 50,
-                "taskType" to "SCAN",
-                "status" to "RUNNING",
-            ),
-        )
-        E2eAssert.status(finalRunningResponse, 200, "[scan] running task log query should remain available")
-        assertFalse(
-            containsScanTaskLog(finalRunningResponse.body(), expectedStatus = "RUNNING"),
-            "[scan] no SCAN task should remain after lifecycle wait",
-        )
-
-        val completedLogsResponse = state.api.get(
-            path = "/api/task/logs",
-            query = mapOf(
-                "pageIndex" to 0,
-                "pageSize" to 200,
-                "taskType" to "SCAN",
-                "status" to "COMPLETED",
-            ),
-        )
-        E2eAssert.status(completedLogsResponse, 200, "[scan] list completed task logs should succeed")
-        val completedRows = pageRows(completedLogsResponse.body(), "[scan] completed task logs response")
-        val completedRow = completedRows.firstOrNull { row ->
-            row.path("taskType").asText() == "SCAN" && taskLogStatus(row) == "COMPLETED"
-        } ?: fail("[scan] completed task logs should contain at least one SCAN row")
-        assertTrue(completedRow.path("completedAt").isTextual, "[scan] completed task log should contain completedAt")
-        val completedReason = completedRow.path("completedReason").asText("")
         assertTrue(
-            completedReason == "SUCCESS" || completedReason.startsWith("FAILED:"),
-            "[scan] completed task log reason should be SUCCESS or FAILED:* actual=$completedReason",
+            observedPending || observedCompletion,
+            "[scan] expected SCAN stats to change after submit, last=$lastStatsBody",
         )
-
-        val abortedId = insertAbortedScanLog(state)
-        val abortedLogsResponse = state.api.get(
-            path = "/api/task/logs",
-            query = mapOf(
-                "pageIndex" to 0,
-                "pageSize" to 200,
-                "taskType" to "SCAN",
-                "status" to "ABORTED",
-            ),
+        assertTrue(
+            observedCompletion,
+            "[scan] SCAN task stats never reached terminal state before timeout ${timeoutMillis}ms, last=$lastStatsBody",
         )
-        E2eAssert.status(abortedLogsResponse, 200, "[scan] list aborted task logs should succeed")
-        val abortedRows = pageRows(abortedLogsResponse.body(), "[scan] aborted task logs response")
-        val abortedRow = abortedRows.firstOrNull { row ->
-            row.path("id").isIntegralNumber && row.path("id").longValue() == abortedId
-        } ?: fail("[scan] aborted task logs should contain inserted aborted row id=$abortedId")
-        assertEquals("ABORTED", taskLogStatus(abortedRow), "[scan] inserted aborted task log status should be ABORTED")
-        assertTrue(abortedRow.path("completedAt").isNull, "[scan] aborted task log should keep completedAt null")
-        assertTrue(abortedRow.path("completedReason").isNull, "[scan] aborted task log should keep completedReason null")
+        val finalStats = fetchTaskStats(state, "[scan] final task stats")
+        val completed = taskCount(finalStats, "SCAN", "COMPLETED")
+        val failed = taskCount(finalStats, "SCAN", "FAILED")
+        assertTrue(
+            completed > baselineCompleted || failed > baselineFailed,
+            "[scan] final stats should include one terminal SCAN task, last=${taskStatsBody(finalStats)}",
+        )
     }
 
     private fun awaitTranscodeTaskSuccess(state: E2eAdminSession, fixture: FixtureInfo) {
         val expectedOpusCount = countFilesWithExtensions(fixture.fixtureRoot, ACCEPT_EXTENSIONS)
         assertTrue(expectedOpusCount > 0, "[transcode] fixture should contain audio files: ${fixture.fixtureRoot}")
         val existingOpusCount = countFilesWithExtensions(state.runtime.scanWorkspace, setOf("opus"))
+        val baselineStats = fetchTaskStats(state, "[transcode] baseline task stats")
+        val baselinePending = taskCount(baselineStats, "TRANSCODE", "PENDING")
+        val baselineCompleted = taskCount(baselineStats, "TRANSCODE", "COMPLETED")
+        val baselineFailed = taskCount(baselineStats, "TRANSCODE", "FAILED")
 
         val submitResponse = state.api.post(
             path = "/api/task/transcode",
@@ -565,40 +476,31 @@ class TaskContentReadE2eTest {
 
         val timeoutMillis = scanWaitTimeoutMillis()
         val deadline = System.currentTimeMillis() + timeoutMillis
-        var lastCompletedBody = """{"rows":[]}"""
+        var observedPending = false
+        var lastStatsBody = """{"rows":[]}"""
 
         while (System.currentTimeMillis() <= deadline) {
-            val completedLogsResponse = state.api.get(
-                path = "/api/task/logs",
-                query = mapOf(
-                    "pageIndex" to 0,
-                    "pageSize" to 50,
-                    "taskType" to "TRANSCODE",
-                    "status" to "COMPLETED",
-                ),
-            )
-            E2eAssert.status(completedLogsResponse, 200, "[transcode] list completed transcode task logs should succeed")
-            lastCompletedBody = completedLogsResponse.body()
+            val statsRows = fetchTaskStats(state, "[transcode] task stats")
+            val pending = taskCount(statsRows, "TRANSCODE", "PENDING")
+            val completed = taskCount(statsRows, "TRANSCODE", "COMPLETED")
+            val failed = taskCount(statsRows, "TRANSCODE", "FAILED")
+            lastStatsBody = taskStatsBody(statsRows)
 
-            val completedRow = pageRows(lastCompletedBody, "[transcode] completed task logs response").firstOrNull { row ->
-                row.path("taskType").asText() == "TRANSCODE" && taskLogStatus(row) == "COMPLETED"
+            if (pending > baselinePending) {
+                observedPending = true
             }
-            if (completedRow != null) {
-                assertTrue(
-                    completedRow.path("completedAt").isTextual,
-                    "[transcode] completed task log should contain completedAt",
-                )
-                val completedReason = completedRow.path("completedReason").asText("")
-                assertEquals(
-                    "SUCCESS",
-                    completedReason,
-                    "[transcode] completed task log reason should be SUCCESS, actual=$completedReason",
-                )
+
+            val terminalDelta = (completed - baselineCompleted) + (failed - baselineFailed)
+            if (pending <= baselinePending && terminalDelta >= expectedOpusCount) {
                 val actualOpusCount = countFilesWithExtensions(state.runtime.scanWorkspace, setOf("opus")) - existingOpusCount
                 assertEquals(
                     expectedOpusCount,
                     actualOpusCount,
                     "[transcode] expected opus output count to match fixture file count, fixture=${fixture.fixtureRoot}",
+                )
+                assertTrue(
+                    observedPending || completed - baselineCompleted == expectedOpusCount.toLong(),
+                    "[transcode] expected pending count increase or direct completion for all tasks, last=$lastStatsBody",
                 )
                 return
             }
@@ -606,7 +508,7 @@ class TaskContentReadE2eTest {
             Thread.sleep(100L)
         }
 
-        fail("[transcode] completed task log was not observed before timeout ${timeoutMillis}ms, last=$lastCompletedBody")
+        fail("[transcode] transcode task stats did not reach terminal state before timeout ${timeoutMillis}ms, last=$lastStatsBody")
     }
 
     private fun pollIntervalMillis(pollCount: Int): Long {
@@ -700,39 +602,30 @@ class TaskContentReadE2eTest {
         }
     }
 
-    private fun containsScanTaskLog(responseBody: String, expectedStatus: String): Boolean {
-        return pageRows(responseBody, "[scan] running task logs response").any { row ->
-            row.path("taskType").asText() == "SCAN" && taskLogStatus(row) == expectedStatus
-        }
+    private fun fetchTaskStats(state: E2eAdminSession, step: String): List<JsonNode> {
+        val response = state.api.get("/api/task/logs")
+        E2eAssert.status(response, 200, "$step should succeed")
+        return taskStatRows(response.body(), step)
     }
 
-    private fun taskLogStatus(row: JsonNode): String {
-        if (row.path("running").asBoolean(false)) {
-            return "RUNNING"
-        }
-        if (row.path("completedAt").isTextual) {
-            return "COMPLETED"
-        }
-        return "ABORTED"
+    private fun taskStatRows(responseBody: String, step: String): List<JsonNode> {
+        val root = E2eJson.mapper.readTree(responseBody)
+        assertTrue(root.isArray, "$step expected root array")
+        return root.toList()
     }
 
-    private fun insertAbortedScanLog(state: E2eAdminSession): Long {
-        val database = state.runtime.database
-        DriverManager.getConnection(database.jdbcUrl, database.user, database.password).use { connection ->
-            connection.prepareStatement(
-                """
-                INSERT INTO public.async_task_log (task_type, started_at, completed_at, params, completed_reason)
-                VALUES (?, now() - interval '10 minutes', NULL, ?, NULL)
-                RETURNING id
-                """.trimIndent(),
-            ).use { statement ->
-                statement.setString(1, "SCAN")
-                statement.setString(2, """{"providerType":"FILE_SYSTEM","providerId":-1}""")
-                statement.executeQuery().use { result ->
-                    assertTrue(result.next(), "[scan] aborted task log insert should return id")
-                    return result.getLong("id")
-                }
-            }
+    private fun taskCount(rows: List<JsonNode>, taskType: String, status: String): Long {
+        return rows.firstOrNull { row ->
+            row.path("taskType").asText() == taskType && row.path("status").asText() == status
+        }?.path("count")?.longValue() ?: 0L
+    }
+
+    private fun taskStatsBody(rows: List<JsonNode>): String {
+        return rows.joinToString(prefix = "[", postfix = "]") { row ->
+            val taskType = row.path("taskType").asText("<missing>")
+            val status = row.path("status").asText("<missing>")
+            val count = row.path("count").asLong(-1L)
+            """{"taskType":"$taskType","status":"$status","count":$count}"""
         }
     }
 

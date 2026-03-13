@@ -218,11 +218,21 @@ CREATE TABLE public.async_task_log
 (
     id               BIGSERIAL PRIMARY KEY,
     task_type        TEXT        NOT NULL, -- 任务类型 枚举 com.coooolfan.unirhy.service.task.common.TaskType
-    started_at       TIMESTAMPTZ NOT NULL, -- 任务开始时间
+    created_at       TIMESTAMPTZ NOT NULL, -- 任务创建时间
+    started_at       TIMESTAMPTZ,          -- 任务开始时间，入队时为空
     completed_at     TIMESTAMPTZ,          -- 任务完成时间，如果任务未完成则为 NULL
     params           TEXT        NOT NULL, -- 任务参数 JSON 格式
-    completed_reason TEXT                  -- 任务完成原因，如果任务未完成则为 NULL
+    completed_reason TEXT,                 -- 任务完成原因，如果任务未完成则为 NULL
+    status           TEXT        NOT NULL  -- 任务状态 枚举 com.coooolfan.unirhy.service.task.common.TaskStatus
 );
 
-CREATE INDEX idx_async_task_log_task_type ON public.async_task_log (task_type);
-CREATE INDEX idx_async_task_log_started_at ON public.async_task_log (started_at DESC);
+CREATE INDEX idx_async_task_log_consume
+    ON public.async_task_log (task_type, status, created_at, id);
+
+CREATE UNIQUE INDEX idx_async_task_log_scan_active_provider
+    ON public.async_task_log (
+        ((params::jsonb ->> 'providerType')),
+        (((params::jsonb ->> 'providerId')::bigint))
+    )
+    WHERE task_type = 'SCAN'
+      AND status IN ('PENDING', 'RUNNING');
