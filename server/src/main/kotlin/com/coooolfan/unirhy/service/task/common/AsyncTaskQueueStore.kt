@@ -46,7 +46,7 @@ class AsyncTaskQueueStore(
                 FROM public.async_task_log
                 WHERE task_type = :taskType
                   AND status = :pendingStatus
-                ORDER BY created_at ASC, id ASC
+                ORDER BY created_at, id
                 LIMIT 1
                 FOR UPDATE SKIP LOCKED
             )

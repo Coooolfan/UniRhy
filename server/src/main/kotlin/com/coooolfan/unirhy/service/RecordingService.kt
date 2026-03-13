@@ -19,7 +19,10 @@ class RecordingService(
     private val jdbc: NamedParameterJdbcTemplate,
 ) {
     fun getRecording(id: Long, fetcher: Fetcher<Recording>): Recording {
-        return sql.findOneById(fetcher, id)
+        return sql.findById(fetcher, id) ?: throw ResponseStatusException(
+            HttpStatus.NOT_FOUND,
+            "recording not found"
+        )
     }
 
     fun updateRecording(input: Recording) {

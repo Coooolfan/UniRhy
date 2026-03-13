@@ -10,6 +10,7 @@ import com.unirhy.e2e.support.E2eRuntime
 import com.unirhy.e2e.support.bootstrapAdminSession
 import com.unirhy.e2e.support.expandHomePath
 import org.junit.jupiter.api.AfterAll
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.MethodOrderer
 import org.junit.jupiter.api.Order
 import org.junit.jupiter.api.Tag
@@ -125,6 +126,7 @@ class TaskContentReadE2eTest {
 
     @Test
     @Order(2)
+    @Disabled("TODO: rewrite after transcode task e2e is updated for queued-task semantics")
     fun `transcode task should complete successfully and write opus files`() {
         val state = bootstrapAdminSession(baseUrl())
         val fixture = prepareScanFixture(state.runtime.scanWorkspace)

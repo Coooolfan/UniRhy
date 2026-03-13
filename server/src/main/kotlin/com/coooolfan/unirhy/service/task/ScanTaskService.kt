@@ -9,6 +9,7 @@ import com.coooolfan.unirhy.utils.sha256
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.babyfish.jimmer.sql.ast.mutation.AssociatedSaveMode
 import org.babyfish.jimmer.sql.ast.mutation.SaveMode
+import org.babyfish.jimmer.sql.exception.ExecutionException
 import org.babyfish.jimmer.sql.kt.KSqlClient
 import org.babyfish.jimmer.sql.kt.ast.expression.eq
 import org.jaudiotagger.audio.AudioFileIO
@@ -41,7 +42,7 @@ class ScanTaskService(
         val paramsJson = objectMapper.writeValueAsString(request)
         try {
             queueStore.enqueue(TaskType.SCAN, listOf(paramsJson))
-        } catch (ex: DataIntegrityViolationException) {
+        } catch (_: ExecutionException) {
             throw ResponseStatusException(
                 HttpStatus.CONFLICT,
                 "Scan task already pending or running for provider ${request.providerType}:${request.providerId}",
