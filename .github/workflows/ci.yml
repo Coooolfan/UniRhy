@@ -45,7 +45,7 @@ jobs:
         run: yarn build
 
   check-website:
-    name: 检查前端 (website)
+    name: 检查官网 (website)
     runs-on: ubuntu-latest
     defaults:
       run:
