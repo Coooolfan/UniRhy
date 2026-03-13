@@ -80,7 +80,7 @@ let tickTimer: number | null = null
 
 const debugSnapshot = computed(() => audioStore.playbackSyncDebugSnapshot)
 
-const reverseCopy = <T,>(items: readonly T[]) =>
+const reverseCopy = <T>(items: readonly T[]) =>
     Array.from(items, (_, index) => items[items.length - index - 1]!)
 
 const formatNumber = (value: number | null | undefined, fractionDigits = 1) => {

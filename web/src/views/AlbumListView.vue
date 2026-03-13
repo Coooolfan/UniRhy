@@ -155,11 +155,7 @@ const syncFromRoute = () => {
     const tabChanged = targetTab !== activeTab.value
     activeTab.value = targetTab
 
-    if (!Number.isNaN(page) && page > 0) {
-        pageIndex.value = page - 1
-    } else {
-        pageIndex.value = 0
-    }
+    pageIndex.value = !Number.isNaN(page) && page > 0 ? page - 1 : 0
 
     if (tabChanged) {
         displayItems.value = []

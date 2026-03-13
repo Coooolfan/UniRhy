@@ -1,7 +1,5 @@
 import type {Executor} from '../';
-import type {AsyncTaskLogDto} from '../model/dto/';
-import type {AsyncTaskLogStatus, TaskType} from '../model/enums/';
-import type {Page, ScanTaskRequest, TranscodeTaskRequest} from '../model/static/';
+import type {AsyncTaskLogCountRow, ScanTaskRequest, TranscodeTaskRequest} from '../model/static/';
 
 /**
  * 任务管理接口
@@ -47,44 +45,14 @@ export class TaskController {
     }
     
     /**
-     * 分页查询任务日志
+     * 查询任务状态统计
      * 
      */
-    readonly listTaskLogs: (options: TaskControllerOptions['listTaskLogs']) => Promise<
-        Page<AsyncTaskLogDto['TaskController/DEFAULT_ASYNC_TASK_LOG_FETCHER']>
-    > = async(options) => {
+    readonly listTaskLogs: () => Promise<
+        ReadonlyArray<AsyncTaskLogCountRow>
+    > = async() => {
         let _uri = '/api/task/logs';
-        let _separator = _uri.indexOf('?') === -1 ? '?' : '&';
-        let _value: any = undefined;
-        _value = options.pageIndex;
-        if (_value !== undefined && _value !== null) {
-            _uri += _separator
-            _uri += 'pageIndex='
-            _uri += encodeURIComponent(_value);
-            _separator = '&';
-        }
-        _value = options.pageSize;
-        if (_value !== undefined && _value !== null) {
-            _uri += _separator
-            _uri += 'pageSize='
-            _uri += encodeURIComponent(_value);
-            _separator = '&';
-        }
-        _value = options.taskType;
-        if (_value !== undefined && _value !== null) {
-            _uri += _separator
-            _uri += 'taskType='
-            _uri += encodeURIComponent(_value);
-            _separator = '&';
-        }
-        _value = options.status;
-        if (_value !== undefined && _value !== null) {
-            _uri += _separator
-            _uri += 'status='
-            _uri += encodeURIComponent(_value);
-            _separator = '&';
-        }
-        return (await this.executor({uri: _uri, method: 'GET'})) as Promise<Page<AsyncTaskLogDto['TaskController/DEFAULT_ASYNC_TASK_LOG_FETCHER']>>;
+        return (await this.executor({uri: _uri, method: 'GET'})) as Promise<ReadonlyArray<AsyncTaskLogCountRow>>;
     }
 }
 
@@ -103,10 +71,5 @@ export type TaskControllerOptions = {
          */
         readonly body: TranscodeTaskRequest
     }, 
-    'listTaskLogs': {
-        readonly pageIndex?: number | undefined, 
-        readonly pageSize?: number | undefined, 
-        readonly taskType?: TaskType | undefined, 
-        readonly status?: AsyncTaskLogStatus | undefined
-    }
+    'listTaskLogs': {}
 }

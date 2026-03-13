@@ -1009,11 +1009,7 @@ export const useAudioStore = defineStore('audio', () => {
                 : payload.state.positionSeconds
         updatePausedTime(recoveredPosition)
 
-        if (isSameBufferTrack(track)) {
-            duration.value = currentBuffer.value!.duration
-        } else {
-            duration.value = 0
-        }
+        duration.value = isSameBufferTrack(track) ? currentBuffer.value!.duration : 0
     }
 
     const handleScheduledAction = async (payload: ScheduledActionPayload) => {
@@ -1169,6 +1165,19 @@ export const useAudioStore = defineStore('audio', () => {
         })
     }
 
+    function pause() {
+        if (!currentTrack.value || !canSendRealtimeControl.value) {
+            return
+        }
+
+        ensureSyncClient().sendPause({
+            commandId: nextCommandId('pause'),
+            recordingId: currentTrack.value.id,
+            mediaFileId: currentTrack.value.mediaFileId,
+            positionSeconds: currentTime.value,
+        })
+    }
+
     async function play(track: AudioTrack) {
         rememberHydratedTrack(track)
 
@@ -1201,19 +1210,6 @@ export const useAudioStore = defineStore('audio', () => {
         }
 
         sendPlayCommand(track, targetPosition)
-    }
-
-    function pause() {
-        if (!currentTrack.value || !canSendRealtimeControl.value) {
-            return
-        }
-
-        ensureSyncClient().sendPause({
-            commandId: nextCommandId('pause'),
-            recordingId: currentTrack.value.id,
-            mediaFileId: currentTrack.value.mediaFileId,
-            positionSeconds: currentTime.value,
-        })
     }
 
     async function resume() {

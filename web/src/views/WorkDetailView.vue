@@ -76,8 +76,11 @@ const workData = ref<WorkData>({
 })
 
 const recordings = ref<Recording[]>([])
+const mergeStateActions: { resetState: () => void } = {
+    resetState: () => undefined,
+}
 
-const fetchWork = async (id: number) => {
+async function fetchWork(id: number) {
     try {
         isLoading.value = true
 
@@ -116,7 +119,7 @@ const fetchWork = async (id: number) => {
 
         currentRecordingId.value = pickInitialRecordingId(recordings.value, 'default-first')
 
-        resetMergeState()
+        mergeStateActions.resetState()
     } catch (error) {
         console.error('Failed to fetch work details:', error)
     } finally {
@@ -145,21 +148,7 @@ const {
     },
 })
 
-const {
-    selectedIds: selectedRecordingIds,
-    selectedOptions: selectedRecordingOptions,
-    hasEnoughSelectedItems: hasEnoughSelectedRecordings,
-    canSubmitMerge: canSubmitRecordingMerge,
-    mergeModalOpen,
-    mergeTargetId: mergeTargetRecordingId,
-    mergeModalError,
-    mergeSubmitting,
-    toggleSelection: toggleRecordingSelection,
-    openMergeModal,
-    closeMergeModal,
-    submitMerge: submitRecordingMerge,
-    resetState: resetMergeState,
-} = useRecordingMergeState<Recording>({
+const mergeState = useRecordingMergeState<Recording>({
     recordings,
     buildOption: (recording) => ({
         id: recording.id,
@@ -183,6 +172,23 @@ const {
     parseError: (error) => normalizeApiError(error).message ?? '合并曲目失败',
     fallbackErrorMessage: '合并曲目失败',
 })
+
+const {
+    selectedIds: selectedRecordingIds,
+    selectedOptions: selectedRecordingOptions,
+    hasEnoughSelectedItems: hasEnoughSelectedRecordings,
+    canSubmitMerge: canSubmitRecordingMerge,
+    mergeModalOpen,
+    mergeTargetId: mergeTargetRecordingId,
+    mergeModalError,
+    mergeSubmitting,
+    toggleSelection: toggleRecordingSelection,
+    openMergeModal,
+    closeMergeModal,
+    submitMerge: submitRecordingMerge,
+    resetState: resetMergeState,
+} = mergeState
+mergeStateActions.resetState = resetMergeState
 
 const openEditModal = () => {
     if (isEditing.value) {

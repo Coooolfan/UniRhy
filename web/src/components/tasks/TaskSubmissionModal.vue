@@ -34,6 +34,12 @@ type TaskDefinition = {
     icon: Component
 }
 
+type TaskAvailability = {
+    title: string
+    description: string
+    icon: Component
+}
+
 type ProviderSelectionPayload = {
     providerType: FileProviderType
     providerId: number
@@ -57,15 +63,13 @@ const TASK_OPTIONS: TaskDefinition[] = [
     {
         id: 'TRANSCODE',
         name: TASK_TYPE_LABEL_MAP.TRANSCODE,
-        desc: '跨节点转换音频编码格式',
+        desc: '按录音拆分为后台任务，批量转码为 Opus 音频资源',
         icon: FileAudio,
     },
 ]
 
 const TARGET_CODEC_OPTIONS: Array<{ value: CodecType; label: string; hint: string }> = [
-    { value: 'OPUS', label: 'Opus', hint: '高压缩率，推荐流媒体播放' },
-    { value: 'MP3', label: 'MP3', hint: '兼容性最好，适合通用分发' },
-    { value: 'AAC', label: 'AAC', hint: '苹果生态与移动端兼容较好' },
+    { value: 'OPUS', label: 'Opus', hint: '当前后端固定输出 Opus，用于流媒体播放' },
 ]
 
 const PROVIDER_TYPE_LABEL_MAP: Record<FileProviderType, string> = {
@@ -86,34 +90,61 @@ const targetCodec = ref<CodecType>('OPUS')
 
 const optionValueOf = (provider: TaskProviderOption) => `${provider.type}:${provider.id}`
 
-const getDefaultProviderValue = (options: TaskProviderOption[], preferredIndex = 0) => {
+const getDefaultProviderValue = (options: readonly TaskProviderOption[], preferredIndex = 0) => {
     const provider = options[preferredIndex] ?? options[0]
     return provider ? optionValueOf(provider) : ''
 }
 
-const syncProviderSelections = (options: TaskProviderOption[]) => {
+const syncSelectionValue = (
+    currentValue: typeof scanProviderValue,
+    options: readonly TaskProviderOption[],
+    preferredIndex = 0,
+) => {
     const validValues = new Set(options.map((option) => optionValueOf(option)))
 
-    if (!validValues.has(scanProviderValue.value)) {
-        scanProviderValue.value = getDefaultProviderValue(options)
-    }
-
-    if (!validValues.has(transcodeSourceProviderValue.value)) {
-        transcodeSourceProviderValue.value = getDefaultProviderValue(options)
-    }
-
-    if (!validValues.has(transcodeDestinationProviderValue.value)) {
-        transcodeDestinationProviderValue.value = getDefaultProviderValue(options, 1)
+    if (!validValues.has(currentValue.value)) {
+        currentValue.value = getDefaultProviderValue(options, preferredIndex)
     }
 }
 
+const scanProviderOptions = computed(() =>
+    props.providerOptions.filter((provider) => provider.type === 'FILE_SYSTEM'),
+)
+
+const transcodeSourceProviderOptions = computed(() =>
+    props.providerOptions.filter((provider) => provider.type === 'FILE_SYSTEM'),
+)
+
+const transcodeDestinationProviderOptions = computed(() =>
+    props.providerOptions.filter(
+        (provider) => provider.type === 'FILE_SYSTEM' && !provider.readonly,
+    ),
+)
+
+const syncProviderSelections = () => {
+    syncSelectionValue(scanProviderValue, scanProviderOptions.value)
+    syncSelectionValue(transcodeSourceProviderValue, transcodeSourceProviderOptions.value)
+    syncSelectionValue(
+        transcodeDestinationProviderValue,
+        transcodeDestinationProviderOptions.value,
+        1,
+    )
+}
+
+const resolveProvider = (options: readonly TaskProviderOption[], value: string) =>
+    options.find((provider) => optionValueOf(provider) === value)
+
 watch(
     () => props.providerOptions,
-    (options) => {
-        syncProviderSelections(options)
+    () => {
+        syncProviderSelections()
     },
     { immediate: true },
 )
+
+watch(activeTask, () => {
+    syncProviderSelections()
+})
 
 watch(
     () => props.open,
@@ -123,7 +154,7 @@ watch(
         }
         activeTask.value = 'SCAN'
         targetCodec.value = 'OPUS'
-        syncProviderSelections(props.providerOptions)
+        syncProviderSelections()
     },
 )
 
@@ -131,19 +162,21 @@ const activeTaskOption = computed<TaskDefinition>(
     () => TASK_OPTIONS.find((option) => option.id === activeTask.value) ?? TASK_OPTIONS[0]!,
 )
 
-const resolveProvider = (value: string) =>
-    props.providerOptions.find((provider) => optionValueOf(provider) === value)
-
-const selectedScanProvider = computed(() => resolveProvider(scanProviderValue.value))
+const selectedScanProvider = computed(() =>
+    resolveProvider(scanProviderOptions.value, scanProviderValue.value),
+)
 const selectedTranscodeSourceProvider = computed(() =>
-    resolveProvider(transcodeSourceProviderValue.value),
+    resolveProvider(transcodeSourceProviderOptions.value, transcodeSourceProviderValue.value),
 )
 const selectedTranscodeDestinationProvider = computed(() =>
-    resolveProvider(transcodeDestinationProviderValue.value),
+    resolveProvider(
+        transcodeDestinationProviderOptions.value,
+        transcodeDestinationProviderValue.value,
+    ),
 )
 
 const canSubmit = computed(() => {
-    if (props.isLoadingProviders || props.providerOptions.length === 0) {
+    if (props.isLoadingProviders) {
         return false
     }
 
@@ -160,7 +193,50 @@ const submitButtonLabel = computed(() =>
     activeTask.value === 'SCAN' ? '提交扫描任务' : '提交转码任务',
 )
 
-const submitHelperText = '提交后将在后台异步执行，可在日志中查看状态。'
+const activeTaskAvailability = computed<TaskAvailability | null>(() => {
+    if (props.providerOptions.length === 0) {
+        return {
+            title: '暂无可用存储节点',
+            description: '请先在系统设置中配置本地存储节点，再回来发起扫描或转码任务。',
+            icon: HardDrive,
+        }
+    }
+
+    if (activeTask.value === 'SCAN' && scanProviderOptions.value.length === 0) {
+        return {
+            title: '暂无可扫描节点',
+            description: '扫描任务目前只支持本地存储节点。',
+            icon: FolderSearch,
+        }
+    }
+
+    if (activeTask.value === 'TRANSCODE' && transcodeSourceProviderOptions.value.length === 0) {
+        return {
+            title: '暂无可转码源节点',
+            description: '转码任务目前只支持本地存储节点作为来源。',
+            icon: FileAudio,
+        }
+    }
+
+    if (
+        activeTask.value === 'TRANSCODE' &&
+        transcodeDestinationProviderOptions.value.length === 0
+    ) {
+        return {
+            title: '暂无可写目标节点',
+            description: '需要至少一个可写的本地存储节点作为转码输出。',
+            icon: HardDrive,
+        }
+    }
+
+    return null
+})
+
+const submitHelperText = computed(() =>
+    activeTask.value === 'SCAN'
+        ? '提交后会进入后台任务队列，状态看板会显示扫描任务的待处理与完成数量。'
+        : '提交后会按录音拆分为多个后台转码任务，状态看板会显示排队与完成进度。',
+)
 
 const closeModal = () => {
     if (props.isSubmitting) {
@@ -308,15 +384,18 @@ const submit = () => {
                             </div>
 
                             <div
-                                v-else-if="providerOptions.length === 0"
+                                v-else-if="activeTaskAvailability"
                                 class="flex min-h-[280px] flex-col items-center justify-center border border-dashed border-[#D6D1C4] px-6 text-center"
                             >
-                                <HardDrive class="h-10 w-10 text-[#C27E46]" />
+                                <component
+                                    :is="activeTaskAvailability.icon"
+                                    class="h-10 w-10 text-[#C27E46]"
+                                />
                                 <h4 class="mt-4 font-serif text-xl text-[#2C2C2C]">
-                                    暂无可用存储节点
+                                    {{ activeTaskAvailability.title }}
                                 </h4>
                                 <p class="mt-2 max-w-md text-sm leading-relaxed text-[#6B635B]">
-                                    请先在系统设置中配置本地存储或对象存储节点，再回来发起扫描或转码任务。
+                                    {{ activeTaskAvailability.description }}
                                 </p>
                             </div>
 
@@ -335,7 +414,7 @@ const submit = () => {
                                                 class="w-full appearance-none bg-[#F7F5F0] border-b border-[#D6D1C4] p-3 pr-10 text-sm text-[#2C2C2C] outline-none transition-colors focus:border-[#C27E46]"
                                             >
                                                 <option
-                                                    v-for="option in providerOptions"
+                                                    v-for="option in scanProviderOptions"
                                                     :key="optionValueOf(option)"
                                                     :value="optionValueOf(option)"
                                                 >
@@ -419,7 +498,7 @@ const submit = () => {
                                                     class="w-full appearance-none bg-[#F7F5F0] border-b border-[#D6D1C4] p-3 pr-10 text-sm text-[#2C2C2C] outline-none transition-colors focus:border-[#C27E46]"
                                                 >
                                                     <option
-                                                        v-for="option in providerOptions"
+                                                        v-for="option in transcodeSourceProviderOptions"
                                                         :key="`src-${optionValueOf(option)}`"
                                                         :value="optionValueOf(option)"
                                                     >
@@ -499,7 +578,7 @@ const submit = () => {
                                                     class="w-full appearance-none bg-[#F7F5F0] border-b border-[#D6D1C4] p-3 pr-10 text-sm text-[#2C2C2C] outline-none transition-colors focus:border-[#C27E46]"
                                                 >
                                                     <option
-                                                        v-for="option in providerOptions"
+                                                        v-for="option in transcodeDestinationProviderOptions"
                                                         :key="`dst-${optionValueOf(option)}`"
                                                         :value="optionValueOf(option)"
                                                     >
@@ -560,6 +639,7 @@ const submit = () => {
                                             v-model="targetCodec"
                                             data-test="target-codec-select"
                                             class="w-full appearance-none bg-[#F7F5F0] border-b border-[#D6D1C4] p-3 pr-10 text-sm text-[#2C2C2C] outline-none transition-colors focus:border-[#C27E46]"
+                                            :disabled="TARGET_CODEC_OPTIONS.length === 1"
                                         >
                                             <option
                                                 v-for="option in TARGET_CODEC_OPTIONS"

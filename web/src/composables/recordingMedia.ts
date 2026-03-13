@@ -85,8 +85,19 @@ type NormalizeRecordingsBaseOptions = {
     fallbackCover?: string
 }
 
-export function normalizeRecordings<TRecording extends NormalizableRecording>(
-    recordings: readonly TRecording[],
+export const resolveArtistName = (artists?: ReadonlyArray<RecordingArtist>) => {
+    const names =
+        artists
+            ?.map((artist) => artist.displayName || artist.name)
+            .filter((name): name is string => typeof name === 'string' && name.length > 0) ?? []
+    if (names.length > 0) {
+        return names.join(', ')
+    }
+    return 'Unknown Artist'
+}
+
+export function normalizeRecordings(
+    recordings: readonly NormalizableRecording[],
     options?: NormalizeRecordingsBaseOptions,
 ): NormalizedRecordingBase[]
 
@@ -144,7 +155,12 @@ export const pickInitialRecordingId = (
 
 export const pickPlayableRecordingEntry = <TRecording extends PlayableRecordingCandidate>(
     recordings: readonly TRecording[],
-) => {
+):
+    | {
+          recording: TRecording
+          playableAudio: PlayableAudioSource
+      }
+    | undefined => {
     let firstPlayableEntry:
         | {
               recording: TRecording
@@ -170,17 +186,6 @@ export const pickPlayableRecordingEntry = <TRecording extends PlayableRecordingC
     }
 
     return firstPlayableEntry
-}
-
-export const resolveArtistName = (artists?: ReadonlyArray<RecordingArtist>) => {
-    const names =
-        artists
-            ?.map((artist) => artist.displayName || artist.name)
-            .filter((name): name is string => typeof name === 'string' && name.length > 0) ?? []
-    if (names.length > 0) {
-        return names.join(', ')
-    }
-    return 'Unknown Artist'
 }
 
 export const formatYear = (releaseDate?: string) => {

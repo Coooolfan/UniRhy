@@ -129,6 +129,36 @@ const closeEditModal = () => {
     deletePlaylistError.value = ''
 }
 
+const confirmDeletePlaylist = async () => {
+    const id = Number(route.params.id)
+    if (Number.isNaN(id) || isDeletingPlaylist.value) {
+        return
+    }
+
+    isDeletingPlaylist.value = true
+    deletePlaylistError.value = ''
+
+    try {
+        await api.playlistController.deletePlaylist({ id })
+        playlistStore.removePlaylist(id)
+
+        if (
+            audioStore.currentTrack &&
+            recordings.value.some((recording) => recording.id === audioStore.currentTrack?.id)
+        ) {
+            audioStore.stop()
+        }
+
+        isEditModalOpen.value = false
+        await router.push({ name: 'dashboard-home' })
+    } catch (error) {
+        const normalized = normalizeApiError(error)
+        deletePlaylistError.value = normalized.message ?? '删除歌单失败'
+    } finally {
+        isDeletingPlaylist.value = false
+    }
+}
+
 const submitEdit = async () => {
     const name = editName.value.trim()
     const id = Number(route.params.id)
@@ -170,36 +200,6 @@ const submitEdit = async () => {
         editError.value = normalized.message ?? '更新歌单失败'
     } finally {
         isEditing.value = false
-    }
-}
-
-const confirmDeletePlaylist = async () => {
-    const id = Number(route.params.id)
-    if (Number.isNaN(id) || isDeletingPlaylist.value) {
-        return
-    }
-
-    isDeletingPlaylist.value = true
-    deletePlaylistError.value = ''
-
-    try {
-        await api.playlistController.deletePlaylist({ id })
-        playlistStore.removePlaylist(id)
-
-        if (
-            audioStore.currentTrack &&
-            recordings.value.some((recording) => recording.id === audioStore.currentTrack?.id)
-        ) {
-            audioStore.stop()
-        }
-
-        isEditModalOpen.value = false
-        await router.push({ name: 'dashboard-home' })
-    } catch (error) {
-        const normalized = normalizeApiError(error)
-        deletePlaylistError.value = normalized.message ?? '删除歌单失败'
-    } finally {
-        isDeletingPlaylist.value = false
     }
 }
 

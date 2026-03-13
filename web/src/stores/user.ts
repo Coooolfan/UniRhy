@@ -24,7 +24,6 @@ export const useUserStore = defineStore('user', () => {
                 body: updateData,
             })
             user.value = updatedUser
-            return updatedUser
         } catch (error) {
             console.error('Failed to update user', error)
             throw error

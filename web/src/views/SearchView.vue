@@ -109,50 +109,6 @@ const closeMergeModal = () => {
     mergeTargetWorkId.value = null
 }
 
-const submitMerge = async () => {
-    if (selectedWorkOptions.value.length < 2) {
-        mergeModalError.value = '至少选择 2 个作品后才能合并。'
-        return
-    }
-
-    if (mergeTargetWorkId.value === null) {
-        mergeModalError.value = '请选择一个目标作品。'
-        return
-    }
-
-    const sourceWorkIds = selectedWorkOptions.value
-        .map((work) => work.id)
-        .filter((id) => id !== mergeTargetWorkId.value)
-
-    if (sourceWorkIds.length === 0) {
-        mergeModalError.value = '请选择至少一个要合并的来源作品。'
-        return
-    }
-
-    mergeSubmitting.value = true
-    mergeModalError.value = ''
-
-    try {
-        await api.workController.mergeWork({
-            body: {
-                targetId: mergeTargetWorkId.value,
-                needMergeIds: sourceWorkIds,
-            },
-        })
-
-        selectedWorkIds.value = new Set()
-        selectedWorks.value = new Map()
-        mergeModalOpen.value = false
-        mergeTargetWorkId.value = null
-        await performSearch(searchQuery.value)
-    } catch (error) {
-        const normalized = normalizeApiError(error)
-        mergeModalError.value = normalized.message ?? '合并作品失败。'
-    } finally {
-        mergeSubmitting.value = false
-    }
-}
-
 const performSearch = async (query: string) => {
     const keyword = query.trim()
     if (!keyword) {
@@ -212,6 +168,50 @@ const performSearch = async (query: string) => {
         console.error('Search failed:', error)
     } finally {
         isLoading.value = false
+    }
+}
+
+const submitMerge = async () => {
+    if (selectedWorkOptions.value.length < 2) {
+        mergeModalError.value = '至少选择 2 个作品后才能合并。'
+        return
+    }
+
+    if (mergeTargetWorkId.value === null) {
+        mergeModalError.value = '请选择一个目标作品。'
+        return
+    }
+
+    const sourceWorkIds = selectedWorkOptions.value
+        .map((work) => work.id)
+        .filter((id) => id !== mergeTargetWorkId.value)
+
+    if (sourceWorkIds.length === 0) {
+        mergeModalError.value = '请选择至少一个要合并的来源作品。'
+        return
+    }
+
+    mergeSubmitting.value = true
+    mergeModalError.value = ''
+
+    try {
+        await api.workController.mergeWork({
+            body: {
+                targetId: mergeTargetWorkId.value,
+                needMergeIds: sourceWorkIds,
+            },
+        })
+
+        selectedWorkIds.value = new Set()
+        selectedWorks.value = new Map()
+        mergeModalOpen.value = false
+        mergeTargetWorkId.value = null
+        await performSearch(searchQuery.value)
+    } catch (error) {
+        const normalized = normalizeApiError(error)
+        mergeModalError.value = normalized.message ?? '合并作品失败。'
+    } finally {
+        mergeSubmitting.value = false
     }
 }
 

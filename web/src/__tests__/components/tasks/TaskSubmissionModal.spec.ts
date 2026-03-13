@@ -3,16 +3,29 @@ import { mount } from '@vue/test-utils'
 import TaskSubmissionModal from '@/components/tasks/TaskSubmissionModal.vue'
 import type { TaskProviderOption } from '@/composables/useTaskManagement'
 
+const getOptionTexts = (selector: Readonly<ReturnType<typeof mountModal>>, dataTest: string) => {
+    const options = selector.get(dataTest).findAll('option')
+    return options.map((option: Readonly<{ text: () => string }>) => option.text())
+}
+
 const providerOptions: TaskProviderOption[] = [
     {
         id: 1,
         name: '[本地] Library A',
         type: 'FILE_SYSTEM',
+        readonly: false,
     },
     {
         id: 2,
-        name: '[OSS] Archive B',
+        name: '[本地] Archive B',
+        type: 'FILE_SYSTEM',
+        readonly: true,
+    },
+    {
+        id: 3,
+        name: '[OSS] Bucket C',
         type: 'OSS',
+        readonly: false,
     },
 ]
 
@@ -39,37 +52,43 @@ describe('TaskSubmissionModal', () => {
         const wrapper = mountModal()
 
         expect(wrapper.text()).toContain('媒体库扫描')
-
-        await wrapper.get('[data-test="scan-provider-select"]').setValue('OSS:2')
         await wrapper.get('[data-test="task-submit-button"]').trigger('click')
 
         expect(wrapper.emitted('submit-scan')).toEqual([
             [
                 {
-                    providerType: 'OSS',
-                    providerId: 2,
+                    providerType: 'FILE_SYSTEM',
+                    providerId: 1,
                 },
             ],
         ])
     })
 
-    it('switches to transcode mode and emits a transcode payload', async () => {
+    it('limits transcode targets to writable local providers and emits an OPUS payload', async () => {
         const wrapper = mountModal()
 
         await wrapper.get('[data-test="task-type-transcode"]').trigger('click')
-        await wrapper.get('[data-test="transcode-source-select"]').setValue('FILE_SYSTEM:1')
-        await wrapper.get('[data-test="transcode-destination-select"]').setValue('OSS:2')
-        await wrapper.get('[data-test="target-codec-select"]').setValue('AAC')
+
+        const sourceOptions = getOptionTexts(wrapper, '[data-test="transcode-source-select"]')
+        const destinationOptions = getOptionTexts(
+            wrapper,
+            '[data-test="transcode-destination-select"]',
+        )
+
+        expect(sourceOptions).toEqual(['[本地] Library A', '[本地] Archive B'])
+        expect(destinationOptions).toEqual(['[本地] Library A'])
+
+        await wrapper.get('[data-test="transcode-source-select"]').setValue('FILE_SYSTEM:2')
         await wrapper.get('[data-test="task-submit-button"]').trigger('click')
 
         expect(wrapper.emitted('submit-transcode')).toEqual([
             [
                 {
                     srcProviderType: 'FILE_SYSTEM',
-                    srcProviderId: 1,
-                    dstProviderType: 'OSS',
-                    dstProviderId: 2,
-                    targetCodec: 'AAC',
+                    srcProviderId: 2,
+                    dstProviderType: 'FILE_SYSTEM',
+                    dstProviderId: 1,
+                    targetCodec: 'OPUS',
                 },
             ],
         ])
