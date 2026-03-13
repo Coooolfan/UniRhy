@@ -92,8 +92,8 @@ describe('TasksView', () => {
         expect(wrapper.text()).toContain('媒体转码')
         expect(wrapper.text()).toContain('状态概览')
         expect(wrapper.text()).toContain('任务类型分布')
-        expect(wrapper.text()).toContain('存在失败任务')
-        expect(wrapper.text()).toContain('队列处理中')
+        expect(wrapper.text()).toMatch(/其中\s*5\s*个排队，1\s*个正在执行。?/)
+        expect(wrapper.text()).toMatch(/1\s*Failed\s*失败/)
     })
 
     it('shows submit feedback on the action button for two seconds after a successful submission', async () => {

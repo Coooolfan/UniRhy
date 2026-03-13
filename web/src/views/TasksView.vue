@@ -37,7 +37,7 @@ const SUBMIT_FEEDBACK_DURATION_MS = 2000
 
 const statusLabelMap: Record<TaskStatus, string> = {
     PENDING: '待处理',
-    RUNNING: '已领取并开始执行',
+    RUNNING: '执行中',
     COMPLETED: '已完成',
     FAILED: '失败',
 }
@@ -161,7 +161,7 @@ const taskSummaryRows = computed<TaskSummaryRow[]>(() =>
             failedCount,
             activeCount,
             totalCount,
-            tone
+            tone,
         }
     }),
 )
