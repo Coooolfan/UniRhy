@@ -229,7 +229,7 @@ CREATE TABLE public.async_task_log
 CREATE INDEX idx_async_task_log_consume
     ON public.async_task_log (task_type, status, created_at, id);
 
-CREATE UNIQUE INDEX idx_async_task_log_metadata_parse_active_provider_object_key
+CREATE UNIQUE INDEX uq_async_task_log_metadata_parse_active
     ON public.async_task_log (
         ((params::jsonb ->> 'providerType')),
         (((params::jsonb ->> 'providerId')::bigint)),
@@ -238,3 +238,15 @@ CREATE UNIQUE INDEX idx_async_task_log_metadata_parse_active_provider_object_key
     WHERE task_type = 'METADATA_PARSE'
       AND status IN ('PENDING', 'RUNNING')
       AND params::jsonb ? 'objectKey';
+
+CREATE UNIQUE INDEX uq_async_task_log_transcode_active
+    ON public.async_task_log (
+        (((params::jsonb ->> 'recordingId')::bigint)),
+        ((params::jsonb ->> 'srcObjectKey')),
+        (((params::jsonb ->> 'srcProviderId')::bigint)),
+        (((params::jsonb ->> 'dstProviderId')::bigint)),
+        ((params::jsonb ->> 'targetCodec'))
+    )
+    WHERE task_type = 'TRANSCODE'
+      AND status IN ('PENDING', 'RUNNING')
+      AND params::jsonb ? 'recordingId';

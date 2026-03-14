@@ -55,7 +55,7 @@ class TranscodeTaskService(
             )
         }
         val paramsJsonList = payloads.map(objectMapper::writeValueAsString)
-        queueStore.enqueue(TaskType.TRANSCODE, paramsJsonList)
+        queueStore.enqueueIgnoringConflicts(TaskType.TRANSCODE, paramsJsonList)
     }
 
     fun consumePendingTask() {

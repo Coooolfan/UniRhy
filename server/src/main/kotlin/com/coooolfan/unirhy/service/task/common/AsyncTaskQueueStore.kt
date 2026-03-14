@@ -2,7 +2,6 @@ package com.coooolfan.unirhy.service.task.common
 
 import com.coooolfan.unirhy.model.*
 import com.coooolfan.unirhy.service.task.AsyncTaskLogCountRow
-import org.babyfish.jimmer.sql.ast.mutation.SaveMode
 import org.babyfish.jimmer.sql.kt.KSqlClient
 import org.babyfish.jimmer.sql.kt.ast.expression.count
 import org.babyfish.jimmer.sql.kt.ast.expression.eq
@@ -17,34 +16,14 @@ class AsyncTaskQueueStore(
     private val jdbc: NamedParameterJdbcTemplate,
 ) {
 
-    fun enqueue(taskType: TaskType, paramsJsonList: List<String>) {
-        if (paramsJsonList.isEmpty()) {
-            return
-        }
-        val now = Instant.now()
-        sql.saveEntities(
-            paramsJsonList.map { paramsJson ->
-                AsyncTaskLog {
-                    this.taskType = taskType
-                    createdAt = now
-                    startedAt = null
-                    completedAt = null
-                    params = paramsJson
-                    completedReason = null
-                    status = TaskStatus.PENDING
-                }
-            }
-        ) {
-            setMode(SaveMode.INSERT_ONLY)
-        }
-    }
-
     fun enqueueIgnoringConflicts(taskType: TaskType, paramsJsonList: List<String>): Int {
+        // 这里用不了 Jimmer
+        // Jimmer 生成的 ON CONFLICT DO NOTHING 总是会匹配具体索引
+        // 无法解析此表的复杂索引
         if (paramsJsonList.isEmpty()) {
             return 0
         }
         val now = Instant.now()
-        // 改写Jimmer
         val sql = """
             INSERT INTO public.async_task_log (
                 task_type,
