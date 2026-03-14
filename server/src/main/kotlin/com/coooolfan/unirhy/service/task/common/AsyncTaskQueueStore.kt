@@ -39,6 +39,42 @@ class AsyncTaskQueueStore(
         }
     }
 
+    fun enqueueIgnoringConflicts(taskType: TaskType, paramsJsonList: List<String>): Int {
+        if (paramsJsonList.isEmpty()) {
+            return 0
+        }
+        val now = Instant.now()
+        // 改写Jimmer
+        val sql = """
+            INSERT INTO public.async_task_log (
+                task_type,
+                created_at,
+                started_at,
+                completed_at,
+                params,
+                completed_reason,
+                status
+            ) VALUES (
+                :taskType,
+                :createdAt,
+                NULL,
+                NULL,
+                :params,
+                NULL,
+                :status
+            )
+            ON CONFLICT DO NOTHING
+        """.trimIndent()
+        val batchParams = paramsJsonList.map { paramsJson ->
+            MapSqlParameterSource()
+                .addValue("taskType", taskType.name)
+                .addValue("createdAt", now)
+                .addValue("params", paramsJson)
+                .addValue("status", TaskStatus.PENDING.name)
+        }.toTypedArray()
+        return jdbc.batchUpdate(sql, batchParams).sum()
+    }
+
     fun claimNext(taskType: TaskType): ClaimedAsyncTask? {
         val sql = """
             WITH grabbed_tasks AS (

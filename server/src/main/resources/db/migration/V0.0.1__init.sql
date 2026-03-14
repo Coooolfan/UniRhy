@@ -229,10 +229,12 @@ CREATE TABLE public.async_task_log
 CREATE INDEX idx_async_task_log_consume
     ON public.async_task_log (task_type, status, created_at, id);
 
-CREATE UNIQUE INDEX idx_async_task_log_scan_active_provider
+CREATE UNIQUE INDEX idx_async_task_log_metadata_parse_active_provider_object_key
     ON public.async_task_log (
         ((params::jsonb ->> 'providerType')),
-        (((params::jsonb ->> 'providerId')::bigint))
+        (((params::jsonb ->> 'providerId')::bigint)),
+        ((params::jsonb ->> 'objectKey'))
     )
-    WHERE task_type = 'SCAN'
-      AND status IN ('PENDING', 'RUNNING');
+    WHERE task_type = 'METADATA_PARSE'
+      AND status IN ('PENDING', 'RUNNING')
+      AND params::jsonb ? 'objectKey';

@@ -7,16 +7,15 @@ private val logger = LoggerFactory.getLogger("TaskCommonUtils")
 
 private val ACCEPT_FILE_EXTENSIONS = setOf("mp3", "wav", "ogg", "flac", "aac", "wma", "m4a")
 
-fun findAudioFilesRecursively(rootDir: File): List<File> {
+fun findAudioFilesRecursively(rootDir: File): Sequence<File> {
     if (!rootDir.exists() || !rootDir.isDirectory) {
         logger.warn("Directory not found or is not a directory: ${rootDir.absolutePath}")
-        return emptyList()
+        return emptySequence()
     }
 
     return rootDir.walk()
         .filter { it.isFile }
         .filter { file -> file.extension.lowercase() in ACCEPT_FILE_EXTENSIONS }
-        .toList()
 }
 
 fun failureReason(ex: Throwable): String {
