@@ -13,11 +13,10 @@ import {
 } from 'lucide-vue-next'
 import type { CodecType } from '@/__generated/model/enums/CodecType'
 import { type FileProviderType } from '@/__generated/model/enums/FileProviderType'
-import type { TaskType } from '@/__generated/model/enums/TaskType'
 import type { TranscodeTaskRequest } from '@/__generated/model/static'
-import { TASK_TYPE_LABEL_MAP, type TaskProviderOption } from '@/composables/useTaskManagement'
+import type { TaskProviderOption } from '@/composables/useTaskManagement'
 
-type TaskKind = TaskType
+type TaskKind = 'METADATA_PARSE' | 'TRANSCODE'
 
 type Props = {
     open: boolean
@@ -49,20 +48,25 @@ const props = defineProps<Props>()
 
 const emit = defineEmits<{
     (event: 'close'): void
-    (event: 'submit-scan', payload: ProviderSelectionPayload): void
+    (event: 'submit-metadata-parse', payload: ProviderSelectionPayload): void
     (event: 'submit-transcode', payload: TranscodeTaskRequest): void
 }>()
 
+const TASK_ACTION_LABEL_MAP: Record<TaskKind, string> = {
+    METADATA_PARSE: '元数据解析',
+    TRANSCODE: '媒体转码',
+}
+
 const TASK_OPTIONS: TaskDefinition[] = [
     {
-        id: 'SCAN',
-        name: TASK_TYPE_LABEL_MAP.SCAN,
-        desc: '发现并索引新媒体文件',
+        id: 'METADATA_PARSE',
+        name: TASK_ACTION_LABEL_MAP.METADATA_PARSE,
+        desc: '遍历存储节点，发现媒体文件并补充缺失的元数据解析任务',
         icon: FolderSearch,
     },
     {
         id: 'TRANSCODE',
-        name: TASK_TYPE_LABEL_MAP.TRANSCODE,
+        name: TASK_ACTION_LABEL_MAP.TRANSCODE,
         desc: '按录音拆分为后台任务，批量转码为 Opus 音频资源',
         icon: FileAudio,
     },
@@ -82,8 +86,8 @@ const PROVIDER_TYPE_ICON_MAP: Record<FileProviderType, Component> = {
     OSS: Cloud,
 }
 
-const activeTask = ref<TaskKind>('SCAN')
-const scanProviderValue = ref('')
+const activeTask = ref<TaskKind>('METADATA_PARSE')
+const metadataParseProviderValue = ref('')
 const transcodeSourceProviderValue = ref('')
 const transcodeDestinationProviderValue = ref('')
 const targetCodec = ref<CodecType>('OPUS')
@@ -96,7 +100,7 @@ const getDefaultProviderValue = (options: readonly TaskProviderOption[], preferr
 }
 
 const syncSelectionValue = (
-    currentValue: typeof scanProviderValue,
+    currentValue: typeof metadataParseProviderValue,
     options: readonly TaskProviderOption[],
     preferredIndex = 0,
 ) => {
@@ -107,7 +111,7 @@ const syncSelectionValue = (
     }
 }
 
-const scanProviderOptions = computed(() =>
+const metadataParseProviderOptions = computed(() =>
     props.providerOptions.filter((provider) => provider.type === 'FILE_SYSTEM'),
 )
 
@@ -122,7 +126,7 @@ const transcodeDestinationProviderOptions = computed(() =>
 )
 
 const syncProviderSelections = () => {
-    syncSelectionValue(scanProviderValue, scanProviderOptions.value)
+    syncSelectionValue(metadataParseProviderValue, metadataParseProviderOptions.value)
     syncSelectionValue(transcodeSourceProviderValue, transcodeSourceProviderOptions.value)
     syncSelectionValue(
         transcodeDestinationProviderValue,
@@ -152,7 +156,7 @@ watch(
         if (!open) {
             return
         }
-        activeTask.value = 'SCAN'
+        activeTask.value = 'METADATA_PARSE'
         targetCodec.value = 'OPUS'
         syncProviderSelections()
     },
@@ -162,8 +166,8 @@ const activeTaskOption = computed<TaskDefinition>(
     () => TASK_OPTIONS.find((option) => option.id === activeTask.value) ?? TASK_OPTIONS[0]!,
 )
 
-const selectedScanProvider = computed(() =>
-    resolveProvider(scanProviderOptions.value, scanProviderValue.value),
+const selectedMetadataParseProvider = computed(() =>
+    resolveProvider(metadataParseProviderOptions.value, metadataParseProviderValue.value),
 )
 const selectedTranscodeSourceProvider = computed(() =>
     resolveProvider(transcodeSourceProviderOptions.value, transcodeSourceProviderValue.value),
@@ -180,8 +184,8 @@ const canSubmit = computed(() => {
         return false
     }
 
-    if (activeTask.value === 'SCAN') {
-        return Boolean(selectedScanProvider.value)
+    if (activeTask.value === 'METADATA_PARSE') {
+        return Boolean(selectedMetadataParseProvider.value)
     }
 
     return Boolean(
@@ -190,22 +194,22 @@ const canSubmit = computed(() => {
 })
 
 const submitButtonLabel = computed(() =>
-    activeTask.value === 'SCAN' ? '提交扫描任务' : '提交转码任务',
+    activeTask.value === 'METADATA_PARSE' ? '提交元数据解析任务' : '提交转码任务',
 )
 
 const activeTaskAvailability = computed<TaskAvailability | null>(() => {
     if (props.providerOptions.length === 0) {
         return {
             title: '暂无可用存储节点',
-            description: '请先在系统设置中配置本地存储节点，再回来发起扫描或转码任务。',
+            description: '请先在系统设置中配置本地存储节点，再回来发起元数据解析或转码任务。',
             icon: HardDrive,
         }
     }
 
-    if (activeTask.value === 'SCAN' && scanProviderOptions.value.length === 0) {
+    if (activeTask.value === 'METADATA_PARSE' && metadataParseProviderOptions.value.length === 0) {
         return {
-            title: '暂无可扫描节点',
-            description: '扫描任务目前只支持本地存储节点。',
+            title: '暂无可解析节点',
+            description: '元数据解析任务目前只支持本地存储节点。',
             icon: FolderSearch,
         }
     }
@@ -233,8 +237,8 @@ const activeTaskAvailability = computed<TaskAvailability | null>(() => {
 })
 
 const submitHelperText = computed(() =>
-    activeTask.value === 'SCAN'
-        ? '提交后会进入后台任务队列，状态看板会显示扫描任务的待处理与完成数量。'
+    activeTask.value === 'METADATA_PARSE'
+        ? '提交后系统会遍历所选节点，并按文件补充缺失的元数据解析任务。'
         : '提交后会按录音拆分为多个后台转码任务，状态看板会显示排队与完成进度。',
 )
 
@@ -250,12 +254,12 @@ const submit = () => {
         return
     }
 
-    if (activeTask.value === 'SCAN') {
-        const provider = selectedScanProvider.value
+    if (activeTask.value === 'METADATA_PARSE') {
+        const provider = selectedMetadataParseProvider.value
         if (!provider) {
             return
         }
-        emit('submit-scan', {
+        emit('submit-metadata-parse', {
             providerType: provider.type,
             providerId: provider.id,
         })
@@ -399,22 +403,22 @@ const submit = () => {
                                 </p>
                             </div>
 
-                            <div v-else-if="activeTask === 'SCAN'" class="space-y-8">
+                            <div v-else-if="activeTask === 'METADATA_PARSE'" class="space-y-8">
                                 <div class="grid gap-6">
                                     <label class="block">
                                         <span
                                             class="mb-2 block text-xs uppercase tracking-[0.24em] text-[#8A8A8A]"
                                         >
-                                            目标存储节点
+                                            解析存储节点
                                         </span>
                                         <div class="relative">
                                             <select
-                                                v-model="scanProviderValue"
-                                                data-test="scan-provider-select"
+                                                v-model="metadataParseProviderValue"
+                                                data-test="metadata-parse-provider-select"
                                                 class="w-full appearance-none bg-[#F7F5F0] border-b border-[#D6D1C4] p-3 pr-10 text-sm text-[#2C2C2C] outline-none transition-colors focus:border-[#C27E46]"
                                             >
                                                 <option
-                                                    v-for="option in scanProviderOptions"
+                                                    v-for="option in metadataParseProviderOptions"
                                                     :key="optionValueOf(option)"
                                                     :value="optionValueOf(option)"
                                                 >
@@ -428,7 +432,7 @@ const submit = () => {
                                     </label>
 
                                     <div
-                                        v-if="selectedScanProvider"
+                                        v-if="selectedMetadataParseProvider"
                                         class="grid gap-4 px-1 py-1 md:grid-cols-2"
                                     >
                                         <div>
@@ -443,14 +447,14 @@ const submit = () => {
                                                 <component
                                                     :is="
                                                         PROVIDER_TYPE_ICON_MAP[
-                                                            selectedScanProvider.type
+                                                            selectedMetadataParseProvider.type
                                                         ]
                                                     "
                                                     class="h-4 w-4 text-[#C27E46]"
                                                 />
                                                 <span class="text-sm">{{
                                                     PROVIDER_TYPE_LABEL_MAP[
-                                                        selectedScanProvider.type
+                                                        selectedMetadataParseProvider.type
                                                     ]
                                                 }}</span>
                                             </div>
@@ -462,7 +466,7 @@ const submit = () => {
                                                 节点 ID
                                             </div>
                                             <div class="mt-2 font-mono text-sm text-[#2C2C2C]">
-                                                #{{ selectedScanProvider.id }}
+                                                #{{ selectedMetadataParseProvider.id }}
                                             </div>
                                         </div>
                                     </div>

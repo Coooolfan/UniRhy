@@ -1,5 +1,5 @@
 export const TaskType_CONSTANTS = [
-    'SCAN', 
+    'METADATA_PARSE', 
     'TRANSCODE'
 ] as const;
 export type TaskType = typeof TaskType_CONSTANTS[number];

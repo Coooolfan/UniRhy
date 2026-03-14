@@ -7,8 +7,6 @@ import com.unirhy.e2e.support.E2eAssert
 import com.unirhy.e2e.support.E2eHttpClient
 import com.unirhy.e2e.support.E2eJson
 import com.unirhy.e2e.support.E2eRuntime
-import com.unirhy.e2e.support.bootstrapAdminSession
-import com.unirhy.e2e.support.expandHomePath
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.MethodOrderer
 import org.junit.jupiter.api.Order
@@ -16,6 +14,8 @@ import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
 import org.junit.jupiter.api.TestMethodOrder
+import org.jaudiotagger.audio.AudioFileIO
+import org.jaudiotagger.tag.FieldKey
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.web.server.LocalServerPort
 import org.springframework.test.annotation.DirtiesContext
@@ -397,7 +397,7 @@ class AccountPlaylistContentE2eTest {
     @Order(4)
     fun `content endpoints should support search update recording update and merge flow`() {
         val state = bootstrapAdminSession(baseUrl())
-        ensurePreparedData(state)
+        val data = ensurePreparedData(state)
         val runSuffix = suffix()
 
         val worksListResponse = state.api.get(
@@ -445,16 +445,8 @@ class AccountPlaylistContentE2eTest {
             step = "[content] unknown work search should return empty array",
         )
 
-        val albumsListResponse = state.api.get(
-            path = "/api/albums",
-            query = mapOf("pageIndex" to 0, "pageSize" to 200),
-        )
-        E2eAssert.status(albumsListResponse, 200, "[content] album list should succeed")
-        val albums = pageRows(albumsListResponse.body(), "[content] albums list")
-        assertTrue(albums.isNotEmpty(), "[content] album search flow requires at least one album")
-        val targetAlbum = albums.first()
-        val targetAlbumId = readIdFromNode(targetAlbum.path("id"), "[content] album id should be integral")
-        val targetAlbumTitle = targetAlbum.path("title").asText()
+        val targetAlbumId = data.albumId
+        val targetAlbumTitle = data.albumTitle
 
         val albumSearchResponse = state.api.get(
             path = "/api/albums/search",
@@ -669,22 +661,37 @@ class AccountPlaylistContentE2eTest {
             return null
         }
 
+        val firstAlbumTitle = albums.first().path("title").asText()
+        if (firstAlbumTitle.isBlank()) {
+            return null
+        }
+
         return PreparedData(
             recordingId = firstRecordingId,
             albumId = firstAlbumId.longValue(),
+            albumTitle = firstAlbumTitle,
         )
     }
 
     private fun executeScanAndPrepareData(state: E2eAdminSession): PreparedData {
         val requestBody = scanRequestBody(state)
-        prepareScanFixture(state.runtime.scanWorkspace)
+        val fixture = prepareScanFixture(state.runtime.scanWorkspace)
+        val baselineStats = fetchTaskStats(state, "[prepare] baseline task stats before submit")
+        val baselinePending = taskCount(baselineStats, "METADATA_PARSE", "PENDING")
+        val baselineCompleted = taskCount(baselineStats, "METADATA_PARSE", "COMPLETED")
+        val baselineFailed = taskCount(baselineStats, "METADATA_PARSE", "FAILED")
 
         val submitResponse = state.api.post(
             path = "/api/task/scan",
             json = requestBody,
         )
         E2eAssert.status(submitResponse, 202, "[prepare] submit scan task should return accepted")
-        awaitScanTaskFinished(state)
+        awaitScanTaskFinished(
+            state = state,
+            baselinePending = baselinePending,
+            baselineCompleted = baselineCompleted,
+            baselineFailed = baselineFailed,
+        )
 
         val worksResponse = state.api.get(
             path = "/api/works",
@@ -695,34 +702,36 @@ class AccountPlaylistContentE2eTest {
         assertTrue(works.isNotEmpty(), "[prepare] expected works after scan")
         val recordingId = extractFirstRecordingId(works.first(), "[prepare] first work after scan should include recording")
 
-        val albumsResponse = state.api.get(
-            path = "/api/albums",
-            query = mapOf("pageIndex" to 0, "pageSize" to 200),
+        val albumSearchResponse = state.api.get(
+            path = "/api/albums/search",
+            query = mapOf("name" to fixture.albumTitle),
         )
-        E2eAssert.status(albumsResponse, 200, "[prepare] list albums after scan should succeed")
-        val albums = pageRows(albumsResponse.body(), "[prepare] albums after scan")
-        assertTrue(albums.isNotEmpty(), "[prepare] expected albums after scan")
-        val albumId = readIdFromNode(albums.first().path("id"), "[prepare] first album after scan should include id")
+        E2eAssert.status(albumSearchResponse, 200, "[prepare] album search after scan should succeed")
+        val albums = E2eJson.mapper.readTree(albumSearchResponse.body())
+        assertTrue(albums.isArray && albums.size() > 0, "[prepare] expected albums after scan search")
+        val albumId = readIdFromNode(albums.first().path("id"), "[prepare] first album after scan search should include id")
 
         return PreparedData(
             recordingId = recordingId,
             albumId = albumId,
+            albumTitle = fixture.albumTitle,
         )
     }
 
-    private fun awaitScanTaskFinished(state: E2eAdminSession) {
-        val baselineStats = fetchTaskStats(state, "[prepare] baseline task stats")
-        val baselinePending = taskCount(baselineStats, "SCAN", "PENDING")
-        val baselineCompleted = taskCount(baselineStats, "SCAN", "COMPLETED")
-        val baselineFailed = taskCount(baselineStats, "SCAN", "FAILED")
+    private fun awaitScanTaskFinished(
+        state: E2eAdminSession,
+        baselinePending: Long,
+        baselineCompleted: Long,
+        baselineFailed: Long,
+    ) {
         val deadline = System.currentTimeMillis() + scanWaitTimeoutMillis()
         var observedPending = false
 
         while (System.currentTimeMillis() <= deadline) {
             val statsRows = fetchTaskStats(state, "[prepare] scan task stats")
-            val pending = taskCount(statsRows, "SCAN", "PENDING")
-            val completed = taskCount(statsRows, "SCAN", "COMPLETED")
-            val failed = taskCount(statsRows, "SCAN", "FAILED")
+            val pending = taskCount(statsRows, "METADATA_PARSE", "PENDING")
+            val completed = taskCount(statsRows, "METADATA_PARSE", "COMPLETED")
+            val failed = taskCount(statsRows, "METADATA_PARSE", "FAILED")
 
             if (pending > baselinePending) {
                 observedPending = true
@@ -751,14 +760,15 @@ class AccountPlaylistContentE2eTest {
         }?.path("count")?.longValue() ?: 0L
     }
 
-    private fun prepareScanFixture(scanWorkspace: Path) {
+    private fun prepareScanFixture(scanWorkspace: Path): FixtureInfo {
         val sourceRoot = resolveScanSourceRoot()
         require(Files.exists(sourceRoot) && Files.isDirectory(sourceRoot)) {
             "[prepare] scan source path does not exist or is not directory: $sourceRoot"
         }
 
-        val seedFile = collectAudioCandidates(sourceRoot).firstOrNull()
-            ?: error("[prepare] no audio files found under $sourceRoot, set env $SCAN_SOURCE_PATH_ENV")
+        val seedFile = collectAudioCandidates(sourceRoot).firstOrNull(::hasScanFixtureMetadata)
+            ?: error("[prepare] no tagged audio files found under $sourceRoot, set env $SCAN_SOURCE_PATH_ENV to a directory with album metadata")
+        val albumTitle = readRequiredAudioTag(seedFile, FieldKey.ALBUM)
 
         val extension = fileExtension(seedFile)
         val fixtureRoot = scanWorkspace.resolve("account-playlist-content-${suffix()}")
@@ -768,6 +778,8 @@ class AccountPlaylistContentE2eTest {
             val target = fixtureRoot.resolve("seed-${index.toString().padStart(3, '0')}.$extension")
             symlinkOrCopy(seedFile, target)
         }
+
+        return FixtureInfo(albumTitle = albumTitle)
     }
 
     private fun collectAudioCandidates(sourceRoot: Path): List<Path> {
@@ -791,6 +803,19 @@ class AccountPlaylistContentE2eTest {
         return candidates.sortedBy { it.toString() }
     }
 
+    private fun hasScanFixtureMetadata(path: Path): Boolean {
+        val tag = runCatching { AudioFileIO.read(path.toFile()).tag }.getOrNull() ?: return false
+        return tag.getFirst(FieldKey.TITLE).isNotBlank()
+                && tag.getFirst(FieldKey.ARTIST).isNotBlank()
+                && tag.getFirst(FieldKey.ALBUM).isNotBlank()
+    }
+
+    private fun readRequiredAudioTag(path: Path, fieldKey: FieldKey): String {
+        val tag = AudioFileIO.read(path.toFile()).tag ?: error("[prepare] missing tag for $fieldKey in $path")
+        return tag.getFirst(fieldKey).takeIf { it.isNotBlank() }
+            ?: error("[prepare] missing non-blank $fieldKey in $path")
+    }
+
     private fun symlinkOrCopy(source: Path, target: Path) {
         val normalizedSource = source.toAbsolutePath().normalize()
         val symlinkCreated = runCatching {
@@ -807,7 +832,14 @@ class AccountPlaylistContentE2eTest {
             ?.trim()
             ?.takeIf { it.isNotBlank() }
             ?: DEFAULT_SCAN_SOURCE_PATH
-        return configured.expandHomePath().toAbsolutePath().normalize()
+        return expandHomePath(configured).toAbsolutePath().normalize()
+    }
+
+    private fun expandHomePath(path: String): Path {
+        if (!path.startsWith("~/")) {
+            return Path.of(path)
+        }
+        return Path.of(System.getProperty("user.home"), path.removePrefix("~/"))
     }
 
     private fun scanRequestBody(state: E2eAdminSession): Map<String, Any> {
@@ -934,6 +966,13 @@ class AccountPlaylistContentE2eTest {
 
     private fun baseUrl(): String = "http://127.0.0.1:$port"
 
+    private fun bootstrapAdminSession(baseUrl: String): E2eAdminSession {
+        val state = com.unirhy.e2e.support.newAdminSession(baseUrl)
+        com.unirhy.e2e.support.ensureSystemInitialized(state)
+        com.unirhy.e2e.support.loginAsAdmin(state)
+        return state
+    }
+
     private data class CreatedAccount(
         val id: Long,
         val name: String,
@@ -944,6 +983,11 @@ class AccountPlaylistContentE2eTest {
     private data class PreparedData(
         val recordingId: Long,
         val albumId: Long,
+        val albumTitle: String,
+    )
+
+    private data class FixtureInfo(
+        val albumTitle: String,
     )
 
     companion object {

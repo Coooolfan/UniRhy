@@ -48,13 +48,13 @@ const mountModal = (overrides: Partial<InstanceType<typeof TaskSubmissionModal>[
     })
 
 describe('TaskSubmissionModal', () => {
-    it('emits a scan payload with the selected provider', async () => {
+    it('emits a metadata parse payload with the selected provider', async () => {
         const wrapper = mountModal()
 
-        expect(wrapper.text()).toContain('媒体库扫描')
+        expect(wrapper.text()).toContain('元数据解析')
         await wrapper.get('[data-test="task-submit-button"]').trigger('click')
 
-        expect(wrapper.emitted('submit-scan')).toEqual([
+        expect(wrapper.emitted('submit-metadata-parse')).toEqual([
             [
                 {
                     providerType: 'FILE_SYSTEM',

@@ -7,8 +7,6 @@ import com.unirhy.e2e.support.E2eAssert
 import com.unirhy.e2e.support.E2eHttpClient
 import com.unirhy.e2e.support.E2eJson
 import com.unirhy.e2e.support.E2eRuntime
-import com.unirhy.e2e.support.bootstrapAdminSession
-import com.unirhy.e2e.support.expandHomePath
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.MethodOrderer
@@ -17,6 +15,8 @@ import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
 import org.junit.jupiter.api.TestMethodOrder
+import org.jaudiotagger.audio.AudioFileIO
+import org.jaudiotagger.tag.FieldKey
 import org.slf4j.LoggerFactory
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.web.server.LocalServerPort
@@ -135,7 +135,7 @@ class TaskContentReadE2eTest {
 
     @Test
     @Order(3)
-    fun `scan task should report stats and reject duplicate submission`() {
+    fun `scan submission should report metadata parse stats and accept incremental duplicate submission`() {
         val state = bootstrapAdminSession(baseUrl())
         preparedData = executeScanAndPrepareData(state)
     }
@@ -229,13 +229,14 @@ class TaskContentReadE2eTest {
         E2eAssert.status(invalidLengthRandomResponse, 400, "[works] random with non-positive length should fail")
 
         val albumsListResponse = state.api.get(
-            path = "/api/albums",
-            query = mapOf("pageIndex" to 0, "pageSize" to 200),
+            path = "/api/albums/search",
+            query = mapOf("name" to data.albumTitle),
         )
-        E2eAssert.status(albumsListResponse, 200, "[albums] list should succeed")
-        assertTrue(
-            pageContainsId(albumsListResponse.body(), data.albumId),
-            "[albums] list should contain prepared album",
+        E2eAssert.status(albumsListResponse, 200, "[albums] search should succeed")
+        E2eAssert.jsonArrayContainsId(
+            responseBody = albumsListResponse.body(),
+            expectedId = data.albumId,
+            step = "[albums] search should contain prepared album",
         )
 
         val albumDetailResponse = state.api.get("/api/albums/${data.albumId}")
@@ -305,6 +306,11 @@ class TaskContentReadE2eTest {
     private fun executeScanAndPrepareData(state: E2eAdminSession): PreparedData {
         val scanRequestBody = scanRequestBody(state)
         val fixture = prepareScanFixture(state.runtime.scanWorkspace)
+        val expectedTaskCount = countFilesWithExtensions(fixture.fixtureRoot, ACCEPT_EXTENSIONS)
+        val baselineStats = fetchTaskStats(state, "[scan] baseline task stats before submit")
+        val baselinePending = taskCount(baselineStats, "METADATA_PARSE", "PENDING")
+        val baselineCompleted = taskCount(baselineStats, "METADATA_PARSE", "COMPLETED")
+        val baselineFailed = taskCount(baselineStats, "METADATA_PARSE", "FAILED")
 
         val submitResponse = state.api.post(
             path = "/api/task/scan",
@@ -312,7 +318,14 @@ class TaskContentReadE2eTest {
         )
         E2eAssert.status(submitResponse, 202, "[scan] submit scan task should return accepted")
 
-        awaitScanTaskLifecycle(state, scanRequestBody)
+        awaitScanTaskLifecycle(
+            state = state,
+            scanRequestBody = scanRequestBody,
+            expectedTaskCount = expectedTaskCount,
+            baselinePending = baselinePending,
+            baselineCompleted = baselineCompleted,
+            baselineFailed = baselineFailed,
+        )
 
         val worksResponse = state.api.get(
             path = "/api/works",
@@ -332,13 +345,13 @@ class TaskContentReadE2eTest {
         val mediaId = extractMediaId(workRows.first(), "[scan] first work should include media file id")
 
         val albumsResponse = state.api.get(
-            path = "/api/albums",
-            query = mapOf("pageIndex" to 0, "pageSize" to 200),
+            path = "/api/albums/search",
+            query = mapOf("name" to fixture.albumTitle),
         )
-        E2eAssert.status(albumsResponse, 200, "[scan] list albums should succeed after scan")
-        val albumRows = pageRows(albumsResponse.body(), "[scan] albums response")
+        E2eAssert.status(albumsResponse, 200, "[scan] album search should succeed after scan")
+        val albumRows = E2eJson.mapper.readTree(albumsResponse.body())
         assertTrue(
-            albumRows.isNotEmpty(),
+            albumRows.isArray && albumRows.size() > 0,
             "[scan] expected albums after scan, source=${fixture.sourceRoot}, fixture=${fixture.fixtureRoot}",
         )
         val albumId = readIdFromNode(
@@ -350,6 +363,7 @@ class TaskContentReadE2eTest {
             workId = workId,
             albumId = albumId,
             mediaId = mediaId,
+            albumTitle = fixture.albumTitle,
         )
     }
 
@@ -386,9 +400,15 @@ class TaskContentReadE2eTest {
         if (albumRows.isEmpty()) {
             return null
         }
-        val albumIdNode = albumRows.first().path("id")
+        val firstAlbum = albumRows.first()
+        val albumIdNode = firstAlbum.path("id")
         if (!albumIdNode.isIntegralNumber) {
             logger.warn("[prepare] skip recover: first album id is not integral")
+            return null
+        }
+        val albumTitle = firstAlbum.path("title").asText()
+        if (albumTitle.isBlank()) {
+            logger.warn("[prepare] skip recover: first album title is blank")
             return null
         }
 
@@ -396,23 +416,26 @@ class TaskContentReadE2eTest {
             workId = workIdNode.longValue(),
             albumId = albumIdNode.longValue(),
             mediaId = mediaId,
+            albumTitle = albumTitle,
         )
     }
 
-    private fun awaitScanTaskLifecycle(state: E2eAdminSession, scanRequestBody: Map<String, Any>) {
-        val baselineStats = fetchTaskStats(state, "[scan] baseline task stats")
-        val baselinePending = taskCount(baselineStats, "SCAN", "PENDING")
-        val baselineCompleted = taskCount(baselineStats, "SCAN", "COMPLETED")
-        val baselineFailed = taskCount(baselineStats, "SCAN", "FAILED")
-
+    private fun awaitScanTaskLifecycle(
+        state: E2eAdminSession,
+        scanRequestBody: Map<String, Any>,
+        expectedTaskCount: Int,
+        baselinePending: Long,
+        baselineCompleted: Long,
+        baselineFailed: Long,
+    ) {
         val duplicateSubmitResponse = state.api.post(
             path = "/api/task/scan",
             json = scanRequestBody,
         )
         E2eAssert.status(
             duplicateSubmitResponse,
-            409,
-            "[scan] duplicate submit while pending should return conflict",
+            202,
+            "[scan] duplicate submit while pending should incrementally fill queue",
         )
 
         val timeoutMillis = scanWaitTimeoutMillis()
@@ -425,9 +448,9 @@ class TaskContentReadE2eTest {
         while (System.currentTimeMillis() <= deadline) {
             pollCount += 1
             val statsRows = fetchTaskStats(state, "[scan] task stats")
-            val pending = taskCount(statsRows, "SCAN", "PENDING")
-            val completed = taskCount(statsRows, "SCAN", "COMPLETED")
-            val failed = taskCount(statsRows, "SCAN", "FAILED")
+            val pending = taskCount(statsRows, "METADATA_PARSE", "PENDING")
+            val completed = taskCount(statsRows, "METADATA_PARSE", "COMPLETED")
+            val failed = taskCount(statsRows, "METADATA_PARSE", "FAILED")
             lastStatsBody = taskStatsBody(statsRows)
 
             if (pending > baselinePending) {
@@ -446,18 +469,20 @@ class TaskContentReadE2eTest {
 
         assertTrue(
             observedPending || observedCompletion,
-            "[scan] expected SCAN stats to change after submit, last=$lastStatsBody",
+            "[scan] expected METADATA_PARSE stats to change after submit, last=$lastStatsBody",
         )
         assertTrue(
             observedCompletion,
-            "[scan] SCAN task stats never reached terminal state before timeout ${timeoutMillis}ms, last=$lastStatsBody",
+            "[scan] METADATA_PARSE task stats never reached terminal state before timeout ${timeoutMillis}ms, last=$lastStatsBody",
         )
         val finalStats = fetchTaskStats(state, "[scan] final task stats")
-        val completed = taskCount(finalStats, "SCAN", "COMPLETED")
-        val failed = taskCount(finalStats, "SCAN", "FAILED")
-        assertTrue(
-            completed > baselineCompleted || failed > baselineFailed,
-            "[scan] final stats should include one terminal SCAN task, last=${taskStatsBody(finalStats)}",
+        val completed = taskCount(finalStats, "METADATA_PARSE", "COMPLETED")
+        val failed = taskCount(finalStats, "METADATA_PARSE", "FAILED")
+        val terminalDelta = (completed - baselineCompleted) + (failed - baselineFailed)
+        assertEquals(
+            expectedTaskCount.toLong(),
+            terminalDelta,
+            "[scan] final stats should only grow by unique fixture file count, last=${taskStatsBody(finalStats)}",
         )
     }
 
@@ -535,7 +560,9 @@ class TaskContentReadE2eTest {
             "[scan] no audio files found under $sourceRoot, expected extensions: ${ACCEPT_EXTENSIONS.joinToString(",")}"
         }
 
-        val seed = candidates.first()
+        val seed = candidates.firstOrNull(::hasScanFixtureMetadata)
+            ?: error("[scan] no tagged audio files found under $sourceRoot, set env $SCAN_SOURCE_PATH_ENV to a directory with album metadata")
+        val albumTitle = readRequiredAudioTag(seed, FieldKey.ALBUM)
         val seedExtension = fileExtension(seed)
         val fixtureRoot = scanWorkspace.resolve("task-content-fixture-${UUID.randomUUID().toString().replace("-", "").take(12)}")
         Files.createDirectories(fixtureRoot)
@@ -549,6 +576,7 @@ class TaskContentReadE2eTest {
         return FixtureInfo(
             sourceRoot = sourceRoot,
             fixtureRoot = fixtureRoot,
+            albumTitle = albumTitle,
         )
     }
 
@@ -578,12 +606,32 @@ class TaskContentReadE2eTest {
         )
     }
 
+    private fun hasScanFixtureMetadata(path: Path): Boolean {
+        val tag = runCatching { AudioFileIO.read(path.toFile()).tag }.getOrNull() ?: return false
+        return tag.getFirst(FieldKey.TITLE).isNotBlank()
+                && tag.getFirst(FieldKey.ARTIST).isNotBlank()
+                && tag.getFirst(FieldKey.ALBUM).isNotBlank()
+    }
+
+    private fun readRequiredAudioTag(path: Path, fieldKey: FieldKey): String {
+        val tag = AudioFileIO.read(path.toFile()).tag ?: error("[scan] missing tag for $fieldKey in $path")
+        return tag.getFirst(fieldKey).takeIf { it.isNotBlank() }
+            ?: error("[scan] missing non-blank $fieldKey in $path")
+    }
+
     private fun resolveScanSourceRoot(): Path {
         val configured = System.getenv(SCAN_SOURCE_PATH_ENV)
             ?.trim()
             ?.takeIf { it.isNotBlank() }
             ?: DEFAULT_SCAN_SOURCE_PATH
-        return configured.expandHomePath().toAbsolutePath().normalize()
+        return expandHomePath(configured).toAbsolutePath().normalize()
+    }
+
+    private fun expandHomePath(path: String): Path {
+        if (!path.startsWith("~/")) {
+            return Path.of(path)
+        }
+        return Path.of(System.getProperty("user.home"), path.removePrefix("~/"))
     }
 
     private fun symlinkOrCopy(source: Path, target: Path) {
@@ -760,15 +808,24 @@ class TaskContentReadE2eTest {
 
     private fun baseUrl(): String = "http://127.0.0.1:$port"
 
+    private fun bootstrapAdminSession(baseUrl: String): E2eAdminSession {
+        val state = com.unirhy.e2e.support.newAdminSession(baseUrl)
+        com.unirhy.e2e.support.ensureSystemInitialized(state)
+        com.unirhy.e2e.support.loginAsAdmin(state)
+        return state
+    }
+
     private data class PreparedData(
         val workId: Long,
         val albumId: Long,
         val mediaId: Long,
+        val albumTitle: String,
     )
 
     private data class FixtureInfo(
         val sourceRoot: Path,
         val fixtureRoot: Path,
+        val albumTitle: String,
     )
 
     companion object {

@@ -13,7 +13,7 @@ export class TaskController {
     /**
      * 触发扫描任务
      * 
-     * 此接口用于提交媒体扫描任务，对同一存储节点的请求是幂等的
+     * 此接口用于提交媒体扫描任务，对同一存储节点的重复请求会增量补充缺失文件任务
      * 需要用户登录认证才能访问
      * 
      * @parameter {TaskControllerOptions['executeScanTask']} options
@@ -30,7 +30,7 @@ export class TaskController {
     /**
      * 触发转码任务
      * 
-     * 此接口用于提交媒体转码任务，非幂等操作
+     * 此接口用于提交媒体转码任务，非幂等操作，但活跃中的相同转码任务会自动去重
      * 需要用户登录认证才能访问
      * 
      * @parameter {TaskControllerOptions['executeTranscodeTask']} options

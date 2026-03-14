@@ -20,7 +20,7 @@ object ApiCoverageRegistry {
     private const val TASK_TRANSCODE_SUCCESS_CASE =
         "com.unirhy.e2e.TaskContentReadE2eTest#transcode task should complete successfully and write opus files"
     private const val TASK_SCAN_LIFECYCLE_CASE =
-        "com.unirhy.e2e.TaskContentReadE2eTest#scan task should report stats and reject duplicate submission"
+        "com.unirhy.e2e.TaskContentReadE2eTest#scan submission should report metadata parse stats and accept incremental duplicate submission"
     private const val WORK_ALBUM_READ_CASE =
         "com.unirhy.e2e.TaskContentReadE2eTest#works and albums should support read random and delete flow"
     private const val MEDIA_READ_CASE =
@@ -201,7 +201,7 @@ object ApiCoverageRegistry {
             "POST",
             "/api/task/scan",
             testRef = TASK_SCAN_LIFECYCLE_CASE,
-            note = "auth: $TASK_CONTENT_AUTH_REQUIRED_CASE; conflict: duplicate submission returns 409 while same provider task is pending or running",
+            note = "auth: $TASK_CONTENT_AUTH_REQUIRED_CASE; duplicate: repeated submission returns 202 and only supplements missing file tasks",
         ),
         full(
             "POST",

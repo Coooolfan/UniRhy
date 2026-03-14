@@ -9,6 +9,9 @@ import org.springframework.jdbc.core.namedparam.MapSqlParameterSource
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate
 import org.springframework.stereotype.Service
 import java.time.Instant
+import java.time.OffsetDateTime
+import java.time.ZoneOffset
+import java.sql.Types
 
 @Service
 class AsyncTaskQueueStore(
@@ -24,6 +27,7 @@ class AsyncTaskQueueStore(
             return 0
         }
         val now = Instant.now()
+        val createdAt = OffsetDateTime.ofInstant(now, ZoneOffset.UTC)
         val sql = """
             INSERT INTO public.async_task_log (
                 task_type,
@@ -47,7 +51,7 @@ class AsyncTaskQueueStore(
         val batchParams = paramsJsonList.map { paramsJson ->
             MapSqlParameterSource()
                 .addValue("taskType", taskType.name)
-                .addValue("createdAt", now)
+                .addValue("createdAt", createdAt, Types.TIMESTAMP_WITH_TIMEZONE)
                 .addValue("params", paramsJson)
                 .addValue("status", TaskStatus.PENDING.name)
         }.toTypedArray()

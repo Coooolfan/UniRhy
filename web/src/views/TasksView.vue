@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import DashboardTopBar from '@/components/dashboard/DashboardTopBar.vue'
 import TaskSubmissionModal from '@/components/tasks/TaskSubmissionModal.vue'
 import type { TaskStatus } from '@/__generated/model/enums/TaskStatus'
@@ -32,8 +32,9 @@ type TaskSummaryRow = {
     tone: SummaryTone
 }
 
-const TASK_TYPE_ORDER: TaskType[] = ['SCAN', 'TRANSCODE']
+const TASK_TYPE_ORDER: TaskType[] = ['METADATA_PARSE', 'TRANSCODE']
 const SUBMIT_FEEDBACK_DURATION_MS = 2000
+const TASK_AUTO_REFRESH_INTERVAL_MS = 2000
 
 const statusLabelMap: Record<TaskStatus, string> = {
     PENDING: '待处理',
@@ -59,7 +60,7 @@ const {
     submitError,
     fetchTaskCounts,
     fetchProviders,
-    startScanTask,
+    startMetadataParseTask,
     startTranscodeTask,
     clearSubmitError,
     init,
@@ -68,6 +69,7 @@ const {
 const isTaskModalOpen = ref(false)
 const submitFeedbackStatus = ref<SubmitFeedbackStatus>('idle')
 let submitFeedbackTimer: ReturnType<typeof setTimeout> | null = null
+let autoRefreshTimer: ReturnType<typeof setInterval> | null = null
 
 const taskActionButtonLabel = computed(() =>
     submitFeedbackStatus.value === 'success' ? '任务已提交' : '发起新任务',
@@ -168,7 +170,7 @@ const taskSummaryRows = computed<TaskSummaryRow[]>(() =>
 
 const queueSummaryText = computed(() => {
     if (activeTaskCount.value === 0) {
-        return '当前没有待处理任务。发起扫描或转码后，这里会显示最新的队列与结果统计。'
+        return '当前没有待处理任务。发起元数据解析或转码后，这里会显示最新的队列与结果统计。'
     }
 
     if (pendingTaskCount.value > 0 && runningTaskCount.value > 0) {
@@ -198,6 +200,34 @@ const clearSubmitFeedbackTimer = () => {
     submitFeedbackTimer = null
 }
 
+const clearAutoRefreshTimer = () => {
+    if (!autoRefreshTimer) {
+        return
+    }
+    clearInterval(autoRefreshTimer)
+    autoRefreshTimer = null
+}
+
+const refreshTaskCounts = () => {
+    if (isLoadingTaskCounts.value) {
+        return
+    }
+    void fetchTaskCounts()
+}
+
+const ensureAutoRefresh = () => {
+    if (activeTaskCount.value === 0) {
+        clearAutoRefreshTimer()
+        return
+    }
+    if (autoRefreshTimer) {
+        return
+    }
+    autoRefreshTimer = setInterval(() => {
+        refreshTaskCounts()
+    }, TASK_AUTO_REFRESH_INTERVAL_MS)
+}
+
 const showSubmitFeedback = () => {
     clearSubmitFeedbackTimer()
     submitFeedbackStatus.value = 'success'
@@ -213,6 +243,11 @@ onMounted(() => {
 
 onUnmounted(() => {
     clearSubmitFeedbackTimer()
+    clearAutoRefreshTimer()
+})
+
+watch(activeTaskCount, () => {
+    ensureAutoRefresh()
 })
 
 const openTaskModal = () => {
@@ -232,10 +267,11 @@ const closeTaskModal = () => {
     }
     isTaskModalOpen.value = false
     clearSubmitError()
+    refreshTaskCounts()
 }
 
-const handleScanSubmit = async (payload: ScanTaskRequest) => {
-    const submitOk = await startScanTask(payload.providerType, payload.providerId)
+const handleMetadataParseSubmit = async (payload: ScanTaskRequest) => {
+    const submitOk = await startMetadataParseTask(payload.providerType, payload.providerId)
     if (!submitOk) {
         return
     }
@@ -253,7 +289,7 @@ const handleTranscodeSubmit = async (payload: TranscodeTaskRequest) => {
 }
 
 const refreshAll = () => {
-    void fetchTaskCounts()
+    refreshTaskCounts()
 }
 </script>
 
@@ -293,7 +329,7 @@ const refreshAll = () => {
                 <div class="border border-[#EAE6DE] bg-[#FFFCF5] p-6 shadow-sm lg:col-span-1">
                     <h3 class="font-serif text-2xl text-[#2B221B]">异步任务</h3>
                     <p class="mt-2 text-sm leading-relaxed text-[#6B635B]">
-                        媒体库扫描、转码等长耗时任务
+                        元数据解析、转码等长耗时任务
                     </p>
 
                     <button
@@ -526,7 +562,7 @@ const refreshAll = () => {
             :is-submitting="isSubmitting"
             :submit-error="submitError"
             @close="closeTaskModal"
-            @submit-scan="handleScanSubmit"
+            @submit-metadata-parse="handleMetadataParseSubmit"
             @submit-transcode="handleTranscodeSubmit"
         />
     </div>

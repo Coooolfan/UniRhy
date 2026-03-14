@@ -16,7 +16,7 @@ export type TaskProviderOption = {
 }
 
 export const TASK_TYPE_LABEL_MAP: Record<TaskType, string> = {
-    SCAN: '媒体库扫描',
+    METADATA_PARSE: '元数据解析',
     TRANSCODE: '媒体转码',
 }
 
@@ -103,7 +103,7 @@ export const useTaskManagement = () => {
         }
     }
 
-    const startScanTask = (providerType: FileProviderType, providerId: number) => {
+    const startMetadataParseTask = (providerType: FileProviderType, providerId: number) => {
         const request: ScanTaskRequest = { providerType, providerId }
         return executeTask(() =>
             api.taskController.executeScanTask({
@@ -137,7 +137,7 @@ export const useTaskManagement = () => {
         submitError,
         fetchTaskCounts,
         fetchProviders,
-        startScanTask,
+        startMetadataParseTask,
         startTranscodeTask,
         clearSubmitError,
         init,
