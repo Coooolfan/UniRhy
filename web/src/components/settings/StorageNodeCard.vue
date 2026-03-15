@@ -19,9 +19,9 @@ const emit = defineEmits<{
     <div
         class="group relative bg-[#F7F5F0] p-0 rounded-sm hover:shadow-[0_8px_30px_rgba(0,0,0,0.04)] transition-all duration-300 border border-transparent hover:border-white"
     >
-        <div class="flex h-full">
+        <div class="flex h-full flex-col sm:flex-row">
             <div
-                class="w-24 bg-[#EAE6D9] flex items-center justify-center text-[#8A8A8A] border-r border-[#D6D1C4]/30 relative overflow-hidden group-hover:text-[#C67C4E] transition-colors duration-300"
+                class="relative flex h-20 items-center justify-center overflow-hidden border-b border-[#D6D1C4]/30 bg-[#EAE6D9] text-[#8A8A8A] transition-colors duration-300 group-hover:text-[#C67C4E] sm:h-auto sm:w-24 sm:border-b-0 sm:border-r"
             >
                 <HardDrive :size="32" stroke-width="1.5" />
             </div>
@@ -39,7 +39,7 @@ const emit = defineEmits<{
                         </div>
                     </div>
                     <div
-                        class="flex flex-col gap-1 items-end group-hover:opacity-0 transition-opacity duration-300"
+                        class="flex flex-col items-end gap-1 transition-opacity duration-300 group-hover:opacity-0"
                     >
                         <span
                             v-if="node.readonly"
@@ -67,7 +67,7 @@ const emit = defineEmits<{
             </div>
 
             <div
-                class="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                class="absolute right-4 top-4 flex gap-2 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100"
             >
                 <button
                     title="编辑"

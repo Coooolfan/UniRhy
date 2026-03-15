@@ -23,13 +23,19 @@ const emit = defineEmits<{
 </script>
 
 <template>
-    <div class="mt-8 flex flex-col md:flex-row gap-12 items-end mb-16">
+    <div
+        class="mb-12 mt-6 flex flex-col items-center gap-8 md:mb-16 md:mt-8 md:flex-row md:items-end md:gap-12"
+    >
         <div
-            class="relative z-0 group shrink-0 w-64 h-64 md:w-80 md:h-80 select-none perspective-1000"
+            class="relative z-0 group h-56 w-56 shrink-0 select-none perspective-1000 sm:h-64 sm:w-64 md:h-80 md:w-80"
         >
             <div
                 class="absolute top-2 right-2 bottom-2 left-2 bg-linear-to-tr from-gray-200 to-gray-100 rounded-full shadow-lg flex items-center justify-center transition-transform duration-2000 ease-out z-0"
-                :class="isCdVisible ? 'translate-x-16 md:translate-x-24' : 'translate-x-0'"
+                :class="
+                    isCdVisible
+                        ? 'translate-x-12 sm:translate-x-16 md:translate-x-24'
+                        : 'translate-x-0'
+                "
             >
                 <div class="w-1/3 h-1/3 border border-gray-300 rounded-full opacity-50"></div>
                 <div
@@ -55,28 +61,30 @@ const emit = defineEmits<{
             </div>
         </div>
 
-        <div class="flex flex-col gap-4 pb-2 w-full relative z-10">
-            <div class="flex items-center gap-3 text-sm tracking-wider uppercase text-[#8C857B]">
+        <div class="relative z-10 flex w-full flex-col gap-4 pb-2 text-center md:text-left">
+            <div
+                class="flex flex-wrap items-center justify-center gap-3 text-sm tracking-wider uppercase text-[#8C857B] md:justify-start"
+            >
                 <span>{{ albumData.type }}</span>
                 <span class="w-8 h-px bg-[#C17D46]"></span>
                 <span>{{ albumData.year }}</span>
             </div>
 
-            <h1 class="text-5xl md:text-7xl font-serif text-[#2C2420] leading-tight">
+            <h1 class="font-serif text-4xl leading-tight text-[#2C2420] sm:text-5xl md:text-7xl">
                 {{ albumData.title }}
             </h1>
 
-            <div class="text-xl text-[#5E564D] font-serif italic mb-2">
+            <div class="mb-2 font-serif text-lg italic text-[#5E564D] sm:text-xl">
                 By {{ albumData.artist }}
             </div>
 
-            <p class="text-sm text-[#8C857B] max-w-2xl line-clamp-3">
+            <p class="mx-auto max-w-2xl text-sm text-[#8C857B] line-clamp-3 md:mx-0">
                 {{ albumData.description }}
             </p>
 
-            <div class="flex items-center gap-4 mt-4">
+            <div class="mt-4 flex items-center justify-center gap-4 md:justify-start">
                 <button
-                    class="px-8 py-3 border border-[#C17D46] text-[#C17D46] hover:bg-[#C17D46] hover:text-white disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-[#C17D46] transition-all duration-300 flex items-center gap-2 text-sm tracking-widest uppercase font-medium rounded-sm cursor-pointer"
+                    class="flex w-full items-center justify-center gap-2 rounded-sm border border-[#C17D46] px-6 py-3 text-sm font-medium tracking-widest text-[#C17D46] uppercase transition-all duration-300 hover:bg-[#C17D46] hover:text-white disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-[#C17D46] sm:w-auto sm:px-8"
                     :disabled="!hasPlayableRecording"
                     @click="emit('play')"
                 >

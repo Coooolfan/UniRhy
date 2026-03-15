@@ -225,16 +225,18 @@ const playItem = async (item: DisplayItem) => {
     <div class="pb-32">
         <DashboardTopBar />
 
-        <div class="px-8 pt-6">
-            <div class="flex flex-wrap items-end justify-between gap-6 mb-8">
+        <div class="px-4 pt-4 sm:px-6 sm:pt-6 lg:px-8">
+            <div
+                class="mb-8 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between sm:gap-6"
+            >
                 <div>
-                    <h2 class="text-4xl font-serif text-[#2C2420] mb-2">资料库</h2>
+                    <h2 class="mb-2 text-3xl font-serif text-[#2C2420] sm:text-4xl">资料库</h2>
                     <p class="text-[#8C857B] font-serif italic">
                         Collection of your musical journeys.
                     </p>
                 </div>
 
-                <div class="flex items-center gap-4">
+                <div class="flex items-center justify-between gap-4 sm:justify-start">
                     <div class="flex bg-[#EFEAE2] p-1 rounded-md">
                         <button
                             class="p-2 rounded-sm transition-all"
@@ -262,7 +264,9 @@ const playItem = async (item: DisplayItem) => {
                 </div>
             </div>
 
-            <div class="flex flex-wrap gap-6 border-b border-[#D6D1C7] pb-4">
+            <div
+                class="flex gap-6 overflow-x-auto border-b border-[#D6D1C7] pb-4 whitespace-nowrap"
+            >
                 <button
                     class="text-sm tracking-wide transition-colors relative"
                     :class="
@@ -288,7 +292,7 @@ const playItem = async (item: DisplayItem) => {
             </div>
         </div>
 
-        <div class="px-8 mt-10">
+        <div class="mt-8 px-4 sm:mt-10 sm:px-6 lg:px-8">
             <div v-if="isLoading && displayItems.length === 0" class="text-[#8C857B] text-sm">
                 加载中...
             </div>
@@ -304,7 +308,7 @@ const playItem = async (item: DisplayItem) => {
 
                 <div
                     v-else-if="viewMode === 'grid'"
-                    class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-x-12 gap-y-16"
+                    class="grid grid-cols-2 gap-x-5 gap-y-10 sm:gap-x-8 sm:gap-y-12 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 xl:gap-x-12 xl:gap-y-16"
                 >
                     <template v-if="activeTab === 'Albums'">
                         <AlbumGridCard
@@ -342,7 +346,7 @@ const playItem = async (item: DisplayItem) => {
 
                 <div v-else class="space-y-2">
                     <div
-                        class="grid grid-cols-12 text-xs text-[#8C857B] uppercase tracking-wider border-b border-[#D6D1C7] pb-2 mb-2 px-4"
+                        class="mb-2 hidden grid-cols-12 border-b border-[#D6D1C7] px-4 pb-2 text-xs uppercase tracking-wider text-[#8C857B] md:grid"
                     >
                         <div class="col-span-1">#</div>
                         <div class="col-span-5">Title</div>
@@ -352,11 +356,11 @@ const playItem = async (item: DisplayItem) => {
                     <div
                         v-for="(item, idx) in displayItems"
                         :key="item.id"
-                        class="grid grid-cols-12 items-center px-4 py-3 hover:bg-[#EFEAE2]/60 rounded-sm group transition-colors cursor-pointer"
+                        class="group flex items-center gap-3 rounded-sm px-3 py-3 transition-colors hover:bg-[#EFEAE2]/60 sm:px-4 md:grid md:grid-cols-12"
                         @click="navigateToDetail(item.id)"
                     >
                         <div
-                            class="col-span-1 text-sm font-serif text-[#8C857B] group-hover:text-[#2C2420]"
+                            class="w-6 shrink-0 text-sm font-serif text-[#8C857B] group-hover:text-[#2C2420] md:col-span-1"
                         >
                             <span class="group-hover:hidden">{{
                                 (idx + 1 + pageIndex * pageSize).toString().padStart(2, '0')
@@ -380,7 +384,7 @@ const playItem = async (item: DisplayItem) => {
                                 <Play v-else :size="14" fill="currentColor" />
                             </button>
                         </div>
-                        <div class="col-span-5 flex items-center gap-4">
+                        <div class="flex min-w-0 flex-1 items-center gap-3 md:col-span-5 md:gap-4">
                             <div class="w-10 h-10 shadow-sm bg-[#D6D1C7] overflow-hidden">
                                 <img
                                     v-if="item.cover"
@@ -398,15 +402,25 @@ const playItem = async (item: DisplayItem) => {
                                 </div>
                             </div>
                         </div>
-                        <div class="col-span-4 text-sm text-[#5E5950]">{{ item.subtitle }}</div>
-                        <div class="col-span-2 text-sm text-[#8C857B] text-right">
-                            {{ item.details }}
+                        <div class="hidden text-sm text-[#5E5950] md:col-span-4 md:block">
+                            {{ item.subtitle }}
+                        </div>
+                        <div class="ml-auto text-right md:col-span-2">
+                            <div class="text-sm text-[#8C857B]">
+                                {{ item.details }}
+                            </div>
+                            <div class="mt-1 text-xs text-[#5E5950] md:hidden">
+                                {{ item.subtitle }}
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <div v-if="totalPageCount > 1" class="flex justify-center items-center mt-12 gap-6">
+            <div
+                v-if="totalPageCount > 1"
+                class="mt-10 flex items-center justify-center gap-4 sm:mt-12 sm:gap-6"
+            >
                 <button
                     :disabled="pageIndex === 0 || isLoading"
                     class="p-2 text-[#8C857B] hover:text-[#C27E46] disabled:opacity-30 disabled:hover:text-[#8C857B] transition-colors"

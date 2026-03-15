@@ -46,10 +46,12 @@ const handleUpdateReadonly = (value: boolean) => {
 
 <template>
     <section class="animate-in fade-in duration-500 font-serif">
-        <div class="flex items-center justify-between mb-6 border-b border-[#E0Dcd0] pb-2">
+        <div
+            class="mb-6 flex flex-col gap-4 border-b border-[#E0Dcd0] pb-3 sm:flex-row sm:items-center sm:justify-between sm:pb-2"
+        >
             <h2 class="text-2xl font-serif text-[#4A3B32] tracking-wide">存储节点</h2>
             <button
-                class="group flex items-center px-6 py-2 bg-[#C67C4E] text-[#F7F5F0] hover:bg-[#A6633C] transition-all duration-300 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                class="group flex w-full items-center justify-center gap-2 bg-[#C67C4E] px-6 py-2 text-[#F7F5F0] transition-all duration-300 shadow-md hover:bg-[#A6633C] hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto sm:justify-start"
                 :disabled="isCreating || isSaving"
                 @click="emit('start-create')"
             >

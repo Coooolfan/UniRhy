@@ -341,10 +341,10 @@ const playItem = async (item: SearchResultItem) => {
             @update:model-value="(v) => (searchQuery = v)"
         />
 
-        <div class="px-8 pt-6">
-            <div class="mb-8 flex items-start justify-between gap-4">
+        <div class="px-4 pt-4 sm:px-6 sm:pt-6 lg:px-8">
+            <div class="mb-8 flex flex-col items-start gap-4 sm:flex-row sm:justify-between">
                 <div>
-                    <h2 class="text-4xl font-serif text-[#2C2420] mb-2">搜索结果</h2>
+                    <h2 class="mb-2 text-3xl font-serif text-[#2C2420] sm:text-4xl">搜索结果</h2>
                     <p class="text-[#8C857B] font-serif italic">
                         Search results for "{{ searchQuery }}"
                     </p>
@@ -352,14 +352,16 @@ const playItem = async (item: SearchResultItem) => {
                 <button
                     v-if="hasSelectedWorks"
                     type="button"
-                    class="shrink-0 mt-1 px-4 py-2 border border-[#C27E46] text-[#C27E46] text-sm tracking-wide transition-colors hover:bg-[#C27E46] hover:text-white"
+                    class="mt-1 w-full border border-[#C27E46] px-4 py-2 text-sm tracking-wide text-[#C27E46] transition-colors hover:bg-[#C27E46] hover:text-white sm:w-auto sm:shrink-0"
                     @click="openMergeModal"
                 >
                     合并
                 </button>
             </div>
 
-            <div class="flex flex-wrap gap-6 border-b border-[#D6D1C7] pb-4 mb-8">
+            <div
+                class="mb-8 flex gap-6 overflow-x-auto border-b border-[#D6D1C7] pb-4 whitespace-nowrap"
+            >
                 <button
                     v-for="tab in searchTabs"
                     :key="tab"
@@ -393,7 +395,7 @@ const playItem = async (item: SearchResultItem) => {
                         艺术家
                     </h3>
                     <div
-                        class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-8"
+                        class="grid grid-cols-2 gap-5 sm:gap-8 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6"
                     >
                         <div
                             v-for="item in filteredResults.artists"
@@ -401,7 +403,7 @@ const playItem = async (item: SearchResultItem) => {
                             class="group cursor-pointer text-center"
                         >
                             <div
-                                class="relative aspect-square mb-4 mx-auto w-32 h-32 md:w-40 md:h-40 rounded-full overflow-hidden shadow-md bg-[#EFEAE2] flex items-center justify-center text-6xl group-hover:scale-105 transition-transform duration-300"
+                                class="relative mx-auto mb-4 flex h-24 w-24 aspect-square items-center justify-center overflow-hidden rounded-full bg-[#EFEAE2] text-6xl shadow-md transition-transform duration-300 group-hover:scale-105 sm:h-32 sm:w-32 md:h-40 md:w-40"
                             >
                                 <svg
                                     xmlns="http://www.w3.org/2000/svg"
@@ -486,7 +488,7 @@ const playItem = async (item: SearchResultItem) => {
                         专辑
                     </h3>
                     <div
-                        class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-x-12 gap-y-16"
+                        class="grid grid-cols-2 gap-x-5 gap-y-10 sm:gap-x-8 sm:gap-y-12 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 xl:gap-x-12 xl:gap-y-16"
                     >
                         <AlbumGridCard
                             v-for="item in filteredResults.albums"
@@ -509,7 +511,7 @@ const playItem = async (item: SearchResultItem) => {
                         作品
                     </h3>
                     <div
-                        class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-x-12 gap-y-16"
+                        class="grid grid-cols-2 gap-x-5 gap-y-10 sm:gap-x-8 sm:gap-y-12 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 xl:gap-x-12 xl:gap-y-16"
                     >
                         <WorkGridCard
                             v-for="item in filteredResults.works"

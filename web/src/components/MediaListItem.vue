@@ -26,16 +26,16 @@ const emit = defineEmits<{
     <!-- Cover (Optional) -->
     <div
         v-if="cover"
-        class="w-10 h-10 shrink-0 bg-[#D6D1C7] rounded-sm overflow-hidden shadow-sm hidden md:block"
+        class="hidden h-10 w-10 shrink-0 overflow-hidden rounded-sm bg-[#D6D1C7] shadow-sm sm:block"
     >
         <img :src="cover" class="w-full h-full object-cover" />
     </div>
 
     <!-- Main Content -->
     <div class="flex-1 min-w-0">
-        <div class="flex items-center gap-2">
+        <div class="flex flex-wrap items-center gap-2">
             <!-- Title -->
-            <div class="text-base font-medium truncate text-[#4A433B]">
+            <div class="truncate text-base font-medium text-[#4A433B]">
                 {{ title }}
             </div>
             <!-- Default Badge (Optional) -->
@@ -49,6 +49,9 @@ const emit = defineEmits<{
         <div v-if="subtitle" class="text-sm text-[#8C857B] truncate">
             {{ subtitle }}
         </div>
+        <div v-if="label" class="mt-1 text-xs text-[#B0AAA0] truncate lg:hidden">
+            {{ label }}
+        </div>
     </div>
 
     <!-- Label -->
@@ -58,7 +61,7 @@ const emit = defineEmits<{
 
     <!-- Play Button (Hover) -->
     <div
-        class="hidden md:flex opacity-0 group-hover:opacity-100 transition-opacity gap-4 mr-4 text-[#8C857B]"
+        class="mr-1 flex shrink-0 items-center gap-3 text-[#8C857B] transition-opacity md:mr-4 md:gap-4 md:opacity-0 md:group-hover:opacity-100"
     >
         <button
             v-if="showRemoveButton"

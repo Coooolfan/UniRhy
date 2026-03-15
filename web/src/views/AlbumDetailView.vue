@@ -273,7 +273,7 @@ watch(
             Loading...
         </div>
 
-        <div v-else class="px-8 pb-32 max-w-5xl mx-auto w-full">
+        <div v-else class="mx-auto w-full max-w-5xl px-4 pb-32 sm:px-6 lg:px-8">
             <AlbumDetailHero
                 :album-data="albumData"
                 :is-cd-visible="isCdVisible"

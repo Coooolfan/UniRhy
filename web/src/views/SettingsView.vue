@@ -43,8 +43,8 @@ onMounted(() => {
     <div class="pb-32 text-[#3D3D3D] font-sans selection:bg-[#C67C4E] selection:text-white">
         <DashboardTopBar />
 
-        <div class="max-w-5xl mx-auto px-8 pt-6">
-            <header class="mb-12">
+        <div class="mx-auto max-w-5xl px-4 pt-4 sm:px-6 sm:pt-6 lg:px-8">
+            <header class="mb-10 sm:mb-12">
                 <h1 class="font-serif text-3xl text-[#2B221B] tracking-tight mb-2">系统设置</h1>
                 <p class="text-[#8A8A8A] font-serif italic text-sm">
                     System Configuration & Storage Management

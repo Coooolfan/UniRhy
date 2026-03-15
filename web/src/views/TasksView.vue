@@ -297,8 +297,10 @@ const refreshAll = () => {
     <div class="pb-32 font-sans text-[#5A524A] selection:bg-[#C67C4E] selection:text-white">
         <DashboardTopBar />
 
-        <div class="mx-auto w-full max-w-5xl px-8 pt-6">
-            <div class="mb-8 flex items-end justify-between border-b border-[#EAE6DE] pb-4">
+        <div class="mx-auto w-full max-w-5xl px-4 pt-4 sm:px-6 sm:pt-6 lg:px-8">
+            <div
+                class="mb-8 flex flex-col gap-4 border-b border-[#EAE6DE] pb-4 sm:flex-row sm:items-end sm:justify-between"
+            >
                 <div>
                     <h2 class="mb-1 font-serif text-3xl text-[#2B221B]">任务管理</h2>
                     <p class="font-serif text-sm italic text-[#8A8A8A]">
@@ -316,7 +318,7 @@ const refreshAll = () => {
             </div>
         </div>
 
-        <div class="mx-auto w-full max-w-5xl px-8 mt-10">
+        <div class="mx-auto w-full max-w-5xl px-4 mt-10 sm:px-6 lg:px-8">
             <div
                 v-if="taskError"
                 class="mb-6 flex items-center border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700"

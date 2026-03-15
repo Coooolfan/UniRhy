@@ -1,19 +1,19 @@
 <template>
     <div
-        class="auth-shell min-h-screen flex items-center justify-center p-4 relative overflow-hidden font-serif text-[#2c2825]"
+        class="auth-shell relative flex min-h-screen items-center justify-center overflow-x-hidden overflow-y-auto px-4 py-6 font-serif text-[#2c2825] md:overflow-y-hidden md:p-4"
     >
         <!-- Main Container -->
         <div
-            class="relative z-10 w-full max-w-sm sm:max-w-100 h-125 perspective-1000 mx-auto translate-x-64"
+            class="relative z-10 mx-auto h-125 w-full max-w-sm perspective-1000 md:translate-x-64 md:max-w-100"
         >
             <div class="deco-circle circle-1"></div>
             <div class="deco-circle circle-2"></div>
             <!-- Register Card (Back/Front based on state) -->
             <div
-                class="paper-card absolute inset-0 rounded-xs p-10 flex flex-col transition-all duration-700 ease-in-out"
+                class="paper-card absolute inset-0 flex flex-col rounded-xs p-6 transition-all duration-700 ease-in-out sm:p-10"
                 :class="
                     isLoginMode
-                        ? 'z-0 transform -rotate-3 -translate-x-4 translate-y-2 opacity-80 scale-[0.98] cursor-pointer hover:-translate-y-1'
+                        ? 'z-0 transform -rotate-3 -translate-x-2 translate-y-2 opacity-80 scale-[0.98] cursor-pointer md:-translate-x-4 md:hover:-translate-y-1'
                         : 'z-20 transform rotate-0 translate-x-0 translate-y-0 opacity-100 scale-100'
                 "
                 :role="isLoginMode ? 'button' : undefined"
@@ -24,7 +24,7 @@
             >
                 <div v-if="!isLoginMode" class="relative h-full flex flex-col">
                     <h1
-                        class="text-3xl font-bold mb-10 text-left tracking-widest border-b-2 border-[#2c2825] pb-4"
+                        class="mb-8 border-b-2 border-[#2c2825] pb-4 text-left text-3xl font-bold tracking-widest sm:mb-10"
                     >
                         注册
                     </h1>
@@ -117,9 +117,11 @@
                 <!-- Vertical Text for collapsed state -->
                 <div
                     v-else
-                    class="h-full flex items-center justify-center opacity-40 group-hover:opacity-60 transition-opacity"
+                    class="flex h-full items-center justify-center opacity-40 transition-opacity md:group-hover:opacity-60"
                 >
-                    <h2 class="text-3xl font-bold tracking-widest writing-vertical-rl select-none">
+                    <h2
+                        class="writing-vertical-rl select-none text-2xl font-bold tracking-widest sm:text-3xl"
+                    >
                         登录
                     </h2>
                 </div>
@@ -127,10 +129,10 @@
 
             <!-- Login Card (Back/Front based on state) -->
             <div
-                class="paper-card absolute inset-0 rounded-xs p-10 flex flex-col transition-all duration-700 ease-in-out"
+                class="paper-card absolute inset-0 flex flex-col rounded-xs p-6 transition-all duration-700 ease-in-out sm:p-10"
                 :class="
                     !isLoginMode
-                        ? 'z-0 transform rotate-3 translate-x-4 translate-y-2 opacity-80 scale-[0.98] cursor-pointer hover:-translate-y-1'
+                        ? 'z-0 transform rotate-3 translate-x-2 translate-y-2 opacity-80 scale-[0.98] cursor-pointer md:translate-x-4 md:hover:-translate-y-1'
                         : 'z-20 transform rotate-0 translate-x-0 translate-y-0 opacity-100 scale-100'
                 "
                 :role="!isLoginMode ? 'button' : undefined"
@@ -141,14 +143,14 @@
             >
                 <div v-if="isLoginMode" class="relative h-full flex flex-col">
                     <h1
-                        class="text-3xl mb-10 text-left tracking-widest border-b-2 border-[#2c2825] pb-4"
+                        class="mb-8 border-b-2 border-[#2c2825] pb-4 text-left text-3xl tracking-widest sm:mb-10"
                     >
                         欢迎回来
                     </h1>
 
                     <form
                         @submit.prevent="handleLogin"
-                        class="flex-1 flex flex-col justify-center space-y-8"
+                        class="flex-1 flex flex-col justify-center space-y-6 sm:space-y-8"
                     >
                         <div class="group relative">
                             <input
@@ -236,7 +238,9 @@
                 </div>
 
                 <div v-else class="h-full flex items-center justify-center opacity-40">
-                    <h2 class="text-3xl font-bold tracking-widest writing-vertical-rl select-none">
+                    <h2
+                        class="writing-vertical-rl select-none text-2xl font-bold tracking-widest sm:text-3xl"
+                    >
                         注册
                     </h2>
                 </div>

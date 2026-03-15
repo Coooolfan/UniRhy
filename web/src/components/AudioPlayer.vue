@@ -148,20 +148,20 @@ const syncStatusClass = computed(() => {
         >
             <div
                 v-show="!audioStore.isPlayerHidden"
-                class="fixed bottom-0 left-0 right-0 z-50 bg-[#FDFBF7] border-t border-[#EFEBE4] shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] px-4 py-3 md:px-8"
+                class="fixed bottom-0 left-0 right-0 z-50 border-t border-[#EFEBE4] bg-[#FDFBF7] px-3 py-3 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] sm:px-4 md:px-8"
             >
                 <div
-                    class="max-w-7xl mx-auto flex items-center justify-between gap-4 transition-all duration-280 ease-in transform-gpu will-change-transform will-change-opacity"
+                    class="mx-auto flex max-w-7xl flex-col gap-3 transition-all duration-280 ease-in transform-gpu will-change-transform will-change-opacity md:flex-row md:items-center md:justify-between md:gap-4"
                     :class="
                         isExpandedPlayerLeaving
                             ? 'translate-x-8 translate-y-4 opacity-0'
                             : 'translate-x-0 translate-y-0 opacity-100'
                     "
                 >
-                    <div class="flex items-center gap-4 w-1/4 min-w-0">
+                    <div class="flex min-w-0 items-center gap-3 md:w-1/4 md:gap-4">
                         <div
                             v-if="audioStore.currentTrack.cover"
-                            class="w-12 h-12 rounded-sm overflow-hidden bg-[#D6D1C7] shrink-0 shadow-sm"
+                            class="h-11 w-11 shrink-0 overflow-hidden rounded-sm bg-[#D6D1C7] shadow-sm md:h-12 md:w-12"
                         >
                             <img
                                 :src="audioStore.currentTrack.cover"
@@ -192,8 +192,8 @@ const syncStatusClass = computed(() => {
                         </div>
                     </div>
 
-                    <div class="flex flex-col items-center flex-1 max-w-2xl gap-1">
-                        <div class="flex items-center gap-6">
+                    <div class="flex w-full flex-col items-center gap-1 md:max-w-2xl md:flex-1">
+                        <div class="flex items-center gap-5 sm:gap-6">
                             <button
                                 class="text-[#8C857B] hover:text-[#C17D46] transition-colors"
                                 disabled
@@ -227,9 +227,9 @@ const syncStatusClass = computed(() => {
                         </div>
 
                         <div
-                            class="w-full flex items-center gap-3 text-xs text-[#8C857B] font-medium tracking-wide"
+                            class="flex w-full items-center gap-2 text-[11px] font-medium tracking-wide text-[#8C857B] sm:gap-3 sm:text-xs"
                         >
-                            <span class="w-10 text-right">{{
+                            <span class="w-9 text-right sm:w-10">{{
                                 formatTime(displayedCurrentTime)
                             }}</span>
                             <div
@@ -263,8 +263,10 @@ const syncStatusClass = computed(() => {
                         </div>
                     </div>
 
-                    <div class="flex items-center justify-end gap-4 w-1/4">
-                        <div class="flex items-center gap-2 group">
+                    <div
+                        class="flex w-full items-center justify-between gap-4 md:w-1/4 md:justify-end"
+                    >
+                        <div class="group hidden items-center gap-2 sm:flex">
                             <button
                                 @click="toggleMute"
                                 class="text-[#8C857B] hover:text-[#C17D46] transition-colors"
@@ -295,6 +297,16 @@ const syncStatusClass = computed(() => {
                                 ></div>
                             </div>
                         </div>
+
+                        <button
+                            type="button"
+                            class="p-1 text-[#8C857B] transition-colors hover:text-[#C17D46] sm:hidden"
+                            aria-label="静音切换"
+                            @click="toggleMute"
+                        >
+                            <VolumeX v-if="audioStore.volume === 0" :size="18" />
+                            <Volume2 v-else :size="18" />
+                        </button>
 
                         <button
                             @click="audioStore.stop()"
@@ -336,8 +348,8 @@ const syncStatusClass = computed(() => {
                         type="button"
                         class="absolute rounded-full flex items-center justify-center transition-all duration-600 ease-[cubic-bezier(0.34,1.56,0.64,1)] shadow-[-10px_-10px_30px_rgba(0,0,0,0.04)]"
                         :style="{
-                            width: '288px',
-                            height: '288px',
+                            width: 'min(288px, 62vw)',
+                            height: 'min(288px, 62vw)',
                             backgroundColor: cornerTheme.sleeveBg,
                             border: `1px solid ${cornerTheme.border}`,
                             transform: isCornerHovered
@@ -385,8 +397,8 @@ const syncStatusClass = computed(() => {
                         type="button"
                         class="absolute rounded-full transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] shadow-[-4px_-4px_15px_rgba(0,0,0,0.1)] flex items-center justify-center overflow-hidden cursor-pointer"
                         :style="{
-                            width: isCornerHovered ? '230px' : '200px',
-                            height: isCornerHovered ? '230px' : '200px',
+                            width: isCornerHovered ? 'min(230px, 48vw)' : 'min(200px, 42vw)',
+                            height: isCornerHovered ? 'min(230px, 48vw)' : 'min(200px, 42vw)',
                             background: `conic-gradient(from 0deg, transparent 0%, rgba(255,255,255,0.08) 15%, transparent 30%, transparent 50%, rgba(255,255,255,0.08) 65%, transparent 80%), repeating-radial-gradient(circle at 50% 50%, #1A1A1A 0%, #242424 1%, #1A1A1A 2%)`,
                             backgroundColor: '#1A1A1A',
                         }"

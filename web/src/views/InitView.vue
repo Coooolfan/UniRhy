@@ -4,7 +4,7 @@
     >
         <!-- Brand Watermark -->
         <h1
-            class="absolute top-8 left-8 md:top-12 md:left-12 font-serif text-2xl tracking-wide text-[#2C2C2C] opacity-80 z-20"
+            class="absolute left-5 top-5 z-20 font-serif text-xl tracking-wide text-[#2C2C2C] opacity-80 sm:left-8 sm:top-8 sm:text-2xl md:left-12 md:top-12"
         >
             UniRhy.
         </h1>
@@ -189,12 +189,12 @@
 
                         <!-- Bottom: Action Button (Fixed Layout) -->
                         <div
-                            class="relative z-10 pt-10 md:pt-0 flex justify-end items-center gap-6 mt-8 md:mt-0"
+                            class="relative z-10 mt-8 flex items-center justify-start gap-6 pt-10 md:mt-0 md:justify-end md:pt-0"
                         >
                             <button
                                 type="submit"
                                 :disabled="isSubmitting"
-                                class="group px-8 py-3 bg-[#2C2C2C] text-[#F0ECE6] hover:bg-[#D4A373] transition-all duration-300 rounded-[2px] shadow-lg flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+                                class="group flex w-full items-center justify-center gap-2 rounded-[2px] bg-[#2C2C2C] px-8 py-3 text-[#F0ECE6] shadow-lg transition-all duration-300 hover:bg-[#D4A373] disabled:cursor-not-allowed disabled:opacity-70 sm:w-auto"
                             >
                                 <span class="font-medium tracking-widest text-xs uppercase">{{
                                     isSubmitting ? 'INITIALIZING...' : 'INITIALIZE'

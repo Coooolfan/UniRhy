@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { ChevronRight, Music, Plus } from 'lucide-vue-next'
+import { ChevronLeft, ChevronRight, Music, Plus, X } from 'lucide-vue-next'
 import { computed, onMounted, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRoute, useRouter } from 'vue-router'
 import { api, normalizeApiError } from '@/ApiInstance'
+import { useDashboardLayout } from '@/composables/useDashboardLayout'
 import { useAudioStore } from '@/stores/audio'
 import { usePlaylistStore } from '@/stores/playlist'
 
@@ -17,6 +18,8 @@ const router = useRouter()
 const route = useRoute()
 const audioStore = useAudioStore()
 const playlistStore = usePlaylistStore()
+const { isDesktopSidebarCollapsed, isMobileSidebarOpen, closeSidebar, closeMobileSidebar } =
+    useDashboardLayout()
 const {
     playlists,
     isLoading: isLoadingPlaylists,
@@ -47,6 +50,13 @@ const playlistSectionTransitionStyle = computed(() => {
     }
 })
 
+const sidebarWrapperClass = computed(() => (isDesktopSidebarCollapsed.value ? 'md:w-0' : 'md:w-64'))
+
+const sidebarPanelClass = computed(() => [
+    isMobileSidebarOpen.value ? 'translate-x-0' : '-translate-x-full',
+    isDesktopSidebarCollapsed.value ? 'md:-translate-x-full' : 'md:translate-x-0',
+])
+
 const isActive = (item: NavItem) => {
     if (!item.routeName) {
         return false
@@ -58,7 +68,16 @@ const isActive = (item: NavItem) => {
 const handleNavClick = (item: NavItem) => {
     if (item.routeName) {
         router.push({ name: item.routeName })
+        closeMobileSidebar()
     }
+}
+
+const handlePlaylistClick = (playlistId: number) => {
+    router.push({
+        name: 'playlist-detail',
+        params: { id: playlistId },
+    })
+    closeMobileSidebar()
 }
 
 const resetCreatePlaylistForm = () => {
@@ -118,81 +137,123 @@ onMounted(() => {
 </script>
 
 <template>
-    <aside class="w-64 flex flex-col pt-12 pl-10 pr-6 z-10 md:flex bg-[#EBE7E0]">
-        <div class="mb-12">
-            <h1 class="text-3xl font-serif tracking-tight text-[#2C2C2C]">UniRhy.</h1>
-        </div>
-
-        <nav class="space-y-6 flex-1">
-            <div
-                v-for="item in navItems"
-                :key="item.label"
-                class="text-sm cursor-pointer transition-colors duration-300"
-                :class="
-                    isActive(item)
-                        ? 'text-[#C27E46] font-medium'
-                        : 'text-[#8A857D] hover:text-[#5E5950]'
-                "
-                @click="handleNavClick(item)"
-            >
-                {{ item.label }}
-            </div>
-        </nav>
-
+    <Transition
+        enter-active-class="transition-opacity duration-200 ease-out"
+        enter-from-class="opacity-0"
+        enter-to-class="opacity-100"
+        leave-active-class="transition-opacity duration-150 ease-in"
+        leave-from-class="opacity-100"
+        leave-to-class="opacity-0"
+    >
         <div
-            class="transition-[padding-bottom] ease-[cubic-bezier(0.22,1,0.36,1)]"
-            :style="playlistSectionTransitionStyle"
+            v-if="isMobileSidebarOpen"
+            class="fixed inset-0 z-30 bg-[#2B221B]/40 md:hidden"
+            @click="closeMobileSidebar"
+        ></div>
+    </Transition>
+
+    <div
+        class="relative z-20 md:shrink-0 md:transition-[width] md:duration-300 md:ease-out"
+        :class="sidebarWrapperClass"
+    >
+        <aside
+            class="fixed inset-y-0 left-0 z-40 flex w-72 max-w-[86vw] flex-col bg-[#EBE7E0] px-6 pb-6 pt-6 shadow-[0_24px_80px_rgba(44,34,27,0.18)] transition-transform duration-300 ease-out md:absolute md:top-0 md:h-full md:w-64 md:max-w-none md:bg-[#EBE7E0] md:px-0 md:pb-0 md:pt-0 md:shadow-none"
+            :class="sidebarPanelClass"
         >
-            <button
-                v-if="!isLoadingPlaylists && !playlistError && playlists.length === 0"
-                type="button"
-                class="inline-flex items-center gap-2 text-sm text-[#8A857D] hover:text-[#C27E46] transition-colors"
-                @click="openCreatePlaylistModal"
-            >
-                <span>创建歌单</span>
-                <ChevronRight :size="14" aria-hidden="true" />
-            </button>
-            <template v-else>
-                <div class="mb-4 flex items-center justify-between border-b border-[#D6D1C7] pb-2">
-                    <span class="text-xs text-[#9C968B] uppercase tracking-widest">我的歌单</span>
+            <div class="flex h-full min-h-0 flex-col md:pl-10 md:pr-6 md:pt-12">
+                <div class="mb-8 flex items-center justify-between md:mb-12">
+                    <h1 class="text-3xl font-serif tracking-tight text-[#2C2C2C]">UniRhy.</h1>
                     <button
-                        v-if="!isLoadingPlaylists && !playlistError && playlists.length > 0"
                         type="button"
-                        class="inline-flex h-5 w-5 items-center justify-center text-[#8A857D] hover:text-[#C27E46] transition-colors"
-                        aria-label="创建歌单"
-                        @click="openCreatePlaylistModal"
+                        class="inline-flex h-9 w-9 items-center justify-center rounded-full text-[#8A857D] transition-colors hover:bg-white/60 hover:text-[#5E5950]"
+                        aria-label="切换侧边栏"
+                        @click="closeSidebar"
                     >
-                        <Plus :size="14" aria-hidden="true" />
+                        <X class="md:hidden" :size="18" />
+                        <ChevronLeft class="hidden md:block" :size="18" />
                     </button>
                 </div>
-                <div v-if="isLoadingPlaylists" class="text-sm text-[#9C968B]">加载中...</div>
-                <div v-else-if="playlistError" class="text-sm text-red-500">
-                    {{ playlistError }}
-                </div>
-                <ul v-else class="space-y-3 text-sm text-[#6B665E]">
-                    <li
-                        v-for="playlist in playlists"
-                        :key="playlist.id"
-                        class="cursor-pointer transition-colors"
-                        :class="
-                            route.name === 'playlist-detail' &&
-                            Number(route.params.id) === playlist.id
-                                ? 'text-[#C27E46] font-medium'
-                                : 'hover:text-[#C27E46]'
-                        "
-                        @click="
-                            router.push({
-                                name: 'playlist-detail',
-                                params: { id: playlist.id },
-                            })
-                        "
+
+                <div class="flex min-h-0 flex-1 flex-col">
+                    <nav class="space-y-2 md:space-y-6">
+                        <button
+                            v-for="item in navItems"
+                            :key="item.label"
+                            type="button"
+                            class="block w-full text-left text-sm transition-colors duration-300"
+                            :class="
+                                isActive(item)
+                                    ? 'font-medium text-[#C27E46]'
+                                    : 'text-[#8A857D] hover:text-[#5E5950]'
+                            "
+                            @click="handleNavClick(item)"
+                        >
+                            {{ item.label }}
+                        </button>
+                    </nav>
+
+                    <div
+                        class="mt-8 min-h-0 flex-1 overflow-y-auto pr-1 md:mt-10 md:pr-0"
+                        :style="playlistSectionTransitionStyle"
                     >
-                        {{ playlist.name }}
-                    </li>
-                </ul>
-            </template>
-        </div>
-    </aside>
+                        <button
+                            v-if="!isLoadingPlaylists && !playlistError && playlists.length === 0"
+                            type="button"
+                            class="inline-flex items-center gap-2 text-sm text-[#8A857D] transition-colors hover:text-[#C27E46]"
+                            @click="openCreatePlaylistModal"
+                        >
+                            <span>创建歌单</span>
+                            <ChevronRight :size="14" aria-hidden="true" />
+                        </button>
+                        <template v-else>
+                            <div
+                                class="mb-4 flex items-center justify-between border-b border-[#D6D1C7] pb-2"
+                            >
+                                <span class="text-xs uppercase tracking-widest text-[#9C968B]"
+                                    >我的歌单</span
+                                >
+                                <button
+                                    v-if="
+                                        !isLoadingPlaylists &&
+                                        !playlistError &&
+                                        playlists.length > 0
+                                    "
+                                    type="button"
+                                    class="inline-flex h-5 w-5 items-center justify-center text-[#8A857D] transition-colors hover:text-[#C27E46]"
+                                    aria-label="创建歌单"
+                                    @click="openCreatePlaylistModal"
+                                >
+                                    <Plus :size="14" aria-hidden="true" />
+                                </button>
+                            </div>
+                            <div v-if="isLoadingPlaylists" class="text-sm text-[#9C968B]">
+                                加载中...
+                            </div>
+                            <div v-else-if="playlistError" class="text-sm text-red-500">
+                                {{ playlistError }}
+                            </div>
+                            <ul v-else class="space-y-3 pb-2 text-sm text-[#6B665E]">
+                                <li
+                                    v-for="playlist in playlists"
+                                    :key="playlist.id"
+                                    class="cursor-pointer transition-colors"
+                                    :class="
+                                        route.name === 'playlist-detail' &&
+                                        Number(route.params.id) === playlist.id
+                                            ? 'font-medium text-[#C27E46]'
+                                            : 'hover:text-[#C27E46]'
+                                    "
+                                    @click="handlePlaylistClick(playlist.id)"
+                                >
+                                    {{ playlist.name }}
+                                </li>
+                            </ul>
+                        </template>
+                    </div>
+                </div>
+            </div>
+        </aside>
+    </div>
 
     <Teleport to="body">
         <Transition

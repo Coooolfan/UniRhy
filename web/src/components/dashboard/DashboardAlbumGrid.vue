@@ -166,7 +166,7 @@ onMounted(() => {
 
         <div
             v-else
-            class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-8 px-2"
+            class="grid grid-cols-2 gap-5 px-1 sm:grid-cols-3 sm:gap-8 sm:px-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6"
         >
             <div
                 v-for="(album, idx) in albums"
@@ -186,7 +186,7 @@ onMounted(() => {
                     <!-- Floating Play Button -->
                     <button
                         type="button"
-                        class="absolute bottom-3 right-3 w-8 h-8 bg-white/90 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 shadow-sm translate-y-2 group-hover:translate-y-0"
+                        class="absolute bottom-3 right-3 flex h-8 w-8 translate-y-0 items-center justify-center rounded-full bg-white/90 opacity-100 shadow-sm transition-all duration-300 sm:translate-y-2 sm:opacity-0 sm:group-hover:translate-y-0 sm:group-hover:opacity-100"
                         @click.stop="playAlbum(album)"
                     >
                         <Play
@@ -205,7 +205,7 @@ onMounted(() => {
                     </button>
                 </div>
                 <h4
-                    class="font-serif text-[#2C2C2C] text-lg leading-tight group-hover:text-[#C27E46] transition-colors line-clamp-1"
+                    class="line-clamp-2 font-serif text-base leading-tight text-[#2C2C2C] transition-colors group-hover:text-[#C27E46] sm:text-lg"
                 >
                     {{ album.title }}
                 </h4>
