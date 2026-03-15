@@ -64,15 +64,32 @@ class TranscodeTaskService(
         }
         try {
             transactionTemplate.executeWithoutResult {
-                val claimedTask = queueStore.claimNext(TaskType.TRANSCODE) ?: return@executeWithoutResult
-                val payload = objectMapper.readValue(claimedTask.paramsJson, TranscodeTaskPayload::class.java)
-                try {
-                    execute(payload)
-                    queueStore.completeTask(claimedTask.id, TaskStatus.COMPLETED, "SUCCESS")
-                } catch (ex: Throwable) {
-                    logger.error("Transcode task failed, logId={}", claimedTask.id, ex)
-                    queueStore.completeTask(claimedTask.id, TaskStatus.FAILED, failureReason(ex))
+                val claimedTasks = queueStore.claim(TaskType.TRANSCODE, TRANSCODE_CLAIM_LIMIT)
+                if (claimedTasks.isEmpty()) {
+                    return@executeWithoutResult
                 }
+                val completionUpdates = mutableListOf<AsyncTaskLog>()
+                for (claimedTask in claimedTasks) {
+                    try {
+                        val payload = objectMapper.readValue(claimedTask.params, TranscodeTaskPayload::class.java)
+                        execute(payload)
+                        completionUpdates +=
+                            AsyncTaskLog {
+                                id = claimedTask.id
+                                status = TaskStatus.COMPLETED
+                                completedReason = "SUCCESS"
+                            }
+                    } catch (ex: Throwable) {
+                        logger.error("Transcode task failed, logId={}", claimedTask.id, ex)
+                        completionUpdates +=
+                            AsyncTaskLog {
+                                id = claimedTask.id
+                                status = TaskStatus.FAILED
+                                completedReason = failureReason(ex)
+                            }
+                    }
+                }
+                sql.saveEntities(completionUpdates, SaveMode.UPDATE_ONLY)
             }
         } catch (ex: Throwable) {
             logger.error("Failed to consume pending transcode task", ex)
@@ -279,6 +296,7 @@ class TranscodeTaskService(
     }
 
     private companion object {
+        private const val TRANSCODE_CLAIM_LIMIT = 1L
         private const val MAX_PROCESS_ERROR_SUMMARY_LENGTH = 300
         private val WHITESPACE_REGEX = "\\s+".toRegex()
     }

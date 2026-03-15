@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
     ChevronLeft,
@@ -38,7 +38,6 @@ const route = useRoute()
 const audioStore = useAudioStore()
 const viewMode = ref<'grid' | 'list'>('grid')
 const activeTab = ref<'Albums' | 'Works'>('Albums')
-const searchQuery = ref('')
 const displayItems = ref<DisplayItem[]>([])
 const isLoading = ref(false)
 const errorMessage = ref('')
@@ -172,19 +171,6 @@ watch(
     { immediate: true },
 )
 
-const filteredItems = computed(() => {
-    const query = searchQuery.value.trim().toLowerCase()
-    if (!query) {
-        return displayItems.value
-    }
-
-    return displayItems.value.filter((item) => {
-        return (
-            item.title.toLowerCase().includes(query) || item.subtitle.toLowerCase().includes(query)
-        )
-    })
-})
-
 const navigateToDetail = (id: number) => {
     if (activeTab.value === 'Albums') {
         router.push({ name: 'album-detail', params: { id } })
@@ -237,7 +223,7 @@ const playItem = async (item: DisplayItem) => {
 
 <template>
     <div class="pb-32">
-        <DashboardTopBar v-model="searchQuery" />
+        <DashboardTopBar />
 
         <div class="px-8 pt-6">
             <div class="flex flex-wrap items-end justify-between gap-6 mb-8">
@@ -312,7 +298,7 @@ const playItem = async (item: DisplayItem) => {
             </div>
 
             <div v-else :class="{ 'opacity-50 pointer-events-none': isLoading }">
-                <div v-if="filteredItems.length === 0" class="text-[#8C857B] text-sm">
+                <div v-if="displayItems.length === 0" class="text-[#8C857B] text-sm">
                     未找到匹配的内容。
                 </div>
 
@@ -322,7 +308,7 @@ const playItem = async (item: DisplayItem) => {
                 >
                     <template v-if="activeTab === 'Albums'">
                         <AlbumGridCard
-                            v-for="item in filteredItems"
+                            v-for="item in displayItems"
                             :key="item.id"
                             :title="item.title"
                             :subtitle="item.subtitle"
@@ -338,7 +324,7 @@ const playItem = async (item: DisplayItem) => {
                     </template>
                     <template v-else>
                         <WorkGridCard
-                            v-for="item in filteredItems"
+                            v-for="item in displayItems"
                             :key="item.id"
                             :title="item.title"
                             :subtitle="item.subtitle"
@@ -364,7 +350,7 @@ const playItem = async (item: DisplayItem) => {
                         <div class="col-span-2 text-right">Details</div>
                     </div>
                     <div
-                        v-for="(item, idx) in filteredItems"
+                        v-for="(item, idx) in displayItems"
                         :key="item.id"
                         class="grid grid-cols-12 items-center px-4 py-3 hover:bg-[#EFEAE2]/60 rounded-sm group transition-colors cursor-pointer"
                         @click="navigateToDetail(item.id)"

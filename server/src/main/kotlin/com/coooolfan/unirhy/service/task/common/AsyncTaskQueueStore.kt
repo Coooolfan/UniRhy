@@ -8,10 +8,10 @@ import org.babyfish.jimmer.sql.kt.ast.expression.eq
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate
 import org.springframework.stereotype.Service
+import java.sql.Types
 import java.time.Instant
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
-import java.sql.Types
 
 @Service
 class AsyncTaskQueueStore(
@@ -58,7 +58,9 @@ class AsyncTaskQueueStore(
         return jdbc.batchUpdate(sql, batchParams).sum()
     }
 
-    fun claimNext(taskType: TaskType): ClaimedAsyncTask? {
+    fun claim(taskType: TaskType, limit: Long): List<AsyncTaskLog> {
+        require(limit > 0) { "limit must be positive" }
+
         val sql = """
             WITH grabbed_tasks AS (
                 SELECT id
@@ -66,7 +68,7 @@ class AsyncTaskQueueStore(
                 WHERE task_type = :taskType
                   AND status = :pendingStatus
                 ORDER BY created_at, id
-                LIMIT 1
+                LIMIT :limit
                 FOR UPDATE SKIP LOCKED
             )
             UPDATE public.async_task_log task
@@ -75,16 +77,17 @@ class AsyncTaskQueueStore(
             WHERE task.id IN (SELECT id FROM grabbed_tasks)
             RETURNING task.id, task.params
         """.trimIndent()
-        val params = MapSqlParameterSource()
+        val queryParams = MapSqlParameterSource()
             .addValue("taskType", taskType.name)
+            .addValue("limit", limit)
             .addValue("pendingStatus", TaskStatus.PENDING.name)
             .addValue("runningStatus", TaskStatus.RUNNING.name)
-        return jdbc.query(sql, params) { rs, _ ->
-            ClaimedAsyncTask(
-                id = rs.getLong("id"),
-                paramsJson = rs.getString("params"),
-            )
-        }.firstOrNull()
+        return jdbc.query(sql, queryParams) { rs, _ ->
+            AsyncTaskLog {
+                id = rs.getLong(1)
+                params = rs.getString(2)
+            }
+        }
     }
 
     fun completeTask(logId: Long, status: TaskStatus, reason: String) {
@@ -121,8 +124,4 @@ class AsyncTaskQueueStore(
         }
     }
 
-    data class ClaimedAsyncTask(
-        val id: Long,
-        val paramsJson: String,
-    )
 }

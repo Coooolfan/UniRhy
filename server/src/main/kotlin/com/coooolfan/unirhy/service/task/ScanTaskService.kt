@@ -54,15 +54,30 @@ class ScanTaskService(
     fun consumePendingTask() {
         try {
             transactionTemplate.executeWithoutResult {
-                val claimedTask = queueStore.claimNext(TaskType.METADATA_PARSE) ?: return@executeWithoutResult
-                val payload = objectMapper.readValue(claimedTask.paramsJson, ScanFileTaskPayload::class.java)
-                try {
-                    val completionReason = execute(payload)
-                    queueStore.completeTask(claimedTask.id, TaskStatus.COMPLETED, completionReason)
-                } catch (ex: Throwable) {
-                    logger.error("Scan task failed, logId={}", claimedTask.id, ex)
-                    queueStore.completeTask(claimedTask.id, TaskStatus.FAILED, failureReason(ex))
+                val claimedTasks = queueStore.claim(TaskType.METADATA_PARSE, METADATA_PARSE_CLAIM_LIMIT)
+
+                val completionUpdates = mutableListOf<AsyncTaskLog>()
+                for (claimedTask in claimedTasks) {
+                    try {
+                        val payload = objectMapper.readValue(claimedTask.params, ScanFileTaskPayload::class.java)
+                        val completionReason = execute(payload)
+                        completionUpdates +=
+                            AsyncTaskLog {
+                                id = claimedTask.id
+                                status = TaskStatus.COMPLETED
+                                completedReason = completionReason
+                            }
+                    } catch (ex: Throwable) {
+                        logger.error("Scan task failed, logId={}", claimedTask.id, ex)
+                        completionUpdates +=
+                            AsyncTaskLog {
+                                id = claimedTask.id
+                                status = TaskStatus.FAILED
+                                completedReason = failureReason(ex)
+                            }
+                    }
                 }
+                sql.saveEntities(completionUpdates, SaveMode.UPDATE_ONLY)
             }
         } catch (ex: Throwable) {
             logger.error("Failed to consume pending scan task", ex)
@@ -107,12 +122,14 @@ class ScanTaskService(
         )
 
         sql.saveEntities(listOf(work)) {
-            setMode(SaveMode.INSERT_ONLY)
+            setMode(SaveMode.INSERT_IF_ABSENT)
             setAssociatedModeAll(AssociatedSaveMode.APPEND)
             setAssociatedMode(Asset::mediaFile, AssociatedSaveMode.APPEND_IF_ABSENT)
             setAssociatedMode(MediaFile::fsProvider, AssociatedSaveMode.APPEND_IF_ABSENT)
             setAssociatedMode(Album::cover, AssociatedSaveMode.APPEND_IF_ABSENT)
             setAssociatedMode(Recording::cover, AssociatedSaveMode.APPEND_IF_ABSENT)
+            setAssociatedMode(Recording::artists, AssociatedSaveMode.APPEND_IF_ABSENT)
+            setAssociatedMode(Recording::albums, AssociatedSaveMode.APPEND_IF_ABSENT)
         }
         return "SUCCESS"
     }
@@ -120,6 +137,7 @@ class ScanTaskService(
 
 private val COVER_EXTENSIONS = hashSetOf("jpg", "jpeg", "png", "gif")
 private const val SCAN_ENQUEUE_BATCH_SIZE = 512
+private const val METADATA_PARSE_CLAIM_LIMIT = 10L
 
 data class ScanTaskRequest(
     val providerType: FileProviderType,

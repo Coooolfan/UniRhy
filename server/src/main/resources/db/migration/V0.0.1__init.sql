@@ -68,6 +68,8 @@ CREATE TABLE public.work
     title TEXT NOT NULL -- 作品标题
 );
 
+CREATE UNIQUE INDEX work_title_uniq ON public.work (title);
+
 -- 录音表：指代作品的具体音频实现（如：某乐团在某年录制的版本）
 CREATE TABLE public.recording
 (
@@ -231,22 +233,22 @@ CREATE INDEX idx_async_task_log_consume
 
 CREATE UNIQUE INDEX uq_async_task_log_metadata_parse_active
     ON public.async_task_log (
-        ((params::jsonb ->> 'providerType')),
-        (((params::jsonb ->> 'providerId')::bigint)),
-        ((params::jsonb ->> 'objectKey'))
-    )
+                              ((params::jsonb ->> 'providerType')),
+                              (((params::jsonb ->> 'providerId')::bigint)),
+                              ((params::jsonb ->> 'objectKey'))
+        )
     WHERE task_type = 'METADATA_PARSE'
-      AND status IN ('PENDING', 'RUNNING')
-      AND params::jsonb ? 'objectKey';
+        AND status IN ('PENDING', 'RUNNING')
+        AND params::jsonb ? 'objectKey';
 
 CREATE UNIQUE INDEX uq_async_task_log_transcode_active
     ON public.async_task_log (
-        (((params::jsonb ->> 'recordingId')::bigint)),
-        ((params::jsonb ->> 'srcObjectKey')),
-        (((params::jsonb ->> 'srcProviderId')::bigint)),
-        (((params::jsonb ->> 'dstProviderId')::bigint)),
-        ((params::jsonb ->> 'targetCodec'))
-    )
+                              (((params::jsonb ->> 'recordingId')::bigint)),
+                              ((params::jsonb ->> 'srcObjectKey')),
+                              (((params::jsonb ->> 'srcProviderId')::bigint)),
+                              (((params::jsonb ->> 'dstProviderId')::bigint)),
+                              ((params::jsonb ->> 'targetCodec'))
+        )
     WHERE task_type = 'TRANSCODE'
-      AND status IN ('PENDING', 'RUNNING')
-      AND params::jsonb ? 'recordingId';
+        AND status IN ('PENDING', 'RUNNING')
+        AND params::jsonb ? 'recordingId';
