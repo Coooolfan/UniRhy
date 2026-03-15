@@ -119,8 +119,10 @@ const seekDisabled = computed(() => {
 
 const syncStatusClass = computed(() => {
     switch (audioStore.syncState) {
+        case 'calibrating':
+            return 'text-[#8C857B]'
         case 'ready':
-            return 'bg-[#EDF5EC] text-[#42653F] border border-[#D5E5D3]'
+            return 'text-[#42653F]'
         case 'audio_locked':
             return 'bg-[#FAF0E0] text-[#9A6231] border border-[#EBCFA9]'
         case 'error':
@@ -171,20 +173,22 @@ const syncStatusClass = computed(() => {
                             <div class="font-serif text-[#2C2420] truncate font-medium">
                                 {{ audioStore.currentTrack.title }}
                             </div>
-                            <div class="text-xs text-[#8C857B] truncate">
-                                {{ audioStore.currentTrack.artist }}
+                            <div class="mt-0.5 flex items-center gap-2 min-w-0">
+                                <div class="text-xs text-[#8C857B] truncate min-w-0">
+                                    {{ audioStore.currentTrack.artist }}
+                                </div>
+                                <button
+                                    type="button"
+                                    data-test="sync-status"
+                                    class="shrink-0 inline-flex cursor-pointer items-center text-[10px] tracking-wide transition-colors hover:text-[#5E5950] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#C17D46]/40"
+                                    :class="syncStatusClass"
+                                    title="打开同步调试页面"
+                                    aria-label="打开同步调试页面"
+                                    @click="openPlaybackSyncDebug"
+                                >
+                                    {{ audioStore.syncStatusText }}
+                                </button>
                             </div>
-                            <button
-                                type="button"
-                                data-test="sync-status"
-                                class="mt-1 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] tracking-wide transition-colors hover:brightness-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#C17D46]/40"
-                                :class="syncStatusClass"
-                                title="打开同步调试页面"
-                                aria-label="打开同步调试页面"
-                                @click="openPlaybackSyncDebug"
-                            >
-                                {{ audioStore.syncStatusText }}
-                            </button>
                         </div>
                     </div>
 

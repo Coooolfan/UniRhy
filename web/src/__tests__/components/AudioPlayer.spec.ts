@@ -93,10 +93,37 @@ describe('AudioPlayer', () => {
 
     it('opens the playback sync debug page when the sync badge is clicked', async () => {
         const wrapper = mount(AudioPlayer)
+        expect(wrapper.get('[data-test="sync-status"]').classes()).toContain('cursor-pointer')
 
         await wrapper.get('[data-test="sync-status"]').trigger('click')
 
         expect(pushMock).toHaveBeenCalledWith({ name: 'playback-sync-debug' })
+    })
+
+    it('removes border and background when sync is ready', () => {
+        audioStore.syncState = 'ready'
+        audioStore.syncStatusText = '同步已就绪'
+
+        const wrapper = mount(AudioPlayer)
+        const syncStatus = wrapper.get('[data-test="sync-status"]')
+        const classes = syncStatus.classes()
+
+        expect(syncStatus.text()).toBe('同步已就绪')
+        expect(classes).not.toContain('bg-[#EDF5EC]')
+        expect(classes).not.toContain('border')
+    })
+
+    it('removes border and background while sync is calibrating', () => {
+        audioStore.syncState = 'calibrating'
+        audioStore.syncStatusText = '同步校时中'
+
+        const wrapper = mount(AudioPlayer)
+        const syncStatus = wrapper.get('[data-test="sync-status"]')
+        const classes = syncStatus.classes()
+
+        expect(syncStatus.text()).toBe('同步校时中')
+        expect(classes).not.toContain('bg-[#F3EEE6]')
+        expect(classes).not.toContain('border')
     })
 
     it('reacts to passive metadata hydration updates from the store', async () => {
