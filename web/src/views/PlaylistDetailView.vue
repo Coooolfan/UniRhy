@@ -299,10 +299,12 @@ watch(
             Loading...
         </div>
 
-        <div v-else class="px-8 pb-32 max-w-5xl mx-auto w-full">
-            <div class="mt-8 flex flex-col md:flex-row gap-12 items-end mb-16 group">
+        <div v-else class="mx-auto w-full max-w-5xl px-4 pb-32 sm:px-6 lg:px-8">
+            <div
+                class="group mb-12 mt-6 flex flex-col items-center gap-8 md:mb-16 md:mt-8 md:flex-row md:items-end md:gap-12"
+            >
                 <div
-                    class="relative z-0 group shrink-0 w-64 h-64 md:w-80 md:h-80 select-none shadow-xl rounded-sm overflow-hidden bg-[#2C2420]"
+                    class="relative z-0 h-56 w-56 shrink-0 overflow-hidden rounded-sm bg-[#2C2420] shadow-xl sm:h-64 sm:w-64 md:h-80 md:w-80"
                 >
                     <img
                         v-if="playlistData.cover"
@@ -318,13 +320,13 @@ watch(
                     </div>
                 </div>
 
-                <div class="flex flex-col gap-4 pb-2 w-full relative z-10">
+                <div class="relative z-10 flex w-full flex-col gap-4 pb-2 text-center md:text-left">
                     <div
-                        class="flex items-center gap-3 text-sm tracking-wider uppercase text-[#8C857B]"
+                        class="flex flex-wrap items-center justify-center gap-3 text-sm tracking-wider uppercase text-[#8C857B] md:justify-start"
                     >
                         <span>Playlist</span>
                         <button
-                            class="p-1 text-[#8C857B] hover:text-[#C17D46] transition-all opacity-0 group-hover:opacity-100 cursor-pointer"
+                            class="cursor-pointer p-1 text-[#8C857B] opacity-100 transition-all hover:text-[#C17D46] md:opacity-0 md:group-hover:opacity-100"
                             title="编辑歌单"
                             @click="openEditModal"
                         >
@@ -332,18 +334,20 @@ watch(
                         </button>
                     </div>
 
-                    <h1 class="text-5xl md:text-7xl font-serif text-[#2C2420] leading-tight">
+                    <h1
+                        class="font-serif text-4xl leading-tight text-[#2C2420] sm:text-5xl md:text-7xl"
+                    >
                         {{ playlistData.title }}
                     </h1>
 
-                    <p class="text-sm text-[#8C857B] max-w-2xl line-clamp-3">
+                    <p class="mx-auto max-w-2xl text-sm text-[#8C857B] line-clamp-3 md:mx-0">
                         {{ playlistData.description }}
                     </p>
 
-                    <div class="flex items-center gap-4 mt-4">
+                    <div class="mt-4 flex items-center justify-center gap-4 md:justify-start">
                         <button
                             :disabled="!hasPlayableRecording"
-                            class="px-8 py-3 border border-[#C17D46] text-[#C17D46] hover:bg-[#C17D46] hover:text-white disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-[#C17D46] transition-all duration-300 flex items-center gap-2 text-sm tracking-widest uppercase font-medium rounded-sm cursor-pointer"
+                            class="flex w-full items-center justify-center gap-2 rounded-sm border border-[#C17D46] px-6 py-3 text-sm font-medium tracking-widest text-[#C17D46] uppercase transition-all duration-300 hover:bg-[#C17D46] hover:text-white disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-[#C17D46] sm:w-auto sm:px-8"
                             @click="handlePlay()"
                         >
                             <Pause v-if="isCurrentRecordingPlaying" :size="16" />

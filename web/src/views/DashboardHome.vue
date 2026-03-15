@@ -7,7 +7,7 @@ import DashboardAlbumGrid from '@/components/dashboard/DashboardAlbumGrid.vue'
 <template>
     <div class="pb-32">
         <DashboardTopBar />
-        <div class="px-8 mt-2">
+        <div class="mt-2 px-4 sm:px-6 lg:px-8">
             <DashboardHero />
             <DashboardAlbumGrid />
         </div>

@@ -58,7 +58,7 @@ const emit = defineEmits<{
 
                 <button
                     v-if="showPlayButton"
-                    class="absolute bottom-4 right-4 w-10 h-10 bg-white/90 rounded-full shadow-lg flex items-center justify-center text-[#2C2420] opacity-0 group-hover:opacity-100 transition-all duration-300 hover:scale-110 z-20"
+                    class="absolute bottom-4 right-4 z-20 flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-[#2C2420] opacity-100 shadow-lg transition-all duration-300 hover:scale-110 sm:opacity-0 sm:group-hover:opacity-100"
                     @click.stop="emit('play')"
                 >
                     <Play v-if="playLoading" :size="16" class="animate-pulse" fill="currentColor" />

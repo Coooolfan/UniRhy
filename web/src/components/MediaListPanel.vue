@@ -38,13 +38,15 @@ const isItemSelected = (itemId: number) => {
 </script>
 
 <template>
-    <div class="bg-[#FDFBF7] rounded-sm shadow-sm p-8 md:p-12 relative">
+    <div class="relative rounded-sm bg-[#FDFBF7] p-5 shadow-sm sm:p-6 md:p-12">
         <div
             class="absolute -bottom-2 -right-2 w-full h-full bg-[#F5F1EA] rounded-sm -z-10 transform translate-x-1 translate-y-1"
         ></div>
 
-        <div class="flex items-center justify-between mb-8 border-b border-[#EFEBE4] pb-4">
-            <div class="flex items-end gap-4">
+        <div
+            class="mb-6 flex flex-col gap-3 border-b border-[#EFEBE4] pb-4 sm:mb-8 sm:flex-row sm:items-center sm:justify-between"
+        >
+            <div class="flex flex-col gap-1 sm:flex-row sm:items-end sm:gap-4">
                 <h3 class="font-serif text-2xl text-[#2C2420]">{{ title }}</h3>
                 <div
                     v-if="summary"
@@ -74,7 +76,7 @@ const isItemSelected = (itemId: number) => {
                 @keydown="(event) => emit('item-keydown', event, item)"
                 tabindex="0"
                 role="button"
-                class="group flex items-center gap-6 py-4 px-4 rounded-sm transition-all duration-200 border-b border-transparent hover:bg-[#F2EFE9] relative overflow-visible"
+                class="group relative flex items-start gap-4 overflow-visible rounded-sm border-b border-transparent px-3 py-4 transition-all duration-200 hover:bg-[#F2EFE9] sm:px-4 md:items-center md:gap-6"
                 :class="{
                     'bg-[#F2EFE9]': enableMultiSelect && isItemSelected(item.id),
                     'cursor-pointer': true,
@@ -91,7 +93,7 @@ const isItemSelected = (itemId: number) => {
 
                 <div
                     v-if="enableMultiSelect && isItemSelected(item.id)"
-                    class="absolute -top-1 left-3 z-20 w-5 drop-shadow-lg pointer-events-none"
+                    class="pointer-events-none absolute -top-1 left-3 z-20 w-5 drop-shadow-lg"
                 >
                     <svg
                         viewBox="0 0 32 64"
@@ -105,7 +107,7 @@ const isItemSelected = (itemId: number) => {
                 </div>
 
                 <div
-                    class="w-6 text-center font-serif text-lg relative z-10 select-none text-[#DCD6CC] group-hover:text-[#8C857B]"
+                    class="relative z-10 w-5 shrink-0 select-none text-center font-serif text-base text-[#DCD6CC] group-hover:text-[#8C857B] sm:w-6 sm:text-lg"
                     :class="{ 'cursor-pointer': enableMultiSelect }"
                     @click.stop="
                         enableMultiSelect

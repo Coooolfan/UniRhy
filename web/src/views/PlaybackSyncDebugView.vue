@@ -466,7 +466,7 @@ onBeforeUnmount(() => {
     >
         <DashboardTopBar />
 
-        <div class="px-6 pt-4 pb-40 md:px-10 xl:px-12">
+        <div class="px-4 pb-40 pt-4 sm:px-6 md:px-8 xl:px-12">
             <section data-test="debug-panel-overview" class="border-b border-[#DCD9D0] pb-8">
                 <div class="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
                     <div>
@@ -521,7 +521,7 @@ onBeforeUnmount(() => {
             </section>
 
             <section class="mt-10 grid gap-px border border-[#DCD9D0] bg-[#DCD9D0] xl:grid-cols-2">
-                <article class="bg-dashboard-main p-6 md:p-8">
+                <article class="bg-dashboard-main p-4 sm:p-6 md:p-8">
                     <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                         <div>
                             <div
@@ -624,7 +624,7 @@ onBeforeUnmount(() => {
                     </div>
                 </article>
 
-                <article class="bg-dashboard-main p-6 md:p-8">
+                <article class="bg-dashboard-main p-4 sm:p-6 md:p-8">
                     <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                         <div>
                             <div
@@ -719,7 +719,7 @@ onBeforeUnmount(() => {
                     </div>
                 </article>
 
-                <article class="bg-dashboard-main p-6 md:p-8 xl:col-span-2">
+                <article class="bg-dashboard-main p-4 sm:p-6 md:p-8 xl:col-span-2">
                     <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                         <div>
                             <div
@@ -769,7 +769,7 @@ onBeforeUnmount(() => {
                                 <div
                                     v-for="row in timelineRows"
                                     :key="row.key"
-                                    class="grid gap-2 px-4 py-3 md:grid-cols-12 md:items-center"
+                                    class="flex flex-col gap-2 px-4 py-3 md:grid md:grid-cols-12 md:items-center"
                                 >
                                     <div
                                         class="w-max border-b border-current pb-0.5 font-mono text-[10px] uppercase tracking-[0.1em]"
@@ -785,7 +785,7 @@ onBeforeUnmount(() => {
                                         {{ row.type }}
                                     </div>
                                     <div
-                                        class="truncate pr-4 font-mono text-[11px] text-[#1A1917]/60 md:col-span-6"
+                                        class="break-all font-mono text-[11px] text-[#1A1917]/60 md:col-span-6 md:truncate md:pr-4"
                                     >
                                         {{ row.detail }}
                                     </div>
@@ -806,7 +806,7 @@ onBeforeUnmount(() => {
 
             <section
                 data-test="debug-local-execution"
-                class="mt-10 grid gap-4 border border-[#DCD9D0] bg-white p-6 md:grid-cols-2 xl:grid-cols-4"
+                class="mt-10 grid gap-4 border border-[#DCD9D0] bg-white p-4 sm:p-6 md:grid-cols-2 xl:grid-cols-4"
             >
                 <div>
                     <div class="text-[9px] uppercase tracking-[0.16em] text-[#1A1917]/40">

@@ -121,25 +121,25 @@ onMounted(async () => {
 </script>
 
 <template>
-    <div class="mb-14 relative px-2">
-        <h2 class="text-xl font-serif mb-6 text-[#2C2C2C]">今日推荐</h2>
+    <div class="relative mb-12 px-1 sm:px-2">
+        <h2 class="mb-5 text-lg font-serif text-[#2C2C2C] sm:mb-6 sm:text-xl">今日推荐</h2>
 
-        <div class="relative h-80 w-full">
+        <div class="relative min-h-[34rem] w-full md:h-80 md:min-h-0">
             <!-- Bottom Stack Layers -->
             <div
-                class="absolute top-4 left-4 -right-2.5 -bottom-2.5 bg-[#F0EBE3] shadow-sm transform rotate-1 rounded-sm border border-[#E6E1D8]"
+                class="absolute top-3 left-3 -right-1.5 -bottom-1.5 rounded-sm border border-[#E6E1D8] bg-[#F0EBE3] shadow-sm rotate-1 sm:top-4 sm:left-4 sm:-right-2.5 sm:-bottom-2.5"
             ></div>
             <div
-                class="absolute top-2 left-2 -right-1.25 -bottom-1.25 bg-[#F5F2EB] shadow-md transform -rotate-1 rounded-sm border border-[#E6E1D8]"
+                class="absolute top-1.5 left-1.5 -right-0.5 -bottom-0.5 rounded-sm border border-[#E6E1D8] bg-[#F5F2EB] shadow-md -rotate-1 sm:top-2 sm:left-2 sm:-right-1.25 sm:-bottom-1.25"
             ></div>
 
             <!-- Top Card -->
             <div
-                class="absolute inset-0 bg-[#FCFBF9] shadow-[0_10px_30px_-10px_rgba(168,160,149,0.4)] rounded-sm flex overflow-hidden border border-white"
+                class="absolute inset-0 flex flex-col overflow-hidden rounded-sm border border-white bg-[#FCFBF9] shadow-[0_10px_30px_-10px_rgba(168,160,149,0.4)] md:flex-row"
             >
                 <!-- Album Cover -->
                 <div
-                    class="h-full aspect-square bg-[#D6D2C9] relative flex items-center justify-center overflow-hidden border-r border-[#EBE7E0] shrink-0"
+                    class="relative flex h-48 w-full shrink-0 items-center justify-center overflow-hidden bg-[#D6D2C9] md:h-full md:aspect-square md:border-r md:border-[#EBE7E0]"
                     :class="{ 'group cursor-pointer': featuredStatus === 'ready' }"
                     @click="handleFeaturedAction"
                 >
@@ -152,10 +152,10 @@ onMounted(async () => {
 
                         <!-- Play Overlay -->
                         <div
-                            class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-500 ease-out flex items-center justify-center"
+                            class="absolute inset-0 flex items-center justify-center bg-black/40 opacity-100 transition-opacity duration-500 ease-out md:opacity-0 md:group-hover:opacity-100"
                         >
                             <div
-                                class="w-14 h-14 bg-[#F5F2EB] rounded-full flex items-center justify-center shadow-lg transform translate-y-4 group-hover:translate-y-0 transition-all duration-300"
+                                class="flex h-12 w-12 items-center justify-center rounded-full bg-[#F5F2EB] shadow-lg transition-all duration-300 md:h-14 md:w-14 md:translate-y-4 md:group-hover:translate-y-0"
                             >
                                 <Pause
                                     v-if="isFeaturedPlaying"
@@ -183,11 +183,11 @@ onMounted(async () => {
 
                 <!-- Content -->
                 <div
-                    class="flex-1 p-12 flex flex-col justify-center bg-[url('https://www.transparenttextures.com/patterns/cream-paper.png')] relative overflow-hidden"
+                    class="relative flex flex-1 flex-col justify-center overflow-hidden bg-[url('https://www.transparenttextures.com/patterns/cream-paper.png')] p-6 sm:p-8 md:p-12"
                 >
                     <!-- Background Decoration -->
                     <div
-                        class="absolute -right-32 top-1/2 -translate-y-1/2 w-96 h-96 opacity-[0.06] pointer-events-none select-none"
+                        class="pointer-events-none absolute -right-32 top-1/2 hidden h-96 w-96 -translate-y-1/2 select-none opacity-[0.06] md:block"
                     >
                         <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
                             <circle
@@ -212,17 +212,17 @@ onMounted(async () => {
                     <div class="relative z-10">
                         <template v-if="featuredStatus === 'ready' && album">
                             <div
-                                class="text-xs uppercase tracking-widest text-[#9C968B] mb-4 font-medium"
+                                class="mb-3 text-[11px] font-medium uppercase tracking-widest text-[#9C968B] md:mb-4"
                             >
                                 Editor's Choice
                             </div>
                             <h3
-                                class="text-5xl font-serif text-[#2C2C2C] mb-4 tracking-tight leading-tight"
+                                class="mb-3 font-serif text-3xl leading-tight tracking-tight text-[#2C2C2C] sm:text-4xl md:mb-4 md:text-5xl"
                             >
                                 {{ album.title }}
                             </h3>
                             <p
-                                class="text-[#8A857D] text-lg mb-10 font-serif italic flex items-center"
+                                class="mb-6 flex items-center text-base font-serif italic text-[#8A857D] sm:text-lg md:mb-10"
                             >
                                 <span class="w-8 h-px bg-[#C27E46] mr-3 inline-block"></span>
                                 {{ album.artist }}
@@ -230,22 +230,24 @@ onMounted(async () => {
                         </template>
                         <template v-else>
                             <div
-                                class="text-xs uppercase tracking-widest text-[#9C968B] mb-4 font-medium"
+                                class="mb-3 text-[11px] font-medium uppercase tracking-widest text-[#9C968B] md:mb-4"
                             >
                                 Daily Pick
                             </div>
                             <h3
-                                class="text-4xl font-serif text-[#2C2C2C] mb-4 tracking-tight leading-tight"
+                                class="mb-3 font-serif text-3xl leading-tight tracking-tight text-[#2C2C2C] sm:text-4xl md:mb-4"
                             >
                                 旋律不可调
                             </h3>
-                            <p class="text-[#8A857D] text-lg mb-10 font-serif italic">
+                            <p
+                                class="mb-6 text-base font-serif italic text-[#8A857D] sm:text-lg md:mb-10"
+                            >
                                 资料库中未能发现可用旋律
                             </p>
                         </template>
-                        <div class="flex items-center space-x-6">
+                        <div class="flex items-center">
                             <button
-                                class="px-8 py-3 border border-[#C27E46] text-[#C27E46] text-sm hover:bg-[#C27E46] hover:text-white disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-[#C27E46] transition-all duration-500 rounded-sm font-medium tracking-wide uppercase"
+                                class="w-full rounded-sm border border-[#C27E46] px-6 py-3 text-sm font-medium tracking-wide text-[#C27E46] uppercase transition-all duration-500 hover:bg-[#C27E46] hover:text-white disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-[#C27E46] sm:w-auto sm:px-8"
                                 :disabled="
                                     isFeaturedActionDisabled ||
                                     (featuredStatus === 'ready' && !hasPlayableFeatured)

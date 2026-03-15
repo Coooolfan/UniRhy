@@ -40,9 +40,11 @@ const nodePath = computed(() => {
         <h2 class="text-2xl font-serif text-[#2C2A28] mb-2">全局状态</h2>
         <div class="h-px w-full bg-[#E8E4D9] mb-6"></div>
 
-        <div class="flex w-full h-36 shadow-sm transition-all duration-300 hover:shadow-md">
+        <div
+            class="flex w-full flex-col overflow-hidden shadow-sm transition-all duration-300 hover:shadow-md md:h-36 md:flex-row"
+        >
             <div
-                class="w-36 bg-[#EBE6D9] flex flex-col items-center justify-center border-y border-l border-[#E0DCD0] rounded-l-sm relative overflow-hidden"
+                class="relative flex h-28 flex-col items-center justify-center overflow-hidden border border-[#E0DCD0] bg-[#EBE6D9] md:h-auto md:w-36 md:rounded-l-sm md:border-r-0"
             >
                 <div
                     class="absolute top-0 left-0 w-full h-full bg-linear-to-b from-white/20 to-transparent"
@@ -64,17 +66,17 @@ const nodePath = computed(() => {
             </div>
 
             <div
-                class="flex-1 bg-[#FCFBF9] border border-[#E0DCD0] rounded-r-sm p-7 flex justify-between items-center relative overflow-hidden"
+                class="relative flex flex-1 flex-col gap-5 overflow-hidden border border-t-0 border-[#E0DCD0] bg-[#FCFBF9] p-5 sm:p-6 md:flex-row md:items-center md:justify-between md:rounded-r-sm md:border-t md:p-7"
             >
-                <div class="flex flex-col justify-center h-full">
+                <div class="flex h-full flex-col justify-center">
                     <div
                         class="text-[10px] tracking-[0.2em] text-[#A39E93] uppercase mb-2 font-medium"
                     >
                         Current System Node
                     </div>
 
-                    <div class="flex items-baseline gap-4 mb-4">
-                        <h3 class="text-3xl font-serif text-[#33312E] tracking-wide">
+                    <div class="mb-4 flex flex-col gap-1 sm:flex-row sm:items-baseline sm:gap-4">
+                        <h3 class="font-serif text-2xl tracking-wide text-[#33312E] sm:text-3xl">
                             {{ nodeName }}
                         </h3>
                         <span class="text-xs text-[#A39E93] font-mono">ID: {{ nodeId }}</span>
@@ -90,7 +92,7 @@ const nodePath = computed(() => {
                     </div>
                 </div>
 
-                <div class="flex flex-col items-end h-full py-1 justify-center z-10">
+                <div class="z-10 flex h-full flex-col justify-center py-1 md:items-end">
                     <div
                         class="bg-[#B87A5B] text-white text-[10px] tracking-widest px-3 py-1.5 rounded-sm shadow-sm flex items-center gap-1.5"
                     >
@@ -100,7 +102,7 @@ const nodePath = computed(() => {
                 </div>
 
                 <div
-                    class="absolute -right-15 -bottom-16 text-[#f4ecd9] opacity-50 pointer-events-none"
+                    class="pointer-events-none absolute -bottom-16 -right-15 hidden text-[#f4ecd9] opacity-50 md:block"
                 >
                     <HardDrive :size="180" stroke-width="0.5" />
                 </div>

@@ -299,8 +299,10 @@ const refreshAll = () => {
     >
         <DashboardTopBar />
 
-        <div class="mx-auto w-full max-w-5xl px-8 pt-6 pb-12">
-            <div class="mb-8 flex items-end justify-between border-b border-[#EAE6DE] pb-4">
+        <div class="mx-auto w-full max-w-5xl px-4 pb-12 pt-4 sm:px-6 sm:pt-6 lg:px-8">
+            <div
+                class="mb-8 flex flex-col gap-4 border-b border-[#EAE6DE] pb-4 sm:flex-row sm:items-end sm:justify-between"
+            >
                 <div>
                     <h2 class="mb-1 font-serif text-3xl text-[#2B221B]">任务管理</h2>
                     <p class="font-serif text-sm italic text-[#8A8A8A]">
