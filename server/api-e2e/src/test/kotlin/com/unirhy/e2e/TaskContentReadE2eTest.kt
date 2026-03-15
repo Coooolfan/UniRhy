@@ -838,8 +838,8 @@ class TaskContentReadE2eTest {
         private const val SCAN_FIXTURE_FILE_COUNT = 24
         private const val MAX_CANDIDATE_FILE_COUNT = 10_000
 
-        private val ACCEPT_EXTENSIONS = linkedSetOf("mp3", "wav", "ogg", "flac", "aac", "wma", "m4a")
-        private val PREFERRED_EXTENSIONS = listOf("mp3", "flac", "m4a", "ogg", "wav", "aac", "wma")
+        private val ACCEPT_EXTENSIONS = linkedSetOf("mp3", "wav", "ogg", "flac", "wma", "m4a")
+        private val PREFERRED_EXTENSIONS = listOf("mp3", "flac", "m4a", "ogg", "wav", "wma")
 
         @JvmStatic
         @DynamicPropertySource

@@ -5,7 +5,7 @@ import java.io.File
 
 private val logger = LoggerFactory.getLogger("TaskCommonUtils")
 
-private val ACCEPT_FILE_EXTENSIONS = setOf("mp3", "wav", "ogg", "flac", "aac", "wma", "m4a")
+private val ACCEPT_FILE_EXTENSIONS = setOf("mp3", "wav", "ogg", "flac", "wma", "m4a")
 
 fun findAudioFilesRecursively(rootDir: File): Sequence<File> {
     if (!rootDir.exists() || !rootDir.isDirectory) {

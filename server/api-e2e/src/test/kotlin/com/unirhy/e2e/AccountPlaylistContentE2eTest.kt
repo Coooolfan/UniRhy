@@ -1000,7 +1000,7 @@ class AccountPlaylistContentE2eTest {
         private const val SCAN_FIXTURE_FILE_COUNT = 16
         private const val MAX_CANDIDATE_FILE_COUNT = 10_000
 
-        private val ACCEPT_EXTENSIONS = setOf("mp3", "wav", "ogg", "flac", "aac", "wma", "m4a")
+        private val ACCEPT_EXTENSIONS = setOf("mp3", "wav", "ogg", "flac", "wma", "m4a")
 
         @JvmStatic
         @DynamicPropertySource
