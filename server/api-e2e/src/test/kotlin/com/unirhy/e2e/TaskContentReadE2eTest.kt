@@ -2,11 +2,14 @@ package com.unirhy.e2e
 
 import com.coooolfan.unirhy.UnirhyApplication
 import com.fasterxml.jackson.databind.JsonNode
+import com.unirhy.e2e.support.AudioFixtureMetadata
 import com.unirhy.e2e.support.E2eAdminSession
 import com.unirhy.e2e.support.E2eAssert
 import com.unirhy.e2e.support.E2eHttpClient
 import com.unirhy.e2e.support.E2eJson
 import com.unirhy.e2e.support.E2eRuntime
+import com.unirhy.e2e.support.SyntheticAudioFixture
+import com.unirhy.e2e.support.bootstrapAdminSession
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.MethodOrderer
@@ -15,8 +18,6 @@ import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
 import org.junit.jupiter.api.TestMethodOrder
-import org.jaudiotagger.audio.AudioFileIO
-import org.jaudiotagger.tag.FieldKey
 import org.slf4j.LoggerFactory
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.web.server.LocalServerPort
@@ -26,7 +27,6 @@ import org.springframework.test.context.DynamicPropertySource
 import java.net.http.HttpResponse
 import java.nio.file.Files
 import java.nio.file.Path
-import java.nio.file.StandardCopyOption
 import java.util.UUID
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -335,7 +335,7 @@ class TaskContentReadE2eTest {
         val workRows = pageRows(worksResponse.body(), "[scan] works response")
         assertTrue(
             workRows.isNotEmpty(),
-            "[scan] expected works after scan, source=${fixture.sourceRoot}, fixture=${fixture.fixtureRoot}",
+            "[scan] expected works after scan, fixture=${fixture.fixtureRoot}",
         )
 
         val workId = readIdFromNode(
@@ -352,7 +352,7 @@ class TaskContentReadE2eTest {
         val albumRows = E2eJson.mapper.readTree(albumsResponse.body())
         assertTrue(
             albumRows.isArray && albumRows.size() > 0,
-            "[scan] expected albums after scan, source=${fixture.sourceRoot}, fixture=${fixture.fixtureRoot}",
+            "[scan] expected albums after scan, fixture=${fixture.fixtureRoot}",
         )
         val albumId = readIdFromNode(
             albumRows.first().path("id"),
@@ -547,109 +547,25 @@ class TaskContentReadE2eTest {
     }
 
     private fun prepareScanFixture(scanWorkspace: Path): FixtureInfo {
-        val sourceRoot = resolveScanSourceRoot()
-        require(Files.exists(sourceRoot)) {
-            "[scan] scan source path does not exist: $sourceRoot (env E2E_SCAN_SOURCE_PATH)"
-        }
-        require(Files.isDirectory(sourceRoot)) {
-            "[scan] scan source path must be a directory: $sourceRoot (env E2E_SCAN_SOURCE_PATH)"
-        }
-
-        val candidates = collectAudioCandidates(sourceRoot)
-        require(candidates.isNotEmpty()) {
-            "[scan] no audio files found under $sourceRoot, expected extensions: ${ACCEPT_EXTENSIONS.joinToString(",")}"
-        }
-
-        val seed = candidates.firstOrNull(::hasScanFixtureMetadata)
-            ?: error("[scan] no tagged audio files found under $sourceRoot, set env $SCAN_SOURCE_PATH_ENV to a directory with album metadata")
-        val albumTitle = readRequiredAudioTag(seed, FieldKey.ALBUM)
-        val seedExtension = fileExtension(seed)
-        val fixtureRoot = scanWorkspace.resolve("task-content-fixture-${UUID.randomUUID().toString().replace("-", "").take(12)}")
-        Files.createDirectories(fixtureRoot)
-
-        repeat(SCAN_FIXTURE_FILE_COUNT) { index ->
-            val fileName = "seed-${index.toString().padStart(4, '0')}.$seedExtension"
-            val target = fixtureRoot.resolve(fileName)
-            symlinkOrCopy(seed, target)
-        }
-
+        val suffix = UUID.randomUUID().toString().replace("-", "").take(12)
+        val albumTitle = "e2e-task-album-$suffix"
+        val metadata = AudioFixtureMetadata(
+            title = "e2e-task-track",
+            artist = "e2e-task-artist",
+            album = albumTitle,
+            comment = "e2e-task-fixture",
+        )
+        val batch = SyntheticAudioFixture.generateBatch(
+            scanWorkspace = scanWorkspace,
+            dirName = "task-content-fixture-$suffix",
+            count = SCAN_FIXTURE_FILE_COUNT,
+            extension = "mp3",
+            metadata = metadata,
+        )
         return FixtureInfo(
-            sourceRoot = sourceRoot,
-            fixtureRoot = fixtureRoot,
+            fixtureRoot = batch.fixtureRoot,
             albumTitle = albumTitle,
         )
-    }
-
-    private fun collectAudioCandidates(sourceRoot: Path): List<Path> {
-        val candidates = mutableListOf<Path>()
-        Files.walk(sourceRoot).use { paths ->
-            val iterator = paths.iterator()
-            while (iterator.hasNext()) {
-                val path = iterator.next()
-                if (!Files.isRegularFile(path)) {
-                    continue
-                }
-                val extension = fileExtension(path)
-                if (extension !in ACCEPT_EXTENSIONS) {
-                    continue
-                }
-                candidates.add(path.toAbsolutePath().normalize())
-                if (candidates.size >= MAX_CANDIDATE_FILE_COUNT) {
-                    break
-                }
-            }
-        }
-
-        return candidates.sortedWith(
-            compareBy<Path> { extensionPriority(fileExtension(it)) }
-                .thenBy { it.toString() },
-        )
-    }
-
-    private fun hasScanFixtureMetadata(path: Path): Boolean {
-        val tag = runCatching { AudioFileIO.read(path.toFile()).tag }.getOrNull() ?: return false
-        return tag.getFirst(FieldKey.TITLE).isNotBlank()
-                && tag.getFirst(FieldKey.ARTIST).isNotBlank()
-                && tag.getFirst(FieldKey.ALBUM).isNotBlank()
-    }
-
-    private fun readRequiredAudioTag(path: Path, fieldKey: FieldKey): String {
-        val tag = AudioFileIO.read(path.toFile()).tag ?: error("[scan] missing tag for $fieldKey in $path")
-        return tag.getFirst(fieldKey).takeIf { it.isNotBlank() }
-            ?: error("[scan] missing non-blank $fieldKey in $path")
-    }
-
-    private fun resolveScanSourceRoot(): Path {
-        val configured = System.getenv(SCAN_SOURCE_PATH_ENV)
-            ?.trim()
-            ?.takeIf { it.isNotBlank() }
-            ?: DEFAULT_SCAN_SOURCE_PATH
-        return expandHomePath(configured).toAbsolutePath().normalize()
-    }
-
-    private fun expandHomePath(path: String): Path {
-        if (!path.startsWith("~/")) {
-            return Path.of(path)
-        }
-        return Path.of(System.getProperty("user.home"), path.removePrefix("~/"))
-    }
-
-    private fun symlinkOrCopy(source: Path, target: Path) {
-        val normalizedSource = source.toAbsolutePath().normalize()
-        val symlinkCreated = runCatching {
-            Files.createSymbolicLink(target, normalizedSource)
-        }.isSuccess
-        if (symlinkCreated) {
-            return
-        }
-        runCatching {
-            Files.copy(normalizedSource, target, StandardCopyOption.REPLACE_EXISTING)
-        }.getOrElse { copyFailure ->
-            throw IllegalStateException(
-                "[scan] failed to create fixture file by symlink or copy: source=$normalizedSource, target=$target",
-                copyFailure,
-            )
-        }
     }
 
     private fun fetchTaskStats(state: E2eAdminSession, step: String): List<JsonNode> {
@@ -727,9 +643,6 @@ class TaskContentReadE2eTest {
         return name.substringAfterLast('.', "").lowercase()
     }
 
-    private fun extensionPriority(extension: String): Int {
-        return PREFERRED_EXTENSIONS.indexOf(extension).let { if (it >= 0) it else PREFERRED_EXTENSIONS.size }
-    }
 
     private fun countFilesWithExtensions(root: Path, extensions: Set<String>): Int {
         return Files.walk(root).use { paths ->
@@ -808,13 +721,6 @@ class TaskContentReadE2eTest {
 
     private fun baseUrl(): String = "http://127.0.0.1:$port"
 
-    private fun bootstrapAdminSession(baseUrl: String): E2eAdminSession {
-        val state = com.unirhy.e2e.support.newAdminSession(baseUrl)
-        com.unirhy.e2e.support.ensureSystemInitialized(state)
-        com.unirhy.e2e.support.loginAsAdmin(state)
-        return state
-    }
-
     private data class PreparedData(
         val workId: Long,
         val albumId: Long,
@@ -823,23 +729,17 @@ class TaskContentReadE2eTest {
     )
 
     private data class FixtureInfo(
-        val sourceRoot: Path,
         val fixtureRoot: Path,
         val albumTitle: String,
     )
 
     companion object {
         private val logger = LoggerFactory.getLogger(TaskContentReadE2eTest::class.java)
-        private const val SCAN_SOURCE_PATH_ENV = "E2E_SCAN_SOURCE_PATH"
         private const val SCAN_WAIT_TIMEOUT_ENV = "E2E_SCAN_WAIT_TIMEOUT_MILLIS"
-        private const val DEFAULT_SCAN_SOURCE_PATH = "~/Music"
         private const val DEFAULT_SCAN_WAIT_TIMEOUT_MILLIS = 120_000L
-        private const val FAST_COMPLETE_EMPTY_POLLS_THRESHOLD = 3
         private const val SCAN_FIXTURE_FILE_COUNT = 24
-        private const val MAX_CANDIDATE_FILE_COUNT = 10_000
 
         private val ACCEPT_EXTENSIONS = linkedSetOf("mp3", "wav", "ogg", "flac", "wma", "m4a")
-        private val PREFERRED_EXTENSIONS = listOf("mp3", "flac", "m4a", "ogg", "wav", "wma")
 
         @JvmStatic
         @DynamicPropertySource

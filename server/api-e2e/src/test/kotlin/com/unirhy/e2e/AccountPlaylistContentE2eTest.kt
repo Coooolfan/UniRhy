@@ -2,11 +2,14 @@ package com.unirhy.e2e
 
 import com.coooolfan.unirhy.UnirhyApplication
 import com.fasterxml.jackson.databind.JsonNode
+import com.unirhy.e2e.support.AudioFixtureMetadata
 import com.unirhy.e2e.support.E2eAdminSession
 import com.unirhy.e2e.support.E2eAssert
 import com.unirhy.e2e.support.E2eHttpClient
 import com.unirhy.e2e.support.E2eJson
 import com.unirhy.e2e.support.E2eRuntime
+import com.unirhy.e2e.support.SyntheticAudioFixture
+import com.unirhy.e2e.support.bootstrapAdminSession
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.MethodOrderer
 import org.junit.jupiter.api.Order
@@ -14,17 +17,13 @@ import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
 import org.junit.jupiter.api.TestMethodOrder
-import org.jaudiotagger.audio.AudioFileIO
-import org.jaudiotagger.tag.FieldKey
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.web.server.LocalServerPort
 import org.springframework.test.annotation.DirtiesContext
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import java.net.http.HttpResponse
-import java.nio.file.Files
 import java.nio.file.Path
-import java.nio.file.StandardCopyOption
 import java.util.UUID
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -761,85 +760,22 @@ class AccountPlaylistContentE2eTest {
     }
 
     private fun prepareScanFixture(scanWorkspace: Path): FixtureInfo {
-        val sourceRoot = resolveScanSourceRoot()
-        require(Files.exists(sourceRoot) && Files.isDirectory(sourceRoot)) {
-            "[prepare] scan source path does not exist or is not directory: $sourceRoot"
-        }
-
-        val seedFile = collectAudioCandidates(sourceRoot).firstOrNull(::hasScanFixtureMetadata)
-            ?: error("[prepare] no tagged audio files found under $sourceRoot, set env $SCAN_SOURCE_PATH_ENV to a directory with album metadata")
-        val albumTitle = readRequiredAudioTag(seedFile, FieldKey.ALBUM)
-
-        val extension = fileExtension(seedFile)
-        val fixtureRoot = scanWorkspace.resolve("account-playlist-content-${suffix()}")
-        Files.createDirectories(fixtureRoot)
-
-        repeat(SCAN_FIXTURE_FILE_COUNT) { index ->
-            val target = fixtureRoot.resolve("seed-${index.toString().padStart(3, '0')}.$extension")
-            symlinkOrCopy(seedFile, target)
-        }
-
+        val suffix = suffix()
+        val albumTitle = "e2e-playlist-album-$suffix"
+        val metadata = AudioFixtureMetadata(
+            title = "e2e-playlist-track",
+            artist = "e2e-playlist-artist",
+            album = albumTitle,
+            comment = "e2e-playlist-fixture",
+        )
+        SyntheticAudioFixture.generateBatch(
+            scanWorkspace = scanWorkspace,
+            dirName = "account-playlist-content-$suffix",
+            count = SCAN_FIXTURE_FILE_COUNT,
+            extension = "mp3",
+            metadata = metadata,
+        )
         return FixtureInfo(albumTitle = albumTitle)
-    }
-
-    private fun collectAudioCandidates(sourceRoot: Path): List<Path> {
-        val candidates = mutableListOf<Path>()
-        Files.walk(sourceRoot).use { paths ->
-            val iterator = paths.iterator()
-            while (iterator.hasNext()) {
-                val file = iterator.next()
-                if (!Files.isRegularFile(file)) {
-                    continue
-                }
-                if (fileExtension(file) !in ACCEPT_EXTENSIONS) {
-                    continue
-                }
-                candidates.add(file.toAbsolutePath().normalize())
-                if (candidates.size >= MAX_CANDIDATE_FILE_COUNT) {
-                    break
-                }
-            }
-        }
-        return candidates.sortedBy { it.toString() }
-    }
-
-    private fun hasScanFixtureMetadata(path: Path): Boolean {
-        val tag = runCatching { AudioFileIO.read(path.toFile()).tag }.getOrNull() ?: return false
-        return tag.getFirst(FieldKey.TITLE).isNotBlank()
-                && tag.getFirst(FieldKey.ARTIST).isNotBlank()
-                && tag.getFirst(FieldKey.ALBUM).isNotBlank()
-    }
-
-    private fun readRequiredAudioTag(path: Path, fieldKey: FieldKey): String {
-        val tag = AudioFileIO.read(path.toFile()).tag ?: error("[prepare] missing tag for $fieldKey in $path")
-        return tag.getFirst(fieldKey).takeIf { it.isNotBlank() }
-            ?: error("[prepare] missing non-blank $fieldKey in $path")
-    }
-
-    private fun symlinkOrCopy(source: Path, target: Path) {
-        val normalizedSource = source.toAbsolutePath().normalize()
-        val symlinkCreated = runCatching {
-            Files.createSymbolicLink(target, normalizedSource)
-        }.isSuccess
-        if (symlinkCreated) {
-            return
-        }
-        Files.copy(normalizedSource, target, StandardCopyOption.REPLACE_EXISTING)
-    }
-
-    private fun resolveScanSourceRoot(): Path {
-        val configured = System.getenv(SCAN_SOURCE_PATH_ENV)
-            ?.trim()
-            ?.takeIf { it.isNotBlank() }
-            ?: DEFAULT_SCAN_SOURCE_PATH
-        return expandHomePath(configured).toAbsolutePath().normalize()
-    }
-
-    private fun expandHomePath(path: String): Path {
-        if (!path.startsWith("~/")) {
-            return Path.of(path)
-        }
-        return Path.of(System.getProperty("user.home"), path.removePrefix("~/"))
     }
 
     private fun scanRequestBody(state: E2eAdminSession): Map<String, Any> {
@@ -945,11 +881,6 @@ class AccountPlaylistContentE2eTest {
         )
     }
 
-    private fun fileExtension(path: Path): String {
-        val filename = path.fileName?.toString().orEmpty()
-        return filename.substringAfterLast('.', "").lowercase()
-    }
-
     private fun scanWaitTimeoutMillis(): Long {
         val raw = System.getenv(SCAN_WAIT_TIMEOUT_ENV)
             ?.trim()
@@ -965,13 +896,6 @@ class AccountPlaylistContentE2eTest {
     private fun suffix(): String = UUID.randomUUID().toString().replace("-", "").take(10)
 
     private fun baseUrl(): String = "http://127.0.0.1:$port"
-
-    private fun bootstrapAdminSession(baseUrl: String): E2eAdminSession {
-        val state = com.unirhy.e2e.support.newAdminSession(baseUrl)
-        com.unirhy.e2e.support.ensureSystemInitialized(state)
-        com.unirhy.e2e.support.loginAsAdmin(state)
-        return state
-    }
 
     private data class CreatedAccount(
         val id: Long,
@@ -991,16 +915,10 @@ class AccountPlaylistContentE2eTest {
     )
 
     companion object {
-        private const val SCAN_SOURCE_PATH_ENV = "E2E_SCAN_SOURCE_PATH"
         private const val SCAN_WAIT_TIMEOUT_ENV = "E2E_SCAN_WAIT_TIMEOUT_MILLIS"
-        private const val DEFAULT_SCAN_SOURCE_PATH = "~/Music"
         private const val DEFAULT_SCAN_WAIT_TIMEOUT_MILLIS = 120_000L
         private const val POLL_INTERVAL_MILLIS = 150L
-        private const val FAST_COMPLETE_EMPTY_POLLS_THRESHOLD = 3
         private const val SCAN_FIXTURE_FILE_COUNT = 16
-        private const val MAX_CANDIDATE_FILE_COUNT = 10_000
-
-        private val ACCEPT_EXTENSIONS = setOf("mp3", "wav", "ogg", "flac", "wma", "m4a")
 
         @JvmStatic
         @DynamicPropertySource
