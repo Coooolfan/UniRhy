@@ -139,7 +139,7 @@ onMounted(async () => {
             >
                 <!-- Album Cover -->
                 <div
-                    class="relative flex h-48 w-full shrink-0 items-center justify-center overflow-hidden bg-[#D6D2C9] md:h-full md:aspect-square md:border-r md:border-[#EBE7E0]"
+                    class="relative flex h-48 w-full shrink-0 items-center justify-center overflow-hidden bg-[#D6D2C9] md:h-full md:w-auto md:aspect-square md:border-r md:border-[#EBE7E0]"
                     :class="{ 'group cursor-pointer': featuredStatus === 'ready' }"
                     @click="handleFeaturedAction"
                 >

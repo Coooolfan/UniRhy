@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ChevronLeft, ChevronRight, Music, Plus, X } from 'lucide-vue-next'
+import { ChevronRight, Music, Plus, X } from 'lucide-vue-next'
 import { computed, onMounted, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRoute, useRouter } from 'vue-router'
@@ -18,8 +18,13 @@ const router = useRouter()
 const route = useRoute()
 const audioStore = useAudioStore()
 const playlistStore = usePlaylistStore()
-const { isDesktopSidebarCollapsed, isMobileSidebarOpen, closeSidebar, closeMobileSidebar } =
-    useDashboardLayout()
+const {
+    isDesktopViewport,
+    isDesktopSidebarCollapsed,
+    isMobileSidebarOpen,
+    closeSidebar,
+    closeMobileSidebar,
+} = useDashboardLayout()
 const {
     playlists,
     isLoading: isLoadingPlaylists,
@@ -37,9 +42,17 @@ const createPlaylistName = ref('')
 const createPlaylistComment = ref('')
 const createPlaylistError = ref('')
 
-const playlistSectionPaddingBottom = computed(() =>
-    audioStore.currentTrack && !audioStore.isPlayerHidden ? '8rem' : '2rem',
-)
+const playlistSectionPaddingBottom = computed(() => {
+    if (!audioStore.currentTrack || audioStore.isPlayerHidden) {
+        return '2rem'
+    }
+
+    if (isDesktopViewport.value) {
+        return '8rem'
+    }
+
+    return 'calc(10.5rem + env(safe-area-inset-bottom))'
+})
 
 const playlistSectionTransitionStyle = computed(() => {
     const isCollapsingWhilePlayerHiding = audioStore.currentTrack && audioStore.isPlayerHidden
@@ -153,34 +166,33 @@ onMounted(() => {
     </Transition>
 
     <div
-        class="relative z-20 md:shrink-0 md:transition-[width] md:duration-300 md:ease-out"
+        class="relative z-40 md:z-20 md:shrink-0 md:transition-[width] md:duration-300 md:ease-out"
         :class="sidebarWrapperClass"
     >
         <aside
-            class="fixed inset-y-0 left-0 z-40 flex w-72 max-w-[86vw] flex-col bg-[#EBE7E0] px-6 pb-6 pt-6 shadow-[0_24px_80px_rgba(44,34,27,0.18)] transition-transform duration-300 ease-out md:absolute md:top-0 md:h-full md:w-64 md:max-w-none md:bg-[#EBE7E0] md:px-0 md:pb-0 md:pt-0 md:shadow-none"
+            class="fixed inset-y-0 left-0 z-40 flex w-80 max-w-[90vw] flex-col bg-[#EBE7E0] px-8 pb-8 pt-8 shadow-[0_24px_80px_rgba(44,34,27,0.18)] transition-transform duration-300 ease-out md:absolute md:top-0 md:h-full md:w-64 md:max-w-none md:bg-[#EBE7E0] md:px-0 md:pb-0 md:pt-0 md:shadow-none"
             :class="sidebarPanelClass"
         >
             <div class="flex h-full min-h-0 flex-col md:pl-10 md:pr-6 md:pt-12">
-                <div class="mb-8 flex items-center justify-between md:mb-12">
+                <div class="mb-10 flex items-center justify-between md:mb-12">
                     <h1 class="text-3xl font-serif tracking-tight text-[#2C2C2C]">UniRhy.</h1>
                     <button
                         type="button"
-                        class="inline-flex h-9 w-9 items-center justify-center rounded-full text-[#8A857D] transition-colors hover:bg-white/60 hover:text-[#5E5950]"
+                        class="inline-flex h-9 w-9 items-center justify-center rounded-full text-[#8A857D] transition-colors hover:bg-white/60 hover:text-[#5E5950] md:hidden"
                         aria-label="切换侧边栏"
                         @click="closeSidebar"
                     >
-                        <X class="md:hidden" :size="18" />
-                        <ChevronLeft class="hidden md:block" :size="18" />
+                        <X :size="18" />
                     </button>
                 </div>
 
                 <div class="flex min-h-0 flex-1 flex-col">
-                    <nav class="space-y-2 md:space-y-6">
+                    <nav class="flex-1 space-y-4 md:space-y-6">
                         <button
                             v-for="item in navItems"
                             :key="item.label"
                             type="button"
-                            class="block w-full text-left text-sm transition-colors duration-300"
+                            class="block w-full text-left text-base transition-colors duration-300 md:text-sm"
                             :class="
                                 isActive(item)
                                     ? 'font-medium text-[#C27E46]'
@@ -193,7 +205,7 @@ onMounted(() => {
                     </nav>
 
                     <div
-                        class="mt-8 min-h-0 flex-1 overflow-y-auto pr-1 md:mt-10 md:pr-0"
+                        class="mt-10 min-h-0 pr-1 md:mt-10 md:pr-0"
                         :style="playlistSectionTransitionStyle"
                     >
                         <button
@@ -209,7 +221,8 @@ onMounted(() => {
                             <div
                                 class="mb-4 flex items-center justify-between border-b border-[#D6D1C7] pb-2"
                             >
-                                <span class="text-xs uppercase tracking-widest text-[#9C968B]"
+                                <span
+                                    class="text-sm uppercase tracking-[0.24em] text-[#9C968B] md:text-xs"
                                     >我的歌单</span
                                 >
                                 <button
@@ -232,7 +245,10 @@ onMounted(() => {
                             <div v-else-if="playlistError" class="text-sm text-red-500">
                                 {{ playlistError }}
                             </div>
-                            <ul v-else class="space-y-3 pb-2 text-sm text-[#6B665E]">
+                            <ul
+                                v-else
+                                class="space-y-4 pb-2 text-base text-[#6B665E] md:space-y-3 md:text-sm"
+                            >
                                 <li
                                     v-for="playlist in playlists"
                                     :key="playlist.id"

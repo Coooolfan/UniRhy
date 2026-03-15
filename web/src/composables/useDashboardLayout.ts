@@ -5,7 +5,6 @@ import {
     onUnmounted,
     provide,
     ref,
-    watch,
     type ComputedRef,
     type InjectionKey,
     type Ref,
@@ -24,7 +23,6 @@ type DashboardLayoutContext = {
 
 const DASHBOARD_LAYOUT_KEY: InjectionKey<DashboardLayoutContext> = Symbol('dashboard-layout')
 const DESKTOP_MEDIA_QUERY = '(min-width: 768px)'
-const SIDEBAR_COLLAPSED_STORAGE_KEY = 'unirhy:web:dashboard-sidebar-collapsed'
 
 export const provideDashboardLayout = () => {
     const isDesktopViewport = ref(false)
@@ -49,6 +47,7 @@ export const provideDashboardLayout = () => {
         isDesktopViewport.value = isDesktop
 
         if (isDesktop) {
+            isDesktopSidebarCollapsed.value = false
             isMobileSidebarOpen.value = false
         }
     }
@@ -74,7 +73,6 @@ export const provideDashboardLayout = () => {
         isDesktopViewport.value = isDesktop
 
         if (isDesktop) {
-            isDesktopSidebarCollapsed.value = true
             return
         }
 
@@ -86,7 +84,6 @@ export const provideDashboardLayout = () => {
         isDesktopViewport.value = isDesktop
 
         if (isDesktop) {
-            isDesktopSidebarCollapsed.value = !isDesktopSidebarCollapsed.value
             return
         }
 
@@ -94,9 +91,6 @@ export const provideDashboardLayout = () => {
     }
 
     onMounted(() => {
-        const storedValue = window.localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY)
-        isDesktopSidebarCollapsed.value = storedValue === '1'
-
         mediaQueryList = window.matchMedia(DESKTOP_MEDIA_QUERY)
         syncViewport()
         mediaQueryList.addEventListener('change', syncViewport)
@@ -104,14 +98,6 @@ export const provideDashboardLayout = () => {
 
     onUnmounted(() => {
         mediaQueryList?.removeEventListener('change', syncViewport)
-    })
-
-    watch(isDesktopSidebarCollapsed, (collapsed) => {
-        if (typeof window === 'undefined') {
-            return
-        }
-
-        window.localStorage.setItem(SIDEBAR_COLLAPSED_STORAGE_KEY, collapsed ? '1' : '0')
     })
 
     const context: DashboardLayoutContext = {

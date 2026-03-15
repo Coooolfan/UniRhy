@@ -400,7 +400,7 @@ const refreshAll = () => {
                 </div>
 
                 <div v-else class="px-2 py-4 md:px-4 md:py-5">
-                    <div class="grid gap-6 md:grid-cols-5">
+                    <div class="grid gap-6 grid-cols-2 md:grid-cols-5">
                         <div
                             v-for="(item, index) in statusOverviewItems"
                             :key="item.key"
@@ -408,7 +408,7 @@ const refreshAll = () => {
                             :class="
                                 index < statusOverviewItems.length - 1
                                     ? 'md:border-r md:border-[#E8DFD2]'
-                                    : ''
+                                    : 'hidden md:block'
                             "
                         >
                             <div class="text-4xl font-serif sm:text-5xl" :class="item.valueClass">
