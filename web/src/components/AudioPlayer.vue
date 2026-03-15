@@ -151,14 +151,14 @@ const syncStatusClass = computed(() => {
                 class="fixed bottom-0 left-0 right-0 z-50 border-t border-[#EFEBE4] bg-[#FDFBF7] px-3 py-3 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] sm:px-4 md:px-8"
             >
                 <div
-                    class="mx-auto flex max-w-7xl flex-col gap-3 transition-all duration-280 ease-in transform-gpu will-change-transform will-change-opacity md:flex-row md:items-center md:justify-between md:gap-4"
+                    class="mx-auto flex max-w-7xl flex-col gap-2 transition-all duration-280 ease-in transform-gpu will-change-transform will-change-opacity md:flex-row md:items-center md:justify-between md:gap-4"
                     :class="
                         isExpandedPlayerLeaving
                             ? 'translate-x-8 translate-y-4 opacity-0'
                             : 'translate-x-0 translate-y-0 opacity-100'
                     "
                 >
-                    <div class="flex min-w-0 items-center gap-3 md:w-1/4 md:gap-4">
+                    <div class="flex w-full min-w-0 items-center gap-3 md:w-1/4 md:gap-4">
                         <div
                             v-if="audioStore.currentTrack.cover"
                             class="h-11 w-11 shrink-0 overflow-hidden rounded-sm bg-[#D6D1C7] shadow-sm md:h-12 md:w-12"
@@ -190,10 +190,44 @@ const syncStatusClass = computed(() => {
                                 </button>
                             </div>
                         </div>
+                        <div class="ml-auto flex items-center gap-4 mr- md:hidden">
+                            <button
+                                type="button"
+                                class="text-[#8C857B] transition-colors hover:text-[#C17D46]"
+                                disabled
+                            >
+                                <SkipBack :size="18" />
+                            </button>
+
+                            <button
+                                type="button"
+                                @click="
+                                    audioStore.isPlaying ? audioStore.pause() : audioStore.resume()
+                                "
+                                :disabled="transportDisabled"
+                                class="flex h-9 w-9 items-center justify-center rounded-full bg-[#C17D46] text-white transition-colors shadow-sm hover:bg-[#A66635]"
+                                :class="
+                                    transportDisabled
+                                        ? 'cursor-not-allowed opacity-50 hover:bg-[#C17D46]'
+                                        : ''
+                                "
+                            >
+                                <Pause v-if="audioStore.isPlaying" :size="18" fill="currentColor" />
+                                <Play v-else :size="18" fill="currentColor" class="ml-0.5" />
+                            </button>
+
+                            <button
+                                type="button"
+                                class="text-[#8C857B] transition-colors hover:text-[#C17D46]"
+                                disabled
+                            >
+                                <SkipForward :size="18" />
+                            </button>
+                        </div>
                     </div>
 
                     <div class="flex w-full flex-col items-center gap-1 md:max-w-2xl md:flex-1">
-                        <div class="flex items-center gap-5 sm:gap-6">
+                        <div class="hidden items-center gap-5 sm:gap-6 md:flex">
                             <button
                                 class="text-[#8C857B] hover:text-[#C17D46] transition-colors"
                                 disabled
@@ -263,10 +297,8 @@ const syncStatusClass = computed(() => {
                         </div>
                     </div>
 
-                    <div
-                        class="flex w-full items-center justify-between gap-4 md:w-1/4 md:justify-end"
-                    >
-                        <div class="group hidden items-center gap-2 sm:flex">
+                    <div class="flex w-full items-center gap-3 md:w-1/4 md:justify-end">
+                        <div class="flex min-w-0 items-center gap-2">
                             <button
                                 @click="toggleMute"
                                 class="text-[#8C857B] hover:text-[#C17D46] transition-colors"
@@ -275,7 +307,7 @@ const syncStatusClass = computed(() => {
                                 <Volume2 v-else :size="18" />
                             </button>
                             <div
-                                class="w-20 h-1 bg-[#EFEBE4] rounded-full relative overflow-hidden"
+                                class="relative h-1 w-16 overflow-hidden rounded-full bg-[#EFEBE4] sm:w-20"
                             >
                                 <input
                                     type="range"
@@ -298,33 +330,25 @@ const syncStatusClass = computed(() => {
                             </div>
                         </div>
 
-                        <button
-                            type="button"
-                            class="p-1 text-[#8C857B] transition-colors hover:text-[#C17D46] sm:hidden"
-                            aria-label="静音切换"
-                            @click="toggleMute"
-                        >
-                            <VolumeX v-if="audioStore.volume === 0" :size="18" />
-                            <Volume2 v-else :size="18" />
-                        </button>
+                        <div class="ml-auto flex items-center gap-3 md:gap-4">
+                            <button
+                                @click="audioStore.stop()"
+                                class="p-1 text-[#DCD6CC] hover:text-[#8C857B] transition-colors"
+                            >
+                                <X :size="20" />
+                            </button>
 
-                        <button
-                            @click="audioStore.stop()"
-                            class="p-1 text-[#DCD6CC] hover:text-[#8C857B] transition-colors"
-                        >
-                            <X :size="20" />
-                        </button>
+                            <div class="h-4 w-px bg-[#E8E2D8]" aria-hidden="true"></div>
 
-                        <div class="w-px h-4 bg-[#E8E2D8]" aria-hidden="true"></div>
-
-                        <button
-                            @click="hidePlayer"
-                            class="p-1 text-[#CFC9BF] hover:text-[#8C857B] transition-colors"
-                            title="收起播放器"
-                            aria-label="收起播放器"
-                        >
-                            <ChevronRight :size="20" />
-                        </button>
+                            <button
+                                @click="hidePlayer"
+                                class="p-1 text-[#CFC9BF] hover:text-[#8C857B] transition-colors"
+                                title="收起播放器"
+                                aria-label="收起播放器"
+                            >
+                                <ChevronRight :size="20" />
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>

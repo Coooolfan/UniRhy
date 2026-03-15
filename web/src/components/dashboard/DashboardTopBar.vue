@@ -64,11 +64,11 @@ const closeProfileModal = () => {
 
 <template>
     <header
-        class="sticky top-0 z-20 flex items-center gap-3 bg-dashboard-main/90 px-4 py-4 backdrop-blur-sm transition-all duration-300 sm:px-6 lg:px-8"
+        class="sticky top-0 z-20 flex items-center gap-3 bg-dashboard-main/90 px-4 py-4 backdrop-blur-sm transition-all duration-300 sm:px-6 md:justify-between lg:px-8"
     >
         <button
             type="button"
-            class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[#8C857B] transition-colors hover:bg-white/60 hover:text-[#5E5950]"
+            class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[#8C857B] transition-colors hover:bg-white/60 hover:text-[#5E5950] md:hidden"
             aria-label="切换侧边栏"
             @click="toggleSidebar"
         >
@@ -76,7 +76,7 @@ const closeProfileModal = () => {
         </button>
 
         <div
-            class="flex min-w-0 flex-1 items-center border-b border-[#DCD6CC] pb-1 text-[#8C857B] md:max-w-80 lg:max-w-md"
+            class="flex min-w-0 flex-1 items-center border-b border-[#DCD6CC] pb-1 text-[#8C857B] md:w-64 md:flex-none"
         >
             <Search :size="18" />
             <input
