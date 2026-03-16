@@ -1,0 +1,22 @@
+appId: com.unirhy.desktop
+productName: UniRhy
+directories:
+  output: release
+files:
+  - dist/**/*
+  - dist-electron/**/*
+extraMetadata:
+  main: dist-electron/main.cjs
+mac:
+  category: public.app-category.music
+  target:
+    - dmg
+    - zip
+win:
+  target:
+    - nsis
+linux:
+  category: AudioVideo
+  target:
+    - AppImage
+    - deb

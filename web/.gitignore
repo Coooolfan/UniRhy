@@ -10,8 +10,10 @@ lerna-debug.log*
 node_modules
 .DS_Store
 dist
+dist-electron
 dist-ssr
 coverage
+release
 *.local
 
 # Editor directories and files

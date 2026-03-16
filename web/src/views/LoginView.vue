@@ -202,7 +202,44 @@
                         </div>
                     </form>
 
-                    <div class="text-center mt-6 flex justify-between items-center px-2">
+                    <div
+                        v-if="showBackendEndpoint"
+                        class="mt-6 border-t border-[#d6d0c4] pt-4 space-y-3"
+                    >
+                        <div class="group relative">
+                            <input
+                                id="backend-endpoint"
+                                v-model="backendEndpoint"
+                                type="url"
+                                name="backend-endpoint"
+                                autocomplete="off"
+                                autocapitalize="off"
+                                inputmode="url"
+                                placeholder="http://127.0.0.1:8654"
+                                class="peer w-full bg-transparent border-b border-[#d6d0c4] focus:border-[#d98c28] outline-none py-2 pr-24 text-[#2c2825] placeholder-transparent transition-colors disabled:cursor-not-allowed disabled:text-[#8a817c]"
+                                :disabled="isBackendEndpointLoading || isBackendEndpointSaving"
+                                data-testid="backend-endpoint-input"
+                                @keydown.enter.prevent="handleBackendEndpointSave"
+                            />
+                            <label
+                                for="backend-endpoint"
+                                class="absolute left-0 -top-3.5 text-[#8a817c] text-sm transition-all peer-placeholder-shown:text-base peer-placeholder-shown:text-[#b0a8a0] peer-placeholder-shown:top-2 peer-focus:-top-3.5 peer-focus:text-[#2c2825] peer-focus:text-sm cursor-text"
+                            >
+                                服务端
+                            </label>
+                            <button
+                                type="button"
+                                class="outline-button absolute right-0 top-1/2 -translate-y-1/2 px-3 py-1 text-xs font-bold tracking-widest transition-all duration-300 disabled:border-[#b0a8a0] disabled:text-[#b0a8a0] disabled:shadow-none disabled:hover:bg-transparent"
+                                :disabled="isBackendEndpointLoading || isBackendEndpointSaving"
+                                data-testid="backend-endpoint-save"
+                                @click="handleBackendEndpointSave"
+                            >
+                                保存
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="mt-6 flex items-center justify-between px-2 text-center">
                         <a
                             href="#"
                             class="text-sm text-[#8a817c] hover:text-[#d98c28] decoration-dotted hover:underline underline-offset-4 transition-colors"
@@ -230,12 +267,18 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { api, normalizeApiError } from '@/ApiInstance'
+import { getPlatformRuntime } from '@/runtime/platform'
 
 const router = useRouter()
 const isLoginMode = ref(true)
+const showBackendEndpoint =
+    getPlatformRuntime().platform !== 'web' && window.__UNIRHY_ELECTRON__ !== undefined
+const backendEndpoint = ref('')
+const isBackendEndpointLoading = ref(showBackendEndpoint)
+const isBackendEndpointSaving = ref(false)
 
 const loginForm = reactive({
     email: '',
@@ -246,6 +289,48 @@ const registerForm = reactive({
     username: '',
     email: '',
     password: '',
+})
+
+const loadBackendEndpoint = async () => {
+    if (!showBackendEndpoint || window.__UNIRHY_ELECTRON__ === undefined) {
+        isBackendEndpointLoading.value = false
+        return
+    }
+
+    try {
+        backendEndpoint.value = await window.__UNIRHY_ELECTRON__.getBackendUrl()
+    } catch (error) {
+        const normalizedError = normalizeApiError(error)
+        alert(normalizedError.message || '读取服务端失败')
+    } finally {
+        isBackendEndpointLoading.value = false
+    }
+}
+
+const handleBackendEndpointSave = async () => {
+    if (!showBackendEndpoint || window.__UNIRHY_ELECTRON__ === undefined) {
+        return
+    }
+
+    isBackendEndpointSaving.value = true
+
+    try {
+        backendEndpoint.value = await window.__UNIRHY_ELECTRON__.setBackendUrl(
+            backendEndpoint.value,
+        )
+    } catch (error) {
+        const normalizedError = normalizeApiError(error)
+        alert(normalizedError.message || '保存服务端失败')
+        isBackendEndpointSaving.value = false
+        return
+    }
+
+    isBackendEndpointSaving.value = false
+    alert('服务端已保存')
+}
+
+onMounted(() => {
+    void loadBackendEndpoint()
 })
 
 const switchToRegister = () => {
