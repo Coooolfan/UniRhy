@@ -472,6 +472,7 @@ describe('audio store', () => {
     beforeEach(() => {
         setActivePinia(createPinia())
         window.localStorage.clear()
+        delete window.__UNIRHY_RUNTIME__
         playbackSyncMockState.clients.length = 0
         nextAnimationFrameId = 1
         animationFrameCallbacks = new Map()
@@ -551,7 +552,9 @@ describe('audio store', () => {
         client.emitMessage(message)
         await flushPromises(12)
 
-        expect(fetchMock).toHaveBeenCalledWith('/api/media/2007')
+        expect(fetchMock).toHaveBeenCalledWith('/api/media/2007', {
+            credentials: 'include',
+        })
         expect(client.sendAudioSourceLoaded).toHaveBeenCalledWith({
             commandId: 'cmd-play-1',
             recordingId: 7,
@@ -559,6 +562,33 @@ describe('audio store', () => {
         })
         expect(audioStore.currentTrack?.id).toBe(7)
         expect(audioStore.duration).toBe(45)
+    })
+
+    it('normalizes sync media urls against runtime api base before fetching audio', async () => {
+        fetchMock.mockResolvedValue(createResponse(45))
+        window.__UNIRHY_RUNTIME__ = {
+            apiBaseUrl: 'http://127.0.0.1:8654',
+        }
+
+        const audioStore = useAudioStore()
+        audioStore.connectPlaybackSync()
+        const client = latestClient()
+
+        client.emitMessage({
+            type: 'ROOM_EVENT_LOAD_AUDIO_SOURCE',
+            payload: {
+                commandId: 'cmd-runtime-load-1',
+                recordingId: 7,
+                mediaFileId: 2_007,
+                sourceUrl: '/api/media/2007',
+            },
+        } satisfies LoadAudioSourceMessage)
+        await flushPromises(12)
+
+        expect(fetchMock).toHaveBeenCalledWith('http://127.0.0.1:8654/api/media/2007', {
+            credentials: 'include',
+        })
+        expect(audioStore.currentTrack?.src).toBe('http://127.0.0.1:8654/api/media/2007')
     })
 
     it('ignores stale scheduled actions with a lower version', async () => {

@@ -2,6 +2,7 @@ import { computed, ref, shallowRef } from 'vue'
 import { defineStore } from 'pinia'
 import { api } from '@/ApiInstance'
 import { resolveCover } from '@/composables/recordingMedia'
+import { buildApiUrl } from '@/runtime/platform'
 import {
     PlaybackSyncClient,
     type PlaybackSyncClientDiagnosticsSnapshot,
@@ -104,6 +105,13 @@ type PlaybackRecordingMetadata = Awaited<ReturnType<typeof api.recordingControll
 const VOLUME_STORAGE_KEY = 'unirhy.audio.volume'
 const PLAYBACK_ERROR_MESSAGE = 'Unable to play audio'
 const MAX_KNOWN_TRACKS = 200
+
+const normalizeTrackSourceUrl = (sourceUrl: string) => {
+    if (/^(?:[a-z][a-z\d+.-]*:|\/\/)/i.test(sourceUrl)) {
+        return sourceUrl
+    }
+    return buildApiUrl(sourceUrl)
+}
 
 const normalizeVolume = (volume: number) => {
     return Math.max(0, Math.min(1, volume))
@@ -684,7 +692,7 @@ export const useAudioStore = defineStore('audio', () => {
             title: base?.title ?? `Recording #${recordingId}`,
             artist: base?.artist ?? 'Unknown Artist',
             cover: base?.cover ?? '',
-            src: sourceUrl,
+            src: normalizeTrackSourceUrl(sourceUrl),
             mediaFileId,
             ...(base?.workId !== undefined ? { workId: base.workId } : {}),
         }
@@ -749,7 +757,9 @@ export const useAudioStore = defineStore('audio', () => {
             promise: Promise.resolve(null),
         }
 
-        const promise = fetch(track.src)
+        const promise = fetch(track.src, {
+            credentials: 'include',
+        })
             .then(async (response) => {
                 if (!response.ok) {
                     throw new Error(`Failed to fetch audio: ${response.status}`)

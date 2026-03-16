@@ -1,12 +1,5 @@
 import { Api, type ApiErrors } from './__generated'
-
-const BASE_URL = ''
-
-declare global {
-    interface Window {
-        __tenant?: string
-    }
-}
+import { buildApiUrl } from '@/runtime/platform'
 
 export type ApiErrorShape = {
     message?: string
@@ -54,8 +47,9 @@ export const api = new Api(async ({ uri, method, headers, body }) => {
         // 仅在非FormData时设置content-type，携带二进制文件时，浏览器会自动设置content-type
         fetchHeaders['content-type'] = 'application/json;charset=UTF-8'
     }
-    const response = await fetch(`${BASE_URL}${uri}`, {
+    const response = await fetch(buildApiUrl(uri), {
         method,
+        credentials: 'include',
         headers: fetchHeaders,
         ...(method !== 'GET' ? { body: isFormData ? body : JSON.stringify(body) } : {}),
     })

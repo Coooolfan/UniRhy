@@ -115,9 +115,14 @@ describe('DashboardHero', () => {
         setActivePinia(createPinia())
         randomWorkMock.mockReset()
         pushMock.mockReset()
+        delete window.__UNIRHY_RUNTIME__
     })
 
     it('shows playable action when daily pick has playable audio', async () => {
+        window.__UNIRHY_RUNTIME__ = {
+            apiBaseUrl: 'http://127.0.0.1:8654',
+            platform: 'macos',
+        }
         randomWorkMock.mockResolvedValueOnce(buildPlayableWork())
 
         const wrapper = mount(DashboardHero)
@@ -125,6 +130,9 @@ describe('DashboardHero', () => {
 
         expect(wrapper.text()).toContain('Playable Work')
         expect(wrapper.text()).not.toContain('旋律不可调')
+        expect(wrapper.get('img[alt="Album Cover"]').attributes('src')).toBe(
+            'http://127.0.0.1:8654/api/media/61',
+        )
 
         const playButton = wrapper
             .findAll('button')
