@@ -1,6 +1,7 @@
 import { computed, ref, shallowRef } from 'vue'
 import { defineStore } from 'pinia'
 import { api } from '@/ApiInstance'
+import { getApiBaseUrl } from '@/config'
 import { resolveCover } from '@/composables/recordingMedia'
 import {
     PlaybackSyncClient,
@@ -684,7 +685,7 @@ export const useAudioStore = defineStore('audio', () => {
             title: base?.title ?? `Recording #${recordingId}`,
             artist: base?.artist ?? 'Unknown Artist',
             cover: base?.cover ?? '',
-            src: sourceUrl,
+            src: sourceUrl.startsWith('/') ? `${getApiBaseUrl()}${sourceUrl}` : sourceUrl,
             mediaFileId,
             ...(base?.workId !== undefined ? { workId: base.workId } : {}),
         }

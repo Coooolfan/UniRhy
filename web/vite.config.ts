@@ -5,26 +5,31 @@ import vue from '@vitejs/plugin-vue'
 import vueDevTools from 'vite-plugin-vue-devtools'
 import tailwindcss from '@tailwindcss/vite'
 
+const isTauri = !!process.env.TAURI_ENV_PLATFORM
+
 const devServer = 'http://localhost:8654'
 const devWebSocketServer = devServer.replace(/^http/i, 'ws')
 
 // https://vite.dev/config/
 export default defineConfig({
     plugins: [vue(), vueDevTools(), tailwindcss()],
+    envPrefix: ['VITE_', 'TAURI_ENV_'],
     resolve: {
         alias: {
             '@': fileURLToPath(new URL('src', import.meta.url)),
         },
     },
     server: {
-        proxy: {
-            '/api': {
-                target: devServer,
+        ...(!isTauri && {
+            proxy: {
+                '/api': {
+                    target: devServer,
+                },
+                '/ws': {
+                    target: devWebSocketServer,
+                    ws: true,
+                },
             },
-            '/ws': {
-                target: devWebSocketServer,
-                ws: true,
-            },
-        },
+        }),
     },
 })

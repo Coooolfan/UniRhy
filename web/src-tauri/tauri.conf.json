@@ -1,0 +1,25 @@
+{
+    "productName": "UniRhy",
+    "version": "0.1.0",
+    "identifier": "com.unirhy.desktop",
+    "build": {
+        "beforeDevCommand": "npm run dev -- --mode tauri",
+        "devUrl": "http://localhost:5173",
+        "beforeBuildCommand": "npm run build",
+        "frontendDist": "../dist"
+    },
+    "app": {
+        "windows": [
+            {
+                "title": "UniRhy",
+                "width": 1280,
+                "height": 800,
+                "minWidth": 900,
+                "minHeight": 600
+            }
+        ],
+        "security": {
+            "csp": "default-src 'self'; connect-src 'self' http://localhost:* ws://localhost:* https://* wss://*; img-src 'self' http://localhost:* https://* data: blob:; media-src 'self' http://localhost:* https://* blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; font-src 'self' data:"
+        }
+    }
+}

@@ -4,7 +4,7 @@ import { featuredAlbum as defaultFeaturedAlbum } from './data'
 import { computed, ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '@/ApiInstance'
-import { resolveArtistName, resolvePlayableAudio } from '@/composables/recordingMedia'
+import { resolveArtistName, resolveCover, resolvePlayableAudio } from '@/composables/recordingMedia'
 import { useAudioStore } from '@/stores/audio'
 
 type Album = {
@@ -107,7 +107,7 @@ onMounted(async () => {
             title: work.title,
             artist: resolveArtistName(featuredRecording.artists),
             cover: featuredRecording.cover?.id
-                ? `/api/media/${featuredRecording.cover.id}`
+                ? resolveCover(featuredRecording.cover.id)
                 : defaultFeaturedAlbum.cover,
             audioSrc: featuredAudio.src,
             mediaFileId: featuredAudio.mediaFileId,

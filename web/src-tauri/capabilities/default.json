@@ -1,0 +1,6 @@
+{
+    "identifier": "default",
+    "description": "Default capabilities for UniRhy desktop",
+    "windows": ["main"],
+    "permissions": ["core:default"]
+}

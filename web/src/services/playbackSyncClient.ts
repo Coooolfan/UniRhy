@@ -6,6 +6,7 @@ import type {
     ServerPlaybackSyncMessage,
 } from '@/services/playbackSyncProtocol'
 import { getAuthToken } from '@/ApiInstance'
+import { getWsBaseUrl } from '@/config'
 import { nowClientMs } from '@/utils/time'
 import { average } from '@/utils/math'
 
@@ -115,6 +116,11 @@ const summarizeMeasurements = (measurements: readonly PlaybackSyncNtpMeasurement
 }
 
 const buildWebSocketUrl = () => {
+    const wsBase = getWsBaseUrl()
+    if (wsBase.length > 0) {
+        return `${wsBase}/ws/playback-sync`
+    }
+
     if (typeof window === 'undefined') {
         return ''
     }
