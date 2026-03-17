@@ -6,7 +6,7 @@ import type {
     ServerPlaybackSyncMessage,
 } from '@/services/playbackSyncProtocol'
 import { getAuthToken } from '@/ApiInstance'
-import { buildWebSocketUrl } from '@/runtime/platform'
+import { buildWebSocketUrl, getPlatformRuntime } from '@/runtime/platform'
 import { nowClientMs } from '@/utils/time'
 import { average } from '@/utils/math'
 
@@ -115,11 +115,39 @@ const summarizeMeasurements = (measurements: readonly PlaybackSyncNtpMeasurement
     }
 }
 
-const createDeviceId = () => {
-    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-        return `web-${crypto.randomUUID().slice(0, 8)}`
+const getDeviceIdPrefix = () => {
+    if (typeof window === 'undefined') {
+        return 'web'
     }
-    return `web-${Math.random().toString(36).slice(2, 10)}`
+
+    const platform = getPlatformRuntime().platform
+
+    switch (platform) {
+        case 'web':
+            return 'web'
+        case 'macos':
+            return 'tauri-darwin'
+        case 'windows':
+            return 'tauri-windows'
+        case 'linux':
+            return 'tauri-linux'
+        default: {
+            const exhaustiveCheck: never = platform
+            return exhaustiveCheck
+        }
+    }
+}
+
+const createDeviceId = () => {
+    const prefix = getDeviceIdPrefix()
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+        return `${prefix}-${crypto.randomUUID().slice(0, 8)}`
+    }
+    return `${prefix}-${Math.random().toString(36).slice(2, 10)}`
+}
+
+const isCurrentPlatformDeviceId = (deviceId: string) => {
+    return deviceId.startsWith(`${getDeviceIdPrefix()}-`)
 }
 
 const getOrCreateDeviceId = () => {
@@ -128,7 +156,7 @@ const getOrCreateDeviceId = () => {
     }
 
     const persisted = window.localStorage.getItem(DEVICE_ID_STORAGE_KEY)
-    if (persisted && persisted.trim().length > 0) {
+    if (persisted && persisted.trim().length > 0 && isCurrentPlatformDeviceId(persisted)) {
         return persisted
     }
 

@@ -157,6 +157,45 @@ describe('playbackSyncClient', () => {
         expect(secondHello.payload.deviceId).toBe(firstHello.payload.deviceId)
     })
 
+    it('uses tauri-darwin prefix for macOS tauri runtime device ids', () => {
+        window.__UNIRHY_RUNTIME__ = {
+            apiBaseUrl: 'http://localhost:4000',
+            platform: 'macos',
+        }
+
+        const client = new PlaybackSyncClient()
+        client.connect()
+
+        const socket = MockWebSocket.instances[0]
+        socket?.emitOpen()
+
+        const hello = JSON.parse(socket?.sentMessages[0] ?? 'null')
+        expect(hello.type).toBe('HELLO')
+        expect(hello.payload.deviceId).toMatch(/^tauri-darwin-/)
+    })
+
+    it('migrates persisted web device ids to tauri-darwin on macOS tauri runtime', () => {
+        window.__UNIRHY_RUNTIME__ = {
+            apiBaseUrl: 'http://localhost:4000',
+            platform: 'macos',
+        }
+        window.localStorage.setItem('unirhy.playback-sync.device-id', 'web-legacy01')
+
+        const client = new PlaybackSyncClient()
+        client.connect()
+
+        const socket = MockWebSocket.instances[0]
+        socket?.emitOpen()
+
+        const hello = JSON.parse(socket?.sentMessages[0] ?? 'null')
+        expect(hello.type).toBe('HELLO')
+        expect(hello.payload.deviceId).toMatch(/^tauri-darwin-/)
+        expect(hello.payload.deviceId).not.toBe('web-legacy01')
+        expect(window.localStorage.getItem('unirhy.playback-sync.device-id')).toBe(
+            hello.payload.deviceId,
+        )
+    })
+
     it('sends HELLO with token from localStorage', () => {
         window.localStorage.setItem('unirhy.auth-token', 'my-test-token')
         const client = new PlaybackSyncClient()
