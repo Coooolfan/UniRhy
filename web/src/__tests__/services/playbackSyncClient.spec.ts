@@ -157,6 +157,40 @@ describe('playbackSyncClient', () => {
         expect(secondHello.payload.deviceId).toBe(firstHello.payload.deviceId)
     })
 
+    it('sends HELLO with token from localStorage', () => {
+        window.localStorage.setItem('unirhy.auth-token', 'my-test-token')
+        const client = new PlaybackSyncClient()
+        client.connect()
+
+        const socket = MockWebSocket.instances[0]
+        socket?.emitOpen()
+
+        const hello = JSON.parse(socket?.sentMessages[0] ?? 'null')
+        expect(hello.type).toBe('HELLO')
+        expect(hello.payload.token).toBe('my-test-token')
+    })
+
+    it('sends HELLO without token when localStorage has no token', () => {
+        const client = new PlaybackSyncClient()
+        client.connect()
+
+        const socket = MockWebSocket.instances[0]
+        socket?.emitOpen()
+
+        const hello = JSON.parse(socket?.sentMessages[0] ?? 'null')
+        expect(hello.type).toBe('HELLO')
+        expect(hello.payload.token).toBeUndefined()
+    })
+
+    it('connects with a clean WebSocket URL without query parameters', () => {
+        const client = new PlaybackSyncClient()
+        client.connect()
+
+        const socket = MockWebSocket.instances[0]
+        expect(socket?.url).toBe('ws://localhost:5173/ws/playback-sync')
+        expect(socket?.url).not.toContain('?')
+    })
+
     it('records jittery calibration measurements and becomes ready', () => {
         const phases: string[] = []
         const client = new PlaybackSyncClient({

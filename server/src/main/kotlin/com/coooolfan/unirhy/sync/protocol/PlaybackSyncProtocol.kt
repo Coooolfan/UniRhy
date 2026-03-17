@@ -1,5 +1,6 @@
 package com.coooolfan.unirhy.sync.protocol
 
+import com.fasterxml.jackson.annotation.JsonInclude
 import com.fasterxml.jackson.annotation.JsonPropertyOrder
 import com.fasterxml.jackson.annotation.JsonSubTypes
 import com.fasterxml.jackson.annotation.JsonTypeInfo
@@ -45,6 +46,8 @@ enum class PlaybackSyncErrorCode {
 data class HelloPayload(
     val deviceId: String,
     val clientVersion: String? = null,
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    val token: String? = null,
 )
 
 data class NtpRequestPayload(

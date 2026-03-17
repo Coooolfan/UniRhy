@@ -82,6 +82,7 @@ class PlaybackSyncWebSocketHandlerTest {
         )
         handler = PlaybackSyncWebSocketHandler(
             objectMapper = objectMapper,
+            authenticator = FakePlaybackSyncAuthenticator(mapOf("valid-token" to 42L)),
             playbackSessionService = playbackSessionService,
             deviceRuntimeService = deviceRuntimeService,
             playbackSyncMediaResolver = mediaResolver,
@@ -91,6 +92,7 @@ class PlaybackSyncWebSocketHandlerTest {
             scheduledActionDispatcher = scheduledActionDispatcher,
             messageSender = messageSender,
             logWriter = PlaybackSyncLogWriter(),
+            scheduler = schedulerExecutor,
         )
     }
 
@@ -404,7 +406,8 @@ class PlaybackSyncWebSocketHandlerTest {
           "type": "HELLO",
           "payload": {
             "deviceId": "$deviceId",
-            "clientVersion": "web@0.1.0"
+            "clientVersion": "web@0.1.0",
+            "token": "valid-token"
           }
         }
     """.trimIndent()
@@ -534,4 +537,10 @@ private class FakePlaybackSyncMediaCatalog : PlaybackSyncMediaCatalog {
         recordingId: Long,
         mediaFileId: Long,
     ): Boolean = recordingId == 1001L && mediaFileId == 2001L
+}
+
+private class FakePlaybackSyncAuthenticator(
+    private val tokenToAccountId: Map<String, Long>,
+) : PlaybackSyncAuthenticator {
+    override fun authenticate(tokenValue: String): Long? = tokenToAccountId[tokenValue]
 }

@@ -2,6 +2,8 @@ import { Api, type ApiErrors } from './__generated'
 
 const BASE_URL = ''
 const AUTH_EXPIRED_MESSAGE = '登录已过期，请重新登录'
+const TOKEN_STORAGE_KEY = 'unirhy.auth-token'
+const TOKEN_HEADER_NAME = 'unirhy-token'
 
 declare global {
     interface Window {
@@ -23,7 +25,16 @@ const isLoginRequest = (uri: string, method: string) =>
     uri.includes('/api/tokens') && method === 'POST'
 
 export const clearAuthToken = () => {
-    document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
+    window.localStorage.removeItem(TOKEN_STORAGE_KEY)
+    document.cookie = `${TOKEN_HEADER_NAME}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`
+}
+
+export const saveAuthToken = (token: string) => {
+    window.localStorage.setItem(TOKEN_STORAGE_KEY, token)
+}
+
+export const getAuthToken = (): string | null => {
+    return window.localStorage.getItem(TOKEN_STORAGE_KEY)
 }
 
 const handleAuthExpiry = () => {
@@ -70,6 +81,10 @@ export const api = new Api(async ({ uri, method, headers, body }) => {
     const fetchHeaders: HeadersInit = {
         ...headers,
         ...(tenant !== undefined && tenant !== '' ? { tenant } : {}),
+    }
+    const token = getAuthToken()
+    if (token) {
+        fetchHeaders[TOKEN_HEADER_NAME] = token
     }
     if (!isFormData) {
         // 仅在非FormData时设置content-type，携带二进制文件时，浏览器会自动设置content-type

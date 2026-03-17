@@ -1,5 +1,5 @@
 import type {Executor} from '../';
-import type {TokenLoginRequest} from '../model/static/';
+import type {TokenLoginRequest, TokenLoginResponse} from '../model/static/';
 
 /**
  * 登录与登出接口
@@ -21,10 +21,10 @@ export class TokenController {
      * 
      */
     readonly login: (options: TokenControllerOptions['login']) => Promise<
-        void
+        TokenLoginResponse
     > = async(options) => {
         let _uri = '/api/tokens';
-        return (await this.executor({uri: _uri, method: 'POST', body: options.body})) as Promise<void>;
+        return (await this.executor({uri: _uri, method: 'POST', body: options.body})) as Promise<TokenLoginResponse>;
     }
     
     /**

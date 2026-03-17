@@ -1,12 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const EXPIRED_TOKEN_COOKIE = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
+const TOKEN_STORAGE_KEY = 'unirhy.auth-token'
 const AUTH_EXPIRED_MESSAGE = '登录已过期，请重新登录'
 
 const fetchMock = vi.fn<typeof fetch>()
 const replaceMock = vi.fn()
 
 const originalLocationDescriptor = Object.getOwnPropertyDescriptor(window, 'location')
+const clearTokenCookie = () => {
+    document.cookie = 'unirhy-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
+}
 
 const createJsonResponse = (status: number, body: unknown) =>
     Response.json(body, {
@@ -24,40 +27,6 @@ const createTextResponse = (status: number, body: string) =>
         },
     })
 
-const installCookieSpy = () => {
-    let cookieValue = ''
-    const assignments: string[] = []
-
-    Object.defineProperty(document, 'cookie', {
-        configurable: true,
-        get: () => cookieValue,
-        set: (value: string) => {
-            assignments.push(value)
-
-            const [cookiePair] = value.split(';')
-            const [rawName, ...rawValueParts] = cookiePair.split('=')
-            const cookieName = rawName.trim()
-            const nextValue = rawValueParts.join('=').trim()
-
-            if (cookieName === 'token' && nextValue.length === 0) {
-                cookieValue = ''
-                return
-            }
-
-            cookieValue = cookiePair.trim()
-        },
-    })
-
-    return {
-        seed: (value: string) => {
-            cookieValue = value
-        },
-        getValue: () => cookieValue,
-        getClearCount: () =>
-            assignments.filter((assignment) => assignment === EXPIRED_TOKEN_COOKIE).length,
-    }
-}
-
 const loadApiInstance = () => {
     vi.resetModules()
     return import('@/ApiInstance')
@@ -69,6 +38,8 @@ describe('ApiInstance', () => {
         replaceMock.mockReset()
         vi.restoreAllMocks()
         vi.stubGlobal('fetch', fetchMock)
+        window.localStorage.clear()
+        clearTokenCookie()
         Object.defineProperty(window, 'location', {
             configurable: true,
             value: {
@@ -80,7 +51,8 @@ describe('ApiInstance', () => {
     afterEach(() => {
         vi.unstubAllGlobals()
         vi.restoreAllMocks()
-        Reflect.deleteProperty(document, 'cookie')
+        window.localStorage.clear()
+        clearTokenCookie()
         if (originalLocationDescriptor) {
             Object.defineProperty(window, 'location', originalLocationDescriptor)
         }
@@ -88,8 +60,8 @@ describe('ApiInstance', () => {
 
     it('handles concurrent non-login 401 responses with one alert and one redirect', async () => {
         const alertMock = vi.spyOn(window, 'alert').mockImplementation(() => undefined)
-        const cookieSpy = installCookieSpy()
-        cookieSpy.seed('token=active')
+        window.localStorage.setItem(TOKEN_STORAGE_KEY, 'test-token')
+        document.cookie = 'unirhy-token=test-token; path=/'
         fetchMock.mockImplementation(() =>
             Promise.resolve(createJsonResponse(401, { message: '未登录' })),
         )
@@ -107,14 +79,14 @@ describe('ApiInstance', () => {
         expect(alertMock).toHaveBeenCalledWith(AUTH_EXPIRED_MESSAGE)
         expect(replaceMock).toHaveBeenCalledTimes(1)
         expect(replaceMock).toHaveBeenCalledWith('/')
-        expect(cookieSpy.getClearCount()).toBe(1)
-        expect(cookieSpy.getValue()).toBe('')
+        expect(window.localStorage.getItem(TOKEN_STORAGE_KEY)).toBeNull()
+        expect(document.cookie).not.toContain('unirhy-token=')
     })
 
     it('does not treat login 401 as an expired-session redirect', async () => {
         const alertMock = vi.spyOn(window, 'alert').mockImplementation(() => undefined)
-        const cookieSpy = installCookieSpy()
-        cookieSpy.seed('token=active')
+        window.localStorage.setItem(TOKEN_STORAGE_KEY, 'test-token')
+        document.cookie = 'unirhy-token=test-token; path=/'
         fetchMock.mockImplementation(() =>
             Promise.resolve(createJsonResponse(401, { message: '登录失败' })),
         )
@@ -132,8 +104,8 @@ describe('ApiInstance', () => {
 
         expect(alertMock).not.toHaveBeenCalled()
         expect(replaceMock).not.toHaveBeenCalled()
-        expect(cookieSpy.getClearCount()).toBe(0)
-        expect(cookieSpy.getValue()).toBe('token=active')
+        expect(window.localStorage.getItem(TOKEN_STORAGE_KEY)).toBe('test-token')
+        expect(document.cookie).toContain('unirhy-token=test-token')
     })
 
     it('keeps existing non-401 error behavior', async () => {

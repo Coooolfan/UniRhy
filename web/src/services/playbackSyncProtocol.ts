@@ -38,6 +38,7 @@ export type PlaybackSyncStatePayload = {
 export type HelloPayload = {
     deviceId: string
     clientVersion?: string
+    token?: string
 }
 
 export type NtpRequestPayload = {

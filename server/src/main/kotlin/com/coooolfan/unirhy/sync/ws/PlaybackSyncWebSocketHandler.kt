@@ -10,16 +10,22 @@ import com.coooolfan.unirhy.sync.model.toProtocolState
 import com.coooolfan.unirhy.sync.protocol.*
 import com.coooolfan.unirhy.sync.service.*
 import com.fasterxml.jackson.databind.ObjectMapper
+import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.stereotype.Component
 import org.springframework.web.socket.CloseStatus
 import org.springframework.web.socket.TextMessage
 import org.springframework.web.socket.WebSocketSession
 import org.springframework.web.socket.handler.ConcurrentWebSocketSessionDecorator
 import org.springframework.web.socket.handler.TextWebSocketHandler
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ScheduledExecutorService
+import java.util.concurrent.ScheduledFuture
+import java.util.concurrent.TimeUnit
 
 @Component
 class PlaybackSyncWebSocketHandler(
     private val objectMapper: ObjectMapper,
+    private val authenticator: PlaybackSyncAuthenticator,
     private val playbackSessionService: PlaybackSessionService,
     private val deviceRuntimeService: DeviceRuntimeService,
     private val playbackSyncMediaResolver: PlaybackSyncMediaResolver,
@@ -29,34 +35,25 @@ class PlaybackSyncWebSocketHandler(
     private val scheduledActionDispatcher: PlaybackSyncScheduledActionDispatcher,
     private val messageSender: PlaybackSyncMessageSender,
     private val logWriter: PlaybackSyncLogWriter,
+    @Qualifier("playbackSyncScheduledExecutor")
+    private val scheduler: ScheduledExecutorService,
 ) : TextWebSocketHandler() {
+
+    private val pendingSessions = ConcurrentHashMap<String, ConcurrentWebSocketSessionDecorator>()
+    private val pendingTimeouts = ConcurrentHashMap<String, ScheduledFuture<*>>()
+
     override fun afterConnectionEstablished(session: WebSocketSession) {
-        val accountId = session.getAccountId()
-        val tokenValue = session.attributes[PlaybackSyncSessionAttributes.TOKEN_VALUE] as? String
         val sessionId = session.getPlaybackSyncSessionId()
-
-        if (accountId == null || tokenValue.isNullOrBlank()) {
-            session.close(POLICY_VIOLATION_CLOSE_STATUS)
-            return
-        }
-
-        val decoratedSession = ConcurrentWebSocketSessionDecorator(
+        val decorated = ConcurrentWebSocketSessionDecorator(
             session,
             SEND_TIME_LIMIT_MS,
             SEND_BUFFER_SIZE_LIMIT_BYTES,
         )
-
-        val context = deviceRuntimeService.registerConnection(
-            accountId = accountId,
-            tokenValue = tokenValue,
-            sessionId = sessionId,
-            session = decoratedSession,
-        )
-
-        logWriter.info(
-            PlaybackSyncLogEvents.CONNECTION_OPENED,
-            *context.toBaseLogFields(),
-            PlaybackSyncLogFields.RESULT to "accepted",
+        pendingSessions[sessionId] = decorated
+        pendingTimeouts[sessionId] = scheduler.schedule(
+            { expirePendingSession(sessionId) },
+            HELLO_TIMEOUT_SECONDS,
+            TimeUnit.SECONDS,
         )
     }
 
@@ -65,7 +62,11 @@ class PlaybackSyncWebSocketHandler(
         message: TextMessage,
     ) {
         val sessionId = session.getPlaybackSyncSessionId()
-        val context = deviceRuntimeService.findConnectionContext(sessionId) ?: return
+        val context = deviceRuntimeService.findConnectionContext(sessionId)
+        if (context == null) {
+            handleUnauthenticatedMessage(session, sessionId, message)
+            return
+        }
         val nowMs = timeProvider.nowMs()
 
         val clientMessage = runCatching {
@@ -120,12 +121,59 @@ class PlaybackSyncWebSocketHandler(
         status: CloseStatus,
     ) {
         val sessionId = session.getPlaybackSyncSessionId()
+        pendingSessions.remove(sessionId)
+        cancelPendingTimeout(sessionId)
         val removal = deviceRuntimeService.removeSession(sessionId) ?: return
         sessionRemovalCoordinator.handleRemoval(
             removal = removal,
             reason = status.reason ?: "connection_closed",
             nowMs = timeProvider.nowMs(),
         )
+    }
+
+    private fun handleUnauthenticatedMessage(
+        session: WebSocketSession,
+        sessionId: String,
+        message: TextMessage,
+    ) {
+        val clientMessage = runCatching {
+            objectMapper.readValue(message.payload, ClientPlaybackSyncMessage::class.java)
+        }.getOrElse {
+            session.close(POLICY_VIOLATION_CLOSE_STATUS)
+            return
+        }
+        if (clientMessage !is HelloMessage) {
+            session.close(POLICY_VIOLATION_CLOSE_STATUS)
+            return
+        }
+        val token = clientMessage.payload.token
+        if (token.isNullOrBlank()) {
+            session.close(POLICY_VIOLATION_CLOSE_STATUS)
+            return
+        }
+        val accountId = authenticator.authenticate(token)
+        if (accountId == null) {
+            session.close(POLICY_VIOLATION_CLOSE_STATUS)
+            return
+        }
+        val decoratedSession = pendingSessions.remove(sessionId)
+        if (decoratedSession == null) {
+            session.close(POLICY_VIOLATION_CLOSE_STATUS)
+            return
+        }
+        cancelPendingTimeout(sessionId)
+        val context = deviceRuntimeService.registerConnection(
+            accountId = accountId,
+            tokenValue = token,
+            sessionId = sessionId,
+            session = decoratedSession,
+        )
+        logWriter.info(
+            PlaybackSyncLogEvents.CONNECTION_OPENED,
+            *context.toBaseLogFields(),
+            PlaybackSyncLogFields.RESULT to "accepted",
+        )
+        handleHello(context, clientMessage.payload, timeProvider.nowMs())
     }
 
     private fun handleHello(
@@ -655,14 +703,14 @@ class PlaybackSyncWebSocketHandler(
         )
     }
 
-    private fun WebSocketSession.getAccountId(): Long? {
-        return when (val value = attributes[PlaybackSyncSessionAttributes.ACCOUNT_ID]) {
-            is Long -> value
-            is Int -> value.toLong()
-            is Number -> value.toLong()
-            is String -> value.toLongOrNull()
-            else -> null
-        }
+    private fun expirePendingSession(sessionId: String) {
+        val session = pendingSessions.remove(sessionId) ?: return
+        pendingTimeouts.remove(sessionId)
+        runCatching { session.close(POLICY_VIOLATION_CLOSE_STATUS) }
+    }
+
+    private fun cancelPendingTimeout(sessionId: String) {
+        pendingTimeouts.remove(sessionId)?.cancel(false)
     }
 
     private fun WebSocketSession.getPlaybackSyncSessionId(): String {
@@ -677,6 +725,7 @@ class PlaybackSyncWebSocketHandler(
     private companion object {
         private const val SEND_TIME_LIMIT_MS = 10_000
         private const val SEND_BUFFER_SIZE_LIMIT_BYTES = 512 * 1024
+        private const val HELLO_TIMEOUT_SECONDS = 10L
         private val POLICY_VIOLATION_CLOSE_STATUS = CloseStatus.POLICY_VIOLATION.withReason("unauthorized")
         private val REPLACED_BY_NEW_CONNECTION_STATUS =
             CloseStatus.POLICY_VIOLATION.withReason("replaced_by_new_connection")

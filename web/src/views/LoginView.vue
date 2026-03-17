@@ -228,7 +228,7 @@
 <script setup lang="ts">
 import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { api, normalizeApiError } from '@/ApiInstance'
+import { api, normalizeApiError, saveAuthToken } from '@/ApiInstance'
 
 const router = useRouter()
 const isLoginMode = ref(true)
@@ -258,12 +258,13 @@ const switchToLogin = () => {
 
 const handleLogin = async () => {
     try {
-        await api.tokenController.login({
+        const result = await api.tokenController.login({
             body: {
                 email: loginForm.email,
                 password: loginForm.password,
             },
         })
+        saveAuthToken(result.token)
     } catch (error) {
         const normalizedError = normalizeApiError(error, 'tokenController', 'login')
         alert(normalizedError.message || '登录失败')

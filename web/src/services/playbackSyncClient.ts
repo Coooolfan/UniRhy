@@ -5,6 +5,7 @@ import type {
     PlaybackControlPayload,
     ServerPlaybackSyncMessage,
 } from '@/services/playbackSyncProtocol'
+import { getAuthToken } from '@/ApiInstance'
 import { nowClientMs } from '@/utils/time'
 import { average } from '@/utils/math'
 
@@ -277,6 +278,7 @@ export class PlaybackSyncClient {
                 payload: {
                     deviceId: this.deviceId,
                     clientVersion: CLIENT_VERSION,
+                    token: getAuthToken() ?? undefined,
                 },
             })
         })

@@ -46,6 +46,8 @@ fun loginAsAdmin(state: E2eAdminSession) {
         ),
     )
     E2eAssert.status(loginResponse, 200, "[prepare] admin login should succeed")
+    val token = E2eJson.mapper.readTree(loginResponse.body()).path("token").asText()
+    state.api.setAuthToken(token)
 }
 
 fun systemInitRequest(state: E2eAdminSession): Map<String, Any> {

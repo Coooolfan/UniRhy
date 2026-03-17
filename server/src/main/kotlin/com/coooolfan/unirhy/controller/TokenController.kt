@@ -1,6 +1,7 @@
 package com.coooolfan.unirhy.controller
 
 import cn.dev33.satoken.annotation.SaCheckLogin
+import cn.dev33.satoken.stp.StpUtil
 import com.coooolfan.unirhy.error.CommonException
 import com.coooolfan.unirhy.model.dto.TokenLoginRequest
 import com.coooolfan.unirhy.service.AccountService
@@ -12,6 +13,8 @@ import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
 import kotlin.jvm.Throws
+
+data class TokenLoginResponse(val token: String)
 
 /**
  * 登录与登出接口
@@ -36,8 +39,9 @@ class TokenController(private val service: AccountService) {
      */
     @PostMapping
     @Throws(CommonException.AuthenticationFailed::class)
-    fun login(@RequestBody request: TokenLoginRequest) {
+    fun login(@RequestBody request: TokenLoginRequest): TokenLoginResponse {
         service.checkChallenge(request.email, request.password)
+        return TokenLoginResponse(token = StpUtil.getTokenValue())
     }
 
     /**
@@ -47,10 +51,8 @@ class TokenController(private val service: AccountService) {
      * 需要用户登录认证才能访问
      *
      * @api DELETE /api/tokens/current
-     * @permission 需要登录认证
      * @description 调用AccountService.logout()方法退出登录
      */
-    @SaCheckLogin
     @DeleteMapping("/current")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     fun logout() {

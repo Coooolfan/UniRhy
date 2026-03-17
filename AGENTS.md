@@ -13,7 +13,7 @@ UniRhy (独一律) 是一个私有化的音乐流媒体平台
   - Jimmer ORM 开发指南与约定见 [skills/jimmer-orm/skills.md](skills/jimmer-orm/skills.md)
 - **前端**: 于 `./web` 文件夹. Vue, TypeScript, Vite, Pinia, Tailwind CSS.
   - 除非用户要求，每次更改后都应当在此项目中执行`yarn verify && yarn format:check`以确保 Lint、类型检查与格式检查通过（若格式检查失败，先执行`yarn format`）
-  - 此工程的 Rest API 客户端(`/web/src/__generated`)由命令 `yarn api` 生成，不得手动修改
+  - 此工程的 Rest API 客户端(`/web/src/__generated`)由命令 `yarn api` 生成，在任何情况下都不允许改动此目录下的文件
 - **官网**: 于 `./website` 文件夹. Vue, TypeScript, Vite.
   - 除非用户要求，每次更改后都应当在此项目中执行`yarn verify && yarn format:check`以确保 Lint、类型检查与格式检查通过（若格式检查失败，先执行`yarn format`）
 
@@ -21,9 +21,6 @@ UniRhy (独一律) 是一个私有化的音乐流媒体平台
 
 - 除非用户主动要求，单次改动只能在单一项目中进行
 - `./skills` 文件夹为技能包存放位置，其中包含某一领域的额外文档、脚本等，先探索项目，再决定是否需要读取相关技能
-  - `./skills/skill-creator` 创建技能包：Guide for creating effective skills. This skill should be used when users want to create a new skill (or update an existing skill) that extends Claude's capabilities with specialized knowledge, workflows, or tool integrations.
   - `./skills/jimmer-orm` Jimmer ORM 开发指南：适用于：(1) 定义或修改 Jimmer 实体（使用 @Entity 注解的 interface）；(2) 编写 Jimmer DSL 查询代码；(3) 配置实体关联关系（@ManyToOne, @OneToMany, @ManyToMany）；(4) 使用动态谓词、动态表连接或隐式子查询；(5) 编辑包含 Jimmer 相关代码的 Java/Kotlin 文件。
-- 如果你需要访问开发环境数据库，请直接使用postgres相关工具，此工具已配置好连接信息与数据库
-- cd <project> && yarn <command> 用于指定工作路径，不要使用 yarn --cwd <project> <command> 以避免误调用 yarn v1
 - 所有描述性文字应该始终是面向 开发者/用户 的最终产物，不需要描述中间过程和演变原因。
 - 除非用户主动要求，不需要考虑 API/数据库/模式 的向前兼容。

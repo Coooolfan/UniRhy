@@ -1,8 +1,6 @@
 package com.unirhy.e2e.support
 
 import java.lang.reflect.Array as ReflectArray
-import java.net.CookieManager
-import java.net.CookiePolicy
 import java.net.URI
 import java.net.URLDecoder
 import java.net.URLEncoder
@@ -13,11 +11,15 @@ import java.nio.charset.StandardCharsets
 import java.time.Duration
 
 class E2eHttpClient(private val baseUrl: String) {
-    private val cookieManager = CookieManager(null, CookiePolicy.ACCEPT_ALL)
     private val httpClient = HttpClient.newBuilder()
-        .cookieHandler(cookieManager)
         .connectTimeout(Duration.ofSeconds(10))
         .build()
+
+    private var authToken: String? = null
+
+    fun setAuthToken(token: String?) {
+        this.authToken = token
+    }
 
     fun get(path: String, headers: Map<String, String> = emptyMap()): HttpResponse<String> {
         return requestText(
@@ -168,6 +170,8 @@ class E2eHttpClient(private val baseUrl: String) {
 
             else -> HttpRequest.BodyPublishers.noBody()
         }
+
+        authToken?.let { headers[TOKEN_HEADER_NAME] = it }
         headers.putAll(request.headers)
 
         val httpRequestBuilder = HttpRequest.newBuilder(uri(request.path, request.query))
@@ -221,6 +225,7 @@ class E2eHttpClient(private val baseUrl: String) {
     companion object {
         private const val CONTENT_TYPE_JSON = "application/json"
         private const val CONTENT_TYPE_FORM = "application/x-www-form-urlencoded"
+        private const val TOKEN_HEADER_NAME = "unirhy-token"
 
         fun urlEncode(value: String): String {
             return URLEncoder.encode(value, StandardCharsets.UTF_8)

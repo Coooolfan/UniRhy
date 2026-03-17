@@ -44,6 +44,8 @@ jimmer:
 sa-token:
   is-print: ${SA_TOKEN_IS_PRINT:true}
   token-name: ${SA_TOKEN_NAME:unirhy-token}
+  is-read-cookie: ${SA_TOKEN_IS_READ_COOKIE:true}
+  is-read-header: ${SA_TOKEN_IS_READ_HEADER:true}
 
 logging:
   pattern:
