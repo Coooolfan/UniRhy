@@ -1,6 +1,7 @@
 import { Api, type ApiErrors } from './__generated'
 
 const BASE_URL = ''
+const AUTH_EXPIRED_MESSAGE = '登录已过期，请重新登录'
 
 declare global {
     interface Window {
@@ -15,6 +16,26 @@ export type ApiErrorShape = {
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
     typeof value === 'object' && value !== null
+
+let hasHandledAuthExpiry = false
+
+const isLoginRequest = (uri: string, method: string) =>
+    uri.includes('/api/tokens') && method === 'POST'
+
+export const clearAuthToken = () => {
+    document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
+}
+
+const handleAuthExpiry = () => {
+    if (!hasHandledAuthExpiry) {
+        hasHandledAuthExpiry = true
+        clearAuthToken()
+        window.alert(AUTH_EXPIRED_MESSAGE)
+        window.location.replace('/')
+    }
+
+    throw new Error(AUTH_EXPIRED_MESSAGE)
+}
 
 export function normalizeApiError(error: unknown): ApiErrorShape
 export function normalizeApiError<C extends keyof ApiErrors, M extends keyof ApiErrors[C]>(
@@ -61,12 +82,8 @@ export const api = new Api(async ({ uri, method, headers, body }) => {
     })
 
     // 401处理：排除登录接口，避免循环
-    if (response.status === 401 && !(uri.includes('/api/tokens') && method === 'POST')) {
-        // 清除 token
-        document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
-
-        window.alert('登录已过期，请重新登录')
-        window.location.replace('/')
+    if (response.status === 401 && !isLoginRequest(uri, method)) {
+        handleAuthExpiry()
     }
 
     if (Math.floor(response.status / 100) === 5) {

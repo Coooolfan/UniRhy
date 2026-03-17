@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { api } from '@/ApiInstance'
+import { api, clearAuthToken } from '@/ApiInstance'
 import type { AccountDto } from '@/__generated/model/dto/AccountDto'
 import type { AccountUpdate } from '@/__generated/model/static/AccountUpdate'
 
@@ -37,7 +37,7 @@ export const useUserStore = defineStore('user', () => {
             console.error('Logout failed', error)
             // Continue with local cleanup even if API fails
         } finally {
-            document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
+            clearAuthToken()
             user.value = null
             // We can't use router here easily if not inside setup,
             // but we can let the component handle navigation or return a promise.
