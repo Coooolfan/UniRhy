@@ -294,12 +294,10 @@ const refreshAll = () => {
 </script>
 
 <template>
-    <div
-        class="min-h-screen pb-32 font-sans text-[#5A524A] selection:bg-[#C67C4E] selection:text-white"
-    >
+    <div class="pb-32 font-sans text-[#5A524A] selection:bg-[#C67C4E] selection:text-white">
         <DashboardTopBar />
 
-        <div class="mx-auto w-full max-w-5xl px-8 pt-6 pb-12">
+        <div class="mx-auto w-full max-w-5xl px-8 pt-6">
             <div class="mb-8 flex items-end justify-between border-b border-[#EAE6DE] pb-4">
                 <div>
                     <h2 class="mb-1 font-serif text-3xl text-[#2B221B]">任务管理</h2>
@@ -316,7 +314,9 @@ const refreshAll = () => {
                     <RefreshCw class="h-5 w-5" :class="{ 'animate-spin': isLoadingTaskCounts }" />
                 </button>
             </div>
+        </div>
 
+        <div class="mx-auto w-full max-w-5xl px-8 mt-10">
             <div
                 v-if="taskError"
                 class="mb-6 flex items-center border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700"

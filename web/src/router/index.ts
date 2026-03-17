@@ -1,12 +1,19 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { api } from '@/ApiInstance'
+import { api, getAuthToken } from '@/ApiInstance'
+
+const hasPersistedAuthToken = () => {
+    const token = getAuthToken()
+    return token !== null && token.trim().length > 0
+}
+
+const requiresAuth = (path: string) => path.startsWith('/dashboard')
 
 const router = createRouter({
     history: createWebHistory(import.meta.env.BASE_URL),
     routes: [
         {
             path: '/',
-            redirect: '/login',
+            redirect: () => (hasPersistedAuthToken() ? '/dashboard' : '/login'),
         },
         {
             path: '/init',
@@ -85,6 +92,17 @@ router.beforeEach(async (to) => {
                 return '/login'
             }
         }
+
+        const isAuthenticated = hasPersistedAuthToken()
+
+        if (isAuthenticated && to.path === '/login') {
+            return '/dashboard'
+        }
+
+        if (!isAuthenticated && requiresAuth(to.path)) {
+            return '/login'
+        }
+
         return true
     } catch (error) {
         console.error('Failed to check initialization status', error)

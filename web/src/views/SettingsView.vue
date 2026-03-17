@@ -40,9 +40,7 @@ onMounted(() => {
 </script>
 
 <template>
-    <div
-        class="min-h-screen text-[#3D3D3D] font-sans selection:bg-[#C67C4E] selection:text-white pb-32"
-    >
+    <div class="pb-32 text-[#3D3D3D] font-sans selection:bg-[#C67C4E] selection:text-white">
         <DashboardTopBar />
 
         <div class="max-w-5xl mx-auto px-8 pt-6">
@@ -52,7 +50,9 @@ onMounted(() => {
                     System Configuration & Storage Management
                 </p>
             </header>
+        </div>
 
+        <div class="max-w-5xl mx-auto px-8 mt-10">
             <SystemStatusSection
                 :active-fs-label="activeFsLabel"
                 :system-config="systemConfig"
