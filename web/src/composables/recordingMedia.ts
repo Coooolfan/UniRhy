@@ -1,4 +1,4 @@
-import { getApiBaseUrl } from '@/config'
+import { buildApiUrl } from '@/runtime/platform'
 
 export type RecordingAsset = {
     mediaFile: {
@@ -64,7 +64,7 @@ type NormalizeRecordingsOptions<
 
 export const resolveCover = (coverId?: number) => {
     if (coverId !== undefined) {
-        return `${getApiBaseUrl()}/api/media/${coverId}`
+        return buildApiUrl(`/api/media/${coverId}`)
     }
     return ''
 }
@@ -75,7 +75,7 @@ export const resolvePlayableAudio = (
     const audioAsset = assets.find((asset) => asset.mediaFile.mimeType.startsWith('audio/'))
     if (audioAsset) {
         return {
-            src: `${getApiBaseUrl()}/api/media/${audioAsset.mediaFile.id}`,
+            src: buildApiUrl(`/api/media/${audioAsset.mediaFile.id}`),
             mediaFileId: audioAsset.mediaFile.id,
         }
     }

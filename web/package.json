@@ -21,10 +21,13 @@
     "verify": "run-s lint typecheck",
     "fix": "run-s lint:fix",
     "api": "node script/generate-api.js",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "tauri:check": "cargo check --manifest-path src-tauri/Cargo.toml",
+    "tauri:dev": "tauri dev"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.2.1",
+    "@tauri-apps/api": "^2",
     "echarts": "^6.0.0",
     "lucide-vue-next": "^0.577.0",
     "pinia": "^3.0.4",

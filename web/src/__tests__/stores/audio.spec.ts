@@ -551,7 +551,7 @@ describe('audio store', () => {
         client.emitMessage(message)
         await flushPromises(12)
 
-        expect(fetchMock).toHaveBeenCalledWith('/api/media/2007')
+        expect(fetchMock).toHaveBeenCalledWith('/api/media/2007', { credentials: 'include' })
         expect(client.sendAudioSourceLoaded).toHaveBeenCalledWith({
             commandId: 'cmd-play-1',
             recordingId: 7,

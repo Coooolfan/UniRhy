@@ -1,14 +1,8 @@
 import { Api, type ApiErrors } from './__generated'
-import { getApiBaseUrl } from './config'
+import { buildApiUrl } from '@/runtime/platform'
 const AUTH_EXPIRED_MESSAGE = '登录已过期，请重新登录'
 const TOKEN_STORAGE_KEY = 'unirhy.auth-token'
 const TOKEN_HEADER_NAME = 'unirhy-token'
-
-declare global {
-    interface Window {
-        __tenant?: string
-    }
-}
 
 export type ApiErrorShape = {
     message?: string
@@ -89,8 +83,9 @@ export const api = new Api(async ({ uri, method, headers, body }) => {
         // 仅在非FormData时设置content-type，携带二进制文件时，浏览器会自动设置content-type
         fetchHeaders['content-type'] = 'application/json;charset=UTF-8'
     }
-    const response = await fetch(`${getApiBaseUrl()}${uri}`, {
+    const response = await fetch(buildApiUrl(uri), {
         method,
+        credentials: 'include',
         headers: fetchHeaders,
         ...(method !== 'GET' ? { body: isFormData ? body : JSON.stringify(body) } : {}),
     })

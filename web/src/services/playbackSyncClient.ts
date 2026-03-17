@@ -6,7 +6,7 @@ import type {
     ServerPlaybackSyncMessage,
 } from '@/services/playbackSyncProtocol'
 import { getAuthToken } from '@/ApiInstance'
-import { getWsBaseUrl } from '@/config'
+import { buildWebSocketUrl } from '@/runtime/platform'
 import { nowClientMs } from '@/utils/time'
 import { average } from '@/utils/math'
 
@@ -113,20 +113,6 @@ const summarizeMeasurements = (measurements: readonly PlaybackSyncNtpMeasurement
         clockOffsetMs,
         roundTripEstimateMs,
     }
-}
-
-const buildWebSocketUrl = () => {
-    const wsBase = getWsBaseUrl()
-    if (wsBase.length > 0) {
-        return `${wsBase}/ws/playback-sync`
-    }
-
-    if (typeof window === 'undefined') {
-        return ''
-    }
-
-    const { origin } = window.location
-    return `${origin.replace(/^http/i, 'ws')}/ws/playback-sync`
 }
 
 const createDeviceId = () => {
@@ -272,7 +258,7 @@ export class PlaybackSyncClient {
 
         this.setPhase(this.reconnectAttempt > 0 ? 'reconnecting' : 'connecting')
 
-        const socket = new WebSocket(buildWebSocketUrl())
+        const socket = new WebSocket(buildWebSocketUrl('/ws/playback-sync'))
         this.socket = socket
         socket.addEventListener('open', () => {
             if (this.socket !== socket) {

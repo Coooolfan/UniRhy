@@ -213,6 +213,26 @@
                             注册账号
                         </button>
                     </div>
+
+                    <!-- Backend endpoint config (Tauri only) -->
+                    <div v-if="showBackendEndpoint" class="mt-6 pt-4 border-t border-[#e6dcc8]">
+                        <label class="text-xs text-[#8a817c] mb-2 block">服务端地址</label>
+                        <div class="flex gap-2">
+                            <input
+                                v-model="backendUrl"
+                                type="text"
+                                placeholder="http://localhost:8654"
+                                class="flex-1 bg-transparent border-b border-[#d6d0c4] focus:border-[#d98c28] outline-none py-1 text-sm text-[#2c2825] transition-colors"
+                            />
+                            <button
+                                type="button"
+                                @click.stop="saveBackendUrl"
+                                class="text-xs px-3 py-1 border border-[#d6d0c4] hover:border-[#d98c28] hover:text-[#d98c28] text-[#8a817c] transition-colors rounded-xs"
+                            >
+                                保存
+                            </button>
+                        </div>
+                    </div>
                 </div>
 
                 <div v-else class="h-full flex items-center justify-center opacity-40">
@@ -226,12 +246,15 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { api, normalizeApiError, saveAuthToken } from '@/ApiInstance'
+import { getPlatformRuntime } from '@/runtime/platform'
 
 const router = useRouter()
 const isLoginMode = ref(true)
+const showBackendEndpoint = getPlatformRuntime().platform !== 'web'
+const backendUrl = ref('')
 
 const loginForm = reactive({
     email: '',
@@ -243,6 +266,24 @@ const registerForm = reactive({
     email: '',
     password: '',
 })
+
+onMounted(async () => {
+    if (showBackendEndpoint) {
+        const { invoke } = await import('@tauri-apps/api/core')
+        backendUrl.value = await invoke<string>('get_backend_url')
+    }
+})
+
+const saveBackendUrl = async () => {
+    try {
+        const { invoke } = await import('@tauri-apps/api/core')
+        const normalized = await invoke<string>('set_backend_url', { url: backendUrl.value })
+        backendUrl.value = normalized
+        window.location.reload()
+    } catch (error) {
+        alert(typeof error === 'string' ? error : '保存失败')
+    }
+}
 
 const switchToRegister = () => {
     if (isLoginMode.value) {

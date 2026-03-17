@@ -1,7 +1,7 @@
 import { computed, ref, shallowRef } from 'vue'
 import { defineStore } from 'pinia'
 import { api } from '@/ApiInstance'
-import { getApiBaseUrl } from '@/config'
+import { buildApiUrl } from '@/runtime/platform'
 import { resolveCover } from '@/composables/recordingMedia'
 import {
     PlaybackSyncClient,
@@ -151,6 +151,13 @@ const clampTime = (time: number, maxDuration?: number) => {
     }
 
     return Math.min(time, maxDuration)
+}
+
+const normalizeTrackSourceUrl = (sourceUrl: string) => {
+    if (/^(?:[a-z][a-z\d+.-]*:|\/\/)/i.test(sourceUrl)) {
+        return sourceUrl
+    }
+    return buildApiUrl(sourceUrl)
 }
 
 const isNil = (value: unknown): value is null | undefined => {
@@ -685,7 +692,7 @@ export const useAudioStore = defineStore('audio', () => {
             title: base?.title ?? `Recording #${recordingId}`,
             artist: base?.artist ?? 'Unknown Artist',
             cover: base?.cover ?? '',
-            src: sourceUrl.startsWith('/') ? `${getApiBaseUrl()}${sourceUrl}` : sourceUrl,
+            src: normalizeTrackSourceUrl(sourceUrl),
             mediaFileId,
             ...(base?.workId !== undefined ? { workId: base.workId } : {}),
         }
@@ -750,7 +757,7 @@ export const useAudioStore = defineStore('audio', () => {
             promise: Promise.resolve(null),
         }
 
-        const promise = fetch(track.src)
+        const promise = fetch(track.src, { credentials: 'include' })
             .then(async (response) => {
                 if (!response.ok) {
                     throw new Error(`Failed to fetch audio: ${response.status}`)
