@@ -148,7 +148,7 @@ const syncStatusClass = computed(() => {
         >
             <div
                 v-show="!audioStore.isPlayerHidden"
-                class="fixed bottom-0 left-0 right-0 z-50 border-t border-[#EFEBE4] bg-[#FDFBF7] px-3 py-3 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] sm:px-4 md:px-8"
+                class="fixed bottom-0 left-0 right-0 z-50 border-t border-[#EFEBE4] bg-[#FDFBF7] px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] sm:px-4 md:px-8"
             >
                 <div
                     class="mx-auto flex max-w-7xl flex-col gap-2 transition-all duration-280 ease-in transform-gpu will-change-transform will-change-opacity md:flex-row md:items-center md:justify-between md:gap-4"

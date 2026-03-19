@@ -131,6 +131,10 @@ const getDeviceIdPrefix = () => {
             return 'tauri-windows'
         case 'linux':
             return 'tauri-linux'
+        case 'android':
+            return 'tauri-android'
+        case 'ios':
+            return 'tauri-ios'
         default: {
             const exhaustiveCheck: never = platform
             return exhaustiveCheck

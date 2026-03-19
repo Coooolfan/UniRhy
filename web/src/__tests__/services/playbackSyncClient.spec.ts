@@ -112,6 +112,7 @@ describe('playbackSyncClient', () => {
     beforeEach(() => {
         MockWebSocket.instances = []
         window.localStorage.clear()
+        delete window.__UNIRHY_RUNTIME__
         vi.useFakeTimers()
         vi.setSystemTime(new Date('2026-03-07T00:00:00Z'))
         vi.stubGlobal('WebSocket', MockWebSocket)
@@ -172,6 +173,40 @@ describe('playbackSyncClient', () => {
         const hello = JSON.parse(socket?.sentMessages[0] ?? 'null')
         expect(hello.type).toBe('HELLO')
         expect(hello.payload.deviceId).toMatch(/^tauri-darwin-/)
+    })
+
+    it('uses tauri-android prefix for Android tauri runtime device ids', () => {
+        window.__UNIRHY_RUNTIME__ = {
+            apiBaseUrl: 'http://localhost:4000',
+            platform: 'android',
+        }
+
+        const client = new PlaybackSyncClient()
+        client.connect()
+
+        const socket = MockWebSocket.instances[0]
+        socket?.emitOpen()
+
+        const hello = JSON.parse(socket?.sentMessages[0] ?? 'null')
+        expect(hello.type).toBe('HELLO')
+        expect(hello.payload.deviceId).toMatch(/^tauri-android-/)
+    })
+
+    it('uses tauri-ios prefix for iOS tauri runtime device ids', () => {
+        window.__UNIRHY_RUNTIME__ = {
+            apiBaseUrl: 'http://localhost:4000',
+            platform: 'ios',
+        }
+
+        const client = new PlaybackSyncClient()
+        client.connect()
+
+        const socket = MockWebSocket.instances[0]
+        socket?.emitOpen()
+
+        const hello = JSON.parse(socket?.sentMessages[0] ?? 'null')
+        expect(hello.type).toBe('HELLO')
+        expect(hello.payload.deviceId).toMatch(/^tauri-ios-/)
     })
 
     it('migrates persisted web device ids to tauri-darwin on macOS tauri runtime', () => {

@@ -1,8 +1,8 @@
 import { computed, ref, shallowRef } from 'vue'
 import { defineStore } from 'pinia'
 import { api } from '@/ApiInstance'
-import { buildApiUrl } from '@/runtime/platform'
 import { resolveCover } from '@/composables/recordingMedia'
+import { normalizeMediaUrl } from '@/runtime/mediaAuth'
 import {
     PlaybackSyncClient,
     type PlaybackSyncClientDiagnosticsSnapshot,
@@ -154,10 +154,7 @@ const clampTime = (time: number, maxDuration?: number) => {
 }
 
 const normalizeTrackSourceUrl = (sourceUrl: string) => {
-    if (/^(?:[a-z][a-z\d+.-]*:|\/\/)/i.test(sourceUrl)) {
-        return sourceUrl
-    }
-    return buildApiUrl(sourceUrl)
+    return normalizeMediaUrl(sourceUrl)
 }
 
 const isNil = (value: unknown): value is null | undefined => {

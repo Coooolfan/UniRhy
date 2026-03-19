@@ -1,0 +1,15 @@
+{
+  "build": {
+    "devUrl": "http://192.168.0.10:5173"
+  },
+  "bundle": {
+    "iOS": {
+      "developmentTeam": "YOURTEAMID"
+    }
+  },
+  "app": {
+    "security": {
+      "csp": "default-src 'self'; connect-src 'self' http://localhost:* http://127.0.0.1:* http://192.168.0.10:* ws://localhost:* ws://127.0.0.1:* ws://192.168.0.10:* https://* wss://*; img-src 'self' http://localhost:* http://127.0.0.1:* http://192.168.0.10:* https://* data: blob:; media-src 'self' http://localhost:* http://127.0.0.1:* http://192.168.0.10:* https://* blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; font-src 'self' data:"
+    }
+  }
+}

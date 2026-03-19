@@ -20,6 +20,7 @@ export default defineConfig({
         },
     },
     server: {
+        host: isTauri ? '0.0.0.0' : undefined,
         ...(!isTauri && {
             proxy: {
                 '/api': {

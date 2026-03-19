@@ -38,3 +38,4 @@ __screenshots__/
 # Tauri
 src-tauri/target
 src-tauri/gen
+src-tauri/tauri.ios.conf.json

@@ -19,8 +19,12 @@ struct RuntimeConfig {
 fn detect_platform() -> String {
     if cfg!(target_os = "macos") {
         "macos".to_string()
+    } else if cfg!(target_os = "ios") {
+        "ios".to_string()
     } else if cfg!(target_os = "windows") {
         "windows".to_string()
+    } else if cfg!(target_os = "android") {
+        "android".to_string()
     } else {
         "linux".to_string()
     }
@@ -53,6 +57,7 @@ async fn set_backend_url(
     Ok(normalized)
 }
 
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .setup(|app| {

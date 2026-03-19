@@ -64,7 +64,7 @@ const closeProfileModal = () => {
 
 <template>
     <header
-        class="sticky top-0 z-20 flex items-center gap-3 bg-dashboard-main/90 px-4 py-4 backdrop-blur-sm transition-all duration-300 sm:px-6 md:justify-between lg:px-8"
+        class="sticky top-0 z-20 flex items-center gap-3 bg-dashboard-main/90 px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-4 backdrop-blur-sm transition-all duration-300 sm:px-6 md:justify-between lg:px-8"
     >
         <button
             type="button"

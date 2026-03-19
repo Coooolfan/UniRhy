@@ -194,13 +194,24 @@ const playbackSyncMockState = vi.hoisted(() => ({
     clients: [] as MockPlaybackSyncClientInstance[],
 }))
 
-vi.mock('@/ApiInstance', () => ({
-    api: {
-        recordingController: {
+vi.mock('@/ApiInstance', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('@/ApiInstance')>()
+    const recordingController = Object.assign(
+        Object.create(Object.getPrototypeOf(actual.api.recordingController)),
+        actual.api.recordingController,
+        {
             getRecording: apiMockState.getRecording,
         },
-    },
-}))
+    )
+    const api = Object.assign(Object.create(Object.getPrototypeOf(actual.api)), actual.api, {
+        recordingController,
+    })
+
+    return {
+        ...actual,
+        api,
+    }
+})
 
 vi.mock('@/services/playbackSyncClient', () => {
     function PlaybackSyncClient(
@@ -472,6 +483,7 @@ describe('audio store', () => {
     beforeEach(() => {
         setActivePinia(createPinia())
         window.localStorage.clear()
+        delete window.__UNIRHY_RUNTIME__
         playbackSyncMockState.clients.length = 0
         nextAnimationFrameId = 1
         animationFrameCallbacks = new Map()
@@ -559,6 +571,40 @@ describe('audio store', () => {
         })
         expect(audioStore.currentTrack?.id).toBe(7)
         expect(audioStore.duration).toBe(45)
+    })
+
+    it('adds proxy auth token to synced audio sources in tauri runtime', async () => {
+        window.__UNIRHY_RUNTIME__ = {
+            apiBaseUrl: 'http://127.0.0.1:34855',
+            platform: 'web',
+        }
+        window.localStorage.setItem('unirhy.auth-token', 'mobile-token')
+        fetchMock.mockResolvedValue(createResponse(45))
+
+        const audioStore = useAudioStore()
+        audioStore.connectPlaybackSync()
+        const client = latestClient()
+
+        client.emitMessage({
+            type: 'ROOM_EVENT_LOAD_AUDIO_SOURCE',
+            payload: {
+                commandId: 'cmd-play-2',
+                recordingId: 8,
+                mediaFileId: 2_008,
+                sourceUrl: '/api/media/2008',
+            },
+        } satisfies LoadAudioSourceMessage)
+        await flushPromises(12)
+
+        expect(fetchMock).toHaveBeenCalledWith(
+            'http://127.0.0.1:34855/api/media/2008?unirhy-proxy-token=mobile-token',
+            { credentials: 'include' },
+        )
+        expect(client.sendAudioSourceLoaded).toHaveBeenCalledWith({
+            commandId: 'cmd-play-2',
+            recordingId: 8,
+            mediaFileId: 2_008,
+        })
     })
 
     it('ignores stale scheduled actions with a lower version', async () => {
