@@ -1,6 +1,6 @@
 package com.coooolfan.unirhy.sync.service
 
-import com.coooolfan.unirhy.controller.MediaFileRoutes
+import com.coooolfan.unirhy.service.MediaUrlSigner
 import com.coooolfan.unirhy.sync.log.PlaybackSyncLogWriter
 import com.coooolfan.unirhy.sync.support.TestPlaybackSyncTimeProvider
 import com.coooolfan.unirhy.sync.support.TestWebSocketSession
@@ -40,6 +40,7 @@ class PlaybackSyncStaleConnectionJanitorTest {
         val messageSender = PlaybackSyncMessageSender(
             objectMapper = jacksonObjectMapper(),
             deviceRuntimeService = deviceRuntimeService,
+            urlSigner = MediaUrlSigner("test-signing-key", 3600),
         )
         scheduledActionDispatcher = PlaybackSyncScheduledActionDispatcher(
             messageSender = messageSender,
@@ -80,7 +81,6 @@ class PlaybackSyncStaleConnectionJanitorTest {
             initiatorDeviceId = "web-a",
             recordingId = 1001L,
             mediaFileId = 2001L,
-            sourceUrl = MediaFileRoutes.mediaFilePath(2001L),
             positionSeconds = 12.5,
             nowMs = 1_000L,
             timeoutAtMs = 4_000L,

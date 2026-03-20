@@ -73,7 +73,7 @@ const emitSnapshot = (socket: MockWebSocket | undefined) => {
                     status: 'PAUSED',
                     recordingId: null,
                     mediaFileId: null,
-                    sourceUrl: null,
+                    presignedUrl: null,
                     positionSeconds: 0,
                     serverTimeToExecuteMs: 0,
                     version: 0,

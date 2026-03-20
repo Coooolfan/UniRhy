@@ -1,6 +1,6 @@
 package com.coooolfan.unirhy.sync.service
 
-import com.coooolfan.unirhy.controller.MediaFileRoutes
+import com.coooolfan.unirhy.service.MediaUrlSigner
 import com.coooolfan.unirhy.sync.log.PlaybackSyncLogWriter
 import com.coooolfan.unirhy.sync.protocol.DeviceChangeMessage
 import com.coooolfan.unirhy.sync.protocol.ScheduledActionMessage
@@ -43,7 +43,7 @@ class PlaybackSyncSessionRemovalCoordinatorTest {
             deviceRuntimeService = deviceRuntimeService,
             scheduler = schedulerExecutor,
         )
-        messageSender = PlaybackSyncMessageSender(objectMapper, deviceRuntimeService)
+        messageSender = PlaybackSyncMessageSender(objectMapper, deviceRuntimeService, MediaUrlSigner("test-signing-key", 3600))
         scheduledActionDispatcher = PlaybackSyncScheduledActionDispatcher(
             messageSender = messageSender,
             logWriter = PlaybackSyncLogWriter(),
@@ -71,7 +71,6 @@ class PlaybackSyncSessionRemovalCoordinatorTest {
             initiatorDeviceId = "web-a",
             recordingId = 1001L,
             mediaFileId = 2001L,
-            sourceUrl = MediaFileRoutes.mediaFilePath(2001L),
             positionSeconds = 12.5,
             nowMs = 1_000L,
             timeoutAtMs = 4_000L,
@@ -93,7 +92,6 @@ class PlaybackSyncSessionRemovalCoordinatorTest {
             initiatorDeviceId = "web-a",
             recordingId = 1001L,
             mediaFileId = 2001L,
-            sourceUrl = MediaFileRoutes.mediaFilePath(2001L),
             positionSeconds = 12.5,
             nowMs = 1_000L,
             timeoutAtMs = 4_000L,
@@ -127,7 +125,6 @@ class PlaybackSyncSessionRemovalCoordinatorTest {
             initiatorDeviceId = "web-a",
             recordingId = 1001L,
             mediaFileId = 2001L,
-            sourceUrl = MediaFileRoutes.mediaFilePath(2001L),
             positionSeconds = 12.5,
             nowMs = 1_000L,
             timeoutAtMs = 4_000L,

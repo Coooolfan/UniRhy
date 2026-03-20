@@ -11,6 +11,7 @@ export type AlbumDto = {
         }>;
         readonly cover?: {
             readonly id: number;
+            readonly url: string;
         } | undefined;
     }, 
     'AlbumController/DETAIL_ALBUM_FETCHER': {
@@ -44,6 +45,7 @@ export type AlbumDto = {
                         readonly id: number;
                     } | undefined;
                     readonly objectKey: string;
+                    readonly url: string;
                 };
             }>;
             readonly artists: ReadonlyArray<{
@@ -60,6 +62,7 @@ export type AlbumDto = {
                 readonly size: number;
                 readonly width?: number | undefined;
                 readonly height?: number | undefined;
+                readonly url: string;
             } | undefined;
         }>;
         readonly cover?: {
@@ -70,6 +73,7 @@ export type AlbumDto = {
             readonly size: number;
             readonly width?: number | undefined;
             readonly height?: number | undefined;
+            readonly url: string;
         } | undefined;
     }
 }

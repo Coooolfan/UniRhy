@@ -13,7 +13,7 @@ UniRhy (独一律) 是一个私有化的音乐流媒体平台
   - Jimmer ORM 开发指南与约定见 [skills/jimmer-orm/skills.md](skills/jimmer-orm/skills.md)
 - **前端**: 于 `./web` 文件夹. Vue, TypeScript, Vite, Pinia, Tailwind CSS.
   - 除非用户要求，每次更改后都应当在此项目中执行`yarn verify && yarn format:check`以确保 Lint、类型检查与格式检查通过（若格式检查失败，先执行`yarn format`）
-  - 此工程的 Rest API 客户端(`/web/src/__generated`)由命令 `yarn api` 生成，在任何情况下都不允许改动此目录下的文件
+  - 此工程的 API 客户端(`/web/src/__generated`)由命令 `yarn api` 生成，在任何情况下都不允许改动此目录下的文件
   - Tauri 2 发行：除非用户要求，每次更改`/web/src-tauri/`后都应当在此项目中执行`yarn tauri:check`以确保类型检查通过
 - **官网**: 于 `./website` 文件夹. Vue, TypeScript, Vite.
   - 除非用户要求，每次更改后都应当在此项目中执行`yarn verify && yarn format:check`以确保 Lint、类型检查与格式检查通过（若格式检查失败，先执行`yarn format`）

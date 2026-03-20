@@ -70,8 +70,8 @@ const playAlbum = async (album: AlbumCard) => {
             album.defaultTrackTitle = targetTrack.title || targetTrack.comment || detail.title
             album.defaultTrackArtist =
                 targetTrack.artists.map((artist) => artist.displayName).join(', ') || album.artist
-            album.defaultTrackCover = targetTrack.cover?.id
-                ? resolveCover(targetTrack.cover.id)
+            album.defaultTrackCover = targetTrack.cover?.url
+                ? resolveCover(targetTrack.cover)
                 : album.cover
             album.defaultTrackSrc = targetEntry.playableAudio.src
             album.defaultTrackMediaFileId = targetEntry.playableAudio.mediaFileId
@@ -112,7 +112,7 @@ const fetchAlbums = async () => {
             id: album.id,
             title: album.title ?? 'Untitled Album',
             artist: album.recordings?.[0]?.label ?? 'Unknown Artist',
-            cover: resolveCover(album.cover?.id),
+            cover: resolveCover(album.cover),
         }))
     } catch (error) {
         albums.value = []

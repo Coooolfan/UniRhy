@@ -63,7 +63,7 @@ const fetchAlbums = async () => {
             title: album.title || 'Untitled Album',
             subtitle: album.recordings?.[0]?.label || 'Unknown Artist',
             details: formatYear(album.releaseDate),
-            cover: resolveCover(album.cover?.id),
+            cover: resolveCover(album.cover),
             badge: album.kind?.trim() ? album.kind : '其他',
         }))
     } catch (error) {
@@ -96,10 +96,10 @@ const fetchWorks = async () => {
                 title: work.title || 'Untitled Work',
                 subtitle: artistName,
                 details: `${work.recordings?.length ?? 0} Tracks`,
-                cover: resolveCover(mainRecording?.cover?.id),
+                cover: resolveCover(mainRecording?.cover),
                 stackedImages: work.recordings?.map((recording) => ({
                     id: recording.id,
-                    cover: resolveCover(recording.cover?.id),
+                    cover: resolveCover(recording.cover),
                 })),
             }
         })

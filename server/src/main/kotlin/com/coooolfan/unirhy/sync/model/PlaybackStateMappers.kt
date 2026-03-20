@@ -6,7 +6,6 @@ fun AccountPlaybackState.toProtocolState(): AccountPlaybackStateDto = AccountPla
     status = status,
     recordingId = recordingId,
     mediaFileId = mediaFileId,
-    sourceUrl = sourceUrl,
     positionSeconds = positionSeconds,
     serverTimeToExecuteMs = serverTimeToExecuteMs,
     version = version,

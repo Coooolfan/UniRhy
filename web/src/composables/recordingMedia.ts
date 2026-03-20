@@ -1,10 +1,11 @@
-import { buildMediaUrl } from '@/runtime/mediaAuth'
+import { buildApiUrl } from '@/runtime/platform'
 
 export type RecordingAsset = {
     mediaFile: {
         id: number
         mimeType: string
         objectKey: string
+        url?: string
         ossProvider?: { id: number }
         fsProvider?: { id: number }
     }
@@ -35,7 +36,7 @@ type NormalizableRecording = {
     title?: string
     comment?: string
     artists?: ReadonlyArray<RecordingArtist>
-    cover?: { id?: number } | null
+    cover?: { id?: number; url?: string } | null
     assets?: readonly RecordingAsset[] | null
     defaultInWork?: boolean
 }
@@ -62,20 +63,17 @@ type NormalizeRecordingsOptions<
     transform: (recording: TRecording, base: NormalizedRecordingBase) => TOutput
 }
 
-export const resolveCover = (coverId?: number) => {
-    if (coverId !== undefined) {
-        return buildMediaUrl(`/api/media/${coverId}`)
-    }
-    return ''
+export const resolveCover = (cover?: { url?: string } | null) => {
+    return cover?.url ? buildApiUrl(cover.url) : ''
 }
 
 export const resolvePlayableAudio = (
     assets: readonly RecordingAsset[],
 ): PlayableAudioSource | undefined => {
     const audioAsset = assets.find((asset) => asset.mediaFile.mimeType.startsWith('audio/'))
-    if (audioAsset) {
+    if (audioAsset?.mediaFile.url) {
         return {
-            src: buildMediaUrl(`/api/media/${audioAsset.mediaFile.id}`),
+            src: buildApiUrl(audioAsset.mediaFile.url),
             mediaFileId: audioAsset.mediaFile.id,
         }
     }
@@ -127,7 +125,7 @@ export function normalizeRecordings<
             title: recording.title || recording.comment || 'Untitled Track',
             artist:
                 resolveArtistName(recording.artists) || options.fallbackArtist || 'Unknown Artist',
-            cover: resolveCover(recording.cover?.id) || options.fallbackCover || '',
+            cover: resolveCover(recording.cover) || options.fallbackCover || '',
             audioSrc: playableAudio?.src,
             mediaFileId: playableAudio?.mediaFileId,
         }

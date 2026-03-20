@@ -27,6 +27,7 @@ export type WorkDto = {
                         readonly id: number;
                     } | undefined;
                     readonly objectKey: string;
+                    readonly url: string;
                 };
             }>;
             readonly artists: ReadonlyArray<{
@@ -43,6 +44,7 @@ export type WorkDto = {
                 readonly size: number;
                 readonly width?: number | undefined;
                 readonly height?: number | undefined;
+                readonly url: string;
             } | undefined;
         }>;
     }

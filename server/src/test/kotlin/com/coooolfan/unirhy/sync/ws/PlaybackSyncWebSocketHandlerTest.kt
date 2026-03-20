@@ -4,7 +4,7 @@ import ch.qos.logback.classic.Level
 import ch.qos.logback.classic.Logger
 import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.core.read.ListAppender
-import com.coooolfan.unirhy.controller.MediaFileRoutes
+import com.coooolfan.unirhy.service.MediaUrlSigner
 import com.coooolfan.unirhy.sync.log.PlaybackSyncLogEvents
 import com.coooolfan.unirhy.sync.log.PlaybackSyncLogWriter
 import com.coooolfan.unirhy.sync.protocol.*
@@ -65,9 +65,11 @@ class PlaybackSyncWebSocketHandlerTest {
         mediaResolver = PlaybackSyncMediaResolver(
             mediaCatalog = FakePlaybackSyncMediaCatalog(),
         )
+        val urlSigner = MediaUrlSigner("test-signing-key", 3600)
         val messageSender = PlaybackSyncMessageSender(
             objectMapper = objectMapper,
             deviceRuntimeService = deviceRuntimeService,
+            urlSigner = urlSigner,
         )
         scheduledActionDispatcher = PlaybackSyncScheduledActionDispatcher(
             messageSender = messageSender,
@@ -180,7 +182,8 @@ class PlaybackSyncWebSocketHandlerTest {
         assertEquals(2, messages.size)
         val loadAudio = messages[0] as LoadAudioSourceMessage
         val scheduledAction = messages[1] as ScheduledActionMessage
-        assertEquals(MediaFileRoutes.mediaFilePath(2001L), loadAudio.payload.sourceUrl)
+        assertTrue(loadAudio.payload.presignedUrl.contains("_sig="))
+        assertTrue(loadAudio.payload.presignedUrl.contains("_exp="))
         assertEquals(ScheduledActionType.PLAY, scheduledAction.payload.scheduledAction.action)
         assertEquals(PlaybackStatus.PLAYING, scheduledAction.payload.scheduledAction.status)
         assertEquals(12.5, scheduledAction.payload.scheduledAction.positionSeconds)

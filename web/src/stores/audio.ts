@@ -2,7 +2,7 @@ import { computed, ref, shallowRef } from 'vue'
 import { defineStore } from 'pinia'
 import { api } from '@/ApiInstance'
 import { resolveCover } from '@/composables/recordingMedia'
-import { normalizeMediaUrl } from '@/runtime/mediaAuth'
+import { buildApiUrl } from '@/runtime/platform'
 import {
     PlaybackSyncClient,
     type PlaybackSyncClientDiagnosticsSnapshot,
@@ -153,8 +153,8 @@ const clampTime = (time: number, maxDuration?: number) => {
     return Math.min(time, maxDuration)
 }
 
-const normalizeTrackSourceUrl = (sourceUrl: string) => {
-    return normalizeMediaUrl(sourceUrl)
+const normalizeTrackUrl = (url: string) => {
+    return buildApiUrl(url)
 }
 
 const isNil = (value: unknown): value is null | undefined => {
@@ -371,7 +371,7 @@ export const useAudioStore = defineStore('audio', () => {
         const artist =
             pickFirstNonBlank(resolveMetadataArtistLabel(metadata.artists), track.artist) ??
             'Unknown Artist'
-        const cover = metadata.cover?.id ? resolveCover(metadata.cover.id) : (track.cover ?? '')
+        const cover = metadata.cover?.url ? resolveCover(metadata.cover) : (track.cover ?? '')
         let workId = track.workId
         if (metadata.work?.id !== undefined) {
             workId = metadata.work.id
@@ -679,7 +679,7 @@ export const useAudioStore = defineStore('audio', () => {
     const createPlaceholderTrack = (
         recordingId: number,
         mediaFileId: number,
-        sourceUrl: string,
+        presignedUrl: string,
     ): AudioTrack => {
         const current = currentTrack.value?.id === recordingId ? currentTrack.value : null
         const cached = knownTracks.get(recordingId)
@@ -689,7 +689,7 @@ export const useAudioStore = defineStore('audio', () => {
             title: base?.title ?? `Recording #${recordingId}`,
             artist: base?.artist ?? 'Unknown Artist',
             cover: base?.cover ?? '',
-            src: normalizeTrackSourceUrl(sourceUrl),
+            src: normalizeTrackUrl(presignedUrl),
             mediaFileId,
             ...(base?.workId !== undefined ? { workId: base.workId } : {}),
         }
@@ -703,10 +703,10 @@ export const useAudioStore = defineStore('audio', () => {
             | ScheduledActionPayload['scheduledAction']
             | LoadAudioSourcePayload,
     ) => {
-        if (isNil(state.recordingId) || isNil(state.mediaFileId) || isNil(state.sourceUrl)) {
+        if (isNil(state.recordingId) || isNil(state.mediaFileId) || isNil(state.presignedUrl)) {
             return null
         }
-        return createPlaceholderTrack(state.recordingId, state.mediaFileId, state.sourceUrl)
+        return createPlaceholderTrack(state.recordingId, state.mediaFileId, state.presignedUrl)
     }
 
     const primeTrackState = (track: AudioTrack, positionSeconds: number) => {
@@ -754,7 +754,8 @@ export const useAudioStore = defineStore('audio', () => {
             promise: Promise.resolve(null),
         }
 
-        const promise = fetch(track.src, { credentials: 'include' })
+        const needsCredentials = !track.src.includes('_sig=')
+        const promise = fetch(track.src, needsCredentials ? { credentials: 'include' } : {})
             .then(async (response) => {
                 if (!response.ok) {
                     throw new Error(`Failed to fetch audio: ${response.status}`)
@@ -1034,7 +1035,7 @@ export const useAudioStore = defineStore('audio', () => {
             status: scheduledAction.status,
             recordingId: scheduledAction.recordingId,
             mediaFileId: scheduledAction.mediaFileId,
-            sourceUrl: scheduledAction.sourceUrl,
+            presignedUrl: scheduledAction.presignedUrl,
             positionSeconds: scheduledAction.positionSeconds,
             serverTimeToExecuteMs: payload.serverTimeToExecuteMs,
             version: scheduledAction.version,

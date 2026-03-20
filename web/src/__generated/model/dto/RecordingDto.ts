@@ -25,6 +25,7 @@ export type RecordingDto = {
             readonly size: number;
             readonly width?: number | undefined;
             readonly height?: number | undefined;
+            readonly url: string;
         } | undefined;
     }
 }

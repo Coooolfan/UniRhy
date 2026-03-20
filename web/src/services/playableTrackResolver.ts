@@ -46,7 +46,7 @@ const resolveTrack = (
             fallback.title ||
             'Untitled Track',
         artist: resolveArtistName(recording.artists) || fallback.artist || 'Unknown Artist',
-        cover: recording.cover?.id ? resolveCover(recording.cover.id) : fallback.cover || '',
+        cover: recording.cover?.url ? resolveCover(recording.cover) : fallback.cover || '',
         src: playableAudio.src,
         mediaFileId: playableAudio.mediaFileId,
     }

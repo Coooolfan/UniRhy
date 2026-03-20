@@ -74,7 +74,6 @@ data class AccountPlaybackState(
     val status: PlaybackStatus,
     val recordingId: Long?,
     val mediaFileId: Long?,
-    val sourceUrl: String?,
     val positionSeconds: Double,
     val serverTimeToExecuteMs: Long,
     val version: Long,
@@ -85,7 +84,7 @@ data class AccountPlaybackState(
 说明：
 - `positionSeconds + serverTimeToExecuteMs` 是播放锚点
 - `version` 单调递增，由服务端在每次更新 `AccountPlaybackState` 时自增，客户端仅接受更高版本
-- `sourceUrl` 由服务端根据 `mediaFileId` 解析生成（可包含签名/CDN 路径），客户端不传 sourceUrl
+- 内部状态不保存 URL，`presignedUrl` 仅在出站消息发送前由 `PlaybackSyncMessageSender` 根据 `mediaFileId` 生成
 - 无播放状态用 `PAUSED + recordingId=null` 表示，不设 STOPPED 状态
 
 ### 4.2 执行中临时态（每账号可空）
@@ -96,7 +95,6 @@ data class PendingPlayState(
     val initiatorDeviceId: String,
     val recordingId: Long,
     val mediaFileId: Long,
-    val sourceUrl: String,
     val clientsLoaded: MutableSet<String>,
     val createdAtMs: Long,
     val timeoutAtMs: Long,
@@ -106,8 +104,7 @@ data class PendingPlayState(
 说明：
 - 对应 Beatsync 的 `pendingPlay`
 - 只在”切歌播放需预加载”阶段存在
-- `sourceUrl` 由服务端在创建 `PendingPlayState` 时根据 `mediaFileId` 解析填入
-- 当 `executeScheduledPlay()` 执行时，将 pending 中的 `recordingId`/`mediaFileId`/`sourceUrl` 写入 `AccountPlaybackState`
+- 当 `executeScheduledPlay()` 执行时，将 pending 中的 `recordingId`/`mediaFileId` 写入 `AccountPlaybackState`
 - 收到新 PLAY 时，先 `clearPendingPlay()`（取消超时定时器）再创建新的，即”后到覆盖”语义（与 Beatsync 一致）
 - `clientsLoaded` 初始化时自动包含 `initiatorDeviceId`（发起者视为已加载，与 Beatsync 一致）
 
@@ -168,7 +165,7 @@ data class DeviceRuntimeState(
 - `SYNC { deviceId }`
 
 说明：
-- `PLAY` 不携带 `sourceUrl`，由服务端根据 `mediaFileId` 解析
+- `PLAY` 不携带 URL，服务端根据 `mediaFileId` 在出站消息中生成 `presignedUrl`
 - 切歌 = 发一个带新 `recordingId` 的 `PLAY`，不设独立 CHANGE_TRACK 消息
 - 无独立 STOP 消息；暂停并清空曲目由 `PAUSE + recordingId=null` 语义覆盖
 - `SYNC` 的前置条件：客户端必须先完成 NTP 初始化校时（`isSynced=true`）后才可发送
@@ -177,14 +174,14 @@ data class DeviceRuntimeState(
 
 - `NTP_RESPONSE { t0, t1, t2 }`
 - `SNAPSHOT { state, serverNowMs }`
-- `ROOM_EVENT_LOAD_AUDIO_SOURCE { commandId, recordingId, mediaFileId, sourceUrl }`
+- `ROOM_EVENT_LOAD_AUDIO_SOURCE { commandId, recordingId, mediaFileId, presignedUrl }`
 - `SCHEDULED_ACTION { commandId, serverTimeToExecuteMs, scheduledAction }`
 - `ROOM_EVENT_DEVICE_CHANGE { devices }`（可选）
 - `ERROR { code, message }`
 
 说明：
 - `SNAPSHOT` 在以下时机发送：①HELLO 响应；②断线重连后服务端自动下发（无需客户端主动 SYNC）
-- `ROOM_EVENT_LOAD_AUDIO_SOURCE` 中的 `sourceUrl` 由服务端解析生成
+- `ROOM_EVENT_LOAD_AUDIO_SOURCE` 中的 `presignedUrl` 由 `PlaybackSyncMessageSender` 在发送前根据 `mediaFileId` 生成
 
 ### 5.3 ACK 策略
 
@@ -207,13 +204,13 @@ data class DeviceRuntimeState(
 ### 6.2 PLAY（切歌场景）
 
 1. 设备 A 发 `PLAY { recordingId, mediaFileId, positionSeconds }`
-2. 服务端根据 `mediaFileId` 解析 `sourceUrl`
+2. 服务端校验 `recordingId`/`mediaFileId` 关联关系
 3. 若已有 `PendingPlayState`，先 `clearPendingPlay()`（取消旧超时），再创建新的（后到覆盖语义）
 4. 创建 `PendingPlayState`，`clientsLoaded` 初始化为 `Set([发起者deviceId])`
-5. 广播 `ROOM_EVENT_LOAD_AUDIO_SOURCE { commandId, recordingId, mediaFileId, sourceUrl }`
+5. 广播 `ROOM_EVENT_LOAD_AUDIO_SOURCE { commandId, recordingId, mediaFileId, presignedUrl }`（`presignedUrl` 由 `PlaybackSyncMessageSender` 补齐）
 6. 各设备收到后执行 `fetch → decodeAudioData`，完成后发 `AUDIO_SOURCE_LOADED`
 7. 全部加载完成或 3 秒超时后，服务端执行 `executeScheduledPlay()`：
-   - 将 pending 中的 `recordingId`/`mediaFileId`/`sourceUrl` 写入 `AccountPlaybackState`
+   - 将 pending 中的 `recordingId`/`mediaFileId` 写入 `AccountPlaybackState`
    - 计算 `serverTimeToExecuteMs`
    - 广播 `SCHEDULED_ACTION(PLAY)`
 8. 客户端使用 `AudioBufferSourceNode.start(when, offset)` 精确调度：

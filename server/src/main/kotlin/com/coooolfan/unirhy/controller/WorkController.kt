@@ -166,12 +166,16 @@ class WorkController(
                         ossProvider()
                         fsProvider()
                         objectKey()
+                        url()
                     }
                 }
                 artists {
                     allScalarFields()
                 }
-                cover { allScalarFields() }
+                cover {
+                    allScalarFields()
+                    url()
+                }
             }
         }
     }

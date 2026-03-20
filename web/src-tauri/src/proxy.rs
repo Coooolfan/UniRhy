@@ -13,9 +13,6 @@ use reqwest::Client;
 use tokio::net::TcpListener;
 use tokio::sync::RwLock;
 
-const MEDIA_AUTH_TOKEN_QUERY_PARAM: &str = "unirhy-proxy-token";
-const TOKEN_HEADER_NAME: &str = "unirhy-token";
-
 #[derive(Clone)]
 struct ProxyState {
     backend_url: Arc<RwLock<String>>,
@@ -24,12 +21,10 @@ struct ProxyState {
 
 pub struct ProxyServer {
     port: u16,
-    backend_url: Arc<RwLock<String>>,
 }
 
 impl ProxyServer {
-    pub async fn start(backend_url: String) -> Self {
-        let backend_url = Arc::new(RwLock::new(backend_url));
+    pub async fn start(backend_url: Arc<RwLock<String>>) -> Self {
         let state = ProxyState {
             backend_url: backend_url.clone(),
             client: Client::new(),
@@ -47,15 +42,11 @@ impl ProxyServer {
             axum::serve(listener, app).await.ok();
         });
 
-        Self { port, backend_url }
+        Self { port }
     }
 
     pub fn port(&self) -> u16 {
         self.port
-    }
-
-    pub fn backend_url(&self) -> &Arc<RwLock<String>> {
-        &self.backend_url
     }
 }
 
@@ -77,7 +68,7 @@ async fn http_proxy(State(state): State<ProxyState>, req: Request) -> Response {
 
     let backend = state.backend_url.read().await.clone();
     let uri = req.uri().to_string();
-    let (target_url, proxy_token) = build_upstream_request(&backend, &uri);
+    let target_url = build_upstream_request(&backend, &uri);
 
     let method = req.method().clone();
     let mut builder = state.client.request(method, &target_url);
@@ -89,10 +80,6 @@ async fn http_proxy(State(state): State<ProxyState>, req: Request) -> Response {
         }
         builder = builder.header(name, value);
     }
-    if let Some(token) = proxy_token {
-        builder = builder.header(TOKEN_HEADER_NAME, token);
-    }
-
     let body_bytes = match axum::body::to_bytes(req.into_body(), usize::MAX).await {
         Ok(b) => b,
         Err(_) => {
@@ -140,31 +127,10 @@ async fn http_proxy(State(state): State<ProxyState>, req: Request) -> Response {
     response
 }
 
-fn build_upstream_request(backend: &str, uri: &str) -> (String, Option<String>) {
-    let mut target_url = reqwest::Url::parse(&format!("{}{}", backend, uri))
-        .expect("proxy target URL should always be valid");
-    let mut proxy_token = None;
-    let mut retained_query_pairs = Vec::new();
-
-    if target_url.query().is_some() {
-        for (key, value) in target_url.query_pairs() {
-            if key == MEDIA_AUTH_TOKEN_QUERY_PARAM {
-                proxy_token.get_or_insert_with(|| value.into_owned());
-                continue;
-            }
-            retained_query_pairs.push((key.into_owned(), value.into_owned()));
-        }
-
-        target_url.set_query(None);
-        if !retained_query_pairs.is_empty() {
-            let mut query_pairs = target_url.query_pairs_mut();
-            for (key, value) in retained_query_pairs {
-                query_pairs.append_pair(&key, &value);
-            }
-        }
-    }
-
-    (target_url.into(), proxy_token)
+fn build_upstream_request(backend: &str, uri: &str) -> String {
+    reqwest::Url::parse(&format!("{}{}", backend, uri))
+        .expect("proxy target URL should always be valid")
+        .into()
 }
 
 async fn ws_proxy(

@@ -1,11 +1,6 @@
 package com.coooolfan.unirhy.sync.ws
 
-import com.coooolfan.unirhy.sync.log.PlaybackSyncLogEvents
-import com.coooolfan.unirhy.sync.log.PlaybackSyncLogFields
-import com.coooolfan.unirhy.sync.log.PlaybackSyncLogWriter
-import com.coooolfan.unirhy.sync.log.logConnectionClosed
-import com.coooolfan.unirhy.sync.log.logScheduledActionSent
-import com.coooolfan.unirhy.sync.log.toBaseLogFields
+import com.coooolfan.unirhy.sync.log.*
 import com.coooolfan.unirhy.sync.model.toProtocolState
 import com.coooolfan.unirhy.sync.protocol.*
 import com.coooolfan.unirhy.sync.service.*
@@ -300,7 +295,6 @@ class PlaybackSyncWebSocketHandler(
             initiatorDeviceId = deviceId,
             recordingId = resolvedMedia.recordingId,
             mediaFileId = resolvedMedia.mediaFileId,
-            sourceUrl = resolvedMedia.sourceUrl,
             positionSeconds = payload.positionSeconds,
             nowMs = nowMs,
             timeoutAtMs = nowMs + PlaybackSchedulerService.PENDING_PLAY_TIMEOUT_MS,
@@ -326,7 +320,7 @@ class PlaybackSyncWebSocketHandler(
                 commandId = payload.commandId,
                 recordingId = resolvedMedia.recordingId,
                 mediaFileId = resolvedMedia.mediaFileId,
-                sourceUrl = resolvedMedia.sourceUrl,
+                presignedUrl = "",
             ),
         )
 
@@ -355,13 +349,11 @@ class PlaybackSyncWebSocketHandler(
             nowMs = nowMs,
         )
 
-        val sourceUrl = if (payload.recordingId != null && payload.mediaFileId != null) {
+        if (payload.recordingId != null && payload.mediaFileId != null) {
             playbackSyncMediaResolver.resolve(
                 recordingId = payload.recordingId,
                 mediaFileId = payload.mediaFileId,
-            ).sourceUrl
-        } else {
-            null
+            )
         }
 
         sessionRemovalCoordinator.abandonPendingPlay(context.accountId)
@@ -377,7 +369,6 @@ class PlaybackSyncWebSocketHandler(
             commandId = payload.commandId,
             recordingId = payload.recordingId,
             mediaFileId = payload.mediaFileId,
-            sourceUrl = sourceUrl,
             positionSeconds = payload.positionSeconds,
             nowMs = nowMs,
             executeAtMs = playbackSchedulerService.calculateExecuteAtMs(context.accountId, nowMs),
@@ -415,7 +406,6 @@ class PlaybackSyncWebSocketHandler(
             commandId = payload.commandId,
             recordingId = resolvedMedia.recordingId,
             mediaFileId = resolvedMedia.mediaFileId,
-            sourceUrl = resolvedMedia.sourceUrl,
             positionSeconds = payload.positionSeconds,
             nowMs = nowMs,
             executeAtMs = playbackSchedulerService.calculateExecuteAtMs(context.accountId, nowMs),
@@ -429,11 +419,7 @@ class PlaybackSyncWebSocketHandler(
         nowMs: Long,
     ) {
         requireMatchingDevice(context, payload.deviceId)
-        requireNonBlank(
-            payload.commandId,
-            "commandId must not be blank",
-            PlaybackSyncErrorReason.COMMAND_ID_BLANK,
-        )
+        requireNonBlank(payload.commandId)
         deviceRuntimeService.touchDevice(context.accountId, payload.deviceId, nowMs)
 
         val pendingPlay = playbackSessionService.markAudioSourceLoaded(
@@ -556,11 +542,7 @@ class PlaybackSyncWebSocketHandler(
         nowMs: Long,
     ): String {
         requireMatchingDevice(context, payload.deviceId)
-        requireNonBlank(
-            payload.commandId,
-            "commandId must not be blank",
-            PlaybackSyncErrorReason.COMMAND_ID_BLANK,
-        )
+        requireNonBlank(payload.commandId)
         requireValidPosition(payload.positionSeconds)
         deviceRuntimeService.touchDevice(context.accountId, payload.deviceId, nowMs)
 
@@ -617,16 +599,12 @@ class PlaybackSyncWebSocketHandler(
         }
     }
 
-    private fun requireNonBlank(
-        value: String,
-        message: String,
-        reason: PlaybackSyncErrorReason,
-    ) {
+    private fun requireNonBlank(value: String) {
         if (value.isBlank()) {
             throw PlaybackSyncProtocolException(
                 code = PlaybackSyncErrorCode.INVALID_MESSAGE,
-                message = message,
-                reason = reason,
+                message = "commandId must not be blank",
+                reason = PlaybackSyncErrorReason.COMMAND_ID_BLANK,
             )
         }
     }

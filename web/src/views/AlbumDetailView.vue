@@ -109,7 +109,7 @@ const fetchAlbum = async (id: number) => {
             year: releaseYear,
             type: data.kind || 'Album',
             description: data.comment || '',
-            cover: resolveCover(data.cover?.id),
+            cover: resolveCover(data.cover),
         }
 
         recordings.value = normalizeRecordings(

@@ -19,7 +19,7 @@
 - `type` 使用大写蛇形命名。
 - `payload` 字段使用 camelCase。
 - 协议中的 `recordingId` 指向后端 `Recording` 实体；UI 侧可继续展示为 Track / 曲目。
-- `sourceUrl` 固定为相对路径 `/api/media/{mediaFileId}`，由服务端生成，客户端不得上传。
+- `presignedUrl` 由服务端根据 `mediaFileId` 生成的带签名相对路径，客户端不得上传。
 - `positionSeconds` 表示播放偏移，单位秒，类型为 `Double`。
 
 ## 2. 公共枚举
@@ -225,7 +225,7 @@
       "status": "PLAYING",
       "recordingId": 1001,
       "mediaFileId": 2001,
-      "sourceUrl": "/api/media/2001",
+      "presignedUrl": "/api/media/2001",
       "positionSeconds": 12.5,
       "serverTimeToExecuteMs": 1730844001500,
       "version": 8,
@@ -241,7 +241,7 @@
 - `status: PlaybackStatus`
 - `recordingId: Long?`
 - `mediaFileId: Long?`
-- `sourceUrl: String?`
+- `presignedUrl: String?`
 - `positionSeconds: Double`
 - `serverTimeToExecuteMs: Long`
 - `version: Long`
@@ -249,7 +249,7 @@
 
 约束：
 
-- 无当前录音时，服务端使用 `status=PAUSED`、`recordingId=null`、`mediaFileId=null`、`sourceUrl=null`，并保留 `positionSeconds=0.0`。
+- 无当前录音时，服务端使用 `status=PAUSED`、`recordingId=null`、`mediaFileId=null`、`presignedUrl=null`，并保留 `positionSeconds=0.0`。
 
 ### `ROOM_EVENT_LOAD_AUDIO_SOURCE`
 
@@ -260,7 +260,7 @@
     "commandId": "cmd-play-001",
     "recordingId": 1001,
     "mediaFileId": 2001,
-    "sourceUrl": "/api/media/2001"
+    "presignedUrl": "/api/media/2001"
   }
 }
 ```
@@ -270,7 +270,7 @@
 - `commandId: String`
 - `recordingId: Long`
 - `mediaFileId: Long`
-- `sourceUrl: String`
+- `presignedUrl: String`
 
 ### `SCHEDULED_ACTION`
 
@@ -285,7 +285,7 @@
       "status": "PLAYING",
       "recordingId": 1001,
       "mediaFileId": 2001,
-      "sourceUrl": "/api/media/2001",
+      "presignedUrl": "/api/media/2001",
       "positionSeconds": 12.5,
       "version": 8
     }
@@ -299,14 +299,14 @@
 - `status: PlaybackStatus`
 - `recordingId: Long?`
 - `mediaFileId: Long?`
-- `sourceUrl: String?`
+- `presignedUrl: String?`
 - `positionSeconds: Double`
 - `version: Long`
 
 约束：
 
-- `PLAY` 必须提供非空 `recordingId`、`mediaFileId`、`sourceUrl`。
-- `PAUSE` 允许 `recordingId`、`mediaFileId`、`sourceUrl` 为空。
+- `PLAY` 必须提供非空 `recordingId`、`mediaFileId`、`presignedUrl`。
+- `PAUSE` 允许 `recordingId`、`mediaFileId`、`presignedUrl` 为空。
 - `SEEK` 必须提供与当前权威态一致的 `status`，客户端按 `status` 决定 seek 后是否继续播放。
 
 ### `ROOM_EVENT_DEVICE_CHANGE`

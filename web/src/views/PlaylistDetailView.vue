@@ -83,7 +83,7 @@ const fetchPlaylist = async (id: number) => {
         playlistData.value = {
             title: data.name,
             description: data.comment || '',
-            cover: firstCover ? resolveCover(firstCover.id) : '',
+            cover: firstCover ? resolveCover(firstCover) : '',
         }
 
         recordings.value = normalizeRecordings(

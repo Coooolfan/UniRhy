@@ -4,10 +4,13 @@ mod proxy;
 use proxy::ProxyServer;
 use serde::Serialize;
 use tauri::Manager;
+use tokio::sync::RwLock;
+use std::sync::Arc;
 
 struct AppState {
-    proxy_port: u16,
-    proxy: ProxyServer,
+    backend_url: Arc<RwLock<String>>,
+    proxy_port: Option<u16>,
+    _proxy: Option<ProxyServer>,
 }
 
 #[derive(Serialize)]
@@ -32,15 +35,19 @@ fn detect_platform() -> String {
 
 #[tauri::command]
 fn get_runtime_config(state: tauri::State<'_, AppState>) -> RuntimeConfig {
+    let backend_url = tauri::async_runtime::block_on(async { state.backend_url.read().await.clone() });
     RuntimeConfig {
-        proxy_url: format!("http://localhost:{}", state.proxy_port),
+        proxy_url: state
+            .proxy_port
+            .map(|port| format!("http://localhost:{port}"))
+            .unwrap_or(backend_url),
         platform: detect_platform(),
     }
 }
 
 #[tauri::command]
 async fn get_backend_url(state: tauri::State<'_, AppState>) -> Result<String, String> {
-    let url = state.proxy.backend_url().read().await.clone();
+    let url = state.backend_url.read().await.clone();
     Ok(url)
 }
 
@@ -52,7 +59,7 @@ async fn set_backend_url(
 ) -> Result<String, String> {
     let normalized = config::normalize_backend_url(&url)?;
     config::save_backend_url(&app, &normalized)?;
-    let mut backend = state.proxy.backend_url().write().await;
+    let mut backend = state.backend_url.write().await;
     *backend = normalized.clone();
     Ok(normalized)
 }
@@ -61,14 +68,12 @@ async fn set_backend_url(
 pub fn run() {
     tauri::Builder::default()
         .setup(|app| {
-            let backend_url = config::load_backend_url(app.handle());
-
-            let proxy = tauri::async_runtime::block_on(ProxyServer::start(backend_url));
-
-            let port = proxy.port();
+            let backend_url = Arc::new(RwLock::new(config::load_backend_url(app.handle())));
+            let proxy = Some(tauri::async_runtime::block_on(ProxyServer::start(backend_url.clone())));
             app.manage(AppState {
-                proxy_port: port,
-                proxy,
+                backend_url,
+                proxy_port: proxy.as_ref().map(ProxyServer::port),
+                _proxy: proxy,
             });
 
             Ok(())

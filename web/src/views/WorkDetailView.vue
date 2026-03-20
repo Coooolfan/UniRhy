@@ -93,7 +93,7 @@ async function fetchWork(id: number) {
         workData.value = {
             title: data.title,
             artist: artistName,
-            cover: resolveCover(defaultRecording?.cover?.id),
+            cover: resolveCover(defaultRecording?.cover),
         }
 
         recordings.value = normalizeRecordings(

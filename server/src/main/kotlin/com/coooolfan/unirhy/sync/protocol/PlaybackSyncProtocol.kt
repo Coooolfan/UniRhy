@@ -84,7 +84,7 @@ data class AccountPlaybackStateDto(
     val status: PlaybackStatus,
     val recordingId: Long? = null,
     val mediaFileId: Long? = null,
-    val sourceUrl: String? = null,
+    val presignedUrl: String? = null,
     val positionSeconds: Double,
     val serverTimeToExecuteMs: Long,
     val version: Long,
@@ -100,7 +100,7 @@ data class LoadAudioSourcePayload(
     val commandId: String,
     val recordingId: Long,
     val mediaFileId: Long,
-    val sourceUrl: String,
+    val presignedUrl: String,
 )
 
 data class ScheduledPlaybackAction(
@@ -108,7 +108,7 @@ data class ScheduledPlaybackAction(
     val status: PlaybackStatus,
     val recordingId: Long? = null,
     val mediaFileId: Long? = null,
-    val sourceUrl: String? = null,
+    val presignedUrl: String? = null,
     val positionSeconds: Double,
     val version: Long,
 )

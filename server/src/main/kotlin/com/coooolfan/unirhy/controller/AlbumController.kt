@@ -80,7 +80,7 @@ class AlbumController(private val service: AlbumService) {
         private val DEFAULT_ALBUM_FETCHER = newFetcher(Album::class).by {
             allScalarFields()
             recordings { label() }
-            cover()
+            cover { url() }
         }
 
         private val DETAIL_ALBUM_FETCHER = newFetcher(Album::class).by {
@@ -94,14 +94,21 @@ class AlbumController(private val service: AlbumService) {
                         ossProvider()
                         fsProvider()
                         objectKey()
+                        url()
                     }
                 }
                 artists {
                     allScalarFields()
                 }
-                cover { allScalarFields() }
+                cover {
+                    allScalarFields()
+                    url()
+                }
             }
-            cover { allScalarFields() }
+            cover {
+                allScalarFields()
+                url()
+            }
         }
 
     }

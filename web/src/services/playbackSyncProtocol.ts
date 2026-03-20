@@ -28,7 +28,7 @@ export type PlaybackSyncStatePayload = {
     status: PlaybackStatus
     recordingId: number | null
     mediaFileId: number | null
-    sourceUrl: string | null
+    presignedUrl: string | null
     positionSeconds: number
     serverTimeToExecuteMs: number
     version: number
@@ -80,7 +80,7 @@ export type LoadAudioSourcePayload = {
     commandId: string
     recordingId: number
     mediaFileId: number
-    sourceUrl: string
+    presignedUrl: string
 }
 
 export type ScheduledPlaybackAction = {
@@ -88,7 +88,7 @@ export type ScheduledPlaybackAction = {
     status: PlaybackStatus
     recordingId: number | null
     mediaFileId: number | null
-    sourceUrl: string | null
+    presignedUrl: string | null
     positionSeconds: number
     version: number
 }

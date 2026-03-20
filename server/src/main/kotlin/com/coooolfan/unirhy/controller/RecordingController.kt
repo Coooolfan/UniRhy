@@ -94,6 +94,7 @@ class RecordingController(private val service: RecordingService) {
             }
             cover {
                 allScalarFields()
+                url()
             }
         }
     }

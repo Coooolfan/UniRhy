@@ -242,7 +242,7 @@ class PlaybackSyncProtocolSerializationTest {
                         status = PlaybackStatus.PLAYING,
                         recordingId = 1001,
                         mediaFileId = 2001,
-                        sourceUrl = "/api/media/2001",
+                        presignedUrl = "/api/media/2001",
                         positionSeconds = 12.5,
                         serverTimeToExecuteMs = 1730844001500,
                         version = 8,
@@ -259,7 +259,7 @@ class PlaybackSyncProtocolSerializationTest {
                       "status": "PLAYING",
                       "recordingId": 1001,
                       "mediaFileId": 2001,
-                      "sourceUrl": "/api/media/2001",
+                      "presignedUrl": "/api/media/2001",
                       "positionSeconds": 12.5,
                       "serverTimeToExecuteMs": 1730844001500,
                       "version": 8,
@@ -277,7 +277,7 @@ class PlaybackSyncProtocolSerializationTest {
                     commandId = "cmd-play-001",
                     recordingId = 1001,
                     mediaFileId = 2001,
-                    sourceUrl = "/api/media/2001",
+                    presignedUrl = "/api/media/2001",
                 ),
             ),
             expectedJson = """
@@ -287,7 +287,7 @@ class PlaybackSyncProtocolSerializationTest {
                     "commandId": "cmd-play-001",
                     "recordingId": 1001,
                     "mediaFileId": 2001,
-                    "sourceUrl": "/api/media/2001"
+                    "presignedUrl": "/api/media/2001"
                   }
                 }
             """.trimIndent(),
@@ -303,7 +303,7 @@ class PlaybackSyncProtocolSerializationTest {
                         status = PlaybackStatus.PAUSED,
                         recordingId = 1001,
                         mediaFileId = 2001,
-                        sourceUrl = "/api/media/2001",
+                        presignedUrl = "/api/media/2001",
                         positionSeconds = 91.0,
                         version = 9,
                     ),
@@ -320,7 +320,7 @@ class PlaybackSyncProtocolSerializationTest {
                       "status": "PAUSED",
                       "recordingId": 1001,
                       "mediaFileId": 2001,
-                      "sourceUrl": "/api/media/2001",
+                      "presignedUrl": "/api/media/2001",
                       "positionSeconds": 91.0,
                       "version": 9
                     }

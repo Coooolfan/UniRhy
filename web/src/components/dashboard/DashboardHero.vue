@@ -106,8 +106,8 @@ onMounted(async () => {
             recordingId: featuredRecording.id,
             title: work.title,
             artist: resolveArtistName(featuredRecording.artists),
-            cover: featuredRecording.cover?.id
-                ? resolveCover(featuredRecording.cover.id)
+            cover: featuredRecording.cover?.url
+                ? resolveCover(featuredRecording.cover)
                 : defaultFeaturedAlbum.cover,
             audioSrc: featuredAudio.src,
             mediaFileId: featuredAudio.mediaFileId,

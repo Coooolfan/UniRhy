@@ -171,12 +171,18 @@ class PlaylistController(private val service: PlaylistService) {
                 allScalarFields()
                 assets {
                     allScalarFields()
-                    mediaFile { allScalarFields() }
+                    mediaFile {
+                        allScalarFields()
+                        url()
+                    }
                 }
                 artists {
                     allScalarFields()
                 }
-                cover { allScalarFields() }
+                cover {
+                    allScalarFields()
+                    url()
+                }
             }
         }
     }

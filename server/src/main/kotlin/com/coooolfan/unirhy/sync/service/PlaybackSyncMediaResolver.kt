@@ -6,7 +6,6 @@ import com.coooolfan.unirhy.model.Recording
 import com.coooolfan.unirhy.model.id
 import com.coooolfan.unirhy.model.mediaFileId
 import com.coooolfan.unirhy.model.recordingId
-import com.coooolfan.unirhy.controller.MediaFileRoutes
 import com.coooolfan.unirhy.sync.protocol.PlaybackSyncErrorCode
 import org.babyfish.jimmer.sql.kt.KSqlClient
 import org.babyfish.jimmer.sql.kt.ast.expression.count
@@ -17,7 +16,6 @@ import org.springframework.stereotype.Service
 data class PlaybackSyncResolvedMedia(
     val recordingId: Long,
     val mediaFileId: Long,
-    val sourceUrl: String,
 )
 
 interface PlaybackSyncMediaCatalog {
@@ -73,7 +71,6 @@ class PlaybackSyncMediaResolver(
             return PlaybackSyncResolvedMedia(
                 recordingId = recordingId,
                 mediaFileId = mediaFileId,
-                sourceUrl = MediaFileRoutes.mediaFilePath(mediaFileId),
             )
         }
 

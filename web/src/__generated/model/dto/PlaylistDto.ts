@@ -27,6 +27,7 @@ export type PlaylistDto = {
                     readonly size: number;
                     readonly width?: number | undefined;
                     readonly height?: number | undefined;
+                    readonly url: string;
                 };
             }>;
             readonly artists: ReadonlyArray<{
@@ -43,6 +44,7 @@ export type PlaylistDto = {
                 readonly size: number;
                 readonly width?: number | undefined;
                 readonly height?: number | undefined;
+                readonly url: string;
             } | undefined;
         }>;
     }
