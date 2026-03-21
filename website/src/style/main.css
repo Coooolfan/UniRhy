@@ -1,0 +1,31 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-brand-sans: 'Barlow Condensed', sans-serif;
+  --font-brand-serif: 'Songti SC', 'SimSun', serif;
+}
+
+html,
+body,
+#app {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  background-color: #050505;
+  overflow: hidden;
+}
+
+.fade-up-enter-active,
+.fade-up-leave-active {
+  transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.fade-up-enter-from {
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+.fade-up-leave-to {
+  opacity: 0;
+  transform: translateY(-10px);
+}

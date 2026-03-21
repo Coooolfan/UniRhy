@@ -8,8 +8,8 @@
     "build": "run-p type-check \"build-only {@}\" --",
     "preview": "vite preview",
     "build-only": "vite build",
-    "type-check": "oxlint . --type-check -A all -A nursery --deny-warnings",
-    "typecheck": "oxlint . --type-check -A all -A nursery --deny-warnings",
+    "type-check": "oxlint . --type-aware --type-check -A all -A nursery --deny-warnings",
+    "typecheck": "oxlint . --type-aware --type-check -A all -A nursery --deny-warnings",
     "lint": "oxlint . --type-aware --deny-warnings",
     "lint:fix": "oxlint . --fix",
     "format": "oxfmt .",
@@ -18,22 +18,24 @@
     "fix": "run-s lint:fix"
   },
   "dependencies": {
-    "@types/three": "^0.182.0",
-    "three": "^0.182.0",
-    "vue": "^3.5.28"
+    "@types/three": "^0.183.1",
+    "three": "^0.183.2",
+    "vue": "^3.5.30"
   },
   "devDependencies": {
+    "@tailwindcss/vite": "^4.2.2",
     "@tsconfig/node24": "^24.0.4",
-    "@types/node": "^24.10.13",
-    "@vitejs/plugin-vue": "^6.0.4",
-    "@vue/tsconfig": "^0.8.1",
+    "@types/node": "^24.12.0",
+    "@vitejs/plugin-vue": "^6.0.5",
+    "@vue/tsconfig": "^0.9.0",
     "npm-run-all2": "^8.0.4",
-    "oxfmt": "^0.32.0",
-    "oxlint": "~1.47.0",
-    "oxlint-tsgolint": "^0.13.0",
+    "oxfmt": "^0.41.0",
+    "oxlint": "~1.56.0",
+    "oxlint-tsgolint": "^0.17.1",
+    "tailwindcss": "^4.2.2",
     "typescript": "~5.9.3",
-    "vite": "npm:rolldown-vite@latest",
-    "vite-plugin-vue-devtools": "^8.0.6"
+    "vite": "^8.0.1",
+    "vite-plugin-vue-devtools": "^8.1.0"
   },
   "engines": {
     "node": "^24.0.0"
