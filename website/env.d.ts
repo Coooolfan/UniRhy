@@ -6,3 +6,10 @@ declare module '*.vue' {
   const component: DefineComponent<Record<string, never>, Record<string, never>, unknown>
   export default component
 }
+
+declare module '*.md' {
+  import type { BlogFrontmatter } from '@/types/blog'
+
+  export const frontmatter: BlogFrontmatter
+  export const html: string
+}

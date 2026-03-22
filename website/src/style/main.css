@@ -11,8 +11,17 @@ body,
   margin: 0;
   width: 100%;
   height: 100%;
+}
+
+html:has(.home-view) {
   background-color: #050505;
   overflow: hidden;
+}
+
+html:has(.blog-layout) {
+  background: radial-gradient(circle at top left, #f5f0e6, #e6dcc8);
+  background-attachment: fixed;
+  overflow: auto;
 }
 
 .fade-up-enter-active,
