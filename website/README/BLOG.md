@@ -122,7 +122,7 @@ draft: true
 ```
 
 - **开发模式** (`yarn dev`)：草稿在列表页可见，标题旁会显示 `DRAFT` 标记
-- **生产构建** (`yarn build`)：草稿自动从列表中过滤，不会出现在线上
+- **生产构建** (`yarn build`)：草稿自动从列表中过滤，不会被编译
 
 发布时删除 `draft: true` 或改为 `draft: false` 即可。
 
