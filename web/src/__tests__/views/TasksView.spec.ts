@@ -12,6 +12,7 @@ vi.mock('@/ApiInstance', async (importOriginal) => {
                 executeScanTask: vi.fn(),
                 executeTranscodeTask: vi.fn(),
                 executeVectorizeTask: vi.fn(),
+                executeDataCleanTask: vi.fn(),
             },
             fileSystemStorageController: {
                 list: vi.fn(),
@@ -30,6 +31,7 @@ const listTaskLogsMock = vi.mocked(api.taskController.listTaskLogs)
 const executeScanTaskMock = vi.mocked(api.taskController.executeScanTask)
 const executeTranscodeTaskMock = vi.mocked(api.taskController.executeTranscodeTask)
 const executeVectorizeTaskMock = vi.mocked(api.taskController.executeVectorizeTask)
+const executeDataCleanTaskMock = vi.mocked(api.taskController.executeDataCleanTask)
 const listFileSystemStorageMock = vi.mocked(api.fileSystemStorageController.list)
 const listOssStorageMock = vi.mocked(api.ossStorageController.list)
 
@@ -41,9 +43,15 @@ const TaskSubmissionModalStub = defineComponent({
             default: false,
         },
     },
-    emits: ['submit-metadata-parse', 'submit-transcode', 'submit-vectorize', 'close'],
+    emits: [
+        'submit-metadata-parse',
+        'submit-transcode',
+        'submit-vectorize',
+        'submit-data-clean',
+        'close',
+    ],
     template:
-        "<div v-if=\"open\"><button data-test=\"submit-metadata-parse\" @click=\"$emit('submit-metadata-parse', { providerType: 'FILE_SYSTEM', providerId: 1 })\">submit-metadata-parse</button><button data-test=\"submit-vectorize\" @click=\"$emit('submit-vectorize', { srcProviderType: 'FILE_SYSTEM', srcProviderId: 1, apiEndpoint: 'https://api.example.com/v1/embeddings', apiKey: 'secret-key', modelName: 'bge-m3' })\">submit-vectorize</button><button data-test=\"close-task-modal\" @click=\"$emit('close')\">close</button></div>",
+        "<div v-if=\"open\"><button data-test=\"submit-metadata-parse\" @click=\"$emit('submit-metadata-parse', { providerType: 'FILE_SYSTEM', providerId: 1 })\">submit-metadata-parse</button><button data-test=\"submit-vectorize\" @click=\"$emit('submit-vectorize', { srcProviderType: 'FILE_SYSTEM', srcProviderId: 1, apiEndpoint: 'https://api.example.com/v1/embeddings', apiKey: 'secret-key', modelName: 'bge-m3' })\">submit-vectorize</button><button data-test=\"submit-data-clean\" @click=\"$emit('submit-data-clean', { srcProviderType: 'FILE_SYSTEM', srcProviderId: 1, apiEndpoint: 'https://api.example.com/v1/responses', apiKey: 'secret-clean-key', modelName: 'gpt-5-mini' })\">submit-data-clean</button><button data-test=\"close-task-modal\" @click=\"$emit('close')\">close</button></div>",
 })
 
 const flushView = async () => {
@@ -59,6 +67,7 @@ describe('TasksView', () => {
         executeScanTaskMock.mockReset()
         executeTranscodeTaskMock.mockReset()
         executeVectorizeTaskMock.mockReset()
+        executeDataCleanTaskMock.mockReset()
         listFileSystemStorageMock.mockReset()
         listOssStorageMock.mockReset()
         vi.useRealTimers()
@@ -78,6 +87,10 @@ describe('TasksView', () => {
             { taskType: 'VECTORIZE', status: 'RUNNING', count: 2 },
             { taskType: 'VECTORIZE', status: 'COMPLETED', count: 4 },
             { taskType: 'VECTORIZE', status: 'FAILED', count: 0 },
+            { taskType: 'DATA_CLEAN', status: 'PENDING', count: 2 },
+            { taskType: 'DATA_CLEAN', status: 'RUNNING', count: 1 },
+            { taskType: 'DATA_CLEAN', status: 'COMPLETED', count: 3 },
+            { taskType: 'DATA_CLEAN', status: 'FAILED', count: 0 },
         ])
         listFileSystemStorageMock.mockResolvedValueOnce([])
         listOssStorageMock.mockResolvedValueOnce([])
@@ -94,13 +107,14 @@ describe('TasksView', () => {
         await flushView()
 
         expect(listTaskLogsMock).toHaveBeenCalledTimes(1)
-        expect(wrapper.text()).toContain('9 个任务待处理或执行中')
+        expect(wrapper.text()).toContain('12 个任务待处理或执行中')
         expect(wrapper.text()).toContain('元数据解析')
         expect(wrapper.text()).toContain('媒体转码')
         expect(wrapper.text()).toContain('向量化')
+        expect(wrapper.text()).toContain('数据清洗')
         expect(wrapper.text()).toContain('状态概览')
         expect(wrapper.text()).toContain('任务类型分布')
-        expect(wrapper.text()).toMatch(/其中\s*6\s*个排队，3\s*个正在执行。?/)
+        expect(wrapper.text()).toMatch(/其中\s*8\s*个排队，4\s*个正在执行。?/)
         expect(wrapper.text()).toMatch(/1\s*Failed\s*失败/)
     })
 
@@ -178,6 +192,49 @@ describe('TasksView', () => {
                 apiEndpoint: 'https://api.example.com/v1/embeddings',
                 apiKey: 'secret-key',
                 modelName: 'bge-m3',
+            },
+        })
+        expect(actionButton.text()).toContain('任务已提交')
+        expect(actionButton.attributes('disabled')).toBeDefined()
+
+        await vi.advanceTimersByTimeAsync(2000)
+        await flushView()
+
+        expect(actionButton.text()).toContain('发起新任务')
+    })
+
+    it('submits data clean tasks through the generated task controller and reuses success feedback', async () => {
+        vi.useFakeTimers()
+        listTaskLogsMock.mockResolvedValue([])
+        executeDataCleanTaskMock.mockResolvedValue(undefined)
+        listFileSystemStorageMock.mockResolvedValue([])
+        listOssStorageMock.mockResolvedValue([])
+
+        const wrapper = mount(TasksView, {
+            global: {
+                stubs: {
+                    DashboardTopBar: true,
+                    TaskSubmissionModal: TaskSubmissionModalStub,
+                },
+            },
+        })
+
+        await flushView()
+
+        const actionButton = wrapper.get('[data-test="open-task-button"]')
+        await actionButton.trigger('click')
+        await flushView()
+
+        await wrapper.get('[data-test="submit-data-clean"]').trigger('click')
+        await flushView()
+
+        expect(executeDataCleanTaskMock).toHaveBeenCalledWith({
+            body: {
+                srcProviderType: 'FILE_SYSTEM',
+                srcProviderId: 1,
+                apiEndpoint: 'https://api.example.com/v1/responses',
+                apiKey: 'secret-clean-key',
+                modelName: 'gpt-5-mini',
             },
         })
         expect(actionButton.text()).toContain('任务已提交')

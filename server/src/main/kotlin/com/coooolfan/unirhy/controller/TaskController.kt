@@ -7,6 +7,8 @@ import com.coooolfan.unirhy.service.task.ScanTaskRequest
 import com.coooolfan.unirhy.service.task.ScanTaskService
 import com.coooolfan.unirhy.service.task.TranscodeTaskRequest
 import com.coooolfan.unirhy.service.task.TranscodeTaskService
+import com.coooolfan.unirhy.service.task.DataCleanTaskRequest
+import com.coooolfan.unirhy.service.task.DataCleanTaskService
 import com.coooolfan.unirhy.service.task.VectorizeTaskRequest
 import com.coooolfan.unirhy.service.task.VectorizeTaskService
 import org.springframework.http.HttpStatus
@@ -25,6 +27,7 @@ class TaskController(
     private val scanTaskService: ScanTaskService,
     private val transcodeTaskService: TranscodeTaskService,
     private val vectorizeTaskService: VectorizeTaskService,
+    private val dataCleanTaskService: DataCleanTaskService,
     private val asyncTaskLogService: AsyncTaskLogService,
 ) {
 
@@ -74,6 +77,12 @@ class TaskController(
     @ResponseStatus(HttpStatus.ACCEPTED)
     fun executeVectorizeTask(@RequestBody request: VectorizeTaskRequest) {
         vectorizeTaskService.submit(request)
+    }
+
+    @PostMapping("/data-clean")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    fun executeDataCleanTask(@RequestBody request: DataCleanTaskRequest) {
+        dataCleanTaskService.submit(request)
     }
 
     @GetMapping("/logs")

@@ -1,6 +1,7 @@
 export type {AccountCreate} from './AccountCreate';
 export type {AccountUpdate} from './AccountUpdate';
 export type {AsyncTaskLogCountRow} from './AsyncTaskLogCountRow';
+export type {DataCleanTaskRequest} from './DataCleanTaskRequest';
 export type {Embedding} from './Embedding';
 export type {FileProviderFileSystemCreate} from './FileProviderFileSystemCreate';
 export type {FileProviderFileSystemUpdate} from './FileProviderFileSystemUpdate';

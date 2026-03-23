@@ -53,6 +53,7 @@ describe('TaskSubmissionModal', () => {
 
         expect(wrapper.text()).toContain('元数据解析')
         expect(wrapper.text()).toContain('向量化')
+        expect(wrapper.text()).toContain('数据清洗')
         await wrapper.get('[data-test="task-submit-button"]').trigger('click')
 
         expect(wrapper.emitted('submit-metadata-parse')).toEqual([
@@ -139,5 +140,51 @@ describe('TaskSubmissionModal', () => {
         await submitButton.trigger('click')
 
         expect(wrapper.emitted('submit-vectorize')).toBeUndefined()
+    })
+
+    it('emits a data clean payload with local provider and required request fields', async () => {
+        const wrapper = mountModal()
+
+        await wrapper.get('[data-test="task-type-data_clean"]').trigger('click')
+
+        const sourceOptions = getOptionTexts(wrapper, '[data-test="data-clean-source-select"]')
+        expect(sourceOptions).toEqual(['[本地] Library A', '[本地] Archive B'])
+
+        await wrapper.get('[data-test="data-clean-source-select"]').setValue('FILE_SYSTEM:2')
+        await wrapper
+            .get('[data-test="data-clean-api-endpoint-input"]')
+            .setValue('https://api.example.com/v1/responses')
+        await wrapper.get('[data-test="data-clean-api-key-input"]').setValue('secret-clean-key')
+        await wrapper.get('[data-test="data-clean-model-name-input"]').setValue('gpt-5-mini')
+        await wrapper.get('[data-test="task-submit-button"]').trigger('click')
+
+        expect(wrapper.emitted('submit-data-clean')).toEqual([
+            [
+                {
+                    srcProviderType: 'FILE_SYSTEM',
+                    srcProviderId: 2,
+                    apiEndpoint: 'https://api.example.com/v1/responses',
+                    apiKey: 'secret-clean-key',
+                    modelName: 'gpt-5-mini',
+                },
+            ],
+        ])
+    })
+
+    it('does not emit data clean event when any required request field is missing', async () => {
+        const wrapper = mountModal()
+
+        await wrapper.get('[data-test="task-type-data_clean"]').trigger('click')
+        await wrapper
+            .get('[data-test="data-clean-api-endpoint-input"]')
+            .setValue('https://api.example.com/v1/responses')
+        await wrapper.get('[data-test="data-clean-api-key-input"]').setValue('secret-clean-key')
+
+        const submitButton = wrapper.get('[data-test="task-submit-button"]')
+        expect(submitButton.attributes('disabled')).toBeDefined()
+
+        await submitButton.trigger('click')
+
+        expect(wrapper.emitted('submit-data-clean')).toBeUndefined()
     })
 })

@@ -13,10 +13,14 @@ import {
 } from 'lucide-vue-next'
 import type { CodecType } from '@/__generated/model/enums/CodecType'
 import { type FileProviderType } from '@/__generated/model/enums/FileProviderType'
-import type { TranscodeTaskRequest, VectorizeTaskRequest } from '@/__generated/model/static'
+import type {
+    DataCleanTaskRequest,
+    TranscodeTaskRequest,
+    VectorizeTaskRequest,
+} from '@/__generated/model/static'
 import type { TaskProviderOption } from '@/composables/useTaskManagement'
 
-type TaskKind = 'METADATA_PARSE' | 'TRANSCODE' | 'VECTORIZE'
+type TaskKind = 'METADATA_PARSE' | 'TRANSCODE' | 'VECTORIZE' | 'DATA_CLEAN'
 
 type Props = {
     open: boolean
@@ -51,12 +55,14 @@ const emit = defineEmits<{
     (event: 'submit-metadata-parse', payload: ProviderSelectionPayload): void
     (event: 'submit-transcode', payload: TranscodeTaskRequest): void
     (event: 'submit-vectorize', payload: VectorizeTaskRequest): void
+    (event: 'submit-data-clean', payload: DataCleanTaskRequest): void
 }>()
 
 const TASK_ACTION_LABEL_MAP: Record<TaskKind, string> = {
     METADATA_PARSE: '元数据解析',
     TRANSCODE: '媒体转码',
     VECTORIZE: '向量化',
+    DATA_CLEAN: '数据清洗',
 }
 
 const TASK_OPTIONS: TaskDefinition[] = [
@@ -76,6 +82,12 @@ const TASK_OPTIONS: TaskDefinition[] = [
         id: 'VECTORIZE',
         name: TASK_ACTION_LABEL_MAP.VECTORIZE,
         desc: '按录音批量补充向量化任务，为录音生成 embedding 数据',
+        icon: Music4,
+    },
+    {
+        id: 'DATA_CLEAN',
+        name: TASK_ACTION_LABEL_MAP.DATA_CLEAN,
+        desc: '按录音批量调用外部模型清洗标题，移除后缀和描述信息',
         icon: Music4,
     },
 ]
@@ -102,6 +114,10 @@ const vectorizeSourceProviderValue = ref('')
 const vectorizeApiEndpoint = ref('')
 const vectorizeApiKey = ref('')
 const vectorizeModelName = ref('')
+const dataCleanSourceProviderValue = ref('')
+const dataCleanApiEndpoint = ref('')
+const dataCleanApiKey = ref('')
+const dataCleanModelName = ref('')
 const targetCodec = ref<CodecType>('OPUS')
 
 const optionValueOf = (provider: TaskProviderOption) => `${provider.type}:${provider.id}`
@@ -141,6 +157,10 @@ const vectorizeSourceProviderOptions = computed(() =>
     props.providerOptions.filter((provider) => provider.type === 'FILE_SYSTEM'),
 )
 
+const dataCleanSourceProviderOptions = computed(() =>
+    props.providerOptions.filter((provider) => provider.type === 'FILE_SYSTEM'),
+)
+
 const syncProviderSelections = () => {
     syncSelectionValue(metadataParseProviderValue, metadataParseProviderOptions.value)
     syncSelectionValue(transcodeSourceProviderValue, transcodeSourceProviderOptions.value)
@@ -150,6 +170,7 @@ const syncProviderSelections = () => {
         1,
     )
     syncSelectionValue(vectorizeSourceProviderValue, vectorizeSourceProviderOptions.value)
+    syncSelectionValue(dataCleanSourceProviderValue, dataCleanSourceProviderOptions.value)
 }
 
 const resolveProvider = (options: readonly TaskProviderOption[], value: string) =>
@@ -178,6 +199,9 @@ watch(
         vectorizeApiEndpoint.value = ''
         vectorizeApiKey.value = ''
         vectorizeModelName.value = ''
+        dataCleanApiEndpoint.value = ''
+        dataCleanApiKey.value = ''
+        dataCleanModelName.value = ''
         syncProviderSelections()
     },
 )
@@ -201,12 +225,34 @@ const selectedTranscodeDestinationProvider = computed(() =>
 const selectedVectorizeSourceProvider = computed(() =>
     resolveProvider(vectorizeSourceProviderOptions.value, vectorizeSourceProviderValue.value),
 )
+const selectedDataCleanSourceProvider = computed(() =>
+    resolveProvider(dataCleanSourceProviderOptions.value, dataCleanSourceProviderValue.value),
+)
 
 const vectorizeRequest = computed<VectorizeTaskRequest | null>(() => {
     const source = selectedVectorizeSourceProvider.value
     const apiEndpoint = vectorizeApiEndpoint.value.trim()
     const apiKey = vectorizeApiKey.value.trim()
     const modelName = vectorizeModelName.value.trim()
+
+    if (!source || !apiEndpoint || !apiKey || !modelName) {
+        return null
+    }
+
+    return {
+        srcProviderType: source.type,
+        srcProviderId: source.id,
+        apiEndpoint,
+        apiKey,
+        modelName,
+    }
+})
+
+const dataCleanRequest = computed<DataCleanTaskRequest | null>(() => {
+    const source = selectedDataCleanSourceProvider.value
+    const apiEndpoint = dataCleanApiEndpoint.value.trim()
+    const apiKey = dataCleanApiKey.value.trim()
+    const modelName = dataCleanModelName.value.trim()
 
     if (!source || !apiEndpoint || !apiKey || !modelName) {
         return null
@@ -236,7 +282,11 @@ const canSubmit = computed(() => {
         )
     }
 
-    return Boolean(vectorizeRequest.value)
+    if (activeTask.value === 'VECTORIZE') {
+        return Boolean(vectorizeRequest.value)
+    }
+
+    return Boolean(dataCleanRequest.value)
 })
 
 const submitButtonLabel = computed(() => {
@@ -248,7 +298,11 @@ const submitButtonLabel = computed(() => {
         return '提交转码任务'
     }
 
-    return '提交向量化任务'
+    if (activeTask.value === 'VECTORIZE') {
+        return '提交向量化任务'
+    }
+
+    return '提交数据清洗任务'
 })
 
 const activeTaskAvailability = computed<TaskAvailability | null>(() => {
@@ -256,7 +310,7 @@ const activeTaskAvailability = computed<TaskAvailability | null>(() => {
         return {
             title: '暂无可用存储节点',
             description:
-                '请先在系统设置中配置本地存储节点，再回来发起元数据解析、转码或向量化任务。',
+                '请先在系统设置中配置本地存储节点，再回来发起元数据解析、转码、向量化或数据清洗任务。',
             icon: HardDrive,
         }
     }
@@ -273,6 +327,14 @@ const activeTaskAvailability = computed<TaskAvailability | null>(() => {
         return {
             title: '暂无可向量化源节点',
             description: '向量化任务目前只支持本地存储节点作为来源。',
+            icon: Music4,
+        }
+    }
+
+    if (activeTask.value === 'DATA_CLEAN' && dataCleanSourceProviderOptions.value.length === 0) {
+        return {
+            title: '暂无可清洗源节点',
+            description: '数据清洗任务目前只支持本地存储节点作为来源。',
             icon: Music4,
         }
     }
@@ -308,7 +370,11 @@ const submitHelperText = computed(() => {
         return '提交后会按录音拆分为多个后台转码任务，状态看板会显示排队与完成进度。'
     }
 
-    return '提交后会按录音补充向量化任务，用于生成 embedding 并写入后台队列。'
+    if (activeTask.value === 'VECTORIZE') {
+        return '提交后会按录音补充向量化任务，用于生成 embedding 并写入后台队列。'
+    }
+
+    return '提交后会按录音补充数据清洗任务，用于批量调用外部模型清洗标题。'
 })
 
 const closeModal = () => {
@@ -352,12 +418,22 @@ const submit = () => {
         return
     }
 
-    const request = vectorizeRequest.value
-    if (!request) {
+    if (activeTask.value === 'VECTORIZE') {
+        const request = vectorizeRequest.value
+        if (!request) {
+            return
+        }
+
+        emit('submit-vectorize', request)
         return
     }
 
-    emit('submit-vectorize', request)
+    const dataCleanPayload = dataCleanRequest.value
+    if (!dataCleanPayload) {
+        return
+    }
+
+    emit('submit-data-clean', dataCleanPayload)
 }
 </script>
 
@@ -749,7 +825,7 @@ const submit = () => {
                                 </label>
                             </div>
 
-                            <div v-else class="space-y-8">
+                            <div v-else-if="activeTask === 'VECTORIZE'" class="space-y-8">
                                 <div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
                                     <div class="space-y-6">
                                         <label class="block">
@@ -884,6 +960,147 @@ const submit = () => {
                                             data-test="vectorize-model-name-input"
                                             type="text"
                                             placeholder="例如 text-embedding-3-large"
+                                            class="w-full bg-[#F7F5F0] border-b border-[#D6D1C4] p-3 text-sm text-[#2C2C2C] outline-none transition-colors placeholder:text-[#A79F93] focus:border-[#C27E46]"
+                                        />
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div v-else class="space-y-8">
+                                <div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+                                    <div class="space-y-6">
+                                        <label class="block">
+                                            <span
+                                                class="mb-2 block text-xs uppercase tracking-[0.24em] text-[#8A8A8A]"
+                                            >
+                                                来源存储节点
+                                            </span>
+                                            <div class="relative">
+                                                <select
+                                                    v-model="dataCleanSourceProviderValue"
+                                                    data-test="data-clean-source-select"
+                                                    class="w-full appearance-none bg-[#F7F5F0] border-b border-[#D6D1C4] p-3 pr-10 text-sm text-[#2C2C2C] outline-none transition-colors focus:border-[#C27E46]"
+                                                >
+                                                    <option
+                                                        v-for="option in dataCleanSourceProviderOptions"
+                                                        :key="`data-clean-${optionValueOf(option)}`"
+                                                        :value="optionValueOf(option)"
+                                                    >
+                                                        {{ option.name }}
+                                                    </option>
+                                                </select>
+                                                <ChevronDown
+                                                    class="pointer-events-none absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 text-[#8A8A8A]"
+                                                />
+                                            </div>
+                                        </label>
+
+                                        <div
+                                            v-if="selectedDataCleanSourceProvider"
+                                            class="grid gap-4 px-1 py-1 md:grid-cols-2"
+                                        >
+                                            <div>
+                                                <div
+                                                    class="text-[11px] uppercase tracking-[0.24em] text-[#8A8A8A]"
+                                                >
+                                                    节点类型
+                                                </div>
+                                                <div
+                                                    class="mt-2 flex items-center gap-2 text-[#2B221B]"
+                                                >
+                                                    <component
+                                                        :is="
+                                                            PROVIDER_TYPE_ICON_MAP[
+                                                                selectedDataCleanSourceProvider.type
+                                                            ]
+                                                        "
+                                                        class="h-4 w-4 text-[#C27E46]"
+                                                    />
+                                                    <span class="text-sm">{{
+                                                        PROVIDER_TYPE_LABEL_MAP[
+                                                            selectedDataCleanSourceProvider.type
+                                                        ]
+                                                    }}</span>
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <div
+                                                    class="text-[11px] uppercase tracking-[0.24em] text-[#8A8A8A]"
+                                                >
+                                                    节点 ID
+                                                </div>
+                                                <div class="mt-2 font-mono text-sm text-[#2C2C2C]">
+                                                    #{{ selectedDataCleanSourceProvider.id }}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div
+                                        class="space-y-5 rounded-sm border border-[#E6E1D8] bg-[#F8F5EE] p-5"
+                                    >
+                                        <div>
+                                            <div
+                                                class="text-[11px] uppercase tracking-[0.24em] text-[#8A8A8A]"
+                                            >
+                                                提交说明
+                                            </div>
+                                            <p class="mt-3 text-sm leading-relaxed text-[#6B635B]">
+                                                提交后系统会按录音补充数据清洗任务，并将接口信息写入任务参数。
+                                            </p>
+                                        </div>
+                                        <div class="flex items-start gap-2 text-sm text-[#6B635B]">
+                                            <Music4
+                                                class="mt-0.5 h-4 w-4 shrink-0 text-[#C27E46]"
+                                            />
+                                            <span>当前只支持本地存储节点作为数据清洗来源。</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="grid gap-6 lg:grid-cols-2">
+                                    <label class="block lg:col-span-2">
+                                        <span
+                                            class="mb-2 block text-xs uppercase tracking-[0.24em] text-[#8A8A8A]"
+                                        >
+                                            API Endpoint
+                                        </span>
+                                        <input
+                                            v-model="dataCleanApiEndpoint"
+                                            data-test="data-clean-api-endpoint-input"
+                                            type="text"
+                                            placeholder="https://api.example.com/v1/responses"
+                                            class="w-full bg-[#F7F5F0] border-b border-[#D6D1C4] p-3 text-sm text-[#2C2C2C] outline-none transition-colors placeholder:text-[#A79F93] focus:border-[#C27E46]"
+                                        />
+                                    </label>
+
+                                    <label class="block">
+                                        <span
+                                            class="mb-2 block text-xs uppercase tracking-[0.24em] text-[#8A8A8A]"
+                                        >
+                                            API Key
+                                        </span>
+                                        <input
+                                            v-model="dataCleanApiKey"
+                                            data-test="data-clean-api-key-input"
+                                            type="password"
+                                            autocomplete="new-password"
+                                            placeholder="输入数据清洗接口密钥"
+                                            class="w-full bg-[#F7F5F0] border-b border-[#D6D1C4] p-3 text-sm text-[#2C2C2C] outline-none transition-colors placeholder:text-[#A79F93] focus:border-[#C27E46]"
+                                        />
+                                    </label>
+
+                                    <label class="block">
+                                        <span
+                                            class="mb-2 block text-xs uppercase tracking-[0.24em] text-[#8A8A8A]"
+                                        >
+                                            Model Name
+                                        </span>
+                                        <input
+                                            v-model="dataCleanModelName"
+                                            data-test="data-clean-model-name-input"
+                                            type="text"
+                                            placeholder="例如 gpt-5-mini"
                                             class="w-full bg-[#F7F5F0] border-b border-[#D6D1C4] p-3 text-sm text-[#2C2C2C] outline-none transition-colors placeholder:text-[#A79F93] focus:border-[#C27E46]"
                                         />
                                     </label>

@@ -9,6 +9,7 @@ export type RecordingDto = {
         readonly comment: string;
         readonly durationMs: number;
         readonly defaultInWork: boolean;
+        readonly lyrics: string;
         readonly embedding?: Embedding | undefined;
         readonly work: {
             readonly id: number;

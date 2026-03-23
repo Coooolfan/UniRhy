@@ -12,6 +12,7 @@ export type WorkDto = {
             readonly comment: string;
             readonly durationMs: number;
             readonly defaultInWork: boolean;
+            readonly lyrics: string;
             readonly embedding?: Embedding | undefined;
             readonly assets: ReadonlyArray<{
                 readonly id: number;
