@@ -18,7 +18,8 @@ class EmbeddingScalarProvider : ScalarProvider<Embedding, PGobject> {
         )
     }
 
-    override fun toScalar(sqlValue: PGobject): Embedding {
+    override fun toScalar(sqlValue: PGobject): Embedding? {
+        if (sqlValue.value == null) return null
         return Embedding(PGvector(sqlValue.value).toArray())
     }
 

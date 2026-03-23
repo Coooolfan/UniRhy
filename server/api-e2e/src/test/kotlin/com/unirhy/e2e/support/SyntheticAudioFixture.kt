@@ -15,6 +15,7 @@ data class AudioFixtureMetadata(
     val artist: String? = null,
     val album: String? = null,
     val comment: String? = null,
+    val lyrics: String? = null,
 )
 
 data class GeneratedFixtureFile(
@@ -78,7 +79,7 @@ object SyntheticAudioFixture {
         } else {
             generateWithFfmpeg(outputPath, extension)
         }
-        if (metadata.title != null || metadata.artist != null || metadata.album != null || metadata.comment != null) {
+        if (metadata.title != null || metadata.artist != null || metadata.album != null || metadata.comment != null || metadata.lyrics != null) {
             writeTags(outputPath, metadata)
         }
         return GeneratedFixtureFile(path = outputPath, metadata = metadata)
@@ -133,6 +134,7 @@ object SyntheticAudioFixture {
         metadata.artist?.let { tag.setField(FieldKey.ARTIST, it) }
         metadata.album?.let { tag.setField(FieldKey.ALBUM, it) }
         metadata.comment?.let { tag.setField(FieldKey.COMMENT, it) }
+        metadata.lyrics?.let { tag.setField(FieldKey.LYRICS, it) }
         audioFile.commit()
     }
 }

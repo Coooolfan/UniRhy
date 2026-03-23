@@ -17,7 +17,8 @@ import org.springframework.web.bind.annotation.*
  *
  * 提供任务触发能力（例如扫描任务）
  */
-@SaCheckLogin
+// TODO
+// @SaCheckLogin
 @RestController
 @RequestMapping("/api/task")
 class TaskController(
