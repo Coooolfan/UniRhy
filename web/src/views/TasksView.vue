@@ -4,7 +4,11 @@ import DashboardTopBar from '@/components/dashboard/DashboardTopBar.vue'
 import TaskSubmissionModal from '@/components/tasks/TaskSubmissionModal.vue'
 import type { TaskStatus } from '@/__generated/model/enums/TaskStatus'
 import type { TaskType } from '@/__generated/model/enums/TaskType'
-import type { ScanTaskRequest, TranscodeTaskRequest } from '@/__generated/model/static'
+import type {
+    ScanTaskRequest,
+    TranscodeTaskRequest,
+    VectorizeTaskRequest,
+} from '@/__generated/model/static'
 import { TASK_TYPE_LABEL_MAP, useTaskManagement } from '@/composables/useTaskManagement'
 import {
     AlertCircle,
@@ -32,7 +36,7 @@ type TaskSummaryRow = {
     tone: SummaryTone
 }
 
-const TASK_TYPE_ORDER: TaskType[] = ['METADATA_PARSE', 'TRANSCODE']
+const TASK_TYPE_ORDER: TaskType[] = ['METADATA_PARSE', 'TRANSCODE', 'VECTORIZE']
 const SUBMIT_FEEDBACK_DURATION_MS = 2000
 const TASK_AUTO_REFRESH_INTERVAL_MS = 2000
 
@@ -62,6 +66,7 @@ const {
     fetchProviders,
     startMetadataParseTask,
     startTranscodeTask,
+    startVectorizeTask,
     clearSubmitError,
     init,
 } = useTaskManagement()
@@ -170,7 +175,7 @@ const taskSummaryRows = computed<TaskSummaryRow[]>(() =>
 
 const queueSummaryText = computed(() => {
     if (activeTaskCount.value === 0) {
-        return '当前没有待处理任务。发起元数据解析或转码后，这里会显示最新的队列与结果统计。'
+        return '当前没有待处理任务。发起元数据解析、转码或向量化后，这里会显示最新的队列与结果统计。'
     }
 
     if (pendingTaskCount.value > 0 && runningTaskCount.value > 0) {
@@ -288,6 +293,15 @@ const handleTranscodeSubmit = async (payload: TranscodeTaskRequest) => {
     showSubmitFeedback()
 }
 
+const handleVectorizeSubmit = async (payload: VectorizeTaskRequest) => {
+    const submitOk = await startVectorizeTask(payload)
+    if (!submitOk) {
+        return
+    }
+    closeTaskModal()
+    showSubmitFeedback()
+}
+
 const refreshAll = () => {
     refreshTaskCounts()
 }
@@ -331,7 +345,7 @@ const refreshAll = () => {
                 <div class="border border-[#EAE6DE] bg-[#FFFCF5] p-6 shadow-sm lg:col-span-1">
                     <h3 class="font-serif text-2xl text-[#2B221B]">异步任务</h3>
                     <p class="mt-2 text-sm leading-relaxed text-[#6B635B]">
-                        元数据解析、转码等长耗时任务
+                        元数据解析、转码、向量化等长耗时任务
                     </p>
 
                     <button
@@ -566,6 +580,7 @@ const refreshAll = () => {
             @close="closeTaskModal"
             @submit-metadata-parse="handleMetadataParseSubmit"
             @submit-transcode="handleTranscodeSubmit"
+            @submit-vectorize="handleVectorizeSubmit"
         />
     </div>
 </template>

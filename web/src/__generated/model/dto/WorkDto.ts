@@ -1,3 +1,5 @@
+import type {Embedding} from '../static/';
+
 export type WorkDto = {
     'WorkController/DEFAULT_WORK_FETCHER': {
         readonly id: number;
@@ -10,6 +12,7 @@ export type WorkDto = {
             readonly comment: string;
             readonly durationMs: number;
             readonly defaultInWork: boolean;
+            readonly embedding?: Embedding | undefined;
             readonly assets: ReadonlyArray<{
                 readonly id: number;
                 readonly comment: string;

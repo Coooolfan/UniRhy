@@ -6,6 +6,7 @@ import type {
     AsyncTaskLogCountRow,
     ScanTaskRequest,
     TranscodeTaskRequest,
+    VectorizeTaskRequest,
 } from '@/__generated/model/static'
 
 export type TaskProviderOption = {
@@ -18,6 +19,7 @@ export type TaskProviderOption = {
 export const TASK_TYPE_LABEL_MAP: Record<TaskType, string> = {
     METADATA_PARSE: '元数据解析',
     TRANSCODE: '媒体转码',
+    VECTORIZE: '向量化',
 }
 
 export const useTaskManagement = () => {
@@ -119,6 +121,13 @@ export const useTaskManagement = () => {
             }),
         )
 
+    const startVectorizeTask = (request: VectorizeTaskRequest) =>
+        executeTask(() =>
+            api.taskController.executeVectorizeTask({
+                body: request,
+            }),
+        )
+
     const init = () => {
         void Promise.all([fetchTaskCounts(), fetchProviders()])
     }
@@ -139,6 +148,7 @@ export const useTaskManagement = () => {
         fetchProviders,
         startMetadataParseTask,
         startTranscodeTask,
+        startVectorizeTask,
         clearSubmitError,
         init,
     }

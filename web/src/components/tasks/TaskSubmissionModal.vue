@@ -13,10 +13,10 @@ import {
 } from 'lucide-vue-next'
 import type { CodecType } from '@/__generated/model/enums/CodecType'
 import { type FileProviderType } from '@/__generated/model/enums/FileProviderType'
-import type { TranscodeTaskRequest } from '@/__generated/model/static'
+import type { TranscodeTaskRequest, VectorizeTaskRequest } from '@/__generated/model/static'
 import type { TaskProviderOption } from '@/composables/useTaskManagement'
 
-type TaskKind = 'METADATA_PARSE' | 'TRANSCODE'
+type TaskKind = 'METADATA_PARSE' | 'TRANSCODE' | 'VECTORIZE'
 
 type Props = {
     open: boolean
@@ -50,11 +50,13 @@ const emit = defineEmits<{
     (event: 'close'): void
     (event: 'submit-metadata-parse', payload: ProviderSelectionPayload): void
     (event: 'submit-transcode', payload: TranscodeTaskRequest): void
+    (event: 'submit-vectorize', payload: VectorizeTaskRequest): void
 }>()
 
 const TASK_ACTION_LABEL_MAP: Record<TaskKind, string> = {
     METADATA_PARSE: '元数据解析',
     TRANSCODE: '媒体转码',
+    VECTORIZE: '向量化',
 }
 
 const TASK_OPTIONS: TaskDefinition[] = [
@@ -69,6 +71,12 @@ const TASK_OPTIONS: TaskDefinition[] = [
         name: TASK_ACTION_LABEL_MAP.TRANSCODE,
         desc: '按录音拆分为后台任务，批量转码为 Opus 音频资源',
         icon: FileAudio,
+    },
+    {
+        id: 'VECTORIZE',
+        name: TASK_ACTION_LABEL_MAP.VECTORIZE,
+        desc: '按录音批量补充向量化任务，为录音生成 embedding 数据',
+        icon: Music4,
     },
 ]
 
@@ -90,6 +98,10 @@ const activeTask = ref<TaskKind>('METADATA_PARSE')
 const metadataParseProviderValue = ref('')
 const transcodeSourceProviderValue = ref('')
 const transcodeDestinationProviderValue = ref('')
+const vectorizeSourceProviderValue = ref('')
+const vectorizeApiEndpoint = ref('')
+const vectorizeApiKey = ref('')
+const vectorizeModelName = ref('')
 const targetCodec = ref<CodecType>('OPUS')
 
 const optionValueOf = (provider: TaskProviderOption) => `${provider.type}:${provider.id}`
@@ -125,6 +137,10 @@ const transcodeDestinationProviderOptions = computed(() =>
     ),
 )
 
+const vectorizeSourceProviderOptions = computed(() =>
+    props.providerOptions.filter((provider) => provider.type === 'FILE_SYSTEM'),
+)
+
 const syncProviderSelections = () => {
     syncSelectionValue(metadataParseProviderValue, metadataParseProviderOptions.value)
     syncSelectionValue(transcodeSourceProviderValue, transcodeSourceProviderOptions.value)
@@ -133,6 +149,7 @@ const syncProviderSelections = () => {
         transcodeDestinationProviderOptions.value,
         1,
     )
+    syncSelectionValue(vectorizeSourceProviderValue, vectorizeSourceProviderOptions.value)
 }
 
 const resolveProvider = (options: readonly TaskProviderOption[], value: string) =>
@@ -158,6 +175,9 @@ watch(
         }
         activeTask.value = 'METADATA_PARSE'
         targetCodec.value = 'OPUS'
+        vectorizeApiEndpoint.value = ''
+        vectorizeApiKey.value = ''
+        vectorizeModelName.value = ''
         syncProviderSelections()
     },
 )
@@ -178,6 +198,28 @@ const selectedTranscodeDestinationProvider = computed(() =>
         transcodeDestinationProviderValue.value,
     ),
 )
+const selectedVectorizeSourceProvider = computed(() =>
+    resolveProvider(vectorizeSourceProviderOptions.value, vectorizeSourceProviderValue.value),
+)
+
+const vectorizeRequest = computed<VectorizeTaskRequest | null>(() => {
+    const source = selectedVectorizeSourceProvider.value
+    const apiEndpoint = vectorizeApiEndpoint.value.trim()
+    const apiKey = vectorizeApiKey.value.trim()
+    const modelName = vectorizeModelName.value.trim()
+
+    if (!source || !apiEndpoint || !apiKey || !modelName) {
+        return null
+    }
+
+    return {
+        srcProviderType: source.type,
+        srcProviderId: source.id,
+        apiEndpoint,
+        apiKey,
+        modelName,
+    }
+})
 
 const canSubmit = computed(() => {
     if (props.isLoadingProviders) {
@@ -188,20 +230,33 @@ const canSubmit = computed(() => {
         return Boolean(selectedMetadataParseProvider.value)
     }
 
-    return Boolean(
-        selectedTranscodeSourceProvider.value && selectedTranscodeDestinationProvider.value,
-    )
+    if (activeTask.value === 'TRANSCODE') {
+        return Boolean(
+            selectedTranscodeSourceProvider.value && selectedTranscodeDestinationProvider.value,
+        )
+    }
+
+    return Boolean(vectorizeRequest.value)
 })
 
-const submitButtonLabel = computed(() =>
-    activeTask.value === 'METADATA_PARSE' ? '提交元数据解析任务' : '提交转码任务',
-)
+const submitButtonLabel = computed(() => {
+    if (activeTask.value === 'METADATA_PARSE') {
+        return '提交元数据解析任务'
+    }
+
+    if (activeTask.value === 'TRANSCODE') {
+        return '提交转码任务'
+    }
+
+    return '提交向量化任务'
+})
 
 const activeTaskAvailability = computed<TaskAvailability | null>(() => {
     if (props.providerOptions.length === 0) {
         return {
             title: '暂无可用存储节点',
-            description: '请先在系统设置中配置本地存储节点，再回来发起元数据解析或转码任务。',
+            description:
+                '请先在系统设置中配置本地存储节点，再回来发起元数据解析、转码或向量化任务。',
             icon: HardDrive,
         }
     }
@@ -211,6 +266,14 @@ const activeTaskAvailability = computed<TaskAvailability | null>(() => {
             title: '暂无可解析节点',
             description: '元数据解析任务目前只支持本地存储节点。',
             icon: FolderSearch,
+        }
+    }
+
+    if (activeTask.value === 'VECTORIZE' && vectorizeSourceProviderOptions.value.length === 0) {
+        return {
+            title: '暂无可向量化源节点',
+            description: '向量化任务目前只支持本地存储节点作为来源。',
+            icon: Music4,
         }
     }
 
@@ -236,11 +299,17 @@ const activeTaskAvailability = computed<TaskAvailability | null>(() => {
     return null
 })
 
-const submitHelperText = computed(() =>
-    activeTask.value === 'METADATA_PARSE'
-        ? '提交后系统会遍历所选节点，并按文件补充缺失的元数据解析任务。'
-        : '提交后会按录音拆分为多个后台转码任务，状态看板会显示排队与完成进度。',
-)
+const submitHelperText = computed(() => {
+    if (activeTask.value === 'METADATA_PARSE') {
+        return '提交后系统会遍历所选节点，并按文件补充缺失的元数据解析任务。'
+    }
+
+    if (activeTask.value === 'TRANSCODE') {
+        return '提交后会按录音拆分为多个后台转码任务，状态看板会显示排队与完成进度。'
+    }
+
+    return '提交后会按录音补充向量化任务，用于生成 embedding 并写入后台队列。'
+})
 
 const closeModal = () => {
     if (props.isSubmitting) {
@@ -266,19 +335,29 @@ const submit = () => {
         return
     }
 
-    const source = selectedTranscodeSourceProvider.value
-    const destination = selectedTranscodeDestinationProvider.value
-    if (!source || !destination) {
+    if (activeTask.value === 'TRANSCODE') {
+        const source = selectedTranscodeSourceProvider.value
+        const destination = selectedTranscodeDestinationProvider.value
+        if (!source || !destination) {
+            return
+        }
+
+        emit('submit-transcode', {
+            srcProviderType: source.type,
+            srcProviderId: source.id,
+            dstProviderType: destination.type,
+            dstProviderId: destination.id,
+            targetCodec: targetCodec.value,
+        })
         return
     }
 
-    emit('submit-transcode', {
-        srcProviderType: source.type,
-        srcProviderId: source.id,
-        dstProviderType: destination.type,
-        dstProviderId: destination.id,
-        targetCodec: targetCodec.value,
-    })
+    const request = vectorizeRequest.value
+    if (!request) {
+        return
+    }
+
+    emit('submit-vectorize', request)
 }
 </script>
 
@@ -473,7 +552,7 @@ const submit = () => {
                                 </div>
                             </div>
 
-                            <div v-else class="space-y-8">
+                            <div v-else-if="activeTask === 'TRANSCODE'" class="space-y-8">
                                 <div
                                     class="grid gap-10 lg:grid-cols-[minmax(0,1fr)_128px_minmax(0,1fr)] lg:gap-0"
                                 >
@@ -668,6 +747,147 @@ const submit = () => {
                                         </span>
                                     </div>
                                 </label>
+                            </div>
+
+                            <div v-else class="space-y-8">
+                                <div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+                                    <div class="space-y-6">
+                                        <label class="block">
+                                            <span
+                                                class="mb-2 block text-xs uppercase tracking-[0.24em] text-[#8A8A8A]"
+                                            >
+                                                来源存储节点
+                                            </span>
+                                            <div class="relative">
+                                                <select
+                                                    v-model="vectorizeSourceProviderValue"
+                                                    data-test="vectorize-source-select"
+                                                    class="w-full appearance-none bg-[#F7F5F0] border-b border-[#D6D1C4] p-3 pr-10 text-sm text-[#2C2C2C] outline-none transition-colors focus:border-[#C27E46]"
+                                                >
+                                                    <option
+                                                        v-for="option in vectorizeSourceProviderOptions"
+                                                        :key="`vector-${optionValueOf(option)}`"
+                                                        :value="optionValueOf(option)"
+                                                    >
+                                                        {{ option.name }}
+                                                    </option>
+                                                </select>
+                                                <ChevronDown
+                                                    class="pointer-events-none absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 text-[#8A8A8A]"
+                                                />
+                                            </div>
+                                        </label>
+
+                                        <div
+                                            v-if="selectedVectorizeSourceProvider"
+                                            class="grid gap-4 px-1 py-1 md:grid-cols-2"
+                                        >
+                                            <div>
+                                                <div
+                                                    class="text-[11px] uppercase tracking-[0.24em] text-[#8A8A8A]"
+                                                >
+                                                    节点类型
+                                                </div>
+                                                <div
+                                                    class="mt-2 flex items-center gap-2 text-[#2B221B]"
+                                                >
+                                                    <component
+                                                        :is="
+                                                            PROVIDER_TYPE_ICON_MAP[
+                                                                selectedVectorizeSourceProvider.type
+                                                            ]
+                                                        "
+                                                        class="h-4 w-4 text-[#C27E46]"
+                                                    />
+                                                    <span class="text-sm">{{
+                                                        PROVIDER_TYPE_LABEL_MAP[
+                                                            selectedVectorizeSourceProvider.type
+                                                        ]
+                                                    }}</span>
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <div
+                                                    class="text-[11px] uppercase tracking-[0.24em] text-[#8A8A8A]"
+                                                >
+                                                    节点 ID
+                                                </div>
+                                                <div class="mt-2 font-mono text-sm text-[#2C2C2C]">
+                                                    #{{ selectedVectorizeSourceProvider.id }}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div
+                                        class="space-y-5 rounded-sm border border-[#E6E1D8] bg-[#F8F5EE] p-5"
+                                    >
+                                        <div>
+                                            <div
+                                                class="text-[11px] uppercase tracking-[0.24em] text-[#8A8A8A]"
+                                            >
+                                                提交说明
+                                            </div>
+                                            <p class="mt-3 text-sm leading-relaxed text-[#6B635B]">
+                                                提交后系统会按录音补充向量化任务，并将接口信息写入任务参数。
+                                            </p>
+                                        </div>
+                                        <div class="flex items-start gap-2 text-sm text-[#6B635B]">
+                                            <Music4
+                                                class="mt-0.5 h-4 w-4 shrink-0 text-[#C27E46]"
+                                            />
+                                            <span>当前只支持本地存储节点作为音频来源。</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="grid gap-6 lg:grid-cols-2">
+                                    <label class="block lg:col-span-2">
+                                        <span
+                                            class="mb-2 block text-xs uppercase tracking-[0.24em] text-[#8A8A8A]"
+                                        >
+                                            API Endpoint
+                                        </span>
+                                        <input
+                                            v-model="vectorizeApiEndpoint"
+                                            data-test="vectorize-api-endpoint-input"
+                                            type="text"
+                                            placeholder="https://api.example.com/v1/embeddings"
+                                            class="w-full bg-[#F7F5F0] border-b border-[#D6D1C4] p-3 text-sm text-[#2C2C2C] outline-none transition-colors placeholder:text-[#A79F93] focus:border-[#C27E46]"
+                                        />
+                                    </label>
+
+                                    <label class="block">
+                                        <span
+                                            class="mb-2 block text-xs uppercase tracking-[0.24em] text-[#8A8A8A]"
+                                        >
+                                            API Key
+                                        </span>
+                                        <input
+                                            v-model="vectorizeApiKey"
+                                            data-test="vectorize-api-key-input"
+                                            type="password"
+                                            autocomplete="new-password"
+                                            placeholder="输入向量接口密钥"
+                                            class="w-full bg-[#F7F5F0] border-b border-[#D6D1C4] p-3 text-sm text-[#2C2C2C] outline-none transition-colors placeholder:text-[#A79F93] focus:border-[#C27E46]"
+                                        />
+                                    </label>
+
+                                    <label class="block">
+                                        <span
+                                            class="mb-2 block text-xs uppercase tracking-[0.24em] text-[#8A8A8A]"
+                                        >
+                                            Model Name
+                                        </span>
+                                        <input
+                                            v-model="vectorizeModelName"
+                                            data-test="vectorize-model-name-input"
+                                            type="text"
+                                            placeholder="例如 text-embedding-3-large"
+                                            class="w-full bg-[#F7F5F0] border-b border-[#D6D1C4] p-3 text-sm text-[#2C2C2C] outline-none transition-colors placeholder:text-[#A79F93] focus:border-[#C27E46]"
+                                        />
+                                    </label>
+                                </div>
                             </div>
                         </div>
 

@@ -2,6 +2,7 @@ package com.coooolfan.unirhy.config
 
 import com.coooolfan.unirhy.service.task.ScanTaskService
 import com.coooolfan.unirhy.service.task.TranscodeTaskService
+import com.coooolfan.unirhy.service.task.VectorizeTaskService
 import org.slf4j.LoggerFactory
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -17,6 +18,7 @@ import java.time.Duration
 class TaskSchedulingConfig(
     private val scanTaskService: ScanTaskService,
     private val transcodeTaskService: TranscodeTaskService,
+    private val vectorizeTaskService: VectorizeTaskService,
 ) : SchedulingConfigurer {
 
     override fun configureTasks(taskRegistrar: ScheduledTaskRegistrar) {
@@ -33,12 +35,16 @@ class TaskSchedulingConfig(
         } else {
             logger.warn("Transcode task scheduler disabled because ffmpeg is unavailable on this node")
         }
+        taskRegistrar.addFixedDelayTask(
+            { vectorizeTaskService.consumePendingTask() },
+            Duration.ofMillis(TASK_POLL_DELAY_MILLIS),
+        )
     }
 
     @Bean(name = ["taskScheduler"], destroyMethod = "shutdown")
     fun taskScheduler(): TaskScheduler {
         return ThreadPoolTaskScheduler().apply {
-            poolSize = 2
+            poolSize = 3
             setThreadNamePrefix("async-task-")
             initialize()
         }

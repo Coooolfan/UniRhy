@@ -186,6 +186,7 @@ private fun buildWorkFromAudioFile(
             label = "CD"
             title = tag?.getFirst(FieldKey.TITLE).orEmpty()
             comment = tag?.getFirst(FieldKey.COMMENT).orEmpty()
+            lyrics = stripLrcTimestamps(tag?.getFirst(FieldKey.LYRICS))
             cover = audioCover
             durationMs = audioTag.audioHeader.preciseTrackLength.toLong() * 1000
             defaultInWork = false
@@ -285,6 +286,17 @@ private fun extensionFromMime(mimeType: String): String =
         "image/bmp" -> "bmp"
         else -> "jpg"
     }
+
+private val LRC_TIMESTAMP_REGEX = "\\[[\\d:.]+]".toRegex()
+
+private fun stripLrcTimestamps(raw: String?): String {
+    if (raw.isNullOrBlank()) return ""
+    return raw.replace(LRC_TIMESTAMP_REGEX, "")
+        .lines()
+        .map { it.trim() }
+        .filter { it.isNotEmpty() }
+        .joinToString("\n")
+}
 
 private fun sha256Bytes(binaryData: ByteArray): String =
     MessageDigest.getInstance("SHA-256").digest(binaryData)

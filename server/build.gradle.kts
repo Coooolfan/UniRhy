@@ -44,6 +44,7 @@ dependencies {
 
   implementation(libs.jAudioTagger)
   implementation(libs.s3)
+  implementation(libs.pgvector)
 
   runtimeOnly(libs.postgresql)
   runtimeOnly(libs.postgresql.flyway)

@@ -1,5 +1,10 @@
 import type {Executor} from '../';
-import type {AsyncTaskLogCountRow, ScanTaskRequest, TranscodeTaskRequest} from '../model/static/';
+import type {
+    AsyncTaskLogCountRow, 
+    ScanTaskRequest, 
+    TranscodeTaskRequest, 
+    VectorizeTaskRequest
+} from '../model/static/';
 
 /**
  * 任务管理接口
@@ -48,6 +53,13 @@ export class TaskController {
      * 查询任务状态统计
      * 
      */
+    readonly executeVectorizeTask: (options: TaskControllerOptions['executeVectorizeTask']) => Promise<
+        void
+    > = async(options) => {
+        let _uri = '/api/task/vectorize';
+        return (await this.executor({uri: _uri, method: 'POST', body: options.body})) as Promise<void>;
+    }
+    
     readonly listTaskLogs: () => Promise<
         ReadonlyArray<AsyncTaskLogCountRow>
     > = async() => {
@@ -70,6 +82,9 @@ export type TaskControllerOptions = {
          * 
          */
         readonly body: TranscodeTaskRequest
+    }, 
+    'executeVectorizeTask': {
+        readonly body: VectorizeTaskRequest
     }, 
     'listTaskLogs': {}
 }

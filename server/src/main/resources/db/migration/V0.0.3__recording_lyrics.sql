@@ -1,0 +1,1 @@
+ALTER TABLE public.recording ADD COLUMN lyrics TEXT NOT NULL DEFAULT '';

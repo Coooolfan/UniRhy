@@ -1,5 +1,6 @@
 export const TaskType_CONSTANTS = [
     'METADATA_PARSE', 
-    'TRANSCODE'
+    'TRANSCODE', 
+    'VECTORIZE'
 ] as const;
 export type TaskType = typeof TaskType_CONSTANTS[number];

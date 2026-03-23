@@ -1,7 +1,14 @@
 package com.coooolfan.unirhy.controller
 
 import cn.dev33.satoken.annotation.SaCheckLogin
-import com.coooolfan.unirhy.service.task.*
+import com.coooolfan.unirhy.service.task.AsyncTaskLogCountRow
+import com.coooolfan.unirhy.service.task.AsyncTaskLogService
+import com.coooolfan.unirhy.service.task.ScanTaskRequest
+import com.coooolfan.unirhy.service.task.ScanTaskService
+import com.coooolfan.unirhy.service.task.TranscodeTaskRequest
+import com.coooolfan.unirhy.service.task.TranscodeTaskService
+import com.coooolfan.unirhy.service.task.VectorizeTaskRequest
+import com.coooolfan.unirhy.service.task.VectorizeTaskService
 import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.*
 
@@ -16,6 +23,7 @@ import org.springframework.web.bind.annotation.*
 class TaskController(
     private val scanTaskService: ScanTaskService,
     private val transcodeTaskService: TranscodeTaskService,
+    private val vectorizeTaskService: VectorizeTaskService,
     private val asyncTaskLogService: AsyncTaskLogService,
 ) {
 
@@ -61,6 +69,12 @@ class TaskController(
      * @api GET /api/task/logs
      * @permission 需要登录认证
      */
+    @PostMapping("/vectorize")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    fun executeVectorizeTask(@RequestBody request: VectorizeTaskRequest) {
+        vectorizeTaskService.submit(request)
+    }
+
     @GetMapping("/logs")
     fun listTaskLogs(): List<AsyncTaskLogCountRow> {
         return asyncTaskLogService.listCounts()

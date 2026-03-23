@@ -36,4 +36,9 @@ interface Recording {
 
     @ManyToMany(mappedBy = "recordings")
     val albums: List<Album>
+
+    val lyrics: String
+
+    @Column(sqlType = "vector(1024)")
+    val embedding: Embedding?
 }

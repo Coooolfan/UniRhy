@@ -1,3 +1,5 @@
+import type {Embedding} from '../static/';
+
 export type RecordingDto = {
     'RecordingController/PLAYBACK_RECORDING_FETCHER': {
         readonly id: number;
@@ -7,6 +9,7 @@ export type RecordingDto = {
         readonly comment: string;
         readonly durationMs: number;
         readonly defaultInWork: boolean;
+        readonly embedding?: Embedding | undefined;
         readonly work: {
             readonly id: number;
             readonly title: string;

@@ -1,6 +1,7 @@
 export type {AccountCreate} from './AccountCreate';
 export type {AccountUpdate} from './AccountUpdate';
 export type {AsyncTaskLogCountRow} from './AsyncTaskLogCountRow';
+export type {Embedding} from './Embedding';
 export type {FileProviderFileSystemCreate} from './FileProviderFileSystemCreate';
 export type {FileProviderFileSystemUpdate} from './FileProviderFileSystemUpdate';
 export type {FileProviderOssCreate} from './FileProviderOssCreate';
@@ -17,5 +18,6 @@ export type {SystemStatus} from './SystemStatus';
 export type {TokenLoginRequest} from './TokenLoginRequest';
 export type {TokenLoginResponse} from './TokenLoginResponse';
 export type {TranscodeTaskRequest} from './TranscodeTaskRequest';
+export type {VectorizeTaskRequest} from './VectorizeTaskRequest';
 export type {WorkMergeReq} from './WorkMergeReq';
 export type {WorkUpdate} from './WorkUpdate';

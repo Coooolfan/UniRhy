@@ -1,3 +1,5 @@
+import type {Embedding} from '../static/';
+
 export type AlbumDto = {
     'AlbumController/DEFAULT_ALBUM_FETCHER': {
         readonly id: number;
@@ -28,6 +30,7 @@ export type AlbumDto = {
             readonly comment: string;
             readonly durationMs: number;
             readonly defaultInWork: boolean;
+            readonly embedding?: Embedding | undefined;
             readonly assets: ReadonlyArray<{
                 readonly id: number;
                 readonly comment: string;

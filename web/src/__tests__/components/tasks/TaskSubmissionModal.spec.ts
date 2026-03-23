@@ -52,6 +52,7 @@ describe('TaskSubmissionModal', () => {
         const wrapper = mountModal()
 
         expect(wrapper.text()).toContain('元数据解析')
+        expect(wrapper.text()).toContain('向量化')
         await wrapper.get('[data-test="task-submit-button"]').trigger('click')
 
         expect(wrapper.emitted('submit-metadata-parse')).toEqual([
@@ -92,5 +93,51 @@ describe('TaskSubmissionModal', () => {
                 },
             ],
         ])
+    })
+
+    it('emits a vectorize payload with local provider and required request fields', async () => {
+        const wrapper = mountModal()
+
+        await wrapper.get('[data-test="task-type-vectorize"]').trigger('click')
+
+        const sourceOptions = getOptionTexts(wrapper, '[data-test="vectorize-source-select"]')
+        expect(sourceOptions).toEqual(['[本地] Library A', '[本地] Archive B'])
+
+        await wrapper.get('[data-test="vectorize-source-select"]').setValue('FILE_SYSTEM:2')
+        await wrapper
+            .get('[data-test="vectorize-api-endpoint-input"]')
+            .setValue('https://api.example.com/v1/embeddings')
+        await wrapper.get('[data-test="vectorize-api-key-input"]').setValue('secret-key')
+        await wrapper.get('[data-test="vectorize-model-name-input"]').setValue('bge-m3')
+        await wrapper.get('[data-test="task-submit-button"]').trigger('click')
+
+        expect(wrapper.emitted('submit-vectorize')).toEqual([
+            [
+                {
+                    srcProviderType: 'FILE_SYSTEM',
+                    srcProviderId: 2,
+                    apiEndpoint: 'https://api.example.com/v1/embeddings',
+                    apiKey: 'secret-key',
+                    modelName: 'bge-m3',
+                },
+            ],
+        ])
+    })
+
+    it('does not emit vectorize event when any required request field is missing', async () => {
+        const wrapper = mountModal()
+
+        await wrapper.get('[data-test="task-type-vectorize"]').trigger('click')
+        await wrapper
+            .get('[data-test="vectorize-api-endpoint-input"]')
+            .setValue('https://api.example.com/v1/embeddings')
+        await wrapper.get('[data-test="vectorize-api-key-input"]').setValue('secret-key')
+
+        const submitButton = wrapper.get('[data-test="task-submit-button"]')
+        expect(submitButton.attributes('disabled')).toBeDefined()
+
+        await submitButton.trigger('click')
+
+        expect(wrapper.emitted('submit-vectorize')).toBeUndefined()
     })
 })
