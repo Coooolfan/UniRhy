@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted } from 'vue'
 import DashboardTopBar from '@/components/dashboard/DashboardTopBar.vue'
+import AiModelConfigSection from '@/components/settings/AiModelConfigSection.vue'
 import StorageNodesSection from '@/components/settings/StorageNodesSection.vue'
 import SystemStatusSection from '@/components/settings/SystemStatusSection.vue'
 import { useStorageSettings } from '@/composables/useStorageSettings'
@@ -28,6 +29,12 @@ const {
     saveEdit,
     startCreate,
     saveCreate,
+    isEditingAiModel,
+    aiModelForm,
+    aiModelError,
+    startEditAiModel,
+    cancelEditAiModel,
+    saveAiModel,
 } = useStorageSettings()
 
 const activeNode = computed(
@@ -59,6 +66,19 @@ onMounted(() => {
                 :active-node="activeNode"
                 :is-loading="isLoadingSystem"
                 :error="systemError"
+            />
+
+            <AiModelConfigSection
+                :completion-model="systemConfig.completionModel"
+                :embedding-model="systemConfig.embeddingModel"
+                :is-editing="isEditingAiModel"
+                :is-saving="isSaving"
+                :error="aiModelError"
+                :form="aiModelForm"
+                @start-edit="startEditAiModel"
+                @cancel-edit="cancelEditAiModel"
+                @save="saveAiModel"
+                @update-form="(patch) => Object.assign(aiModelForm, patch)"
             />
 
             <StorageNodesSection

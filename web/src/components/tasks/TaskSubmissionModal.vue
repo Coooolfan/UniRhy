@@ -111,13 +111,7 @@ const metadataParseProviderValue = ref('')
 const transcodeSourceProviderValue = ref('')
 const transcodeDestinationProviderValue = ref('')
 const vectorizeSourceProviderValue = ref('')
-const vectorizeApiEndpoint = ref('')
-const vectorizeApiKey = ref('')
-const vectorizeModelName = ref('')
 const dataCleanSourceProviderValue = ref('')
-const dataCleanApiEndpoint = ref('')
-const dataCleanApiKey = ref('')
-const dataCleanModelName = ref('')
 const targetCodec = ref<CodecType>('OPUS')
 
 const optionValueOf = (provider: TaskProviderOption) => `${provider.type}:${provider.id}`
@@ -196,12 +190,6 @@ watch(
         }
         activeTask.value = 'METADATA_PARSE'
         targetCodec.value = 'OPUS'
-        vectorizeApiEndpoint.value = ''
-        vectorizeApiKey.value = ''
-        vectorizeModelName.value = ''
-        dataCleanApiEndpoint.value = ''
-        dataCleanApiKey.value = ''
-        dataCleanModelName.value = ''
         syncProviderSelections()
     },
 )
@@ -231,39 +219,19 @@ const selectedDataCleanSourceProvider = computed(() =>
 
 const vectorizeRequest = computed<VectorizeTaskRequest | null>(() => {
     const source = selectedVectorizeSourceProvider.value
-    const apiEndpoint = vectorizeApiEndpoint.value.trim()
-    const apiKey = vectorizeApiKey.value.trim()
-    const modelName = vectorizeModelName.value.trim()
-
-    if (!source || !apiEndpoint || !apiKey || !modelName) {
-        return null
-    }
-
+    if (!source) return null
     return {
         srcProviderType: source.type,
         srcProviderId: source.id,
-        apiEndpoint,
-        apiKey,
-        modelName,
     }
 })
 
 const dataCleanRequest = computed<DataCleanTaskRequest | null>(() => {
     const source = selectedDataCleanSourceProvider.value
-    const apiEndpoint = dataCleanApiEndpoint.value.trim()
-    const apiKey = dataCleanApiKey.value.trim()
-    const modelName = dataCleanModelName.value.trim()
-
-    if (!source || !apiEndpoint || !apiKey || !modelName) {
-        return null
-    }
-
+    if (!source) return null
     return {
         srcProviderType: source.type,
         srcProviderId: source.id,
-        apiEndpoint,
-        apiKey,
-        modelName,
     }
 })
 
@@ -917,52 +885,15 @@ const submit = () => {
                                     </div>
                                 </div>
 
-                                <div class="grid gap-6 lg:grid-cols-2">
-                                    <label class="block lg:col-span-2">
-                                        <span
-                                            class="mb-2 block text-xs uppercase tracking-[0.24em] text-[#8A8A8A]"
-                                        >
-                                            API Endpoint
-                                        </span>
-                                        <input
-                                            v-model="vectorizeApiEndpoint"
-                                            data-test="vectorize-api-endpoint-input"
-                                            type="text"
-                                            placeholder="https://api.example.com/v1/embeddings"
-                                            class="w-full bg-[#F7F5F0] border-b border-[#D6D1C4] p-3 text-sm text-[#2C2C2C] outline-none transition-colors placeholder:text-[#A79F93] focus:border-[#C27E46]"
+                                <div
+                                    class="space-y-5 rounded-sm border border-[#E6E1D8] bg-[#F8F5EE] p-5"
+                                >
+                                    <div class="flex items-start gap-2 text-sm text-[#6B635B]">
+                                        <Music4
+                                            class="mt-0.5 h-4 w-4 shrink-0 text-[#C27E46]"
                                         />
-                                    </label>
-
-                                    <label class="block">
-                                        <span
-                                            class="mb-2 block text-xs uppercase tracking-[0.24em] text-[#8A8A8A]"
-                                        >
-                                            API Key
-                                        </span>
-                                        <input
-                                            v-model="vectorizeApiKey"
-                                            data-test="vectorize-api-key-input"
-                                            type="password"
-                                            autocomplete="new-password"
-                                            placeholder="输入向量接口密钥"
-                                            class="w-full bg-[#F7F5F0] border-b border-[#D6D1C4] p-3 text-sm text-[#2C2C2C] outline-none transition-colors placeholder:text-[#A79F93] focus:border-[#C27E46]"
-                                        />
-                                    </label>
-
-                                    <label class="block">
-                                        <span
-                                            class="mb-2 block text-xs uppercase tracking-[0.24em] text-[#8A8A8A]"
-                                        >
-                                            Model Name
-                                        </span>
-                                        <input
-                                            v-model="vectorizeModelName"
-                                            data-test="vectorize-model-name-input"
-                                            type="text"
-                                            placeholder="例如 text-embedding-3-large"
-                                            class="w-full bg-[#F7F5F0] border-b border-[#D6D1C4] p-3 text-sm text-[#2C2C2C] outline-none transition-colors placeholder:text-[#A79F93] focus:border-[#C27E46]"
-                                        />
-                                    </label>
+                                        <span>嵌入模型的 API 配置已移至系统设置页面。</span>
+                                    </div>
                                 </div>
                             </div>
 
@@ -1046,7 +977,7 @@ const submit = () => {
                                                 提交说明
                                             </div>
                                             <p class="mt-3 text-sm leading-relaxed text-[#6B635B]">
-                                                提交后系统会按录音补充数据清洗任务，并将接口信息写入任务参数。
+                                                提交后系统会按录音补充数据清洗任务。补全模型的 API 配置已移至系统设置页面。
                                             </p>
                                         </div>
                                         <div class="flex items-start gap-2 text-sm text-[#6B635B]">
@@ -1056,54 +987,6 @@ const submit = () => {
                                             <span>当前只支持本地存储节点作为数据清洗来源。</span>
                                         </div>
                                     </div>
-                                </div>
-
-                                <div class="grid gap-6 lg:grid-cols-2">
-                                    <label class="block lg:col-span-2">
-                                        <span
-                                            class="mb-2 block text-xs uppercase tracking-[0.24em] text-[#8A8A8A]"
-                                        >
-                                            API Endpoint
-                                        </span>
-                                        <input
-                                            v-model="dataCleanApiEndpoint"
-                                            data-test="data-clean-api-endpoint-input"
-                                            type="text"
-                                            placeholder="https://api.example.com/v1/responses"
-                                            class="w-full bg-[#F7F5F0] border-b border-[#D6D1C4] p-3 text-sm text-[#2C2C2C] outline-none transition-colors placeholder:text-[#A79F93] focus:border-[#C27E46]"
-                                        />
-                                    </label>
-
-                                    <label class="block">
-                                        <span
-                                            class="mb-2 block text-xs uppercase tracking-[0.24em] text-[#8A8A8A]"
-                                        >
-                                            API Key
-                                        </span>
-                                        <input
-                                            v-model="dataCleanApiKey"
-                                            data-test="data-clean-api-key-input"
-                                            type="password"
-                                            autocomplete="new-password"
-                                            placeholder="输入数据清洗接口密钥"
-                                            class="w-full bg-[#F7F5F0] border-b border-[#D6D1C4] p-3 text-sm text-[#2C2C2C] outline-none transition-colors placeholder:text-[#A79F93] focus:border-[#C27E46]"
-                                        />
-                                    </label>
-
-                                    <label class="block">
-                                        <span
-                                            class="mb-2 block text-xs uppercase tracking-[0.24em] text-[#8A8A8A]"
-                                        >
-                                            Model Name
-                                        </span>
-                                        <input
-                                            v-model="dataCleanModelName"
-                                            data-test="data-clean-model-name-input"
-                                            type="text"
-                                            placeholder="例如 gpt-5-mini"
-                                            class="w-full bg-[#F7F5F0] border-b border-[#D6D1C4] p-3 text-sm text-[#2C2C2C] outline-none transition-colors placeholder:text-[#A79F93] focus:border-[#C27E46]"
-                                        />
-                                    </label>
                                 </div>
                             </div>
                         </div>

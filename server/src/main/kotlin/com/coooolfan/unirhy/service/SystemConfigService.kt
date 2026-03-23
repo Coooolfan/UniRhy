@@ -49,6 +49,8 @@ class SystemConfigService(
                 id = SYSTEM_CONFIG_ID
                 ossProvider = null
                 fsProvider = storageProvider
+                completionModel = null
+                embeddingModel = null
             }, SaveMode.INSERT_ONLY).execute()
         } catch (e: Exception) {
             throw SystemException.SystemAlreadyInitialized()

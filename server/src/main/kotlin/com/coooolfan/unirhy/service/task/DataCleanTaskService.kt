@@ -3,6 +3,7 @@ package com.coooolfan.unirhy.service.task
 import com.coooolfan.unirhy.model.*
 import com.coooolfan.unirhy.model.storage.FileProviderFileSystem
 import com.coooolfan.unirhy.model.storage.FileProviderType
+import com.coooolfan.unirhy.service.SystemConfigService
 import com.coooolfan.unirhy.service.task.common.AsyncTaskQueueStore
 import com.coooolfan.unirhy.service.task.common.TaskStatus
 import com.coooolfan.unirhy.service.task.common.TaskType
@@ -11,6 +12,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import org.babyfish.jimmer.sql.ast.mutation.SaveMode
 import org.babyfish.jimmer.sql.kt.KSqlClient
 import org.babyfish.jimmer.sql.kt.ast.expression.eq
+import org.babyfish.jimmer.sql.kt.fetcher.newFetcher
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.support.TransactionTemplate
@@ -26,6 +28,7 @@ class DataCleanTaskService(
     private val objectMapper: ObjectMapper,
     private val queueStore: AsyncTaskQueueStore,
     private val transactionTemplate: TransactionTemplate,
+    private val systemConfigService: SystemConfigService,
 ) {
 
     private val logger = LoggerFactory.getLogger(DataCleanTaskService::class.java)
@@ -57,9 +60,6 @@ class DataCleanTaskService(
                 recordingId = entry.key,
                 srcObjectKey = entry.value,
                 srcProviderId = srcProvider.id,
-                apiEndpoint = request.apiEndpoint,
-                apiKey = request.apiKey,
-                modelName = request.modelName,
             )
         }
         val paramsJsonList = payloads.map(objectMapper::writeValueAsString)
@@ -111,12 +111,20 @@ class DataCleanTaskService(
 
                 if (tasksWithTitle.isNotEmpty()) {
                     try {
-                        val apiConfig = tasksWithTitle.first().payload
+                        val completionModelConfig = systemConfigService.get(
+                            newFetcher(SystemConfig::class).by { completionModel() }
+                        ).completionModel
+                            ?: error("Completion model not configured in system settings")
+
+                        if (completionModelConfig.requestFormat != AiRequestFormat.OPENAI) {
+                            error("Unsupported request format for data clean: ${completionModelConfig.requestFormat}. Only OPENAI is supported.")
+                        }
+
                         val distinctTitles = tasksWithTitle.map { it.title }.distinct()
                         val rules = callDataCleanApi(
-                            apiEndpoint = apiConfig.apiEndpoint,
-                            apiKey = apiConfig.apiKey,
-                            modelName = apiConfig.modelName,
+                            apiEndpoint = completionModelConfig.endpoint,
+                            apiKey = completionModelConfig.key,
+                            modelName = completionModelConfig.model,
                             titles = distinctTitles,
                         )
 
@@ -261,16 +269,10 @@ class DataCleanTaskService(
 data class DataCleanTaskRequest(
     val srcProviderType: FileProviderType,
     val srcProviderId: Long,
-    val apiEndpoint: String,
-    val apiKey: String,
-    val modelName: String,
 )
 
 data class DataCleanTaskPayload(
     val recordingId: Long,
     val srcObjectKey: String,
     val srcProviderId: Long,
-    val apiEndpoint: String,
-    val apiKey: String,
-    val modelName: String,
 )

@@ -23,4 +23,8 @@ interface SystemConfig {
 
     @IdView("fsProvider")
     val fsProviderId: Long?
+
+    val completionModel: AiModelConfig?
+
+    val embeddingModel: AiModelConfig?
 }

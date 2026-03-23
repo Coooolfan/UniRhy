@@ -1,5 +1,6 @@
 export type {AccountCreate} from './AccountCreate';
 export type {AccountUpdate} from './AccountUpdate';
+export type {AiModelConfig} from './AiModelConfig';
 export type {AsyncTaskLogCountRow} from './AsyncTaskLogCountRow';
 export type {DataCleanTaskRequest} from './DataCleanTaskRequest';
 export type {Embedding} from './Embedding';

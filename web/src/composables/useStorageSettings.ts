@@ -1,5 +1,7 @@
 import { computed, reactive, ref } from 'vue'
 import { api, normalizeApiError } from '@/ApiInstance'
+import type { AiModelConfig } from '@/__generated/model/static'
+import type { AiRequestFormat } from '@/__generated/model/enums/AiRequestFormat'
 
 export type StorageNode = {
     id: number
@@ -11,6 +13,8 @@ export type StorageNode = {
 export type SystemConfig = {
     ossProviderId: number | null
     fsProviderId: number | null
+    completionModel: AiModelConfig | null
+    embeddingModel: AiModelConfig | null
 }
 
 export type StorageNodeForm = {
@@ -19,11 +23,20 @@ export type StorageNodeForm = {
     readonly: boolean
 }
 
+export type AiModelForm = {
+    endpoint: string
+    model: string
+    key: string
+    requestFormat: AiRequestFormat
+}
+
 export const useStorageSettings = () => {
     const storageNodes = ref<StorageNode[]>([])
     const systemConfig = ref<SystemConfig>({
         ossProviderId: null,
         fsProviderId: null,
+        completionModel: null,
+        embeddingModel: null,
     })
 
     const isEditing = ref<number | null>(null)
@@ -68,10 +81,14 @@ export const useStorageSettings = () => {
             const config = await api.systemConfigController.get()
             systemConfig.value.fsProviderId = config.fsProviderId ?? null
             systemConfig.value.ossProviderId = config.ossProviderId ?? null
+            systemConfig.value.completionModel = config.completionModel ?? null
+            systemConfig.value.embeddingModel = config.embeddingModel ?? null
         } catch (error) {
             const normalized = normalizeApiError(error)
             systemConfig.value.fsProviderId = null
             systemConfig.value.ossProviderId = null
+            systemConfig.value.completionModel = null
+            systemConfig.value.embeddingModel = null
             systemError.value = normalized.message ?? '系统配置加载失败'
         } finally {
             isLoadingSystem.value = false
@@ -215,6 +232,91 @@ export const useStorageSettings = () => {
         }
     }
 
+    const isEditingAiModel = ref<'completion' | 'embedding' | null>(null)
+    const aiModelError = ref('')
+
+    const aiModelForm = reactive<AiModelForm>({
+        endpoint: '',
+        model: '',
+        key: '',
+        requestFormat: 'OPENAI',
+    })
+
+    const resetAiModelForm = () => {
+        aiModelForm.endpoint = ''
+        aiModelForm.model = ''
+        aiModelForm.key = ''
+        aiModelForm.requestFormat = 'OPENAI'
+    }
+
+    const startEditAiModel = (type: 'completion' | 'embedding') => {
+        isEditingAiModel.value = type
+        const config =
+            type === 'completion'
+                ? systemConfig.value.completionModel
+                : systemConfig.value.embeddingModel
+        if (config) {
+            aiModelForm.endpoint = config.endpoint
+            aiModelForm.model = config.model
+            aiModelForm.key = config.key
+            aiModelForm.requestFormat = config.requestFormat
+        } else {
+            resetAiModelForm()
+            if (type === 'embedding') {
+                aiModelForm.requestFormat = 'JINA'
+            }
+        }
+    }
+
+    const cancelEditAiModel = () => {
+        isEditingAiModel.value = null
+        resetAiModelForm()
+        aiModelError.value = ''
+    }
+
+    const saveAiModel = async () => {
+        if (!isEditingAiModel.value || isSaving.value) return
+        const endpoint = aiModelForm.endpoint.trim()
+        const model = aiModelForm.model.trim()
+        const key = aiModelForm.key.trim()
+        if (!endpoint || !model || !key) {
+            aiModelError.value = '请填写所有字段'
+            return
+        }
+        isSaving.value = true
+        aiModelError.value = ''
+        try {
+            const newConfig: AiModelConfig = {
+                endpoint,
+                model,
+                key,
+                requestFormat: aiModelForm.requestFormat,
+            }
+            const updatePayload: Record<string, unknown> = {
+                fsProviderId: systemConfig.value.fsProviderId,
+                ossProviderId: systemConfig.value.ossProviderId,
+            }
+            if (isEditingAiModel.value === 'completion') {
+                updatePayload.completionModel = newConfig
+                updatePayload.embeddingModel = systemConfig.value.embeddingModel
+            } else {
+                updatePayload.completionModel = systemConfig.value.completionModel
+                updatePayload.embeddingModel = newConfig
+            }
+            await api.systemConfigController.update({
+                body: updatePayload as any,
+            })
+            await fetchSystemConfig()
+            isEditingAiModel.value = null
+            resetAiModelForm()
+        } catch (error) {
+            const normalized = normalizeApiError(error)
+            aiModelError.value = normalized.message ?? '保存失败'
+        } finally {
+            isSaving.value = false
+        }
+    }
+
     return {
         storageNodes,
         systemConfig,
@@ -238,5 +340,11 @@ export const useStorageSettings = () => {
         saveEdit,
         startCreate,
         saveCreate,
+        isEditingAiModel,
+        aiModelForm,
+        aiModelError,
+        startEditAiModel,
+        cancelEditAiModel,
+        saveAiModel,
     }
 }
