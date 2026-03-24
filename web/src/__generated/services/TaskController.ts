@@ -1,7 +1,6 @@
 import type {Executor} from '../';
 import type {
     AsyncTaskLogCountRow, 
-    DataCleanTaskRequest, 
     ScanTaskRequest, 
     TranscodeTaskRequest, 
     VectorizeTaskRequest
@@ -16,11 +15,11 @@ export class TaskController {
     
     constructor(private executor: Executor) {}
     
-    readonly executeDataCleanTask: (options: TaskControllerOptions['executeDataCleanTask']) => Promise<
+    readonly executeDataCleanTask: () => Promise<
         void
-    > = async(options) => {
+    > = async() => {
         let _uri = '/api/task/data-clean';
-        return (await this.executor({uri: _uri, method: 'POST', body: options.body})) as Promise<void>;
+        return (await this.executor({uri: _uri, method: 'POST'})) as Promise<void>;
     }
     
     /**
@@ -94,8 +93,6 @@ export type TaskControllerOptions = {
     'executeVectorizeTask': {
         readonly body: VectorizeTaskRequest
     }, 
-    'executeDataCleanTask': {
-        readonly body: DataCleanTaskRequest
-    }, 
+    'executeDataCleanTask': {}, 
     'listTaskLogs': {}
 }

@@ -5,7 +5,6 @@ import TaskSubmissionModal from '@/components/tasks/TaskSubmissionModal.vue'
 import type { TaskStatus } from '@/__generated/model/enums/TaskStatus'
 import type { TaskType } from '@/__generated/model/enums/TaskType'
 import type {
-    DataCleanTaskRequest,
     ScanTaskRequest,
     TranscodeTaskRequest,
     VectorizeTaskRequest,
@@ -304,8 +303,8 @@ const handleVectorizeSubmit = async (payload: VectorizeTaskRequest) => {
     showSubmitFeedback()
 }
 
-const handleDataCleanSubmit = async (payload: DataCleanTaskRequest) => {
-    const submitOk = await startDataCleanTask(payload)
+const handleDataCleanSubmit = async () => {
+    const submitOk = await startDataCleanTask()
     if (!submitOk) {
         return
     }

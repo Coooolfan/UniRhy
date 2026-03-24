@@ -1,8 +1,6 @@
 package com.coooolfan.unirhy.service.task
 
 import com.coooolfan.unirhy.model.*
-import com.coooolfan.unirhy.model.storage.FileProviderFileSystem
-import com.coooolfan.unirhy.model.storage.FileProviderType
 import com.coooolfan.unirhy.service.SystemConfigService
 import com.coooolfan.unirhy.service.task.common.AsyncTaskQueueStore
 import com.coooolfan.unirhy.service.task.common.TaskStatus
@@ -11,7 +9,8 @@ import com.coooolfan.unirhy.service.task.common.failureReason
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.babyfish.jimmer.sql.ast.mutation.SaveMode
 import org.babyfish.jimmer.sql.kt.KSqlClient
-import org.babyfish.jimmer.sql.kt.ast.expression.eq
+import org.babyfish.jimmer.sql.kt.ast.expression.isNull
+import org.babyfish.jimmer.sql.kt.ast.expression.ne
 import org.babyfish.jimmer.sql.kt.fetcher.newFetcher
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
@@ -38,30 +37,15 @@ class VectorizeTaskService(
         .build()
 
     fun submit(request: VectorizeTaskRequest) {
-        if (request.srcProviderType != FileProviderType.FILE_SYSTEM) {
-            error("Unsupported source provider type: ${request.srcProviderType}")
-        }
-        val srcProvider = sql.findById(FileProviderFileSystem::class, request.srcProviderId)
-            ?: error("Source provider not found")
-
-        val audioFiles = sql.createQuery(Asset::class) {
-            where(table.mediaFile.fsProviderId eq srcProvider.id)
-            orderBy(table.recordingId, table.mediaFile.objectKey, table.id)
-            select(table.recordingId, table.mediaFile.objectKey)
+        val recordingIds = sql.createQuery(Recording::class) {
+            where(table.lyrics ne "")
+            if (request.mode == VectorizeMode.PENDING_ONLY) {
+                where(table.embedding.isNull())
+            }
+            select(table.id)
         }.execute()
 
-        val recordingAssetMap = linkedMapOf<Long, String>()
-        for ((recordingId, objectKey) in audioFiles) {
-            recordingAssetMap.putIfAbsent(recordingId, objectKey)
-        }
-
-        val payloads = recordingAssetMap.entries.map { entry ->
-            VectorizeTaskPayload(
-                recordingId = entry.key,
-                srcObjectKey = entry.value,
-                srcProviderId = srcProvider.id,
-            )
-        }
+        val payloads = recordingIds.map { VectorizeTaskPayload(recordingId = it) }
         val paramsJsonList = payloads.map(objectMapper::writeValueAsString)
         queueStore.enqueueIgnoringConflicts(TaskType.VECTORIZE, paramsJsonList)
     }
@@ -208,13 +192,15 @@ class VectorizeTaskService(
     }
 }
 
+enum class VectorizeMode {
+    ALL,
+    PENDING_ONLY,
+}
+
 data class VectorizeTaskRequest(
-    val srcProviderType: FileProviderType,
-    val srcProviderId: Long,
+    val mode: VectorizeMode,
 )
 
 data class VectorizeTaskPayload(
     val recordingId: Long,
-    val srcObjectKey: String,
-    val srcProviderId: Long,
 )

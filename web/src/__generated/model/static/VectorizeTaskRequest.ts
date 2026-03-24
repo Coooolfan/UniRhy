@@ -1,6 +1,5 @@
-import type {FileProviderType} from '../enums/';
+import type {VectorizeMode} from '../enums/';
 
 export interface VectorizeTaskRequest {
-    readonly srcProviderType: FileProviderType;
-    readonly srcProviderId: number;
+    readonly mode: VectorizeMode;
 }

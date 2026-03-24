@@ -13,8 +13,8 @@ import {
 } from 'lucide-vue-next'
 import type { CodecType } from '@/__generated/model/enums/CodecType'
 import { type FileProviderType } from '@/__generated/model/enums/FileProviderType'
+import type { VectorizeMode } from '@/__generated/model/enums/VectorizeMode'
 import type {
-    DataCleanTaskRequest,
     TranscodeTaskRequest,
     VectorizeTaskRequest,
 } from '@/__generated/model/static'
@@ -55,7 +55,7 @@ const emit = defineEmits<{
     (event: 'submit-metadata-parse', payload: ProviderSelectionPayload): void
     (event: 'submit-transcode', payload: TranscodeTaskRequest): void
     (event: 'submit-vectorize', payload: VectorizeTaskRequest): void
-    (event: 'submit-data-clean', payload: DataCleanTaskRequest): void
+    (event: 'submit-data-clean'): void
 }>()
 
 const TASK_ACTION_LABEL_MAP: Record<TaskKind, string> = {
@@ -110,8 +110,7 @@ const activeTask = ref<TaskKind>('METADATA_PARSE')
 const metadataParseProviderValue = ref('')
 const transcodeSourceProviderValue = ref('')
 const transcodeDestinationProviderValue = ref('')
-const vectorizeSourceProviderValue = ref('')
-const dataCleanSourceProviderValue = ref('')
+const vectorizeMode = ref<VectorizeMode>('PENDING_ONLY')
 const targetCodec = ref<CodecType>('OPUS')
 
 const optionValueOf = (provider: TaskProviderOption) => `${provider.type}:${provider.id}`
@@ -147,14 +146,6 @@ const transcodeDestinationProviderOptions = computed(() =>
     ),
 )
 
-const vectorizeSourceProviderOptions = computed(() =>
-    props.providerOptions.filter((provider) => provider.type === 'FILE_SYSTEM'),
-)
-
-const dataCleanSourceProviderOptions = computed(() =>
-    props.providerOptions.filter((provider) => provider.type === 'FILE_SYSTEM'),
-)
-
 const syncProviderSelections = () => {
     syncSelectionValue(metadataParseProviderValue, metadataParseProviderOptions.value)
     syncSelectionValue(transcodeSourceProviderValue, transcodeSourceProviderOptions.value)
@@ -163,8 +154,6 @@ const syncProviderSelections = () => {
         transcodeDestinationProviderOptions.value,
         1,
     )
-    syncSelectionValue(vectorizeSourceProviderValue, vectorizeSourceProviderOptions.value)
-    syncSelectionValue(dataCleanSourceProviderValue, dataCleanSourceProviderOptions.value)
 }
 
 const resolveProvider = (options: readonly TaskProviderOption[], value: string) =>
@@ -190,6 +179,7 @@ watch(
         }
         activeTask.value = 'METADATA_PARSE'
         targetCodec.value = 'OPUS'
+        vectorizeMode.value = 'PENDING_ONLY'
         syncProviderSelections()
     },
 )
@@ -210,30 +200,10 @@ const selectedTranscodeDestinationProvider = computed(() =>
         transcodeDestinationProviderValue.value,
     ),
 )
-const selectedVectorizeSourceProvider = computed(() =>
-    resolveProvider(vectorizeSourceProviderOptions.value, vectorizeSourceProviderValue.value),
-)
-const selectedDataCleanSourceProvider = computed(() =>
-    resolveProvider(dataCleanSourceProviderOptions.value, dataCleanSourceProviderValue.value),
-)
 
-const vectorizeRequest = computed<VectorizeTaskRequest | null>(() => {
-    const source = selectedVectorizeSourceProvider.value
-    if (!source) return null
-    return {
-        srcProviderType: source.type,
-        srcProviderId: source.id,
-    }
-})
-
-const dataCleanRequest = computed<DataCleanTaskRequest | null>(() => {
-    const source = selectedDataCleanSourceProvider.value
-    if (!source) return null
-    return {
-        srcProviderType: source.type,
-        srcProviderId: source.id,
-    }
-})
+const vectorizeRequest = computed<VectorizeTaskRequest>(() => ({
+    mode: vectorizeMode.value,
+}))
 
 const canSubmit = computed(() => {
     if (props.isLoadingProviders) {
@@ -251,10 +221,10 @@ const canSubmit = computed(() => {
     }
 
     if (activeTask.value === 'VECTORIZE') {
-        return Boolean(vectorizeRequest.value)
+        return true
     }
 
-    return Boolean(dataCleanRequest.value)
+    return true // DATA_CLEAN always submittable
 })
 
 const submitButtonLabel = computed(() => {
@@ -274,11 +244,13 @@ const submitButtonLabel = computed(() => {
 })
 
 const activeTaskAvailability = computed<TaskAvailability | null>(() => {
-    if (props.providerOptions.length === 0) {
+    if (
+        props.providerOptions.length === 0 &&
+        (activeTask.value === 'METADATA_PARSE' || activeTask.value === 'TRANSCODE')
+    ) {
         return {
             title: '暂无可用存储节点',
-            description:
-                '请先在系统设置中配置本地存储节点，再回来发起元数据解析、转码、向量化或数据清洗任务。',
+            description: '请先在系统设置中配置本地存储节点，再回来发起元数据解析或转码任务。',
             icon: HardDrive,
         }
     }
@@ -288,22 +260,6 @@ const activeTaskAvailability = computed<TaskAvailability | null>(() => {
             title: '暂无可解析节点',
             description: '元数据解析任务目前只支持本地存储节点。',
             icon: FolderSearch,
-        }
-    }
-
-    if (activeTask.value === 'VECTORIZE' && vectorizeSourceProviderOptions.value.length === 0) {
-        return {
-            title: '暂无可向量化源节点',
-            description: '向量化任务目前只支持本地存储节点作为来源。',
-            icon: Music4,
-        }
-    }
-
-    if (activeTask.value === 'DATA_CLEAN' && dataCleanSourceProviderOptions.value.length === 0) {
-        return {
-            title: '暂无可清洗源节点',
-            description: '数据清洗任务目前只支持本地存储节点作为来源。',
-            icon: Music4,
         }
     }
 
@@ -387,21 +343,11 @@ const submit = () => {
     }
 
     if (activeTask.value === 'VECTORIZE') {
-        const request = vectorizeRequest.value
-        if (!request) {
-            return
-        }
-
-        emit('submit-vectorize', request)
+        emit('submit-vectorize', vectorizeRequest.value)
         return
     }
 
-    const dataCleanPayload = dataCleanRequest.value
-    if (!dataCleanPayload) {
-        return
-    }
-
-    emit('submit-data-clean', dataCleanPayload)
+    emit('submit-data-clean')
 }
 </script>
 
@@ -794,198 +740,76 @@ const submit = () => {
                             </div>
 
                             <div v-else-if="activeTask === 'VECTORIZE'" class="space-y-8">
-                                <div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-                                    <div class="space-y-6">
-                                        <label class="block">
-                                            <span
-                                                class="mb-2 block text-xs uppercase tracking-[0.24em] text-[#8A8A8A]"
+                                <div class="space-y-6">
+                                    <div>
+                                        <span class="mb-3 block text-xs uppercase tracking-[0.24em] text-[#8A8A8A]">
+                                            向量化模式
+                                        </span>
+                                        <div class="flex gap-4">
+                                            <label
+                                                class="flex cursor-pointer items-center gap-2 rounded-sm border px-4 py-3 text-sm transition-colors"
+                                                :class="vectorizeMode === 'PENDING_ONLY'
+                                                    ? 'border-[#C27E46] bg-[#FBF6F0] text-[#C27E46]'
+                                                    : 'border-[#E0DCD0] bg-[#F7F5F0] text-[#6B635B] hover:border-[#C27E46]/50'"
                                             >
-                                                来源存储节点
-                                            </span>
-                                            <div class="relative">
-                                                <select
-                                                    v-model="vectorizeSourceProviderValue"
-                                                    data-test="vectorize-source-select"
-                                                    class="w-full appearance-none bg-[#F7F5F0] border-b border-[#D6D1C4] p-3 pr-10 text-sm text-[#2C2C2C] outline-none transition-colors focus:border-[#C27E46]"
-                                                >
-                                                    <option
-                                                        v-for="option in vectorizeSourceProviderOptions"
-                                                        :key="`vector-${optionValueOf(option)}`"
-                                                        :value="optionValueOf(option)"
-                                                    >
-                                                        {{ option.name }}
-                                                    </option>
-                                                </select>
-                                                <ChevronDown
-                                                    class="pointer-events-none absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 text-[#8A8A8A]"
+                                                <input
+                                                    v-model="vectorizeMode"
+                                                    type="radio"
+                                                    value="PENDING_ONLY"
+                                                    class="sr-only"
                                                 />
-                                            </div>
-                                        </label>
-
-                                        <div
-                                            v-if="selectedVectorizeSourceProvider"
-                                            class="grid gap-4 px-1 py-1 md:grid-cols-2"
-                                        >
-                                            <div>
-                                                <div
-                                                    class="text-[11px] uppercase tracking-[0.24em] text-[#8A8A8A]"
-                                                >
-                                                    节点类型
-                                                </div>
-                                                <div
-                                                    class="mt-2 flex items-center gap-2 text-[#2B221B]"
-                                                >
-                                                    <component
-                                                        :is="
-                                                            PROVIDER_TYPE_ICON_MAP[
-                                                                selectedVectorizeSourceProvider.type
-                                                            ]
-                                                        "
-                                                        class="h-4 w-4 text-[#C27E46]"
-                                                    />
-                                                    <span class="text-sm">{{
-                                                        PROVIDER_TYPE_LABEL_MAP[
-                                                            selectedVectorizeSourceProvider.type
-                                                        ]
-                                                    }}</span>
-                                                </div>
-                                            </div>
-                                            <div>
-                                                <div
-                                                    class="text-[11px] uppercase tracking-[0.24em] text-[#8A8A8A]"
-                                                >
-                                                    节点 ID
-                                                </div>
-                                                <div class="mt-2 font-mono text-sm text-[#2C2C2C]">
-                                                    #{{ selectedVectorizeSourceProvider.id }}
-                                                </div>
-                                            </div>
+                                                补充未向量化
+                                            </label>
+                                            <label
+                                                class="flex cursor-pointer items-center gap-2 rounded-sm border px-4 py-3 text-sm transition-colors"
+                                                :class="vectorizeMode === 'ALL'
+                                                    ? 'border-[#C27E46] bg-[#FBF6F0] text-[#C27E46]'
+                                                    : 'border-[#E0DCD0] bg-[#F7F5F0] text-[#6B635B] hover:border-[#C27E46]/50'"
+                                            >
+                                                <input
+                                                    v-model="vectorizeMode"
+                                                    type="radio"
+                                                    value="ALL"
+                                                    class="sr-only"
+                                                />
+                                                全部重新向量化
+                                            </label>
                                         </div>
                                     </div>
 
-                                    <div
-                                        class="space-y-5 rounded-sm border border-[#E6E1D8] bg-[#F8F5EE] p-5"
-                                    >
+                                    <div class="space-y-5 rounded-sm border border-[#E6E1D8] bg-[#F8F5EE] p-5">
                                         <div>
-                                            <div
-                                                class="text-[11px] uppercase tracking-[0.24em] text-[#8A8A8A]"
-                                            >
+                                            <div class="text-[11px] uppercase tracking-[0.24em] text-[#8A8A8A]">
                                                 提交说明
                                             </div>
                                             <p class="mt-3 text-sm leading-relaxed text-[#6B635B]">
-                                                提交后系统会按录音补充向量化任务，并将接口信息写入任务参数。
+                                                {{ vectorizeMode === 'PENDING_ONLY'
+                                                    ? '仅为尚未生成 embedding 的录音补充向量化任务。'
+                                                    : '对所有有歌词的录音重新生成 embedding，包括已向量化的。'
+                                                }}
                                             </p>
                                         </div>
                                         <div class="flex items-start gap-2 text-sm text-[#6B635B]">
-                                            <Music4
-                                                class="mt-0.5 h-4 w-4 shrink-0 text-[#C27E46]"
-                                            />
-                                            <span>当前只支持本地存储节点作为音频来源。</span>
+                                            <Music4 class="mt-0.5 h-4 w-4 shrink-0 text-[#C27E46]" />
+                                            <span>嵌入模型的 API 配置已移至系统设置页面。</span>
                                         </div>
-                                    </div>
-                                </div>
-
-                                <div
-                                    class="space-y-5 rounded-sm border border-[#E6E1D8] bg-[#F8F5EE] p-5"
-                                >
-                                    <div class="flex items-start gap-2 text-sm text-[#6B635B]">
-                                        <Music4
-                                            class="mt-0.5 h-4 w-4 shrink-0 text-[#C27E46]"
-                                        />
-                                        <span>嵌入模型的 API 配置已移至系统设置页面。</span>
                                     </div>
                                 </div>
                             </div>
 
                             <div v-else class="space-y-8">
-                                <div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-                                    <div class="space-y-6">
-                                        <label class="block">
-                                            <span
-                                                class="mb-2 block text-xs uppercase tracking-[0.24em] text-[#8A8A8A]"
-                                            >
-                                                来源存储节点
-                                            </span>
-                                            <div class="relative">
-                                                <select
-                                                    v-model="dataCleanSourceProviderValue"
-                                                    data-test="data-clean-source-select"
-                                                    class="w-full appearance-none bg-[#F7F5F0] border-b border-[#D6D1C4] p-3 pr-10 text-sm text-[#2C2C2C] outline-none transition-colors focus:border-[#C27E46]"
-                                                >
-                                                    <option
-                                                        v-for="option in dataCleanSourceProviderOptions"
-                                                        :key="`data-clean-${optionValueOf(option)}`"
-                                                        :value="optionValueOf(option)"
-                                                    >
-                                                        {{ option.name }}
-                                                    </option>
-                                                </select>
-                                                <ChevronDown
-                                                    class="pointer-events-none absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 text-[#8A8A8A]"
-                                                />
-                                            </div>
-                                        </label>
-
-                                        <div
-                                            v-if="selectedDataCleanSourceProvider"
-                                            class="grid gap-4 px-1 py-1 md:grid-cols-2"
-                                        >
-                                            <div>
-                                                <div
-                                                    class="text-[11px] uppercase tracking-[0.24em] text-[#8A8A8A]"
-                                                >
-                                                    节点类型
-                                                </div>
-                                                <div
-                                                    class="mt-2 flex items-center gap-2 text-[#2B221B]"
-                                                >
-                                                    <component
-                                                        :is="
-                                                            PROVIDER_TYPE_ICON_MAP[
-                                                                selectedDataCleanSourceProvider.type
-                                                            ]
-                                                        "
-                                                        class="h-4 w-4 text-[#C27E46]"
-                                                    />
-                                                    <span class="text-sm">{{
-                                                        PROVIDER_TYPE_LABEL_MAP[
-                                                            selectedDataCleanSourceProvider.type
-                                                        ]
-                                                    }}</span>
-                                                </div>
-                                            </div>
-                                            <div>
-                                                <div
-                                                    class="text-[11px] uppercase tracking-[0.24em] text-[#8A8A8A]"
-                                                >
-                                                    节点 ID
-                                                </div>
-                                                <div class="mt-2 font-mono text-sm text-[#2C2C2C]">
-                                                    #{{ selectedDataCleanSourceProvider.id }}
-                                                </div>
-                                            </div>
+                                <div class="space-y-5 rounded-sm border border-[#E6E1D8] bg-[#F8F5EE] p-5">
+                                    <div>
+                                        <div class="text-[11px] uppercase tracking-[0.24em] text-[#8A8A8A]">
+                                            提交说明
                                         </div>
+                                        <p class="mt-3 text-sm leading-relaxed text-[#6B635B]">
+                                            提交后系统会为所有录音补充数据清洗任务，批量调用外部模型清洗标题。
+                                        </p>
                                     </div>
-
-                                    <div
-                                        class="space-y-5 rounded-sm border border-[#E6E1D8] bg-[#F8F5EE] p-5"
-                                    >
-                                        <div>
-                                            <div
-                                                class="text-[11px] uppercase tracking-[0.24em] text-[#8A8A8A]"
-                                            >
-                                                提交说明
-                                            </div>
-                                            <p class="mt-3 text-sm leading-relaxed text-[#6B635B]">
-                                                提交后系统会按录音补充数据清洗任务。补全模型的 API 配置已移至系统设置页面。
-                                            </p>
-                                        </div>
-                                        <div class="flex items-start gap-2 text-sm text-[#6B635B]">
-                                            <Music4
-                                                class="mt-0.5 h-4 w-4 shrink-0 text-[#C27E46]"
-                                            />
-                                            <span>当前只支持本地存储节点作为数据清洗来源。</span>
-                                        </div>
+                                    <div class="flex items-start gap-2 text-sm text-[#6B635B]">
+                                        <Music4 class="mt-0.5 h-4 w-4 shrink-0 text-[#C27E46]" />
+                                        <span>补全模型的 API 配置已移至系统设置页面。</span>
                                     </div>
                                 </div>
                             </div>

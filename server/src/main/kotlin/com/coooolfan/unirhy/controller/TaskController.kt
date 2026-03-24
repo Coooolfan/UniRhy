@@ -7,7 +7,6 @@ import com.coooolfan.unirhy.service.task.ScanTaskRequest
 import com.coooolfan.unirhy.service.task.ScanTaskService
 import com.coooolfan.unirhy.service.task.TranscodeTaskRequest
 import com.coooolfan.unirhy.service.task.TranscodeTaskService
-import com.coooolfan.unirhy.service.task.DataCleanTaskRequest
 import com.coooolfan.unirhy.service.task.DataCleanTaskService
 import com.coooolfan.unirhy.service.task.VectorizeTaskRequest
 import com.coooolfan.unirhy.service.task.VectorizeTaskService
@@ -81,8 +80,8 @@ class TaskController(
 
     @PostMapping("/data-clean")
     @ResponseStatus(HttpStatus.ACCEPTED)
-    fun executeDataCleanTask(@RequestBody request: DataCleanTaskRequest) {
-        dataCleanTaskService.submit(request)
+    fun executeDataCleanTask() {
+        dataCleanTaskService.submit()
     }
 
     @GetMapping("/logs")

@@ -4,7 +4,6 @@ import { type FileProviderType } from '@/__generated/model/enums/FileProviderTyp
 import type { TaskType } from '@/__generated/model/enums/TaskType'
 import type {
     AsyncTaskLogCountRow,
-    DataCleanTaskRequest,
     ScanTaskRequest,
     TranscodeTaskRequest,
     VectorizeTaskRequest,
@@ -130,12 +129,8 @@ export const useTaskManagement = () => {
             }),
         )
 
-    const startDataCleanTask = (request: DataCleanTaskRequest) =>
-        executeTask(() =>
-            api.taskController.executeDataCleanTask({
-                body: request,
-            }),
-        )
+    const startDataCleanTask = () =>
+        executeTask(() => api.taskController.executeDataCleanTask())
 
     const init = () => {
         void Promise.all([fetchTaskCounts(), fetchProviders()])

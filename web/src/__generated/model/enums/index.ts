@@ -8,3 +8,5 @@ export type {TaskStatus} from './TaskStatus';
 export {TaskStatus_CONSTANTS} from './TaskStatus';
 export type {TaskType} from './TaskType';
 export {TaskType_CONSTANTS} from './TaskType';
+export type {VectorizeMode} from './VectorizeMode';
+export {VectorizeMode_CONSTANTS} from './VectorizeMode';
