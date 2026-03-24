@@ -8,6 +8,7 @@ import org.babyfish.jimmer.sql.kt.KSqlClient
 import org.babyfish.jimmer.sql.kt.ast.expression.count
 import org.babyfish.jimmer.sql.kt.ast.expression.valueIn
 import org.springframework.http.HttpStatus
+import org.springframework.jdbc.core.namedparam.MapSqlParameterSource
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -23,6 +24,28 @@ class RecordingService(
             HttpStatus.NOT_FOUND,
             "recording not found"
         )
+    }
+
+    fun findSimilarRecordings(recordingId: Long, limit: Int, fetcher: Fetcher<Recording>): List<Recording> {
+        val searchSql = """
+            WITH query AS (
+                SELECT embedding FROM public.recording
+                WHERE id = :recordingId AND embedding IS NOT NULL
+            )
+            SELECT r.id
+            FROM public.recording r, query q
+            WHERE r.embedding IS NOT NULL AND r.id != :recordingId
+            ORDER BY r.embedding <=> q.embedding
+            LIMIT :limit
+        """.trimIndent()
+
+        val params = MapSqlParameterSource()
+            .addValue("recordingId", recordingId)
+            .addValue("limit", limit)
+
+        val ids = jdbc.query(searchSql, params) { rs, _ -> rs.getLong("id") }
+        if (ids.isEmpty()) return emptyList()
+        return sql.findByIds(fetcher, ids)
     }
 
     fun updateRecording(input: Recording) {

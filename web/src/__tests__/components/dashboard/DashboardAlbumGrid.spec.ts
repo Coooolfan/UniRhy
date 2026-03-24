@@ -122,6 +122,7 @@ describe('DashboardAlbumGrid', () => {
                     comment: '',
                     durationMs: 180000,
                     defaultInWork: true,
+                    lyrics: '',
                     assets: [],
                     artists: [{ id: 801, displayName: 'Artist A', alias: [], comment: '' }],
                     cover: undefined,
@@ -133,6 +134,7 @@ describe('DashboardAlbumGrid', () => {
                     comment: '',
                     durationMs: 200000,
                     defaultInWork: true,
+                    lyrics: '',
                     assets: [
                         {
                             id: 901,
@@ -164,6 +166,7 @@ describe('DashboardAlbumGrid', () => {
                     comment: '',
                     durationMs: 210000,
                     defaultInWork: false,
+                    lyrics: '',
                     assets: [
                         {
                             id: 902,

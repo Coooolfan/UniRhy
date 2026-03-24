@@ -119,27 +119,30 @@ class TranscodeTaskService(
     }
 
     private fun execute(payload: TranscodeTaskPayload) {
-        if (payload.targetCodec != CodecType.OPUS) {
-            error("Unsupported target codec: ${payload.targetCodec}")
+        val codecProfile = when (payload.targetCodec) {
+            CodecType.OPUS -> CodecProfile(extension = "opus", mimeType = "audio/opus")
+            CodecType.MP3 -> CodecProfile(extension = "mp3", mimeType = "audio/mpeg")
+            else -> error("Unsupported target codec: ${payload.targetCodec}")
         }
         val (srcProvider, dstProvider) = resolveProviders(payload.srcProviderId, payload.dstProviderId)
         val srcRoot = File(srcProvider.parentPath)
         val dstRoot = ensureDestinationRoot(dstProvider)
         val srcFile = File(srcRoot, payload.srcObjectKey)
-        val outputFile = File(dstRoot, "${UUID.randomUUID()}.opus")
+        val outputFile = File(dstRoot, "${UUID.randomUUID()}.${codecProfile.extension}")
 
-        executeFfmpegCommand(
-            command = buildFfmpegCommand(srcFile, outputFile),
-            srcFile = srcFile,
-            outputFile = outputFile,
-        )
+        val command = when (payload.targetCodec) {
+            CodecType.OPUS -> buildOpusFfmpegCommand(srcFile, outputFile)
+            CodecType.MP3 -> buildMp3FfmpegCommand(srcFile, outputFile)
+            else -> error("Unsupported target codec: ${payload.targetCodec}")
+        }
+        executeFfmpegCommand(command = command, srcFile = srcFile, outputFile = outputFile)
 
         sql.saveCommand(Asset {
             recording = Recording { id = payload.recordingId }
             mediaFile {
                 sha256 = "mocked-sha256"
                 objectKey = outputFile.toString()
-                mimeType = "audio/opus"
+                mimeType = codecProfile.mimeType
                 size = outputFile.length()
                 width = null
                 height = null
@@ -155,7 +158,7 @@ class TranscodeTaskService(
     }
 
     private fun resolveAndValidateProviders(request: TranscodeTaskRequest): Pair<FileProviderFileSystem, FileProviderFileSystem> {
-        if (request.targetCodec != CodecType.OPUS) {
+        if (request.targetCodec != CodecType.OPUS && request.targetCodec != CodecType.MP3) {
             error("Unsupported target codec: ${request.targetCodec}")
         }
         if (request.srcProviderType != FileProviderType.FILE_SYSTEM) {
@@ -205,7 +208,7 @@ class TranscodeTaskService(
         return dstRoot
     }
 
-    private fun buildFfmpegCommand(
+    private fun buildOpusFfmpegCommand(
         srcFile: File,
         outputFile: File,
     ): List<String> {
@@ -227,6 +230,29 @@ class TranscodeTaskService(
             "-map_metadata", "-1", // 去掉流级元数据
             "-map_metadata:s", "-1", // 去掉章节信息
             "-map_chapters", "-1", // 指定输出文件路径
+            outputFile.absolutePath,
+        )
+    }
+
+    private fun buildMp3FfmpegCommand(
+        srcFile: File,
+        outputFile: File,
+    ): List<String> {
+        return listOf(
+            "ffmpeg",
+            "-nostdin",
+            "-v", "error",
+            "-i", srcFile.absolutePath,
+            "-map", "0:a:0",
+            "-vn",
+            "-sn",
+            "-dn",
+            "-c:a", "libmp3lame", // MP3 编码器
+            "-b:a", "16k", // 16 kbps
+            "-ac", "1", // 单声道
+            "-map_metadata", "-1",
+            "-map_metadata:s", "-1",
+            "-map_chapters", "-1",
             outputFile.absolutePath,
         )
     }
@@ -322,3 +348,8 @@ data class TranscodeTaskPayload(
 enum class CodecType {
     MP3, OPUS, AAC,
 }
+
+private data class CodecProfile(
+    val extension: String,
+    val mimeType: String,
+)

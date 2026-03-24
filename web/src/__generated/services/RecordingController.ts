@@ -31,15 +31,33 @@ export class RecordingController {
     }
     
     /**
-     * 录音合并接口
+     * 获取相似录音
      * 
-     * 此接口用于将多个录音合并为一个录音
-     * 需要用户登录认证才能访问
+     * 基于 pgvector 余弦距离查找与指定录音最相似的录音列表
      * 
-     * @parameter {RecordingControllerOptions['mergeRecording']} options
-     * - input RecordingMergeReq 合并参数
-     * 
+     * @parameter {RecordingControllerOptions['getSimilarRecordings']} options
+     * - id Recording ID
+     * - limit 返回数量上限，默认 5
+     * @return 相似录音列表
      */
+    readonly getSimilarRecordings: (options: RecordingControllerOptions['getSimilarRecordings']) => Promise<
+        ReadonlyArray<RecordingDto['RecordingController/SIMILAR_RECORDING_FETCHER']>
+    > = async(options) => {
+        let _uri = '/api/recordings/';
+        _uri += encodeURIComponent(options.id);
+        _uri += '/similar';
+        let _separator = _uri.indexOf('?') === -1 ? '?' : '&';
+        let _value: any = undefined;
+        _value = options.limit;
+        if (_value !== undefined && _value !== null) {
+            _uri += _separator
+            _uri += 'limit='
+            _uri += encodeURIComponent(_value);
+            _separator = '&';
+        }
+        return (await this.executor({uri: _uri, method: 'GET'})) as Promise<ReadonlyArray<RecordingDto['RecordingController/SIMILAR_RECORDING_FETCHER']>>;
+    }
+    
     readonly mergeRecording: (options: RecordingControllerOptions['mergeRecording']) => Promise<
         void
     > = async(options) => {
@@ -85,11 +103,17 @@ export type RecordingControllerOptions = {
          */
         readonly body: RecordingUpdate
     }, 
-    'mergeRecording': {
+    'getSimilarRecordings': {
         /**
-         * RecordingMergeReq 合并参数
-         * 
+         * Recording ID
          */
+        readonly id: number, 
+        /**
+         * 返回数量上限，默认 5
+         */
+        readonly limit?: number | undefined
+    }, 
+    'mergeRecording': {
         readonly body: RecordingMergeReq
     }
 }

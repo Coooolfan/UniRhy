@@ -9,6 +9,7 @@ export type {FileProviderOssCreate} from './FileProviderOssCreate';
 export type {FileProviderOssUpdate} from './FileProviderOssUpdate';
 export type {Page} from './Page';
 export type {PlaylistCreate} from './PlaylistCreate';
+export type {PlaylistGenerateTaskRequest} from './PlaylistGenerateTaskRequest';
 export type {PlaylistUpdate} from './PlaylistUpdate';
 export type {RecordingMergeReq} from './RecordingMergeReq';
 export type {RecordingUpdate} from './RecordingUpdate';

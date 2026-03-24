@@ -53,6 +53,7 @@ const buildAlbumResponse = () => ({
             comment: 'Track Comment',
             durationMs: 240000,
             defaultInWork: false,
+            lyrics: '',
             assets: [],
             artists: [{ id: 101, displayName: 'Artist A', alias: [], comment: '' }],
             cover: undefined,

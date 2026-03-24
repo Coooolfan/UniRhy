@@ -15,12 +15,13 @@ import type { CodecType } from '@/__generated/model/enums/CodecType'
 import { type FileProviderType } from '@/__generated/model/enums/FileProviderType'
 import type { VectorizeMode } from '@/__generated/model/enums/VectorizeMode'
 import type {
+    PlaylistGenerateTaskRequest,
     TranscodeTaskRequest,
     VectorizeTaskRequest,
 } from '@/__generated/model/static'
 import type { TaskProviderOption } from '@/composables/useTaskManagement'
 
-type TaskKind = 'METADATA_PARSE' | 'TRANSCODE' | 'VECTORIZE' | 'DATA_CLEAN'
+type TaskKind = 'METADATA_PARSE' | 'TRANSCODE' | 'VECTORIZE' | 'DATA_CLEAN' | 'PLAYLIST_GENERATE'
 
 type Props = {
     open: boolean
@@ -56,6 +57,7 @@ const emit = defineEmits<{
     (event: 'submit-transcode', payload: TranscodeTaskRequest): void
     (event: 'submit-vectorize', payload: VectorizeTaskRequest): void
     (event: 'submit-data-clean'): void
+    (event: 'submit-playlist-generate', payload: PlaylistGenerateTaskRequest): void
 }>()
 
 const TASK_ACTION_LABEL_MAP: Record<TaskKind, string> = {
@@ -63,6 +65,7 @@ const TASK_ACTION_LABEL_MAP: Record<TaskKind, string> = {
     TRANSCODE: '媒体转码',
     VECTORIZE: '向量化',
     DATA_CLEAN: '数据清洗',
+    PLAYLIST_GENERATE: '歌单生成',
 }
 
 const TASK_OPTIONS: TaskDefinition[] = [
@@ -90,10 +93,17 @@ const TASK_OPTIONS: TaskDefinition[] = [
         desc: '按录音批量调用外部模型清洗标题，移除后缀和描述信息',
         icon: Music4,
     },
+    {
+        id: 'PLAYLIST_GENERATE',
+        name: TASK_ACTION_LABEL_MAP.PLAYLIST_GENERATE,
+        desc: '根据你的描述创建智能歌单，并自动关联语义匹配的候选录音',
+        icon: Music4,
+    },
 ]
 
 const TARGET_CODEC_OPTIONS: Array<{ value: CodecType; label: string; hint: string }> = [
-    { value: 'OPUS', label: 'Opus', hint: '当前后端固定输出 Opus，用于流媒体播放' },
+    { value: 'OPUS', label: 'Opus', hint: '128kbps VBR，用于流媒体播放' },
+    { value: 'MP3', label: 'MP3', hint: '16kbps 单声道，用于低带宽场景' },
 ]
 
 const PROVIDER_TYPE_LABEL_MAP: Record<FileProviderType, string> = {
@@ -111,6 +121,7 @@ const metadataParseProviderValue = ref('')
 const transcodeSourceProviderValue = ref('')
 const transcodeDestinationProviderValue = ref('')
 const vectorizeMode = ref<VectorizeMode>('PENDING_ONLY')
+const playlistGenerateDescription = ref('')
 const targetCodec = ref<CodecType>('OPUS')
 
 const optionValueOf = (provider: TaskProviderOption) => `${provider.type}:${provider.id}`
@@ -180,6 +191,7 @@ watch(
         activeTask.value = 'METADATA_PARSE'
         targetCodec.value = 'OPUS'
         vectorizeMode.value = 'PENDING_ONLY'
+        playlistGenerateDescription.value = ''
         syncProviderSelections()
     },
 )
@@ -205,6 +217,10 @@ const vectorizeRequest = computed<VectorizeTaskRequest>(() => ({
     mode: vectorizeMode.value,
 }))
 
+const playlistGenerateRequest = computed<PlaylistGenerateTaskRequest>(() => ({
+    description: playlistGenerateDescription.value.trim(),
+}))
+
 const canSubmit = computed(() => {
     if (props.isLoadingProviders) {
         return false
@@ -224,6 +240,10 @@ const canSubmit = computed(() => {
         return true
     }
 
+    if (activeTask.value === 'PLAYLIST_GENERATE') {
+        return playlistGenerateRequest.value.description.length > 0
+    }
+
     return true // DATA_CLEAN always submittable
 })
 
@@ -238,6 +258,10 @@ const submitButtonLabel = computed(() => {
 
     if (activeTask.value === 'VECTORIZE') {
         return '提交向量化任务'
+    }
+
+    if (activeTask.value === 'PLAYLIST_GENERATE') {
+        return '提交歌单生成任务'
     }
 
     return '提交数据清洗任务'
@@ -298,6 +322,10 @@ const submitHelperText = computed(() => {
         return '提交后会按录音补充向量化任务，用于生成 embedding 并写入后台队列。'
     }
 
+    if (activeTask.value === 'PLAYLIST_GENERATE') {
+        return '提交后系统会根据描述在后台生成智能歌单，完成后会自动刷新侧边栏歌单列表。'
+    }
+
     return '提交后会按录音补充数据清洗任务，用于批量调用外部模型清洗标题。'
 })
 
@@ -344,6 +372,11 @@ const submit = () => {
 
     if (activeTask.value === 'VECTORIZE') {
         emit('submit-vectorize', vectorizeRequest.value)
+        return
+    }
+
+    if (activeTask.value === 'PLAYLIST_GENERATE') {
+        emit('submit-playlist-generate', playlistGenerateRequest.value)
         return
     }
 
@@ -742,15 +775,19 @@ const submit = () => {
                             <div v-else-if="activeTask === 'VECTORIZE'" class="space-y-8">
                                 <div class="space-y-6">
                                     <div>
-                                        <span class="mb-3 block text-xs uppercase tracking-[0.24em] text-[#8A8A8A]">
+                                        <span
+                                            class="mb-3 block text-xs uppercase tracking-[0.24em] text-[#8A8A8A]"
+                                        >
                                             向量化模式
                                         </span>
                                         <div class="flex gap-4">
                                             <label
                                                 class="flex cursor-pointer items-center gap-2 rounded-sm border px-4 py-3 text-sm transition-colors"
-                                                :class="vectorizeMode === 'PENDING_ONLY'
-                                                    ? 'border-[#C27E46] bg-[#FBF6F0] text-[#C27E46]'
-                                                    : 'border-[#E0DCD0] bg-[#F7F5F0] text-[#6B635B] hover:border-[#C27E46]/50'"
+                                                :class="
+                                                    vectorizeMode === 'PENDING_ONLY'
+                                                        ? 'border-[#C27E46] bg-[#FBF6F0] text-[#C27E46]'
+                                                        : 'border-[#E0DCD0] bg-[#F7F5F0] text-[#6B635B] hover:border-[#C27E46]/50'
+                                                "
                                             >
                                                 <input
                                                     v-model="vectorizeMode"
@@ -762,9 +799,11 @@ const submit = () => {
                                             </label>
                                             <label
                                                 class="flex cursor-pointer items-center gap-2 rounded-sm border px-4 py-3 text-sm transition-colors"
-                                                :class="vectorizeMode === 'ALL'
-                                                    ? 'border-[#C27E46] bg-[#FBF6F0] text-[#C27E46]'
-                                                    : 'border-[#E0DCD0] bg-[#F7F5F0] text-[#6B635B] hover:border-[#C27E46]/50'"
+                                                :class="
+                                                    vectorizeMode === 'ALL'
+                                                        ? 'border-[#C27E46] bg-[#FBF6F0] text-[#C27E46]'
+                                                        : 'border-[#E0DCD0] bg-[#F7F5F0] text-[#6B635B] hover:border-[#C27E46]/50'
+                                                "
                                             >
                                                 <input
                                                     v-model="vectorizeMode"
@@ -777,30 +816,80 @@ const submit = () => {
                                         </div>
                                     </div>
 
-                                    <div class="space-y-5 rounded-sm border border-[#E6E1D8] bg-[#F8F5EE] p-5">
+                                    <div
+                                        class="space-y-5 rounded-sm border border-[#E6E1D8] bg-[#F8F5EE] p-5"
+                                    >
                                         <div>
-                                            <div class="text-[11px] uppercase tracking-[0.24em] text-[#8A8A8A]">
+                                            <div
+                                                class="text-[11px] uppercase tracking-[0.24em] text-[#8A8A8A]"
+                                            >
                                                 提交说明
                                             </div>
                                             <p class="mt-3 text-sm leading-relaxed text-[#6B635B]">
-                                                {{ vectorizeMode === 'PENDING_ONLY'
-                                                    ? '仅为尚未生成 embedding 的录音补充向量化任务。'
-                                                    : '对所有有歌词的录音重新生成 embedding，包括已向量化的。'
+                                                {{
+                                                    vectorizeMode === 'PENDING_ONLY'
+                                                        ? '仅为尚未生成 embedding 的录音补充向量化任务。'
+                                                        : '对所有有歌词的录音重新生成 embedding，包括已向量化的。'
                                                 }}
                                             </p>
                                         </div>
                                         <div class="flex items-start gap-2 text-sm text-[#6B635B]">
-                                            <Music4 class="mt-0.5 h-4 w-4 shrink-0 text-[#C27E46]" />
+                                            <Music4
+                                                class="mt-0.5 h-4 w-4 shrink-0 text-[#C27E46]"
+                                            />
                                             <span>嵌入模型的 API 配置已移至系统设置页面。</span>
                                         </div>
                                     </div>
                                 </div>
                             </div>
 
-                            <div v-else class="space-y-8">
-                                <div class="space-y-5 rounded-sm border border-[#E6E1D8] bg-[#F8F5EE] p-5">
+                            <div v-else-if="activeTask === 'PLAYLIST_GENERATE'" class="space-y-8">
+                                <label class="block">
+                                    <span
+                                        class="mb-2 block text-xs uppercase tracking-[0.24em] text-[#8A8A8A]"
+                                    >
+                                        歌单描述
+                                    </span>
+                                    <textarea
+                                        v-model="playlistGenerateDescription"
+                                        data-test="playlist-generate-description-input"
+                                        rows="6"
+                                        class="w-full resize-none border border-[#D6D1C4] bg-[#F7F5F0] p-4 text-sm leading-relaxed text-[#2C2C2C] outline-none transition-colors focus:border-[#C27E46]"
+                                        placeholder="例如：通勤路上适合傍晚城市灯光、节奏平稳但有一点电子感的音乐"
+                                    />
+                                </label>
+
+                                <div
+                                    class="space-y-5 rounded-sm border border-[#E6E1D8] bg-[#F8F5EE] p-5"
+                                >
                                     <div>
-                                        <div class="text-[11px] uppercase tracking-[0.24em] text-[#8A8A8A]">
+                                        <div
+                                            class="text-[11px] uppercase tracking-[0.24em] text-[#8A8A8A]"
+                                        >
+                                            提交说明
+                                        </div>
+                                        <p class="mt-3 text-sm leading-relaxed text-[#6B635B]">
+                                            输入你想听的氛围、场景或风格，系统会在后台生成一个新的智能歌单。
+                                        </p>
+                                    </div>
+                                    <div class="flex items-start gap-2 text-sm text-[#6B635B]">
+                                        <Music4 class="mt-0.5 h-4 w-4 shrink-0 text-[#C27E46]" />
+                                        <span
+                                            >嵌入模型和补全模型的 API
+                                            配置仍在系统设置页面维护。</span
+                                        >
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div v-else class="space-y-8">
+                                <div
+                                    class="space-y-5 rounded-sm border border-[#E6E1D8] bg-[#F8F5EE] p-5"
+                                >
+                                    <div>
+                                        <div
+                                            class="text-[11px] uppercase tracking-[0.24em] text-[#8A8A8A]"
+                                        >
                                             提交说明
                                         </div>
                                         <p class="mt-3 text-sm leading-relaxed text-[#6B635B]">

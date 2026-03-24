@@ -428,6 +428,7 @@ const buildRecordingMetadata = (
         comment: rest.comment ?? `Comment ${id}`,
         durationMs: rest.durationMs ?? id * 1_000,
         defaultInWork: rest.defaultInWork ?? false,
+        lyrics: rest.lyrics ?? '',
         artists: rest.artists ?? [
             {
                 id: id + 20_000,

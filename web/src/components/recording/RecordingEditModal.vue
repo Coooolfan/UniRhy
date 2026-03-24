@@ -1,6 +1,9 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import { Disc, FileAudio, Users, Image as ImageIcon } from 'lucide-vue-next'
+import { computed, ref, watch } from 'vue'
+import { ChevronDown, Disc, FileAudio, Users, Image as ImageIcon } from 'lucide-vue-next'
+import { buildApiUrl } from '@/runtime/platform'
+import { getAuthToken } from '@/ApiInstance'
+import { formatDurationMs, resolveCover } from '@/composables/recordingMedia'
 
 export type RecordingAsset = {
     mediaFile: {
@@ -26,9 +29,19 @@ export type RecordingEditForm = {
     isDefault: boolean
 }
 
+type SimilarRecording = {
+    id: number
+    title: string | null
+    durationMs: number
+    work: { title: string }
+    artists: { displayName: string }[]
+    cover: { url: string } | null
+}
+
 type Props = {
     open: boolean
     recording: RecordingPreview | null
+    recordingId?: number | null
     form: RecordingEditForm
     error: string
     isSaving: boolean
@@ -36,6 +49,7 @@ type Props = {
 }
 
 const props = withDefaults(defineProps<Props>(), {
+    recordingId: null,
     showDefaultToggle: false,
 })
 
@@ -83,6 +97,51 @@ const submit = () => {
     }
     emit('submit')
 }
+
+const similarExpanded = ref(false)
+const similarLoading = ref(false)
+const similarRecordings = ref<SimilarRecording[]>([])
+const similarError = ref('')
+
+const fetchSimilarRecordings = async (id: number) => {
+    similarLoading.value = true
+    similarError.value = ''
+    try {
+        const token = getAuthToken()
+        const headers: HeadersInit = { 'content-type': 'application/json;charset=UTF-8' }
+        if (token) {
+            headers['unirhy-token'] = token
+        }
+        const response = await fetch(buildApiUrl(`/api/recordings/${id}/similar?limit=5`), {
+            method: 'GET',
+            credentials: 'include',
+            headers,
+        })
+        if (!response.ok) throw new Error(`HTTP ${response.status}`)
+        similarRecordings.value = await response.json()
+    } catch {
+        similarError.value = '加载相似歌曲失败'
+        similarRecordings.value = []
+    } finally {
+        similarLoading.value = false
+    }
+}
+
+watch(similarExpanded, (expanded) => {
+    if (expanded && props.recordingId && similarRecordings.value.length === 0 && !similarLoading.value) {
+        fetchSimilarRecordings(props.recordingId)
+    }
+})
+
+watch(
+    () => [props.open, props.recordingId],
+    () => {
+        similarExpanded.value = false
+        similarRecordings.value = []
+        similarError.value = ''
+        similarLoading.value = false
+    },
+)
 </script>
 
 <template>
@@ -226,6 +285,88 @@ const submit = () => {
                                     class="flex-1 flex items-center justify-center text-[#8C857B] text-xs italic opacity-70"
                                 >
                                     No audio assets attached
+                                </div>
+
+                                <div
+                                    v-if="recordingId"
+                                    class="border-t border-[#D6D1C4] pt-4"
+                                >
+                                    <button
+                                        type="button"
+                                        class="flex items-center gap-2 w-full text-left text-xs text-[#8C857B] uppercase tracking-wider hover:text-[#C67C4E] transition-colors"
+                                        data-test="similar-tracks-toggle"
+                                        @click="similarExpanded = !similarExpanded"
+                                    >
+                                        <ChevronDown
+                                            :size="14"
+                                            class="transition-transform duration-200"
+                                            :class="{ '-rotate-90': !similarExpanded }"
+                                        />
+                                        <span>相似歌曲 (Similar Tracks)</span>
+                                    </button>
+
+                                    <div v-if="similarExpanded" class="mt-3 space-y-2">
+                                        <div
+                                            v-if="similarLoading"
+                                            class="text-xs text-[#8C857B] italic"
+                                        >
+                                            搜索中...
+                                        </div>
+
+                                        <div
+                                            v-else-if="similarError"
+                                            class="text-xs text-[#B95D5D]"
+                                        >
+                                            {{ similarError }}
+                                        </div>
+
+                                        <div
+                                            v-else-if="similarRecordings.length === 0"
+                                            class="text-xs text-[#8C857B] italic opacity-70"
+                                        >
+                                            暂无相似歌曲
+                                        </div>
+
+                                        <div
+                                            v-for="similar in similarRecordings"
+                                            :key="similar.id"
+                                            class="flex items-center gap-3 p-2 bg-[#EAE6DE]/50 border border-[#D6D1C4]/50 rounded-sm hover:bg-[#EAE6DE] transition-colors"
+                                        >
+                                            <div
+                                                class="w-10 h-10 shrink-0 bg-[#EAE6DE] rounded-sm overflow-hidden"
+                                            >
+                                                <img
+                                                    v-if="similar.cover?.url"
+                                                    :src="resolveCover(similar.cover)"
+                                                    class="w-full h-full object-cover"
+                                                />
+                                                <div
+                                                    v-else
+                                                    class="w-full h-full flex items-center justify-center text-[#8C857B]"
+                                                >
+                                                    <Disc :size="14" />
+                                                </div>
+                                            </div>
+                                            <div class="flex-1 min-w-0">
+                                                <div
+                                                    class="text-sm text-[#2C2420] font-medium truncate"
+                                                >
+                                                    {{ similar.title || similar.work.title }}
+                                                </div>
+                                                <div class="text-xs text-[#8C857B] truncate">
+                                                    {{
+                                                        similar.artists
+                                                            .map((a) => a.displayName)
+                                                            .join(', ') || 'Unknown Artist'
+                                                    }}
+                                                    <span v-if="similar.durationMs" class="ml-1">
+                                                        &middot;
+                                                        {{ formatDurationMs(similar.durationMs) }}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>

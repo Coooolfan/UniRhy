@@ -31,5 +31,22 @@ export type RecordingDto = {
             readonly height?: number | undefined;
             readonly url: string;
         } | undefined;
+    }, 
+    'RecordingController/SIMILAR_RECORDING_FETCHER': {
+        readonly id: number;
+        readonly title?: string | undefined;
+        readonly durationMs: number;
+        readonly work: {
+            readonly id: number;
+            readonly title: string;
+        };
+        readonly artists: ReadonlyArray<{
+            readonly id: number;
+            readonly displayName: string;
+        }>;
+        readonly cover?: {
+            readonly id: number;
+            readonly url: string;
+        } | undefined;
     }
 }

@@ -5,4 +5,5 @@ enum class TaskType {
     TRANSCODE,
     VECTORIZE,
     DATA_CLEAN,
+    PLAYLIST_GENERATE,
 }

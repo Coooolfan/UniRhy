@@ -3,8 +3,8 @@ import { mount } from '@vue/test-utils'
 import TaskSubmissionModal from '@/components/tasks/TaskSubmissionModal.vue'
 import type { TaskProviderOption } from '@/composables/useTaskManagement'
 
-const getOptionTexts = (selector: Readonly<ReturnType<typeof mountModal>>, dataTest: string) => {
-    const options = selector.get(dataTest).findAll('option')
+const getOptionTexts = (wrapper: Readonly<ReturnType<typeof mountModal>>, dataTest: string) => {
+    const options = wrapper.get(dataTest).findAll('option')
     return options.map((option: Readonly<{ text: () => string }>) => option.text())
 }
 
@@ -54,6 +54,7 @@ describe('TaskSubmissionModal', () => {
         expect(wrapper.text()).toContain('元数据解析')
         expect(wrapper.text()).toContain('向量化')
         expect(wrapper.text()).toContain('数据清洗')
+        expect(wrapper.text()).toContain('歌单生成')
         await wrapper.get('[data-test="task-submit-button"]').trigger('click')
 
         expect(wrapper.emitted('submit-metadata-parse')).toEqual([
@@ -96,95 +97,64 @@ describe('TaskSubmissionModal', () => {
         ])
     })
 
-    it('emits a vectorize payload with local provider and required request fields', async () => {
+    it('emits a vectorize payload with the selected mode', async () => {
         const wrapper = mountModal()
 
         await wrapper.get('[data-test="task-type-vectorize"]').trigger('click')
-
-        const sourceOptions = getOptionTexts(wrapper, '[data-test="vectorize-source-select"]')
-        expect(sourceOptions).toEqual(['[本地] Library A', '[本地] Archive B'])
-
-        await wrapper.get('[data-test="vectorize-source-select"]').setValue('FILE_SYSTEM:2')
-        await wrapper
-            .get('[data-test="vectorize-api-endpoint-input"]')
-            .setValue('https://api.example.com/v1/embeddings')
-        await wrapper.get('[data-test="vectorize-api-key-input"]').setValue('secret-key')
-        await wrapper.get('[data-test="vectorize-model-name-input"]').setValue('bge-m3')
+        await wrapper.find('input[value="ALL"]').setValue(true)
         await wrapper.get('[data-test="task-submit-button"]').trigger('click')
 
         expect(wrapper.emitted('submit-vectorize')).toEqual([
             [
                 {
-                    srcProviderType: 'FILE_SYSTEM',
-                    srcProviderId: 2,
-                    apiEndpoint: 'https://api.example.com/v1/embeddings',
-                    apiKey: 'secret-key',
-                    modelName: 'bge-m3',
+                    mode: 'ALL',
                 },
             ],
         ])
     })
 
-    it('does not emit vectorize event when any required request field is missing', async () => {
-        const wrapper = mountModal()
-
-        await wrapper.get('[data-test="task-type-vectorize"]').trigger('click')
-        await wrapper
-            .get('[data-test="vectorize-api-endpoint-input"]')
-            .setValue('https://api.example.com/v1/embeddings')
-        await wrapper.get('[data-test="vectorize-api-key-input"]').setValue('secret-key')
-
-        const submitButton = wrapper.get('[data-test="task-submit-button"]')
-        expect(submitButton.attributes('disabled')).toBeDefined()
-
-        await submitButton.trigger('click')
-
-        expect(wrapper.emitted('submit-vectorize')).toBeUndefined()
-    })
-
-    it('emits a data clean payload with local provider and required request fields', async () => {
+    it('emits a data clean event without requiring additional form fields', async () => {
         const wrapper = mountModal()
 
         await wrapper.get('[data-test="task-type-data_clean"]').trigger('click')
 
-        const sourceOptions = getOptionTexts(wrapper, '[data-test="data-clean-source-select"]')
-        expect(sourceOptions).toEqual(['[本地] Library A', '[本地] Archive B'])
+        const submitButton = wrapper.get('[data-test="task-submit-button"]')
+        expect(submitButton.attributes('disabled')).toBeUndefined()
 
-        await wrapper.get('[data-test="data-clean-source-select"]').setValue('FILE_SYSTEM:2')
+        await submitButton.trigger('click')
+
+        expect(wrapper.emitted('submit-data-clean')).toEqual([[]])
+    })
+
+    it('emits a playlist generate payload when the description is non-empty', async () => {
+        const wrapper = mountModal()
+
+        await wrapper.get('[data-test="task-type-playlist_generate"]').trigger('click')
         await wrapper
-            .get('[data-test="data-clean-api-endpoint-input"]')
-            .setValue('https://api.example.com/v1/responses')
-        await wrapper.get('[data-test="data-clean-api-key-input"]').setValue('secret-clean-key')
-        await wrapper.get('[data-test="data-clean-model-name-input"]').setValue('gpt-5-mini')
+            .get('[data-test="playlist-generate-description-input"]')
+            .setValue('适合深夜写代码时听的低饱和电子氛围')
         await wrapper.get('[data-test="task-submit-button"]').trigger('click')
 
-        expect(wrapper.emitted('submit-data-clean')).toEqual([
+        expect(wrapper.emitted('submit-playlist-generate')).toEqual([
             [
                 {
-                    srcProviderType: 'FILE_SYSTEM',
-                    srcProviderId: 2,
-                    apiEndpoint: 'https://api.example.com/v1/responses',
-                    apiKey: 'secret-clean-key',
-                    modelName: 'gpt-5-mini',
+                    description: '适合深夜写代码时听的低饱和电子氛围',
                 },
             ],
         ])
     })
 
-    it('does not emit data clean event when any required request field is missing', async () => {
+    it('does not emit playlist generate event when the description is blank', async () => {
         const wrapper = mountModal()
 
-        await wrapper.get('[data-test="task-type-data_clean"]').trigger('click')
-        await wrapper
-            .get('[data-test="data-clean-api-endpoint-input"]')
-            .setValue('https://api.example.com/v1/responses')
-        await wrapper.get('[data-test="data-clean-api-key-input"]').setValue('secret-clean-key')
+        await wrapper.get('[data-test="task-type-playlist_generate"]').trigger('click')
+        await wrapper.get('[data-test="playlist-generate-description-input"]').setValue('   ')
 
         const submitButton = wrapper.get('[data-test="task-submit-button"]')
         expect(submitButton.attributes('disabled')).toBeDefined()
 
         await submitButton.trigger('click')
 
-        expect(wrapper.emitted('submit-data-clean')).toBeUndefined()
+        expect(wrapper.emitted('submit-playlist-generate')).toBeUndefined()
     })
 })

@@ -48,6 +48,7 @@ const buildPlayableWork = () => ({
             comment: 'Track A Comment',
             durationMs: 180000,
             defaultInWork: true,
+            lyrics: '',
             assets: [
                 {
                     id: 31,
@@ -87,6 +88,7 @@ const buildUnplayableWork = () => ({
             comment: 'Track B Comment',
             durationMs: 210000,
             defaultInWork: true,
+            lyrics: '',
             assets: [
                 {
                     id: 32,

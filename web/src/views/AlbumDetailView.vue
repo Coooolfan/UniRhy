@@ -317,6 +317,7 @@ watch(
         <RecordingEditModal
             :open="isEditRecordingModalOpen"
             :recording="editingRecording"
+            :recording-id="editingRecording?.id ?? null"
             :form="editRecordingForm"
             :error="editRecordingError"
             :is-saving="isEditingRecording"

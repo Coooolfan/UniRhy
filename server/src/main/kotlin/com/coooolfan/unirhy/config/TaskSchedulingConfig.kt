@@ -3,6 +3,7 @@ package com.coooolfan.unirhy.config
 import com.coooolfan.unirhy.service.task.ScanTaskService
 import com.coooolfan.unirhy.service.task.TranscodeTaskService
 import com.coooolfan.unirhy.service.task.DataCleanTaskService
+import com.coooolfan.unirhy.service.task.PlaylistGenerateTaskService
 import com.coooolfan.unirhy.service.task.VectorizeTaskService
 import org.slf4j.LoggerFactory
 import org.springframework.context.annotation.Bean
@@ -21,6 +22,7 @@ class TaskSchedulingConfig(
     private val transcodeTaskService: TranscodeTaskService,
     private val vectorizeTaskService: VectorizeTaskService,
     private val dataCleanTaskService: DataCleanTaskService,
+    private val playlistGenerateTaskService: PlaylistGenerateTaskService,
 ) : SchedulingConfigurer {
 
     override fun configureTasks(taskRegistrar: ScheduledTaskRegistrar) {
@@ -45,12 +47,16 @@ class TaskSchedulingConfig(
             { dataCleanTaskService.consumePendingTask() },
             Duration.ofMillis(TASK_POLL_DELAY_MILLIS),
         )
+        taskRegistrar.addFixedDelayTask(
+            { playlistGenerateTaskService.consumePendingTask() },
+            Duration.ofMillis(TASK_POLL_DELAY_MILLIS),
+        )
     }
 
     @Bean(name = ["taskScheduler"], destroyMethod = "shutdown")
     fun taskScheduler(): TaskScheduler {
         return ThreadPoolTaskScheduler().apply {
-            poolSize = 4
+            poolSize = 5
             setThreadNamePrefix("async-task-")
             initialize()
         }

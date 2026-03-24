@@ -1,6 +1,7 @@
 import type {Executor} from '../';
 import type {
     AsyncTaskLogCountRow, 
+    PlaylistGenerateTaskRequest, 
     ScanTaskRequest, 
     TranscodeTaskRequest, 
     VectorizeTaskRequest
@@ -20,6 +21,13 @@ export class TaskController {
     > = async() => {
         let _uri = '/api/task/data-clean';
         return (await this.executor({uri: _uri, method: 'POST'})) as Promise<void>;
+    }
+    
+    readonly executePlaylistGenerateTask: (options: TaskControllerOptions['executePlaylistGenerateTask']) => Promise<
+        void
+    > = async(options) => {
+        let _uri = '/api/task/playlist-generate';
+        return (await this.executor({uri: _uri, method: 'POST', body: options.body})) as Promise<void>;
     }
     
     /**
@@ -94,5 +102,8 @@ export type TaskControllerOptions = {
         readonly body: VectorizeTaskRequest
     }, 
     'executeDataCleanTask': {}, 
+    'executePlaylistGenerateTask': {
+        readonly body: PlaylistGenerateTaskRequest
+    }, 
     'listTaskLogs': {}
 }

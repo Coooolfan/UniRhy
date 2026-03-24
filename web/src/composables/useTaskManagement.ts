@@ -4,6 +4,7 @@ import { type FileProviderType } from '@/__generated/model/enums/FileProviderTyp
 import type { TaskType } from '@/__generated/model/enums/TaskType'
 import type {
     AsyncTaskLogCountRow,
+    PlaylistGenerateTaskRequest,
     ScanTaskRequest,
     TranscodeTaskRequest,
     VectorizeTaskRequest,
@@ -21,6 +22,7 @@ export const TASK_TYPE_LABEL_MAP: Record<TaskType, string> = {
     TRANSCODE: '媒体转码',
     VECTORIZE: '向量化',
     DATA_CLEAN: '数据清洗',
+    PLAYLIST_GENERATE: '歌单生成',
 }
 
 export const useTaskManagement = () => {
@@ -129,8 +131,14 @@ export const useTaskManagement = () => {
             }),
         )
 
-    const startDataCleanTask = () =>
-        executeTask(() => api.taskController.executeDataCleanTask())
+    const startDataCleanTask = () => executeTask(() => api.taskController.executeDataCleanTask())
+
+    const startPlaylistGenerateTask = (request: PlaylistGenerateTaskRequest) =>
+        executeTask(() =>
+            api.taskController.executePlaylistGenerateTask({
+                body: request,
+            }),
+        )
 
     const init = () => {
         void Promise.all([fetchTaskCounts(), fetchProviders()])
@@ -154,6 +162,7 @@ export const useTaskManagement = () => {
         startTranscodeTask,
         startVectorizeTask,
         startDataCleanTask,
+        startPlaylistGenerateTask,
         clearSubmitError,
         init,
     }

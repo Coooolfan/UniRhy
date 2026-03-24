@@ -33,6 +33,10 @@ object ApiCoverageRegistry {
         "com.unirhy.e2e.AccountPlaylistContentE2eTest#playlists should support owner scoped crud and recording association"
     private const val CONTENT_SEARCH_UPDATE_MERGE_CASE =
         "com.unirhy.e2e.AccountPlaylistContentE2eTest#content endpoints should support search update recording update and merge flow"
+    private const val PLAYLIST_GENERATE_TASK_AUTH_CASE =
+        "com.unirhy.e2e.PlaylistGenerateTaskE2eTest#playlist-generate endpoint should reject unauthenticated access"
+    private const val PLAYLIST_GENERATE_TASK_PIPELINE_CASE =
+        "com.unirhy.e2e.PlaylistGenerateTaskE2eTest#playlist-generate task should complete full pipeline and create playlist"
 
     val coverageByKey: Map<ApiEndpointKey, CoverageMark> = listOf(
         full(
@@ -283,6 +287,12 @@ object ApiCoverageRegistry {
             condition = "!Range",
             testRef = MEDIA_READ_CASE,
             note = "auth: $TASK_CONTENT_AUTH_REQUIRED_CASE",
+        ),
+        full(
+            "POST",
+            "/api/task/playlist-generate",
+            testRef = PLAYLIST_GENERATE_TASK_PIPELINE_CASE,
+            note = "auth: $PLAYLIST_GENERATE_TASK_AUTH_CASE; pipeline: embedding -> vector search -> LLM -> playlist creation",
         ),
     ).associate { it.key to it.mark }
 

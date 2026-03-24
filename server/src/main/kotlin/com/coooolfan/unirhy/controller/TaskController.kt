@@ -8,8 +8,11 @@ import com.coooolfan.unirhy.service.task.ScanTaskService
 import com.coooolfan.unirhy.service.task.TranscodeTaskRequest
 import com.coooolfan.unirhy.service.task.TranscodeTaskService
 import com.coooolfan.unirhy.service.task.DataCleanTaskService
+import com.coooolfan.unirhy.service.task.PlaylistGenerateTaskRequest
+import com.coooolfan.unirhy.service.task.PlaylistGenerateTaskService
 import com.coooolfan.unirhy.service.task.VectorizeTaskRequest
 import com.coooolfan.unirhy.service.task.VectorizeTaskService
+import cn.dev33.satoken.stp.StpUtil
 import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.*
 
@@ -27,6 +30,7 @@ class TaskController(
     private val transcodeTaskService: TranscodeTaskService,
     private val vectorizeTaskService: VectorizeTaskService,
     private val dataCleanTaskService: DataCleanTaskService,
+    private val playlistGenerateTaskService: PlaylistGenerateTaskService,
     private val asyncTaskLogService: AsyncTaskLogService,
 ) {
 
@@ -82,6 +86,13 @@ class TaskController(
     @ResponseStatus(HttpStatus.ACCEPTED)
     fun executeDataCleanTask() {
         dataCleanTaskService.submit()
+    }
+
+    @PostMapping("/playlist-generate")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    fun executePlaylistGenerateTask(@RequestBody request: PlaylistGenerateTaskRequest) {
+        val accountId = StpUtil.getLoginIdAsLong()
+        playlistGenerateTaskService.submit(request, accountId)
     }
 
     @GetMapping("/logs")

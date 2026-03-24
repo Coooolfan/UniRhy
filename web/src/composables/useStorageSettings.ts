@@ -1,6 +1,6 @@
 import { computed, reactive, ref } from 'vue'
 import { api, normalizeApiError } from '@/ApiInstance'
-import type { AiModelConfig } from '@/__generated/model/static'
+import type { AiModelConfig, SystemConfigUpdate } from '@/__generated/model/static'
 import type { AiRequestFormat } from '@/__generated/model/enums/AiRequestFormat'
 
 export type StorageNode = {
@@ -292,19 +292,22 @@ export const useStorageSettings = () => {
                 key,
                 requestFormat: aiModelForm.requestFormat,
             }
-            const updatePayload: Record<string, unknown> = {
-                fsProviderId: systemConfig.value.fsProviderId,
-                ossProviderId: systemConfig.value.ossProviderId,
-            }
-            if (isEditingAiModel.value === 'completion') {
-                updatePayload.completionModel = newConfig
-                updatePayload.embeddingModel = systemConfig.value.embeddingModel
-            } else {
-                updatePayload.completionModel = systemConfig.value.completionModel
-                updatePayload.embeddingModel = newConfig
-            }
+            const updatePayload: SystemConfigUpdate =
+                isEditingAiModel.value === 'completion'
+                    ? {
+                          fsProviderId: systemConfig.value.fsProviderId ?? undefined,
+                          ossProviderId: systemConfig.value.ossProviderId ?? undefined,
+                          completionModel: newConfig,
+                          embeddingModel: systemConfig.value.embeddingModel ?? undefined,
+                      }
+                    : {
+                          fsProviderId: systemConfig.value.fsProviderId ?? undefined,
+                          ossProviderId: systemConfig.value.ossProviderId ?? undefined,
+                          completionModel: systemConfig.value.completionModel ?? undefined,
+                          embeddingModel: newConfig,
+                      }
             await api.systemConfigController.update({
-                body: updatePayload as any,
+                body: updatePayload,
             })
             await fetchSystemConfig()
             isEditingAiModel.value = null

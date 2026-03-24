@@ -13,6 +13,7 @@ vi.mock('@/ApiInstance', async (importOriginal) => {
                 executeTranscodeTask: vi.fn(),
                 executeVectorizeTask: vi.fn(),
                 executeDataCleanTask: vi.fn(),
+                executePlaylistGenerateTask: vi.fn(),
             },
             fileSystemStorageController: {
                 list: vi.fn(),
@@ -32,6 +33,7 @@ const executeScanTaskMock = vi.mocked(api.taskController.executeScanTask)
 const executeTranscodeTaskMock = vi.mocked(api.taskController.executeTranscodeTask)
 const executeVectorizeTaskMock = vi.mocked(api.taskController.executeVectorizeTask)
 const executeDataCleanTaskMock = vi.mocked(api.taskController.executeDataCleanTask)
+const executePlaylistGenerateTaskMock = vi.mocked(api.taskController.executePlaylistGenerateTask)
 const listFileSystemStorageMock = vi.mocked(api.fileSystemStorageController.list)
 const listOssStorageMock = vi.mocked(api.ossStorageController.list)
 
@@ -48,10 +50,11 @@ const TaskSubmissionModalStub = defineComponent({
         'submit-transcode',
         'submit-vectorize',
         'submit-data-clean',
+        'submit-playlist-generate',
         'close',
     ],
     template:
-        "<div v-if=\"open\"><button data-test=\"submit-metadata-parse\" @click=\"$emit('submit-metadata-parse', { providerType: 'FILE_SYSTEM', providerId: 1 })\">submit-metadata-parse</button><button data-test=\"submit-vectorize\" @click=\"$emit('submit-vectorize', { srcProviderType: 'FILE_SYSTEM', srcProviderId: 1, apiEndpoint: 'https://api.example.com/v1/embeddings', apiKey: 'secret-key', modelName: 'bge-m3' })\">submit-vectorize</button><button data-test=\"submit-data-clean\" @click=\"$emit('submit-data-clean', { srcProviderType: 'FILE_SYSTEM', srcProviderId: 1, apiEndpoint: 'https://api.example.com/v1/responses', apiKey: 'secret-clean-key', modelName: 'gpt-5-mini' })\">submit-data-clean</button><button data-test=\"close-task-modal\" @click=\"$emit('close')\">close</button></div>",
+        '<div v-if="open"><button data-test="submit-metadata-parse" @click="$emit(\'submit-metadata-parse\', { providerType: \'FILE_SYSTEM\', providerId: 1 })">submit-metadata-parse</button><button data-test="submit-vectorize" @click="$emit(\'submit-vectorize\', { mode: \'PENDING_ONLY\' })">submit-vectorize</button><button data-test="submit-data-clean" @click="$emit(\'submit-data-clean\')">submit-data-clean</button><button data-test="submit-playlist-generate" @click="$emit(\'submit-playlist-generate\', { description: \'适合夜间通勤的电子氛围\' })">submit-playlist-generate</button><button data-test="close-task-modal" @click="$emit(\'close\')">close</button></div>',
 })
 
 const flushView = async () => {
@@ -68,6 +71,7 @@ describe('TasksView', () => {
         executeTranscodeTaskMock.mockReset()
         executeVectorizeTaskMock.mockReset()
         executeDataCleanTaskMock.mockReset()
+        executePlaylistGenerateTaskMock.mockReset()
         listFileSystemStorageMock.mockReset()
         listOssStorageMock.mockReset()
         vi.useRealTimers()
@@ -91,6 +95,10 @@ describe('TasksView', () => {
             { taskType: 'DATA_CLEAN', status: 'RUNNING', count: 1 },
             { taskType: 'DATA_CLEAN', status: 'COMPLETED', count: 3 },
             { taskType: 'DATA_CLEAN', status: 'FAILED', count: 0 },
+            { taskType: 'PLAYLIST_GENERATE', status: 'PENDING', count: 0 },
+            { taskType: 'PLAYLIST_GENERATE', status: 'RUNNING', count: 0 },
+            { taskType: 'PLAYLIST_GENERATE', status: 'COMPLETED', count: 2 },
+            { taskType: 'PLAYLIST_GENERATE', status: 'FAILED', count: 0 },
         ])
         listFileSystemStorageMock.mockResolvedValueOnce([])
         listOssStorageMock.mockResolvedValueOnce([])
@@ -112,6 +120,7 @@ describe('TasksView', () => {
         expect(wrapper.text()).toContain('媒体转码')
         expect(wrapper.text()).toContain('向量化')
         expect(wrapper.text()).toContain('数据清洗')
+        expect(wrapper.text()).toContain('歌单生成')
         expect(wrapper.text()).toContain('状态概览')
         expect(wrapper.text()).toContain('任务类型分布')
         expect(wrapper.text()).toMatch(/其中\s*8\s*个排队，4\s*个正在执行。?/)
@@ -187,11 +196,7 @@ describe('TasksView', () => {
 
         expect(executeVectorizeTaskMock).toHaveBeenCalledWith({
             body: {
-                srcProviderType: 'FILE_SYSTEM',
-                srcProviderId: 1,
-                apiEndpoint: 'https://api.example.com/v1/embeddings',
-                apiKey: 'secret-key',
-                modelName: 'bge-m3',
+                mode: 'PENDING_ONLY',
             },
         })
         expect(actionButton.text()).toContain('任务已提交')
@@ -228,15 +233,8 @@ describe('TasksView', () => {
         await wrapper.get('[data-test="submit-data-clean"]').trigger('click')
         await flushView()
 
-        expect(executeDataCleanTaskMock).toHaveBeenCalledWith({
-            body: {
-                srcProviderType: 'FILE_SYSTEM',
-                srcProviderId: 1,
-                apiEndpoint: 'https://api.example.com/v1/responses',
-                apiKey: 'secret-clean-key',
-                modelName: 'gpt-5-mini',
-            },
-        })
+        expect(executeDataCleanTaskMock).toHaveBeenCalledTimes(1)
+        expect(executeDataCleanTaskMock).toHaveBeenCalledWith()
         expect(actionButton.text()).toContain('任务已提交')
         expect(actionButton.attributes('disabled')).toBeDefined()
 
@@ -244,6 +242,40 @@ describe('TasksView', () => {
         await flushView()
 
         expect(actionButton.text()).toContain('发起新任务')
+    })
+
+    it('submits playlist generate tasks through the generated task controller', async () => {
+        vi.useFakeTimers()
+        listTaskLogsMock.mockResolvedValue([])
+        executePlaylistGenerateTaskMock.mockResolvedValue(undefined)
+        listFileSystemStorageMock.mockResolvedValue([])
+        listOssStorageMock.mockResolvedValue([])
+
+        const wrapper = mount(TasksView, {
+            global: {
+                stubs: {
+                    DashboardTopBar: true,
+                    TaskSubmissionModal: TaskSubmissionModalStub,
+                },
+            },
+        })
+
+        await flushView()
+
+        const actionButton = wrapper.get('[data-test="open-task-button"]')
+        await actionButton.trigger('click')
+        await flushView()
+
+        await wrapper.get('[data-test="submit-playlist-generate"]').trigger('click')
+        await flushView()
+
+        expect(executePlaylistGenerateTaskMock).toHaveBeenCalledWith({
+            body: {
+                description: '适合夜间通勤的电子氛围',
+            },
+        })
+        expect(actionButton.text()).toContain('任务已提交')
+        expect(actionButton.attributes('disabled')).toBeDefined()
     })
 
     it('auto refreshes while there are pending or running tasks', async () => {

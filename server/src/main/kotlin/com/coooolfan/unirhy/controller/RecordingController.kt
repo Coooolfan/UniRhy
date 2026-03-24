@@ -77,6 +77,24 @@ class RecordingController(private val service: RecordingService) {
      * @permission 需要登录认证
      * @description 调用RecordingService.mergeRecording()方法合并录音
      */
+    /**
+     * 获取相似录音
+     *
+     * 基于 pgvector 余弦距离查找与指定录音最相似的录音列表
+     *
+     * @param id Recording ID
+     * @param limit 返回数量上限，默认 5
+     * @return 相似录音列表
+     */
+    @GetMapping("/{id}/similar")
+    @ResponseStatus(HttpStatus.OK)
+    fun getSimilarRecordings(
+        @PathVariable id: Long,
+        @RequestParam(defaultValue = "5") limit: Int,
+    ): List<@FetchBy("SIMILAR_RECORDING_FETCHER") Recording> {
+        return service.findSimilarRecordings(id, limit, SIMILAR_RECORDING_FETCHER)
+    }
+
     @PutMapping("/merge")
     @ResponseStatus(HttpStatus.OK)
     fun mergeRecording(@RequestBody input: RecordingMergeReq) {
@@ -94,6 +112,20 @@ class RecordingController(private val service: RecordingService) {
             }
             cover {
                 allScalarFields()
+                url()
+            }
+        }
+
+        val SIMILAR_RECORDING_FETCHER = newFetcher(Recording::class).by {
+            title()
+            durationMs()
+            work {
+                title()
+            }
+            artists {
+                displayName()
+            }
+            cover {
                 url()
             }
         }
