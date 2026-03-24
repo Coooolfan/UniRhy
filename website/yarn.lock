@@ -1468,18 +1468,18 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@vue/tsconfig@npm:^0.9.0":
-  version: 0.9.0
-  resolution: "@vue/tsconfig@npm:0.9.0"
+"@vue/tsconfig@npm:^0.9.1":
+  version: 0.9.1
+  resolution: "@vue/tsconfig@npm:0.9.1"
   peerDependencies:
-    typescript: 5.x
+    typescript: ">= 5.8"
     vue: ^3.4.0
   peerDependenciesMeta:
     typescript:
       optional: true
     vue:
       optional: true
-  checksum: 10c0/9f6f6d1d34e775e620e1ffd8396b8806e5d571779d878cd5d2badde33450a3a99cf420f1714eccc89c966262fe0dde4ea719aa2d0518025bf5fa9344a53d3c3f
+  checksum: 10c0/eed93e10edbe09830afa0b728ca658b6249cba1467c74487d1dc8cfabcb57297d78fed6b2ba0c52f9ba99c8e0ba5e56caf320b8f39a71dacfebebd1bd69cc2a9
   languageName: node
   linkType: hard
 
@@ -3240,7 +3240,7 @@ __metadata:
     "@types/node": "npm:^24.12.0"
     "@types/three": "npm:^0.183.1"
     "@vitejs/plugin-vue": "npm:^6.0.5"
-    "@vue/tsconfig": "npm:^0.9.0"
+    "@vue/tsconfig": "npm:^0.9.1"
     gray-matter: "npm:^4.0.3"
     markdown-it: "npm:^14.1.1"
     npm-run-all2: "npm:^8.0.4"
