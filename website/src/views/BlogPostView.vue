@@ -3,12 +3,12 @@ import { computed, nextTick, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import BlogLayout from '@/components/BlogLayout.vue'
 import type { BlogModule } from '@/types/blog'
-import { useBlogLang } from '@/composables/useBlogLang'
+import { useLang } from '@/composables/useLang'
 import { useToc } from '@/composables/useToc'
 import { useBlogWidth } from '@/composables/useBlogWidth'
 
 const route = useRoute()
-const { lang } = useBlogLang()
+const { lang } = useLang()
 const { isWide } = useBlogWidth()
 
 const proseRef = ref<HTMLElement | null>(null)

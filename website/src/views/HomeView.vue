@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed } from 'vue'
 import LightPillar from '@/components/LightPillar.vue'
 import BrandLogo from '@/components/BrandLogo.vue'
 import HeroSubtitle from '@/components/HeroSubtitle.vue'
+import { useLang } from '@/composables/useLang'
 
-const isChinese = ref(false)
+const { lang } = useLang()
+const isChinese = computed(() => lang.value === 'zh')
 </script>
 
 <template>
@@ -57,7 +59,7 @@ const isChinese = ref(false)
               ? 'scale-110 font-bold text-white [text-shadow:0_0_15px_rgba(255,255,255,0.6)]'
               : ''
           "
-          @click="isChinese = true"
+          @click="lang = 'zh'"
         >
           中文
         </span>
@@ -69,7 +71,7 @@ const isChinese = ref(false)
               ? 'scale-110 font-bold text-white [text-shadow:0_0_15px_rgba(255,255,255,0.6)]'
               : ''
           "
-          @click="isChinese = false"
+          @click="lang = 'en'"
         >
           English
         </span>

@@ -2,9 +2,9 @@
 import { computed } from 'vue'
 import BlogLayout from '@/components/BlogLayout.vue'
 import type { BlogModule, BlogPostMeta } from '@/types/blog'
-import { useBlogLang } from '@/composables/useBlogLang'
+import { useLang } from '@/composables/useLang'
 
-const { lang } = useBlogLang()
+const { lang } = useLang()
 
 const modules = import.meta.glob<BlogModule>('/content/blog/**/*.md', { eager: true })
 
