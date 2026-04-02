@@ -7,7 +7,10 @@ import com.coooolfan.unirhy.sync.protocol.LoadAudioSourceMessage
 import com.coooolfan.unirhy.sync.protocol.LoadAudioSourcePayload
 import com.coooolfan.unirhy.sync.protocol.NtpResponseMessage
 import com.coooolfan.unirhy.sync.protocol.NtpResponsePayload
+import com.coooolfan.unirhy.sync.protocol.CurrentQueueDto
 import com.coooolfan.unirhy.sync.protocol.PlaybackSyncDevice
+import com.coooolfan.unirhy.sync.protocol.QueueChangeMessage
+import com.coooolfan.unirhy.sync.protocol.QueueChangePayload
 import com.coooolfan.unirhy.sync.protocol.ScheduledActionMessage
 import com.coooolfan.unirhy.sync.protocol.ScheduledActionPayload
 import com.coooolfan.unirhy.sync.protocol.ServerPlaybackSyncMessage
@@ -61,6 +64,18 @@ class PlaybackSyncMessageSender(
         broadcast(
             accountId = accountId,
             message = LoadAudioSourceMessage(payload = payload.withPresignedUrl()),
+        )
+    }
+
+    fun broadcastQueueChange(
+        accountId: Long,
+        queue: CurrentQueueDto,
+    ) {
+        broadcast(
+            accountId = accountId,
+            message = QueueChangeMessage(
+                payload = QueueChangePayload(queue = queue),
+            ),
         )
     }
 

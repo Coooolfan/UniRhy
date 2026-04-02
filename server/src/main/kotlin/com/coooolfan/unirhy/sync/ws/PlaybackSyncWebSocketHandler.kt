@@ -21,12 +21,15 @@ import java.util.concurrent.TimeUnit
 class PlaybackSyncWebSocketHandler(
     private val objectMapper: ObjectMapper,
     private val authenticator: PlaybackSyncAuthenticator,
+    private val currentQueueService: CurrentQueueService,
     private val playbackSessionService: PlaybackSessionService,
     private val deviceRuntimeService: DeviceRuntimeService,
     private val playbackSyncMediaResolver: PlaybackSyncMediaResolver,
     private val playbackSchedulerService: PlaybackSchedulerService,
     private val timeProvider: PlaybackSyncTimeProvider,
     private val sessionRemovalCoordinator: PlaybackSyncSessionRemovalCoordinator,
+    private val playCoordinator: PlaybackPlayCoordinator,
+    private val autoAdvanceService: PlaybackAutoAdvanceService,
     private val scheduledActionDispatcher: PlaybackSyncScheduledActionDispatcher,
     private val messageSender: PlaybackSyncMessageSender,
     private val logWriter: PlaybackSyncLogWriter,
@@ -212,6 +215,7 @@ class PlaybackSyncWebSocketHandler(
             context = registration.context,
             payload = SnapshotPayload(
                 state = state.toProtocolState(),
+                queue = currentQueueService.getQueue(registration.context.accountId),
                 serverNowMs = nowMs,
             ),
         )
@@ -282,6 +286,17 @@ class PlaybackSyncWebSocketHandler(
             recordingId = requireNotNull(payload.recordingId),
             mediaFileId = requireNotNull(payload.mediaFileId),
         )
+        val queueChange = currentQueueService.syncTrackWithPlayback(
+            accountId = context.accountId,
+            recording = currentQueueService.resolvePlayableRecording(
+                recordingId = resolvedMedia.recordingId,
+                mediaFileId = resolvedMedia.mediaFileId,
+            ),
+            nowMs = nowMs,
+        )
+        if (queueChange != null) {
+            messageSender.broadcastQueueChange(context.accountId, queueChange.queue)
+        }
 
         logControlRequest(
             event = PlaybackSyncLogEvents.PLAY_REQUEST,
@@ -289,23 +304,8 @@ class PlaybackSyncWebSocketHandler(
             payload = payload,
         )
 
-        val pendingPlayResult = playbackSessionService.createPendingPlay(
-            accountId = context.accountId,
-            commandId = payload.commandId,
-            initiatorDeviceId = deviceId,
-            recordingId = resolvedMedia.recordingId,
-            mediaFileId = resolvedMedia.mediaFileId,
-            positionSeconds = payload.positionSeconds,
-            nowMs = nowMs,
-            timeoutAtMs = nowMs + PlaybackSchedulerService.PENDING_PLAY_TIMEOUT_MS,
-        )
-
         logWriter.info(
-            if (pendingPlayResult.replaced) {
-                PlaybackSyncLogEvents.PENDING_PLAY_REPLACED
-            } else {
-                PlaybackSyncLogEvents.PENDING_PLAY_CREATED
-            },
+            PlaybackSyncLogEvents.PENDING_PLAY_CREATED,
             *context.toBaseLogFields(),
             PlaybackSyncLogFields.COMMAND_ID to payload.commandId,
             PlaybackSyncLogFields.RECORDING_ID to payload.recordingId,
@@ -313,27 +313,16 @@ class PlaybackSyncWebSocketHandler(
             PlaybackSyncLogFields.POSITION_SECONDS to payload.positionSeconds,
             PlaybackSyncLogFields.RESULT to "accepted",
         )
-
-        messageSender.broadcastLoadAudioSource(
+        playCoordinator.initiatePlay(
             accountId = context.accountId,
-            payload = LoadAudioSourcePayload(
-                commandId = payload.commandId,
-                recordingId = resolvedMedia.recordingId,
-                mediaFileId = resolvedMedia.mediaFileId,
-                presignedUrl = "",
-            ),
+            commandId = payload.commandId,
+            initiatorDeviceId = deviceId,
+            recordingId = resolvedMedia.recordingId,
+            mediaFileId = resolvedMedia.mediaFileId,
+            positionSeconds = payload.positionSeconds,
+            nowMs = nowMs,
+            logDeviceId = context.deviceId,
         )
-
-        val scheduledAction = maybeCompletePendingPlay(context.accountId, nowMs)
-        if (scheduledAction != null) {
-            playbackSchedulerService.cancelPendingPlayTimeout(context.accountId)
-            scheduledActionDispatcher.broadcastAndLog(context.accountId, context.deviceId, scheduledAction, nowMs)
-            return
-        }
-
-        playbackSchedulerService.schedulePendingPlayTimeout(context.accountId, payload.commandId) {
-            handlePendingPlayTimeout(context.accountId, payload.commandId)
-        }
     }
 
     private fun handlePause(
@@ -374,6 +363,7 @@ class PlaybackSyncWebSocketHandler(
             executeAtMs = playbackSchedulerService.calculateExecuteAtMs(context.accountId, nowMs),
         )
         scheduledActionDispatcher.broadcastAndLog(context.accountId, context.deviceId, scheduledAction, nowMs)
+        autoAdvanceService.syncFromScheduledAction(context.accountId, scheduledAction, nowMs)
     }
 
     private fun handleSeek(
@@ -411,6 +401,7 @@ class PlaybackSyncWebSocketHandler(
             executeAtMs = playbackSchedulerService.calculateExecuteAtMs(context.accountId, nowMs),
         )
         scheduledActionDispatcher.broadcastAndLog(context.accountId, context.deviceId, scheduledAction, nowMs)
+        autoAdvanceService.syncFromScheduledAction(context.accountId, scheduledAction, nowMs)
     }
 
     private fun handleAudioSourceLoaded(
@@ -443,20 +434,12 @@ class PlaybackSyncWebSocketHandler(
             PlaybackSyncLogFields.RESULT to "accepted",
         )
 
-        val runtimeSnapshot = deviceRuntimeService.getActiveRuntimeSnapshot(context.accountId)
-        if (!playbackSessionService.areAllDevicesLoaded(context.accountId, runtimeSnapshot.deviceIds)) {
-            return
-        }
-
-        val scheduledAction = playbackSessionService.completePendingPlay(
+        playCoordinator.completePendingPlayIfReady(
             accountId = context.accountId,
             commandId = pendingPlay.commandId,
             nowMs = nowMs,
-            executeAtMs = playbackSchedulerService.calculateExecuteAtMs(runtimeSnapshot.runtimeStates, nowMs),
-        ) ?: return
-
-        playbackSchedulerService.cancelPendingPlayTimeout(context.accountId)
-        scheduledActionDispatcher.broadcastAndLog(context.accountId, context.deviceId, scheduledAction, nowMs)
+            logDeviceId = context.deviceId,
+        )
     }
 
     private fun handleSync(
@@ -501,32 +484,7 @@ class PlaybackSyncWebSocketHandler(
         accountId: Long,
         commandId: String,
     ) {
-        val nowMs = timeProvider.nowMs()
-        val scheduledAction = playbackSessionService.completePendingPlay(
-            accountId = accountId,
-            commandId = commandId,
-            nowMs = nowMs,
-            executeAtMs = playbackSchedulerService.calculateExecuteAtMs(accountId, nowMs),
-        ) ?: return
-
-        scheduledActionDispatcher.broadcastAndLog(accountId, null, scheduledAction, nowMs)
-    }
-
-    private fun maybeCompletePendingPlay(
-        accountId: Long,
-        nowMs: Long,
-    ): ScheduledActionPayload? {
-        val pendingPlay = playbackSessionService.getPendingPlay(accountId) ?: return null
-        val runtimeSnapshot = deviceRuntimeService.getActiveRuntimeSnapshot(accountId)
-        if (!playbackSessionService.areAllDevicesLoaded(accountId, runtimeSnapshot.deviceIds)) {
-            return null
-        }
-        return playbackSessionService.completePendingPlay(
-            accountId = accountId,
-            commandId = pendingPlay.commandId,
-            nowMs = nowMs,
-            executeAtMs = playbackSchedulerService.calculateExecuteAtMs(runtimeSnapshot.runtimeStates, nowMs),
-        )
+        playCoordinator.handlePendingPlayTimeout(accountId, commandId)
     }
 
     private fun handleReplacedConnection(replacedContext: PlaybackConnectionContext) {

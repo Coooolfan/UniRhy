@@ -22,6 +22,7 @@ class PlaybackSyncStaleConnectionJanitorTest {
     private lateinit var playbackSessionService: PlaybackSessionService
     private lateinit var playbackSchedulerService: PlaybackSchedulerService
     private lateinit var scheduledActionDispatcher: PlaybackSyncScheduledActionDispatcher
+    private lateinit var autoAdvanceService: PlaybackAutoAdvanceService
     private lateinit var coordinator: PlaybackSyncSessionRemovalCoordinator
     private lateinit var janitor: PlaybackSyncStaleConnectionJanitor
     private lateinit var staleSession: TestWebSocketSession
@@ -46,11 +47,26 @@ class PlaybackSyncStaleConnectionJanitorTest {
             messageSender = messageSender,
             logWriter = PlaybackSyncLogWriter(),
         )
+        autoAdvanceService = PlaybackAutoAdvanceService(
+            currentQueueService = CurrentQueueService(
+                lockManager = lockManager,
+                recordingCatalog = FakeCatalog(),
+                timeProvider = timeProvider,
+                urlSigner = MediaUrlSigner("test-signing-key", 3600),
+            ),
+            playbackSessionService = playbackSessionService,
+            playbackSchedulerService = playbackSchedulerService,
+            scheduledActionDispatcher = scheduledActionDispatcher,
+            messageSender = messageSender,
+            timeProvider = timeProvider,
+            scheduler = schedulerExecutor,
+        )
         coordinator = PlaybackSyncSessionRemovalCoordinator(
             playbackSessionService = playbackSessionService,
             playbackSchedulerService = playbackSchedulerService,
             scheduledActionDispatcher = scheduledActionDispatcher,
             messageSender = messageSender,
+            autoAdvanceService = autoAdvanceService,
             logWriter = PlaybackSyncLogWriter(),
         )
         janitor = PlaybackSyncStaleConnectionJanitor(
@@ -112,5 +128,18 @@ class PlaybackSyncStaleConnectionJanitorTest {
             clientVersion = "web@0.1.0",
         )
         return session
+    }
+
+    private class FakeCatalog : CurrentQueueRecordingCatalog {
+        override fun getExistingRecordingIds(recordingIds: Set<Long>): Set<Long> {
+            return recordingIds
+        }
+
+        override fun loadResolvedRecordings(
+            recordingIds: Set<Long>,
+            requiredMediaFileId: Long?,
+        ): List<ResolvedQueueRecording> {
+            return emptyList()
+        }
     }
 }

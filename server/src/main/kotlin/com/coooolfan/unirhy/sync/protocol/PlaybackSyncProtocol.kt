@@ -17,6 +17,7 @@ enum class PlaybackSyncMessageType {
     NTP_RESPONSE,
     SNAPSHOT,
     ROOM_EVENT_LOAD_AUDIO_SOURCE,
+    ROOM_EVENT_QUEUE_CHANGE,
     SCHEDULED_ACTION,
     ROOM_EVENT_DEVICE_CHANGE,
     ERROR,
@@ -93,6 +94,7 @@ data class AccountPlaybackStateDto(
 
 data class SnapshotPayload(
     val state: AccountPlaybackStateDto,
+    val queue: CurrentQueueDto,
     val serverNowMs: Long,
 )
 
@@ -206,6 +208,7 @@ data class SyncMessage(
     JsonSubTypes.Type(value = NtpResponseMessage::class, name = "NTP_RESPONSE"),
     JsonSubTypes.Type(value = SnapshotMessage::class, name = "SNAPSHOT"),
     JsonSubTypes.Type(value = LoadAudioSourceMessage::class, name = "ROOM_EVENT_LOAD_AUDIO_SOURCE"),
+    JsonSubTypes.Type(value = QueueChangeMessage::class, name = "ROOM_EVENT_QUEUE_CHANGE"),
     JsonSubTypes.Type(value = ScheduledActionMessage::class, name = "SCHEDULED_ACTION"),
     JsonSubTypes.Type(value = DeviceChangeMessage::class, name = "ROOM_EVENT_DEVICE_CHANGE"),
     JsonSubTypes.Type(value = ErrorMessage::class, name = "ERROR"),
@@ -231,6 +234,12 @@ data class SnapshotMessage(
 data class LoadAudioSourceMessage(
     override val payload: LoadAudioSourcePayload,
     override val type: PlaybackSyncMessageType = PlaybackSyncMessageType.ROOM_EVENT_LOAD_AUDIO_SOURCE,
+) : ServerPlaybackSyncMessage
+
+@JsonTypeName("ROOM_EVENT_QUEUE_CHANGE")
+data class QueueChangeMessage(
+    override val payload: QueueChangePayload,
+    override val type: PlaybackSyncMessageType = PlaybackSyncMessageType.ROOM_EVENT_QUEUE_CHANGE,
 ) : ServerPlaybackSyncMessage
 
 @JsonTypeName("SCHEDULED_ACTION")

@@ -128,7 +128,12 @@ const fetchSimilarRecordings = async (id: number) => {
 }
 
 watch(similarExpanded, (expanded) => {
-    if (expanded && props.recordingId && similarRecordings.value.length === 0 && !similarLoading.value) {
+    if (
+        expanded &&
+        props.recordingId &&
+        similarRecordings.value.length === 0 &&
+        !similarLoading.value
+    ) {
         fetchSimilarRecordings(props.recordingId)
     }
 })
@@ -287,10 +292,7 @@ watch(
                                     No audio assets attached
                                 </div>
 
-                                <div
-                                    v-if="recordingId"
-                                    class="border-t border-[#D6D1C4] pt-4"
-                                >
+                                <div v-if="recordingId" class="border-t border-[#D6D1C4] pt-4">
                                     <button
                                         type="button"
                                         class="flex items-center gap-2 w-full text-left text-xs text-[#8C857B] uppercase tracking-wider hover:text-[#C67C4E] transition-colors"

@@ -79,6 +79,11 @@ const emitSnapshot = (socket: MockWebSocket | undefined) => {
                     version: 0,
                     updatedAtMs: 0,
                 },
+                queue: {
+                    items: [],
+                    version: 0,
+                    updatedAtMs: 0,
+                },
                 serverNowMs: Date.now(),
             },
         }),

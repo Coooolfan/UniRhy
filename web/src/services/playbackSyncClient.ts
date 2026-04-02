@@ -23,6 +23,7 @@ const SERVER_MESSAGE_TYPES = [
     'NTP_RESPONSE',
     'SNAPSHOT',
     'ROOM_EVENT_LOAD_AUDIO_SOURCE',
+    'ROOM_EVENT_QUEUE_CHANGE',
     'SCHEDULED_ACTION',
     'ROOM_EVENT_DEVICE_CHANGE',
     'ERROR',
@@ -476,6 +477,7 @@ export class PlaybackSyncClient {
                 }
                 break
             case 'ROOM_EVENT_LOAD_AUDIO_SOURCE':
+            case 'ROOM_EVENT_QUEUE_CHANGE':
             case 'SCHEDULED_ACTION':
             case 'ROOM_EVENT_DEVICE_CHANGE':
             case 'ERROR':

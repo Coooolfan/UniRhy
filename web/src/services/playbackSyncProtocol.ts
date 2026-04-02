@@ -9,6 +9,7 @@ export type PlaybackSyncMessageType =
     | 'NTP_RESPONSE'
     | 'SNAPSHOT'
     | 'ROOM_EVENT_LOAD_AUDIO_SOURCE'
+    | 'ROOM_EVENT_QUEUE_CHANGE'
     | 'SCHEDULED_ACTION'
     | 'ROOM_EVENT_DEVICE_CHANGE'
     | 'ERROR'
@@ -73,7 +74,29 @@ export type NtpResponsePayload = {
 
 export type SnapshotPayload = {
     state: PlaybackSyncStatePayload
+    queue: CurrentQueueDto
     serverNowMs: number
+}
+
+export type CurrentQueueItemDto = {
+    entryId: number
+    recordingId: number
+    mediaFileId: number
+    title: string
+    artistLabel: string
+    coverUrl?: string
+    durationMs: number
+}
+
+export type CurrentQueueDto = {
+    items: readonly CurrentQueueItemDto[]
+    currentEntryId?: number
+    version: number
+    updatedAtMs: number
+}
+
+export type QueueChangePayload = {
+    queue: CurrentQueueDto
 }
 
 export type LoadAudioSourcePayload = {
@@ -169,6 +192,11 @@ export type LoadAudioSourceMessage = {
     payload: LoadAudioSourcePayload
 }
 
+export type QueueChangeMessage = {
+    type: 'ROOM_EVENT_QUEUE_CHANGE'
+    payload: QueueChangePayload
+}
+
 export type ScheduledActionMessage = {
     type: 'SCHEDULED_ACTION'
     payload: ScheduledActionPayload
@@ -188,6 +216,7 @@ export type ServerPlaybackSyncMessage =
     | NtpResponseMessage
     | SnapshotMessage
     | LoadAudioSourceMessage
+    | QueueChangeMessage
     | ScheduledActionMessage
     | DeviceChangeMessage
     | ErrorMessage

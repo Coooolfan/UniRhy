@@ -45,6 +45,7 @@
 | `music.work`      | 作品       | Work              | 乐曲（文案场景）     | -                      | -                       | 音乐作品实体，可关联多个版本曲目。     | UI / API / DB / 文档 | 中：此作品有多个演绎版本。<br>EN: This work has multiple track versions. |
 | `music.recording` | 曲目       | Track             | 歌曲                 | 录音                   | 统一为“曲目 / Track”    | 可播放实体，关联作品、艺人、媒体资产。 | UI / 文档            | 中：请选择要编辑的曲目。<br>EN: Select the track to edit.                |
 | `music.playlist`  | 歌单       | Playlist          | 播放列表             | SongList（用于实体名） | 统一为“歌单 / Playlist” | 用户自定义的曲目集合。                 | UI / API / DB / 文档 | 中：将曲目添加到歌单。<br>EN: Add the track to a playlist.               |
+| `playback.current-queue` | 当前队列   | Current Queue     | 运行队列             | 播放列表（运行态语义） | 统一为“当前队列 / Current Queue” | 账号级、服务端维护的当前播放顺序与当前项，不等同于用户保存的歌单。 | UI / API / 文档 | 中：当前队列由服务端同步。<br>EN: The current queue is synchronized by the server. |
 | `music.artist`    | 艺术家     | Artist            | 演奏者（说明性文案） | -                      | -                       | 参与曲目演绎的实体。                   | UI / API / DB / 文档 | 中：艺术家信息来自歌曲关联。<br>EN: Artist info is linked from tracks.   |
 
 ### 账号认证

@@ -9,9 +9,12 @@ import {
     type PlaybackSyncClientPhase,
 } from '@/services/playbackSyncClient'
 import type {
+    CurrentQueueDto,
+    CurrentQueueItemDto,
     DeviceChangePayload,
     LoadAudioSourcePayload,
     PlaybackSyncStatePayload,
+    QueueChangePayload,
     ScheduledActionPayload,
     ServerPlaybackSyncMessage,
     SnapshotPayload,
@@ -26,6 +29,16 @@ export type AudioTrack = {
     src: string
     mediaFileId: number
     workId?: number
+}
+
+export type AudioQueueEntry = {
+    entryId: number
+    recordingId: number
+    mediaFileId: number
+    title: string
+    artist: string
+    cover?: string
+    durationMs: number
 }
 
 export type AudioSyncState =
@@ -187,8 +200,26 @@ const cloneTrack = (track: AudioTrack): AudioTrack => ({
     ...track,
 })
 
+const isSameTrackRef = (left: AudioTrack | null, right: AudioTrack) => {
+    return left?.id === right.id && left.mediaFileId === right.mediaFileId
+}
+
+const createEmptyQueue = (): CurrentQueueDto => ({
+    items: [],
+    version: 0,
+    updatedAtMs: 0,
+})
+
+const cloneQueue = (queue: CurrentQueueDto): CurrentQueueDto => ({
+    items: queue.items.map((item) => ({ ...item })),
+    ...(queue.currentEntryId === undefined ? {} : { currentEntryId: queue.currentEntryId }),
+    version: queue.version,
+    updatedAtMs: queue.updatedAtMs,
+})
+
 export const useAudioStore = defineStore('audio', () => {
     const currentTrack = ref<AudioTrack | null>(null)
+    const currentQueue = ref<CurrentQueueDto>(createEmptyQueue())
     const isPlaying = ref(false)
     const isPlayerHidden = ref(false)
     const currentTime = ref(0)
@@ -235,6 +266,34 @@ export const useAudioStore = defineStore('audio', () => {
     let scheduledStopTimer: number | null = null
     let trackMetadataGeneration = 0
 
+    const currentQueueEntry = computed(() => {
+        const currentEntryId = currentQueue.value.currentEntryId
+        if (currentEntryId === undefined) {
+            return null
+        }
+        return currentQueue.value.items.find((item) => item.entryId === currentEntryId) ?? null
+    })
+
+    const currentQueueIndex = computed(() => {
+        const currentEntryId = currentQueue.value.currentEntryId
+        if (currentEntryId === undefined) {
+            return -1
+        }
+        return currentQueue.value.items.findIndex((item) => item.entryId === currentEntryId)
+    })
+
+    const queueEntries = computed<AudioQueueEntry[]>(() =>
+        currentQueue.value.items.map((item) => ({
+            entryId: item.entryId,
+            recordingId: item.recordingId,
+            mediaFileId: item.mediaFileId,
+            title: item.title,
+            artist: item.artistLabel,
+            cover: item.coverUrl ? buildApiUrl(item.coverUrl) : '',
+            durationMs: item.durationMs,
+        })),
+    )
+
     const effectiveSyncState = computed<AudioSyncState>(() => {
         if (clientPhase.value === 'error') {
             return 'error'
@@ -271,6 +330,10 @@ export const useAudioStore = defineStore('audio', () => {
     })
 
     const canSendRealtimeControl = computed(() => effectiveSyncState.value === 'ready')
+
+    const canNavigateQueue = computed(() => {
+        return currentQueue.value.items.length > 0 && canSendRealtimeControl.value
+    })
 
     const playbackSyncDebugSnapshot = computed<PlaybackSyncDebugSnapshot>(() => {
         const queuedIntent = queuedPlayIntent.value
@@ -350,6 +413,69 @@ export const useAudioStore = defineStore('audio', () => {
                 knownTracks.delete(oldestKey)
             }
         }
+    }
+
+    const createTrackFromQueueItem = (item: CurrentQueueItemDto): AudioTrack => {
+        const current =
+            currentTrack.value?.id === item.recordingId &&
+            currentTrack.value.mediaFileId === item.mediaFileId
+                ? currentTrack.value
+                : null
+        const cached = knownTracks.get(item.recordingId)
+        let workId = current?.workId
+        if (workId === undefined && cached?.workId !== undefined) {
+            workId = cached.workId
+        }
+
+        const cover = item.coverUrl ? buildApiUrl(item.coverUrl) : ''
+        const title =
+            item.title || cached?.title || current?.title || `Recording #${item.recordingId}`
+        const artist = item.artistLabel || cached?.artist || current?.artist || 'Unknown Artist'
+
+        return {
+            id: item.recordingId,
+            title,
+            artist,
+            cover: cover || cached?.cover || current?.cover || '',
+            src: current?.src || cached?.src || '',
+            mediaFileId: item.mediaFileId,
+            ...(workId === undefined ? {} : { workId }),
+        }
+    }
+
+    const applyQueueSnapshot = (queue: CurrentQueueDto) => {
+        currentQueue.value = cloneQueue(queue)
+        currentQueue.value.items.forEach((item) => {
+            cacheTrack(createTrackFromQueueItem(item))
+        })
+
+        const nextCurrentItem = currentQueueEntry.value
+        if (!nextCurrentItem) {
+            return
+        }
+
+        const nextTrack = createTrackFromQueueItem(nextCurrentItem)
+        cacheTrack(nextTrack)
+        currentTrack.value = cloneTrack(nextTrack)
+
+        if (
+            !(
+                currentBufferTrack.value?.mediaFileId === nextTrack.mediaFileId &&
+                currentBuffer.value !== null
+            ) &&
+            nextCurrentItem.durationMs > 0
+        ) {
+            duration.value = nextCurrentItem.durationMs / 1_000
+        }
+    }
+
+    const queueRecordingIdsEqual = (recordingIds: number[]) => {
+        if (recordingIds.length !== currentQueue.value.items.length) {
+            return false
+        }
+        return currentQueue.value.items.every(
+            (item, index) => item.recordingId === recordingIds[index],
+        )
     }
 
     const rememberHydratedTrack = (track: AudioTrack) => {
@@ -995,6 +1121,7 @@ export const useAudioStore = defineStore('audio', () => {
     const handleSnapshot = (payload: SnapshotPayload) => {
         latestSnapshotReceivedAtMs.value = nowClientMs()
         latestSnapshot.value = payload.state
+        applyQueueSnapshot(payload.queue)
         const track = resolveTrackFromState(payload.state)
 
         if (!track) {
@@ -1016,6 +1143,10 @@ export const useAudioStore = defineStore('audio', () => {
         updatePausedTime(recoveredPosition)
 
         duration.value = isSameBufferTrack(track) ? currentBuffer.value!.duration : 0
+    }
+
+    const handleQueueChange = (payload: QueueChangePayload) => {
+        applyQueueSnapshot(payload.queue)
     }
 
     const handleScheduledAction = async (payload: ScheduledActionPayload) => {
@@ -1088,6 +1219,9 @@ export const useAudioStore = defineStore('audio', () => {
                     payload: { ...message.payload },
                 }
                 await handleLoadAudioSource(message.payload)
+                break
+            case 'ROOM_EVENT_QUEUE_CHANGE':
+                handleQueueChange(message.payload)
                 break
             case 'SCHEDULED_ACTION':
                 lastScheduledAction.value = {
@@ -1171,6 +1305,191 @@ export const useAudioStore = defineStore('audio', () => {
         })
     }
 
+    const requestPlay = async (
+        track: AudioTrack,
+        positionSeconds: number,
+        options: {
+            toggleIfSameTrack?: boolean
+        } = {},
+    ) => {
+        const toggleIfSameTrack = options.toggleIfSameTrack ?? false
+        rememberHydratedTrack(track)
+
+        const isSameTrack = isSameTrackRef(currentTrack.value, track)
+        if (toggleIfSameTrack && isSameTrack && isPlaying.value) {
+            ensureSyncClient().sendPause({
+                commandId: nextCommandId('pause'),
+                recordingId: currentTrack.value?.id ?? null,
+                mediaFileId: currentTrack.value?.mediaFileId ?? null,
+                positionSeconds: currentTime.value,
+            })
+            return
+        }
+
+        const client = ensureSyncClient()
+        client.connect()
+
+        if (effectiveSyncState.value === 'audio_locked') {
+            queuePlay(track, positionSeconds)
+            const context = await ensureAudioContextResumed()
+            if (!context) {
+                return
+            }
+            if (canSendRealtimeControl.value) {
+                flushQueuedPlayIntent()
+            }
+            return
+        }
+
+        if (!canSendRealtimeControl.value) {
+            queuePlay(track, positionSeconds)
+            return
+        }
+
+        sendPlayCommand(track, positionSeconds)
+    }
+
+    async function replaceQueueAndPlay(tracks: AudioTrack[], currentIndex: number) {
+        if (tracks.length === 0 || currentIndex < 0 || currentIndex >= tracks.length) {
+            return
+        }
+
+        tracks.forEach((track) => {
+            rememberHydratedTrack(track)
+        })
+        const targetTrack = tracks[currentIndex]
+        if (!targetTrack) {
+            return
+        }
+        const recordingIds = tracks.map((track) => track.id)
+
+        if (queueRecordingIdsEqual(recordingIds)) {
+            const targetQueueEntry = currentQueue.value.items[currentIndex]
+            if (targetQueueEntry) {
+                if (currentQueue.value.currentEntryId !== targetQueueEntry.entryId) {
+                    const queue = await api.playbackQueueController.setCurrentEntry({
+                        body: { entryId: targetQueueEntry.entryId },
+                    })
+                    applyQueueSnapshot(queue)
+                    await requestPlay(targetTrack, 0)
+                    return
+                }
+
+                if (isSameTrackRef(currentTrack.value, targetTrack)) {
+                    if (isPlaying.value) {
+                        ensureSyncClient().sendPause({
+                            commandId: nextCommandId('pause'),
+                            recordingId: currentTrack.value?.id ?? null,
+                            mediaFileId: currentTrack.value?.mediaFileId ?? null,
+                            positionSeconds: currentTime.value,
+                        })
+                    } else {
+                        await requestPlay(targetTrack, currentTime.value)
+                    }
+                    return
+                }
+            }
+        }
+
+        const queue = await api.playbackQueueController.replaceCurrentQueue({
+            body: {
+                recordingIds,
+                currentIndex,
+            },
+        })
+        applyQueueSnapshot(queue)
+        await requestPlay(targetTrack, 0)
+    }
+
+    async function appendToQueue(tracks: AudioTrack[]) {
+        if (tracks.length === 0) {
+            return
+        }
+
+        tracks.forEach((track) => {
+            rememberHydratedTrack(track)
+        })
+        const queue = await api.playbackQueueController.appendToCurrentQueue({
+            body: {
+                recordingIds: tracks.map((track) => track.id),
+            },
+        })
+        applyQueueSnapshot(queue)
+    }
+
+    async function reorderQueue(entryIds: number[]) {
+        if (entryIds.length === 0) {
+            return
+        }
+
+        const queue = await api.playbackQueueController.reorderCurrentQueue({
+            body: { entryIds },
+        })
+        applyQueueSnapshot(queue)
+    }
+
+    async function playQueueEntry(entryId: number) {
+        const queue = await api.playbackQueueController.setCurrentEntry({
+            body: { entryId },
+        })
+        applyQueueSnapshot(queue)
+        const nextCurrentEntry = queue.currentEntryId
+        if (nextCurrentEntry === undefined) {
+            return
+        }
+        const currentItem = queue.items.find((item) => item.entryId === nextCurrentEntry)
+        if (!currentItem) {
+            return
+        }
+
+        await requestPlay(createTrackFromQueueItem(currentItem), 0)
+    }
+
+    async function playNext() {
+        if (currentQueue.value.items.length === 0) {
+            return
+        }
+
+        const nextIndex =
+            currentQueueIndex.value < 0
+                ? 0
+                : (currentQueueIndex.value + 1) % currentQueue.value.items.length
+        const nextEntry = currentQueue.value.items[nextIndex]
+        if (!nextEntry) {
+            return
+        }
+
+        await playQueueEntry(nextEntry.entryId)
+    }
+
+    async function playPrevious() {
+        if (currentQueue.value.items.length === 0) {
+            return
+        }
+
+        const previousIndex =
+            currentQueueIndex.value < 0
+                ? 0
+                : (currentQueueIndex.value - 1 + currentQueue.value.items.length) %
+                  currentQueue.value.items.length
+        const previousEntry = currentQueue.value.items[previousIndex]
+        if (!previousEntry) {
+            return
+        }
+
+        await playQueueEntry(previousEntry.entryId)
+    }
+
+    async function removeQueueEntry(entryId: number) {
+        const queue = await api.playbackQueueController.removeCurrentQueueEntry({ entryId })
+        applyQueueSnapshot(queue)
+    }
+
+    async function clearQueue() {
+        const queue = await api.playbackQueueController.clearCurrentQueue()
+        applyQueueSnapshot(queue)
+    }
+
     function pause() {
         if (!currentTrack.value || !canSendRealtimeControl.value) {
             return
@@ -1185,37 +1504,7 @@ export const useAudioStore = defineStore('audio', () => {
     }
 
     async function play(track: AudioTrack) {
-        rememberHydratedTrack(track)
-
-        const isSameTrack = currentTrack.value?.id === track.id
-        const targetPosition = isSameTrack ? currentTime.value : 0
-
-        if (isSameTrack && isPlaying.value) {
-            pause()
-            return
-        }
-
-        const client = ensureSyncClient()
-        client.connect()
-
-        if (effectiveSyncState.value === 'audio_locked') {
-            queuePlay(track, targetPosition)
-            const context = await ensureAudioContextResumed()
-            if (!context) {
-                return
-            }
-            if (canSendRealtimeControl.value) {
-                flushQueuedPlayIntent()
-            }
-            return
-        }
-
-        if (!canSendRealtimeControl.value) {
-            queuePlay(track, targetPosition)
-            return
-        }
-
-        sendPlayCommand(track, targetPosition)
+        await replaceQueueAndPlay([track], 0)
     }
 
     async function resume() {
@@ -1251,6 +1540,7 @@ export const useAudioStore = defineStore('audio', () => {
         if (!canSendRealtimeControl.value) {
             latestSnapshot.value = null
             latestSnapshotReceivedAtMs.value = null
+            currentQueue.value = createEmptyQueue()
             clearTrackState()
             return
         }
@@ -1335,6 +1625,7 @@ export const useAudioStore = defineStore('audio', () => {
         awaitingSyncRecovery.value = false
         audioUnlockRequired.value = false
         isPlayerHidden.value = false
+        currentQueue.value = createEmptyQueue()
         trackMetadataGeneration += 1
         trackMetadataRequests.clear()
         hydratedTrackIds.clear()
@@ -1345,6 +1636,10 @@ export const useAudioStore = defineStore('audio', () => {
 
     return {
         currentTrack,
+        currentQueue,
+        currentQueueEntry,
+        currentQueueIndex,
+        queueEntries,
         isPlaying,
         isPlayerHidden,
         currentTime,
@@ -1355,7 +1650,16 @@ export const useAudioStore = defineStore('audio', () => {
         syncState: effectiveSyncState,
         syncStatusText,
         canSendRealtimeControl,
+        canNavigateQueue,
         play,
+        replaceQueueAndPlay,
+        appendToQueue,
+        reorderQueue,
+        playQueueEntry,
+        playNext,
+        playPrevious,
+        removeQueueEntry,
+        clearQueue,
         pause,
         resume,
         stop,

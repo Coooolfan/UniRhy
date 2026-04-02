@@ -35,6 +35,9 @@ class PlaybackSyncWebSocketHandlerTest {
     private lateinit var playbackSessionService: PlaybackSessionService
     private lateinit var playbackSchedulerService: PlaybackSchedulerService
     private lateinit var sessionRemovalCoordinator: PlaybackSyncSessionRemovalCoordinator
+    private lateinit var currentQueueService: CurrentQueueService
+    private lateinit var autoAdvanceService: PlaybackAutoAdvanceService
+    private lateinit var playCoordinator: PlaybackPlayCoordinator
     private lateinit var scheduledActionDispatcher: PlaybackSyncScheduledActionDispatcher
     private lateinit var mediaResolver: PlaybackSyncMediaResolver
     private lateinit var handler: PlaybackSyncWebSocketHandler
@@ -58,6 +61,12 @@ class PlaybackSyncWebSocketHandlerTest {
         val lockManager = PlaybackAccountLockManager()
         deviceRuntimeService = DeviceRuntimeService(lockManager, timeProvider)
         playbackSessionService = PlaybackSessionService(lockManager, timeProvider)
+        currentQueueService = CurrentQueueService(
+            lockManager = lockManager,
+            recordingCatalog = FakeCurrentQueueRecordingCatalog(),
+            timeProvider = timeProvider,
+            urlSigner = MediaUrlSigner("test-signing-key", 3600),
+        )
         playbackSchedulerService = PlaybackSchedulerService(
             deviceRuntimeService = deviceRuntimeService,
             scheduler = schedulerExecutor,
@@ -75,22 +84,43 @@ class PlaybackSyncWebSocketHandlerTest {
             messageSender = messageSender,
             logWriter = PlaybackSyncLogWriter(),
         )
+        autoAdvanceService = PlaybackAutoAdvanceService(
+            currentQueueService = currentQueueService,
+            playbackSessionService = playbackSessionService,
+            playbackSchedulerService = playbackSchedulerService,
+            scheduledActionDispatcher = scheduledActionDispatcher,
+            messageSender = messageSender,
+            timeProvider = timeProvider,
+            scheduler = schedulerExecutor,
+        )
+        playCoordinator = PlaybackPlayCoordinator(
+            playbackSessionService = playbackSessionService,
+            deviceRuntimeService = deviceRuntimeService,
+            playbackSchedulerService = playbackSchedulerService,
+            scheduledActionDispatcher = scheduledActionDispatcher,
+            messageSender = messageSender,
+            autoAdvanceService = autoAdvanceService,
+        )
         sessionRemovalCoordinator = PlaybackSyncSessionRemovalCoordinator(
             playbackSessionService = playbackSessionService,
             playbackSchedulerService = playbackSchedulerService,
             scheduledActionDispatcher = scheduledActionDispatcher,
             messageSender = messageSender,
+            autoAdvanceService = autoAdvanceService,
             logWriter = PlaybackSyncLogWriter(),
         )
         handler = PlaybackSyncWebSocketHandler(
             objectMapper = objectMapper,
             authenticator = FakePlaybackSyncAuthenticator(mapOf("valid-token" to 42L)),
+            currentQueueService = currentQueueService,
             playbackSessionService = playbackSessionService,
             deviceRuntimeService = deviceRuntimeService,
             playbackSyncMediaResolver = mediaResolver,
             playbackSchedulerService = playbackSchedulerService,
             timeProvider = timeProvider,
             sessionRemovalCoordinator = sessionRemovalCoordinator,
+            playCoordinator = playCoordinator,
+            autoAdvanceService = autoAdvanceService,
             scheduledActionDispatcher = scheduledActionDispatcher,
             messageSender = messageSender,
             logWriter = PlaybackSyncLogWriter(),
@@ -123,6 +153,7 @@ class PlaybackSyncWebSocketHandlerTest {
         assertEquals(0L, snapshot.payload.state.version)
         assertEquals(0.0, snapshot.payload.state.positionSeconds)
         assertEquals(null, snapshot.payload.state.recordingId)
+        assertTrue(snapshot.payload.queue.items.isEmpty())
 
         val deviceChange = messages[1] as DeviceChangeMessage
         assertEquals(listOf("web-7c2f"), deviceChange.payload.devices.map { it.deviceId })
@@ -179,9 +210,10 @@ class PlaybackSyncWebSocketHandlerTest {
         handler.handleMessage(session, textMessage(playPayload()))
 
         val messages = session.serverMessages()
-        assertEquals(2, messages.size)
-        val loadAudio = messages[0] as LoadAudioSourceMessage
-        val scheduledAction = messages[1] as ScheduledActionMessage
+        assertEquals(3, messages.size)
+        assertTrue(messages[0] is QueueChangeMessage)
+        val loadAudio = messages[1] as LoadAudioSourceMessage
+        val scheduledAction = messages[2] as ScheduledActionMessage
         assertTrue(loadAudio.payload.presignedUrl.contains("_sig="))
         assertTrue(loadAudio.payload.presignedUrl.contains("_exp="))
         assertEquals(ScheduledActionType.PLAY, scheduledAction.payload.scheduledAction.action)
@@ -329,8 +361,12 @@ class PlaybackSyncWebSocketHandlerTest {
                 ),
             ),
         )
-        assertEquals(1, sessionA.serverMessages().size)
-        assertEquals(1, sessionB.serverMessages().size)
+        assertEquals(2, sessionA.serverMessages().size)
+        assertEquals(2, sessionB.serverMessages().size)
+        assertTrue(sessionA.serverMessages()[0] is QueueChangeMessage)
+        assertTrue(sessionA.serverMessages()[1] is LoadAudioSourceMessage)
+        assertTrue(sessionB.serverMessages()[0] is QueueChangeMessage)
+        assertTrue(sessionB.serverMessages()[1] is LoadAudioSourceMessage)
 
         handler.handleMessage(
             sessionB,
@@ -528,6 +564,34 @@ class PlaybackSyncWebSocketHandlerTest {
     ) {
         val logEvent = logAppender.list.single { it.formattedMessage.startsWith("event=$event") }
         assertEquals(level, logEvent.level)
+    }
+}
+
+private class FakeCurrentQueueRecordingCatalog : CurrentQueueRecordingCatalog {
+    override fun getExistingRecordingIds(recordingIds: Set<Long>): Set<Long> = recordingIds
+
+    override fun loadResolvedRecordings(
+        recordingIds: Set<Long>,
+        requiredMediaFileId: Long?,
+    ): List<ResolvedQueueRecording> {
+        return recordingIds.mapNotNull { recordingId ->
+            val mediaFileId = when (recordingId) {
+                1001L -> 2001L
+                1002L -> 2002L
+                else -> null
+            } ?: return@mapNotNull null
+            if (requiredMediaFileId != null && requiredMediaFileId != mediaFileId) {
+                return@mapNotNull null
+            }
+            ResolvedQueueRecording(
+                recordingId = recordingId,
+                mediaFileId = mediaFileId,
+                title = "Track $recordingId",
+                artistLabel = "Artist $recordingId",
+                coverMediaFileId = null,
+                durationMs = 180_000,
+            )
+        }
     }
 }
 

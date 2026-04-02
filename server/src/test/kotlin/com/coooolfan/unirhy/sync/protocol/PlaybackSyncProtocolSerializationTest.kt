@@ -248,6 +248,22 @@ class PlaybackSyncProtocolSerializationTest {
                         version = 8,
                         updatedAtMs = 1730844000100,
                     ),
+                    queue = CurrentQueueDto(
+                        items = listOf(
+                            CurrentQueueItemDto(
+                                entryId = 1,
+                                recordingId = 1001,
+                                mediaFileId = 2001,
+                                title = "Track 1",
+                                artistLabel = "Artist 1",
+                                coverUrl = "/api/media/3001",
+                                durationMs = 180000,
+                            ),
+                        ),
+                        currentEntryId = 1,
+                        version = 3,
+                        updatedAtMs = 1730844000090,
+                    ),
                     serverNowMs = 1730844000200,
                 ),
             ),
@@ -264,6 +280,22 @@ class PlaybackSyncProtocolSerializationTest {
                       "serverTimeToExecuteMs": 1730844001500,
                       "version": 8,
                       "updatedAtMs": 1730844000100
+                    },
+                    "queue": {
+                      "items": [
+                        {
+                          "entryId": 1,
+                          "recordingId": 1001,
+                          "mediaFileId": 2001,
+                          "title": "Track 1",
+                          "artistLabel": "Artist 1",
+                          "coverUrl": "/api/media/3001",
+                          "durationMs": 180000
+                        }
+                      ],
+                      "currentEntryId": 1,
+                      "version": 3,
+                      "updatedAtMs": 1730844000090
                     },
                     "serverNowMs": 1730844000200
                   }
@@ -292,6 +324,70 @@ class PlaybackSyncProtocolSerializationTest {
                 }
             """.trimIndent(),
             expectedType = LoadAudioSourceMessage::class,
+        ),
+        ServerSample(
+            message = QueueChangeMessage(
+                payload = QueueChangePayload(
+                    queue = CurrentQueueDto(
+                        items = listOf(
+                            CurrentQueueItemDto(
+                                entryId = 1,
+                                recordingId = 1001,
+                                mediaFileId = 2001,
+                                title = "Track 1",
+                                artistLabel = "Artist 1",
+                                coverUrl = "/api/media/3001",
+                                durationMs = 180000,
+                            ),
+                            CurrentQueueItemDto(
+                                entryId = 2,
+                                recordingId = 1002,
+                                mediaFileId = 2002,
+                                title = "Track 2",
+                                artistLabel = "Artist 2",
+                                coverUrl = null,
+                                durationMs = 210000,
+                            ),
+                        ),
+                        currentEntryId = 2,
+                        version = 4,
+                        updatedAtMs = 1730844000500,
+                    ),
+                ),
+            ),
+            expectedJson = """
+                {
+                  "type": "ROOM_EVENT_QUEUE_CHANGE",
+                  "payload": {
+                    "queue": {
+                      "items": [
+                        {
+                          "entryId": 1,
+                          "recordingId": 1001,
+                          "mediaFileId": 2001,
+                          "title": "Track 1",
+                          "artistLabel": "Artist 1",
+                          "coverUrl": "/api/media/3001",
+                          "durationMs": 180000
+                        },
+                        {
+                          "entryId": 2,
+                          "recordingId": 1002,
+                          "mediaFileId": 2002,
+                          "title": "Track 2",
+                          "artistLabel": "Artist 2",
+                          "coverUrl": null,
+                          "durationMs": 210000
+                        }
+                      ],
+                      "currentEntryId": 2,
+                      "version": 4,
+                      "updatedAtMs": 1730844000500
+                    }
+                  }
+                }
+            """.trimIndent(),
+            expectedType = QueueChangeMessage::class,
         ),
         ServerSample(
             message = ScheduledActionMessage(

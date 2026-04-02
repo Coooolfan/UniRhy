@@ -10,6 +10,7 @@ class PlaybackSyncSessionRemovalCoordinator(
     private val playbackSchedulerService: PlaybackSchedulerService,
     private val scheduledActionDispatcher: PlaybackSyncScheduledActionDispatcher,
     private val messageSender: PlaybackSyncMessageSender,
+    private val autoAdvanceService: PlaybackAutoAdvanceService,
     private val logWriter: PlaybackSyncLogWriter,
 ) {
     fun handleRemoval(
@@ -44,6 +45,7 @@ class PlaybackSyncSessionRemovalCoordinator(
         if (scheduledAction != null) {
             playbackSchedulerService.cancelPendingPlayTimeout(accountId)
             scheduledActionDispatcher.broadcastAndLog(accountId, removal.context.deviceId, scheduledAction, nowMs)
+            autoAdvanceService.syncFromScheduledAction(accountId, scheduledAction, nowMs)
         } else if (removal.remainingDeviceIds.isEmpty()) {
             abandonPendingPlay(accountId)
         }

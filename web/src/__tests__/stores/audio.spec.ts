@@ -3,6 +3,12 @@ import { createPinia, setActivePinia } from 'pinia'
 
 const apiMockState = vi.hoisted(() => ({
     getRecording: vi.fn(),
+    replaceCurrentQueue: vi.fn(),
+    appendToCurrentQueue: vi.fn(),
+    reorderCurrentQueue: vi.fn(),
+    setCurrentEntry: vi.fn(),
+    removeCurrentQueueEntry: vi.fn(),
+    clearCurrentQueue: vi.fn(),
 }))
 
 type MockPlaybackSyncClientState = {
@@ -203,8 +209,21 @@ vi.mock('@/ApiInstance', async (importOriginal) => {
             getRecording: apiMockState.getRecording,
         },
     )
+    const playbackQueueController = Object.assign(
+        Object.create(Object.getPrototypeOf(actual.api.playbackQueueController)),
+        actual.api.playbackQueueController,
+        {
+            replaceCurrentQueue: apiMockState.replaceCurrentQueue,
+            appendToCurrentQueue: apiMockState.appendToCurrentQueue,
+            reorderCurrentQueue: apiMockState.reorderCurrentQueue,
+            setCurrentEntry: apiMockState.setCurrentEntry,
+            removeCurrentQueueEntry: apiMockState.removeCurrentQueueEntry,
+            clearCurrentQueue: apiMockState.clearCurrentQueue,
+        },
+    )
     const api = Object.assign(Object.create(Object.getPrototypeOf(actual.api)), actual.api, {
         recordingController,
+        playbackQueueController,
     })
 
     return {
@@ -304,6 +323,12 @@ import type {
 import { nowClientMs } from '@/utils/time'
 
 const getRecordingMock = vi.mocked(api.recordingController.getRecording)
+const replaceCurrentQueueMock = vi.mocked(api.playbackQueueController.replaceCurrentQueue)
+const appendToCurrentQueueMock = vi.mocked(api.playbackQueueController.appendToCurrentQueue)
+const reorderCurrentQueueMock = vi.mocked(api.playbackQueueController.reorderCurrentQueue)
+const setCurrentEntryMock = vi.mocked(api.playbackQueueController.setCurrentEntry)
+const removeCurrentQueueEntryMock = vi.mocked(api.playbackQueueController.removeCurrentQueueEntry)
+const clearCurrentQueueMock = vi.mocked(api.playbackQueueController.clearCurrentQueue)
 type RecordingMetadata = Awaited<ReturnType<typeof api.recordingController.getRecording>>
 type RecordingMetadataOverrides = Partial<Omit<RecordingMetadata, 'cover'>> & {
     cover?: RecordingMetadata['cover'] | null
@@ -413,6 +438,21 @@ const buildTrack = (id: number, src = `/audio/${id}.mp3`): AudioTrack => ({
     mediaFileId: id + 1_000,
 })
 
+const buildQueue = (tracks: AudioTrack[], currentIndex = 0) => ({
+    items: tracks.map((track, index) => ({
+        entryId: index + 1,
+        recordingId: track.id,
+        mediaFileId: track.mediaFileId,
+        title: track.title,
+        artistLabel: track.artist,
+        coverUrl: track.cover,
+        durationMs: 180_000,
+    })),
+    ...(tracks[currentIndex] ? { currentEntryId: currentIndex + 1 } : {}),
+    version: 1,
+    updatedAtMs: nowClientMs(),
+})
+
 const buildRecordingMetadata = (
     id: number,
     overrides: RecordingMetadataOverrides = {},
@@ -494,7 +534,26 @@ describe('audio store', () => {
         MockAudioContext.defaultState = 'running'
         fetchMock.mockReset()
         getRecordingMock.mockReset()
+        replaceCurrentQueueMock.mockReset()
+        appendToCurrentQueueMock.mockReset()
+        reorderCurrentQueueMock.mockReset()
+        setCurrentEntryMock.mockReset()
+        removeCurrentQueueEntryMock.mockReset()
+        clearCurrentQueueMock.mockReset()
         getRecordingMock.mockRejectedValue(new Error('metadata unavailable'))
+        replaceCurrentQueueMock.mockImplementation(({ body }) =>
+            Promise.resolve(
+                buildQueue(
+                    body.recordingIds.map((recordingId) => buildTrack(recordingId)),
+                    body.currentIndex,
+                ),
+            ),
+        )
+        appendToCurrentQueueMock.mockResolvedValue(buildQueue([]))
+        reorderCurrentQueueMock.mockResolvedValue(buildQueue([]))
+        setCurrentEntryMock.mockResolvedValue(buildQueue([]))
+        removeCurrentQueueEntryMock.mockResolvedValue(buildQueue([]))
+        clearCurrentQueueMock.mockResolvedValue(buildQueue([]))
 
         vi.stubGlobal('fetch', fetchMock)
         vi.stubGlobal('AudioContext', MockAudioContext)
@@ -540,6 +599,73 @@ describe('audio store', () => {
             expect.objectContaining({
                 recordingId: secondTrack.id,
                 mediaFileId: secondTrack.mediaFileId,
+                positionSeconds: 0,
+            }),
+        )
+        expect(replaceCurrentQueueMock).toHaveBeenNthCalledWith(1, {
+            body: {
+                recordingIds: [1],
+                currentIndex: 0,
+            },
+        })
+        expect(replaceCurrentQueueMock).toHaveBeenNthCalledWith(2, {
+            body: {
+                recordingIds: [2],
+                currentIndex: 0,
+            },
+        })
+    })
+
+    it('updates local queue state from queue change broadcasts', async () => {
+        const audioStore = useAudioStore()
+        audioStore.connectPlaybackSync()
+        const client = latestClient()
+
+        client.emitMessage({
+            type: 'ROOM_EVENT_QUEUE_CHANGE',
+            payload: {
+                queue: buildQueue([buildTrack(3), buildTrack(4)], 1),
+            },
+        })
+        await flushPromises()
+
+        expect(audioStore.queueEntries).toHaveLength(2)
+        expect(audioStore.currentQueueEntry?.entryId).toBe(2)
+        expect(audioStore.currentTrack?.id).toBe(4)
+        expect(audioStore.currentTrack?.title).toBe('Track 4')
+    })
+
+    it('advances to the next queue entry through the server current queue API', async () => {
+        fetchMock.mockResolvedValue(createResponse(45))
+
+        const audioStore = useAudioStore()
+        audioStore.connectPlaybackSync()
+        const client = latestClient()
+        client.setState({
+            phase: 'ready',
+            clockOffsetMs: 0,
+            roundTripEstimateMs: 10,
+        })
+
+        client.emitMessage({
+            type: 'ROOM_EVENT_QUEUE_CHANGE',
+            payload: {
+                queue: buildQueue([buildTrack(5), buildTrack(6)], 0),
+            },
+        })
+        await flushPromises()
+
+        setCurrentEntryMock.mockResolvedValueOnce(buildQueue([buildTrack(5), buildTrack(6)], 1))
+
+        await audioStore.playNext()
+
+        expect(setCurrentEntryMock).toHaveBeenCalledWith({
+            body: { entryId: 2 },
+        })
+        expect(client.sendPlay).toHaveBeenCalledWith(
+            expect.objectContaining({
+                recordingId: 6,
+                mediaFileId: 1_006,
                 positionSeconds: 0,
             }),
         )
@@ -685,6 +811,7 @@ describe('audio store', () => {
                     version: 3,
                     updatedAtMs: performance.timeOrigin + performance.now(),
                 },
+                queue: buildQueue([buildTrack(8)], 0),
                 serverNowMs: performance.timeOrigin + performance.now(),
             },
         })
@@ -736,6 +863,7 @@ describe('audio store', () => {
                     version: 5,
                     updatedAtMs: nowClientMs(),
                 },
+                queue: buildQueue([buildTrack(7)], 0),
                 serverNowMs: nowClientMs(),
             },
         })
@@ -992,6 +1120,7 @@ describe('audio store', () => {
                     version: 1,
                     updatedAtMs: nowClientMs(),
                 },
+                queue: buildQueue([buildTrack(12)], 0),
                 serverNowMs: nowClientMs(),
             },
         })
@@ -1053,6 +1182,7 @@ describe('audio store', () => {
                     version: 1,
                     updatedAtMs: nowClientMs(),
                 },
+                queue: buildQueue([buildTrack(14)], 0),
                 serverNowMs: nowClientMs(),
             },
         })
@@ -1106,6 +1236,7 @@ describe('audio store', () => {
                     version: 1,
                     updatedAtMs: nowClientMs(),
                 },
+                queue: buildQueue([buildTrack(21)], 0),
                 serverNowMs: nowClientMs(),
             },
         })
@@ -1124,6 +1255,7 @@ describe('audio store', () => {
                     version: 2,
                     updatedAtMs: nowClientMs(),
                 },
+                queue: buildQueue([buildTrack(22)], 0),
                 serverNowMs: nowClientMs(),
             },
         })
@@ -1173,6 +1305,7 @@ describe('audio store', () => {
                     version: 1,
                     updatedAtMs: nowClientMs(),
                 },
+                queue: buildQueue([buildTrack(2)], 0),
                 serverNowMs: nowClientMs(),
             },
         })
@@ -1193,6 +1326,7 @@ describe('audio store', () => {
                     version: 2,
                     updatedAtMs: nowClientMs(),
                 },
+                queue: buildQueue([buildTrack(1)], 0),
                 serverNowMs: nowClientMs(),
             },
         })

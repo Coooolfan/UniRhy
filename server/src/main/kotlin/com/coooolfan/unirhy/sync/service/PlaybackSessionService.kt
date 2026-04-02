@@ -26,7 +26,7 @@ class PlaybackSessionService(
     fun createPendingPlay(
         accountId: Long,
         commandId: String,
-        initiatorDeviceId: String,
+        initiatorDeviceId: String?,
         recordingId: Long,
         mediaFileId: Long,
         positionSeconds: Double,
@@ -40,7 +40,7 @@ class PlaybackSessionService(
                 recordingId = recordingId,
                 mediaFileId = mediaFileId,
                 positionSeconds = positionSeconds,
-                clientsLoaded = mutableSetOf(initiatorDeviceId),
+                clientsLoaded = initiatorDeviceId?.let { mutableSetOf(it) } ?: mutableSetOf(),
                 createdAtMs = nowMs,
                 timeoutAtMs = timeoutAtMs,
             )
