@@ -84,8 +84,6 @@ data class NtpResponsePayload(
 data class AccountPlaybackStateDto(
     val status: PlaybackStatus,
     val recordingId: Long? = null,
-    val mediaFileId: Long? = null,
-    val presignedUrl: String? = null,
     val positionSeconds: Double,
     val serverTimeToExecuteMs: Long,
     val version: Long,
@@ -101,16 +99,12 @@ data class SnapshotPayload(
 data class LoadAudioSourcePayload(
     val commandId: String,
     val recordingId: Long,
-    val mediaFileId: Long,
-    val presignedUrl: String,
 )
 
 data class ScheduledPlaybackAction(
     val action: ScheduledActionType,
     val status: PlaybackStatus,
     val recordingId: Long? = null,
-    val mediaFileId: Long? = null,
-    val presignedUrl: String? = null,
     val positionSeconds: Double,
     val version: Long,
 )

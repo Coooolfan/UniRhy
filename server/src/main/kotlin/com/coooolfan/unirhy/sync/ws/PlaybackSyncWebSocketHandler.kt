@@ -279,19 +279,14 @@ class PlaybackSyncWebSocketHandler(
         val deviceId = requireValidControlPayload(
             context = context,
             payload = payload,
-            requireMediaContext = true,
+            requireRecordingContext = true,
             nowMs = nowMs,
         )
-        val resolvedMedia = playbackSyncMediaResolver.resolve(
-            recordingId = requireNotNull(payload.recordingId),
-            mediaFileId = requireNotNull(payload.mediaFileId),
-        )
+        val recordingId = requireNotNull(payload.recordingId)
+        playbackSyncMediaResolver.validatePlayableRecording(recordingId)
         val queueChange = currentQueueService.syncTrackWithPlayback(
             accountId = context.accountId,
-            recording = currentQueueService.resolvePlayableRecording(
-                recordingId = resolvedMedia.recordingId,
-                mediaFileId = resolvedMedia.mediaFileId,
-            ),
+            recording = currentQueueService.resolvePlayableRecording(recordingId),
             nowMs = nowMs,
         )
         if (queueChange != null) {
@@ -317,8 +312,7 @@ class PlaybackSyncWebSocketHandler(
             accountId = context.accountId,
             commandId = payload.commandId,
             initiatorDeviceId = deviceId,
-            recordingId = resolvedMedia.recordingId,
-            mediaFileId = resolvedMedia.mediaFileId,
+            recordingId = recordingId,
             positionSeconds = payload.positionSeconds,
             nowMs = nowMs,
             logDeviceId = context.deviceId,
@@ -333,16 +327,13 @@ class PlaybackSyncWebSocketHandler(
         requireValidControlPayload(
             context = context,
             payload = payload,
-            requireMediaContext = false,
-            allowNullMediaContext = true,
+            requireRecordingContext = false,
+            allowNullRecordingContext = true,
             nowMs = nowMs,
         )
 
-        if (payload.recordingId != null && payload.mediaFileId != null) {
-            playbackSyncMediaResolver.resolve(
-                recordingId = payload.recordingId,
-                mediaFileId = payload.mediaFileId,
-            )
+        if (payload.recordingId != null) {
+            playbackSyncMediaResolver.validatePlayableRecording(payload.recordingId)
         }
 
         sessionRemovalCoordinator.abandonPendingPlay(context.accountId)
@@ -357,7 +348,6 @@ class PlaybackSyncWebSocketHandler(
             accountId = context.accountId,
             commandId = payload.commandId,
             recordingId = payload.recordingId,
-            mediaFileId = payload.mediaFileId,
             positionSeconds = payload.positionSeconds,
             nowMs = nowMs,
             executeAtMs = playbackSchedulerService.calculateExecuteAtMs(context.accountId, nowMs),
@@ -374,14 +364,12 @@ class PlaybackSyncWebSocketHandler(
         requireValidControlPayload(
             context = context,
             payload = payload,
-            requireMediaContext = true,
+            requireRecordingContext = true,
             nowMs = nowMs,
         )
 
-        val resolvedMedia = playbackSyncMediaResolver.resolve(
-            recordingId = requireNotNull(payload.recordingId),
-            mediaFileId = requireNotNull(payload.mediaFileId),
-        )
+        val recordingId = requireNotNull(payload.recordingId)
+        playbackSyncMediaResolver.validatePlayableRecording(recordingId)
 
         sessionRemovalCoordinator.abandonPendingPlay(context.accountId)
 
@@ -394,8 +382,7 @@ class PlaybackSyncWebSocketHandler(
         val scheduledAction = playbackSessionService.scheduleSeek(
             accountId = context.accountId,
             commandId = payload.commandId,
-            recordingId = resolvedMedia.recordingId,
-            mediaFileId = resolvedMedia.mediaFileId,
+            recordingId = recordingId,
             positionSeconds = payload.positionSeconds,
             nowMs = nowMs,
             executeAtMs = playbackSchedulerService.calculateExecuteAtMs(context.accountId, nowMs),
@@ -418,7 +405,6 @@ class PlaybackSyncWebSocketHandler(
             commandId = payload.commandId,
             deviceId = payload.deviceId,
             recordingId = payload.recordingId,
-            mediaFileId = payload.mediaFileId,
         ) ?: throw PlaybackSyncProtocolException(
             code = PlaybackSyncErrorCode.INVALID_MESSAGE,
             message = "No matching pending play found for AUDIO_SOURCE_LOADED",
@@ -495,8 +481,8 @@ class PlaybackSyncWebSocketHandler(
     private fun requireValidControlPayload(
         context: PlaybackConnectionContext,
         payload: PlaybackControlPayload,
-        requireMediaContext: Boolean,
-        allowNullMediaContext: Boolean = false,
+        requireRecordingContext: Boolean,
+        allowNullRecordingContext: Boolean = false,
         nowMs: Long,
     ): String {
         requireMatchingDevice(context, payload.deviceId)
@@ -507,18 +493,18 @@ class PlaybackSyncWebSocketHandler(
         val hasRecording = payload.recordingId != null
         val hasMediaFile = payload.mediaFileId != null
         when {
-            requireMediaContext && (!hasRecording || !hasMediaFile) -> {
+            requireRecordingContext && !hasRecording -> {
                 throw PlaybackSyncProtocolException(
                     code = PlaybackSyncErrorCode.INVALID_MESSAGE,
-                    message = "recordingId and mediaFileId are required",
+                    message = "recordingId is required",
                     reason = PlaybackSyncErrorReason.MEDIA_CONTEXT_REQUIRED,
                 )
             }
 
-            allowNullMediaContext && hasRecording != hasMediaFile -> {
+            !hasRecording && hasMediaFile -> {
                 throw PlaybackSyncProtocolException(
                     code = PlaybackSyncErrorCode.INVALID_MESSAGE,
-                    message = "recordingId and mediaFileId must both be present or both be null",
+                    message = "mediaFileId requires recordingId",
                     reason = PlaybackSyncErrorReason.MEDIA_CONTEXT_MISMATCH,
                 )
             }

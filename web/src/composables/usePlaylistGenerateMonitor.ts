@@ -1,5 +1,4 @@
-import { onMounted, onUnmounted } from 'vue'
-import { api } from '@/ApiInstance'
+import { type Ref, watch } from 'vue'
 import type { AsyncTaskLogCountRow } from '@/__generated/model/static'
 import { usePlaylistStore } from '@/stores/playlist'
 
@@ -9,8 +8,6 @@ type PlaylistGenerateStats = {
     completed: number
     failed: number
 }
-
-const PLAYLIST_GENERATE_POLL_INTERVAL_MS = 2000
 
 const emptyStats = (): PlaylistGenerateStats => ({
     pending: 0,
@@ -50,57 +47,21 @@ const readPlaylistGenerateStats = (
     return stats
 }
 
-export const usePlaylistGenerateMonitor = () => {
+export const usePlaylistGenerateMonitor = (rows: Ref<ReadonlyArray<AsyncTaskLogCountRow>>) => {
     const playlistStore = usePlaylistStore()
-    let timer: ReturnType<typeof setInterval> | null = null
     let previousStats: PlaylistGenerateStats | null = null
-    let isPolling = false
-    let isDisposed = false
 
-    const pollPlaylistGenerateStats = async () => {
-        if (isPolling || isDisposed) {
-            return
-        }
+    watch(rows, async (nextRows) => {
+        const nextStats = readPlaylistGenerateStats(nextRows)
+        const lastStats = previousStats
+        previousStats = nextStats
 
-        isPolling = true
+        const hadActiveTasks = lastStats !== null && lastStats.pending + lastStats.running > 0
+        const isIdleNow = nextStats.pending + nextStats.running === 0
+        const completedIncreased = lastStats !== null && nextStats.completed > lastStats.completed
 
-        try {
-            const nextStats = readPlaylistGenerateStats(await api.taskController.listTaskLogs())
-            if (isDisposed) {
-                return
-            }
-
-            const lastStats = previousStats
-            previousStats = nextStats
-
-            const hadActiveTasks = lastStats !== null && lastStats.pending + lastStats.running > 0
-            const isIdleNow = nextStats.pending + nextStats.running === 0
-            const completedIncreased =
-                lastStats !== null && nextStats.completed > lastStats.completed
-
-            if (hadActiveTasks && isIdleNow && completedIncreased) {
-                await playlistStore.fetchPlaylists(true)
-            }
-        } catch {
-            // Ignore transient polling failures and retry on the next interval.
-        } finally {
-            isPolling = false
-        }
-    }
-
-    onMounted(() => {
-        void pollPlaylistGenerateStats()
-        timer = setInterval(() => {
-            void pollPlaylistGenerateStats()
-        }, PLAYLIST_GENERATE_POLL_INTERVAL_MS)
-    })
-
-    onUnmounted(() => {
-        isDisposed = true
-        previousStats = null
-        if (timer) {
-            clearInterval(timer)
-            timer = null
+        if (hadActiveTasks && isIdleNow && completedIncreased) {
+            await playlistStore.fetchPlaylists(true)
         }
     })
 }

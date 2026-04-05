@@ -4,6 +4,8 @@ export type {CodecType} from './CodecType';
 export {CodecType_CONSTANTS} from './CodecType';
 export type {FileProviderType} from './FileProviderType';
 export {FileProviderType_CONSTANTS} from './FileProviderType';
+export type {PlaybackPreference} from './PlaybackPreference';
+export {PlaybackPreference_CONSTANTS} from './PlaybackPreference';
 export type {TaskStatus} from './TaskStatus';
 export {TaskStatus_CONSTANTS} from './TaskStatus';
 export type {TaskType} from './TaskType';

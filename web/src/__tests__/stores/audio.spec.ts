@@ -442,7 +442,6 @@ const buildQueue = (tracks: AudioTrack[], currentIndex = 0) => ({
     items: tracks.map((track, index) => ({
         entryId: index + 1,
         recordingId: track.id,
-        mediaFileId: track.mediaFileId,
         title: track.title,
         artistLabel: track.artist,
         coverUrl: track.cover,
@@ -475,6 +474,20 @@ const buildRecordingMetadata = (
                 displayName: `Hydrated Artist ${id}`,
                 alias: [],
                 comment: '',
+            },
+        ],
+        assets: rest.assets ?? [
+            {
+                id: id + 40_000,
+                comment: `Asset ${id}`,
+                mediaFile: {
+                    id: id + 2_000,
+                    sha256: `audio-sha-${id}`,
+                    objectKey: `audio/${id}.opus`,
+                    mimeType: 'audio/opus',
+                    size: 4_096,
+                    url: `/api/media/${id + 2_000}`,
+                },
             },
         ],
         ...(cover === null
@@ -683,8 +696,6 @@ describe('audio store', () => {
             payload: {
                 commandId: 'cmd-play-1',
                 recordingId: 7,
-                mediaFileId: 2_007,
-                presignedUrl: '/api/media/2007',
             },
         }
 
@@ -718,8 +729,6 @@ describe('audio store', () => {
             payload: {
                 commandId: 'cmd-play-2',
                 recordingId: 8,
-                mediaFileId: 2_008,
-                presignedUrl: '/api/media/2008?_sig=abc&_exp=9999999999',
             },
         } satisfies LoadAudioSourceMessage)
         await flushPromises(12)
@@ -757,8 +766,6 @@ describe('audio store', () => {
                     action: 'PLAY',
                     status: 'PLAYING',
                     recordingId: 5,
-                    mediaFileId: 2_005,
-                    presignedUrl: '/api/media/2005',
                     positionSeconds: 12,
                     version: 2,
                 },
@@ -780,8 +787,6 @@ describe('audio store', () => {
                     action: 'PAUSE',
                     status: 'PAUSED',
                     recordingId: null,
-                    mediaFileId: null,
-                    presignedUrl: null,
                     positionSeconds: 0,
                     version: 1,
                 },
@@ -804,8 +809,6 @@ describe('audio store', () => {
                 state: {
                     status: 'PLAYING',
                     recordingId: 8,
-                    mediaFileId: 2_008,
-                    presignedUrl: '/api/media/2008',
                     positionSeconds: 16,
                     serverTimeToExecuteMs: performance.timeOrigin + performance.now(),
                     version: 3,
@@ -856,8 +859,6 @@ describe('audio store', () => {
                 state: {
                     status: 'PAUSED',
                     recordingId: 7,
-                    mediaFileId: 2_007,
-                    presignedUrl: '/api/media/2007',
                     positionSeconds: 12,
                     serverTimeToExecuteMs: nowClientMs(),
                     version: 5,
@@ -872,8 +873,6 @@ describe('audio store', () => {
             payload: {
                 commandId: 'cmd-load-debug',
                 recordingId: 7,
-                mediaFileId: 2_007,
-                presignedUrl: '/api/media/2007',
             },
         } satisfies LoadAudioSourceMessage)
         await flushPromises(12)
@@ -928,8 +927,6 @@ describe('audio store', () => {
                     action: 'PLAY',
                     status: 'PLAYING',
                     recordingId: 6,
-                    mediaFileId: 2_006,
-                    presignedUrl: '/api/media/2006',
                     positionSeconds: 4,
                     version: 6,
                 },
@@ -962,8 +959,6 @@ describe('audio store', () => {
                 state: {
                     status: 'PLAYING',
                     recordingId: 11,
-                    mediaFileId: 2_011,
-                    presignedUrl: '/api/media/2011',
                     positionSeconds: 3,
                     serverTimeToExecuteMs: nowClientMs(),
                     version: 8,
@@ -1019,8 +1014,6 @@ describe('audio store', () => {
             payload: {
                 commandId: 'cmd-preload-1',
                 recordingId: 7,
-                mediaFileId: 2_007,
-                presignedUrl: '/api/media/2007',
             },
         }
 
@@ -1064,8 +1057,6 @@ describe('audio store', () => {
             payload: {
                 commandId: 'cmd-preload-metadata',
                 recordingId: 7,
-                mediaFileId: 2_007,
-                presignedUrl: '/api/media/2007',
             },
         } satisfies LoadAudioSourceMessage)
         await flushPromises(12)
@@ -1113,8 +1104,6 @@ describe('audio store', () => {
                 state: {
                     status: 'PAUSED',
                     recordingId: 12,
-                    mediaFileId: 2_012,
-                    presignedUrl: '/api/media/2012',
                     positionSeconds: 1,
                     serverTimeToExecuteMs: nowClientMs(),
                     version: 1,
@@ -1135,8 +1124,6 @@ describe('audio store', () => {
                     action: 'PAUSE',
                     status: 'PAUSED',
                     recordingId: 12,
-                    mediaFileId: 2_012,
-                    presignedUrl: '/api/media/2012',
                     positionSeconds: 1,
                     version: 2,
                 },
@@ -1175,8 +1162,6 @@ describe('audio store', () => {
                 state: {
                     status: 'PAUSED',
                     recordingId: 14,
-                    mediaFileId: 2_014,
-                    presignedUrl: '/api/media/2014',
                     positionSeconds: 0,
                     serverTimeToExecuteMs: nowClientMs(),
                     version: 1,
@@ -1195,8 +1180,6 @@ describe('audio store', () => {
             payload: {
                 commandId: 'cmd-retry-metadata',
                 recordingId: 14,
-                mediaFileId: 2_014,
-                presignedUrl: '/api/media/2014',
             },
         } satisfies LoadAudioSourceMessage)
         await flushPromises(12)
@@ -1229,8 +1212,6 @@ describe('audio store', () => {
                 state: {
                     status: 'PAUSED',
                     recordingId: 21,
-                    mediaFileId: 2_021,
-                    presignedUrl: '/api/media/2021',
                     positionSeconds: 0,
                     serverTimeToExecuteMs: nowClientMs(),
                     version: 1,
@@ -1248,8 +1229,6 @@ describe('audio store', () => {
                 state: {
                     status: 'PAUSED',
                     recordingId: 22,
-                    mediaFileId: 2_022,
-                    presignedUrl: '/api/media/2022',
                     positionSeconds: 0,
                     serverTimeToExecuteMs: nowClientMs(),
                     version: 2,
@@ -1298,8 +1277,6 @@ describe('audio store', () => {
                 state: {
                     status: 'PAUSED',
                     recordingId: 2,
-                    mediaFileId: 1_002,
-                    presignedUrl: '/api/media/1002',
                     positionSeconds: 0,
                     serverTimeToExecuteMs: nowClientMs(),
                     version: 1,
@@ -1319,8 +1296,6 @@ describe('audio store', () => {
                 state: {
                     status: 'PAUSED',
                     recordingId: 1,
-                    mediaFileId: 1_001,
-                    presignedUrl: '/api/media/1001',
                     positionSeconds: 0,
                     serverTimeToExecuteMs: nowClientMs(),
                     version: 2,
@@ -1348,8 +1323,6 @@ describe('audio store', () => {
             payload: {
                 commandId: 'cmd-late-load',
                 recordingId: 9,
-                mediaFileId: 2_009,
-                presignedUrl: '/api/media/2009',
             },
         } satisfies LoadAudioSourceMessage)
         await flushPromises()
@@ -1392,8 +1365,6 @@ describe('audio store', () => {
                     action: 'PLAY',
                     status: 'PLAYING',
                     recordingId: 6,
-                    mediaFileId: 2_006,
-                    presignedUrl: '/api/media/2006',
                     positionSeconds: 4,
                     version: 6,
                 },

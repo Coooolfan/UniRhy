@@ -145,7 +145,7 @@ class TranscodeTaskService(
             recording = Recording { id = payload.recordingId }
             mediaFile {
                 sha256 = "mocked-sha256"
-                objectKey = outputFile.toString()
+                objectKey = buildTranscodedObjectKey(outputFile, dstRoot)
                 mimeType = codecProfile.mimeType
                 size = outputFile.length()
                 width = null
@@ -357,3 +357,12 @@ private data class CodecProfile(
     val extension: String,
     val mimeType: String,
 )
+
+internal fun buildTranscodedObjectKey(outputFile: File, dstRoot: File): String {
+    val normalizedRootPath = dstRoot.toPath().toAbsolutePath().normalize()
+    val normalizedOutputPath = outputFile.toPath().toAbsolutePath().normalize()
+    require(normalizedOutputPath.startsWith(normalizedRootPath)) {
+        "Transcoded output must stay under destination root: $normalizedOutputPath"
+    }
+    return normalizedRootPath.relativize(normalizedOutputPath).toString().replace(File.separatorChar, '/')
+}

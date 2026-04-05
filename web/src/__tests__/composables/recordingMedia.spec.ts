@@ -40,6 +40,88 @@ describe('recordingMedia', () => {
         ])
     })
 
+    it('prefers the requested playback format before falling back to opus then raw', () => {
+        expect(
+            recordingMedia.resolvePlayableAudio(
+                [
+                    {
+                        mediaFile: {
+                            id: 31,
+                            mimeType: 'audio/flac',
+                            objectKey: 'track-a.flac',
+                            url: '/api/media/31',
+                        },
+                    },
+                    {
+                        mediaFile: {
+                            id: 32,
+                            mimeType: 'audio/opus',
+                            objectKey: 'track-a.opus',
+                            url: '/api/media/32',
+                        },
+                    },
+                    {
+                        mediaFile: {
+                            id: 33,
+                            mimeType: 'audio/mpeg',
+                            objectKey: 'track-a.mp3',
+                            url: '/api/media/33',
+                        },
+                    },
+                ],
+                'MP3',
+            ),
+        ).toEqual({
+            src: '/api/media/33',
+            mediaFileId: 33,
+        })
+
+        expect(
+            recordingMedia.resolvePlayableAudio(
+                [
+                    {
+                        mediaFile: {
+                            id: 41,
+                            mimeType: 'audio/flac',
+                            objectKey: 'track-b.flac',
+                            url: '/api/media/41',
+                        },
+                    },
+                    {
+                        mediaFile: {
+                            id: 42,
+                            mimeType: 'audio/opus',
+                            objectKey: 'track-b.opus',
+                            url: '/api/media/42',
+                        },
+                    },
+                ],
+                'MP3',
+            ),
+        ).toEqual({
+            src: '/api/media/42',
+            mediaFileId: 42,
+        })
+    })
+
+    it('does not implicitly fall back to mp3 when only mp3 is available', () => {
+        expect(
+            recordingMedia.resolvePlayableAudio(
+                [
+                    {
+                        mediaFile: {
+                            id: 51,
+                            mimeType: 'audio/mpeg',
+                            objectKey: 'track-c.mp3',
+                            url: '/api/media/51',
+                        },
+                    },
+                ],
+                'RAW',
+            ),
+        ).toBeUndefined()
+    })
+
     it('picks initial recording ids according to strategy', () => {
         expect(
             recordingMedia.pickInitialRecordingId(

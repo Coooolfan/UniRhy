@@ -1,11 +1,12 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { api, clearAuthToken } from '@/ApiInstance'
 import type { AccountDto } from '@/__generated/model/dto/AccountDto'
 import type { AccountUpdate } from '@/__generated/model/static/AccountUpdate'
 
 export const useUserStore = defineStore('user', () => {
     const user = ref<AccountDto['AccountController/DEFAULT_ACCOUNT_FETCHER'] | null>(null)
+    const playbackPreference = computed(() => user.value?.preferences?.playbackPreference ?? 'OPUS')
 
     const fetchUser = async () => {
         try {
@@ -51,6 +52,7 @@ export const useUserStore = defineStore('user', () => {
 
     return {
         user,
+        playbackPreference,
         fetchUser,
         updateUser,
         logout,

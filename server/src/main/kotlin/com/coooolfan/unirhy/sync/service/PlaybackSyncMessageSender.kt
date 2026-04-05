@@ -1,6 +1,5 @@
 package com.coooolfan.unirhy.sync.service
 
-import com.coooolfan.unirhy.service.MediaUrlSigner
 import com.coooolfan.unirhy.sync.protocol.DeviceChangeMessage
 import com.coooolfan.unirhy.sync.protocol.DeviceChangePayload
 import com.coooolfan.unirhy.sync.protocol.LoadAudioSourceMessage
@@ -25,7 +24,6 @@ import org.springframework.web.socket.TextMessage
 class PlaybackSyncMessageSender(
     private val objectMapper: ObjectMapper,
     private val deviceRuntimeService: DeviceRuntimeService,
-    private val urlSigner: MediaUrlSigner,
 ) {
     private val logger = LoggerFactory.getLogger(PlaybackSyncMessageSender::class.java)
 
@@ -47,14 +45,14 @@ class PlaybackSyncMessageSender(
         context: PlaybackConnectionContext,
         payload: SnapshotPayload,
     ) {
-        send(context, SnapshotMessage(payload = payload.withPresignedUrl()))
+        send(context, SnapshotMessage(payload = payload))
     }
 
     fun sendScheduledAction(
         context: PlaybackConnectionContext,
         payload: ScheduledActionPayload,
     ) {
-        send(context, ScheduledActionMessage(payload = payload.withPresignedUrl()))
+        send(context, ScheduledActionMessage(payload = payload))
     }
 
     fun broadcastLoadAudioSource(
@@ -63,7 +61,7 @@ class PlaybackSyncMessageSender(
     ) {
         broadcast(
             accountId = accountId,
-            message = LoadAudioSourceMessage(payload = payload.withPresignedUrl()),
+            message = LoadAudioSourceMessage(payload = payload),
         )
     }
 
@@ -85,7 +83,7 @@ class PlaybackSyncMessageSender(
     ) {
         broadcast(
             accountId = accountId,
-            message = ScheduledActionMessage(payload = payload.withPresignedUrl()),
+            message = ScheduledActionMessage(payload = payload),
         )
     }
 
@@ -131,27 +129,5 @@ class PlaybackSyncMessageSender(
 
     private fun serialize(message: ServerPlaybackSyncMessage): TextMessage {
         return TextMessage(objectMapper.writeValueAsString(message))
-    }
-
-    private fun generatePresignedUrl(mediaFileId: Long): String {
-        return urlSigner.generatePresignedPath(mediaFileId)
-    }
-
-    private fun SnapshotPayload.withPresignedUrl(): SnapshotPayload {
-        val mfId = state.mediaFileId ?: return this
-        return copy(state = state.copy(presignedUrl = generatePresignedUrl(mfId)))
-    }
-
-    private fun ScheduledActionPayload.withPresignedUrl(): ScheduledActionPayload {
-        val mfId = scheduledAction.mediaFileId ?: return this
-        return copy(
-            scheduledAction = scheduledAction.copy(
-                presignedUrl = generatePresignedUrl(mfId),
-            ),
-        )
-    }
-
-    private fun LoadAudioSourcePayload.withPresignedUrl(): LoadAudioSourcePayload {
-        return copy(presignedUrl = generatePresignedUrl(mediaFileId))
     }
 }

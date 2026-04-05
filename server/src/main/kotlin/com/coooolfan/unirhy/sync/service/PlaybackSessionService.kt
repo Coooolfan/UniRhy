@@ -28,7 +28,6 @@ class PlaybackSessionService(
         commandId: String,
         initiatorDeviceId: String?,
         recordingId: Long,
-        mediaFileId: Long,
         positionSeconds: Double,
         nowMs: Long,
         timeoutAtMs: Long,
@@ -38,7 +37,6 @@ class PlaybackSessionService(
                 commandId = commandId,
                 initiatorDeviceId = initiatorDeviceId,
                 recordingId = recordingId,
-                mediaFileId = mediaFileId,
                 positionSeconds = positionSeconds,
                 clientsLoaded = initiatorDeviceId?.let { mutableSetOf(it) } ?: mutableSetOf(),
                 createdAtMs = nowMs,
@@ -72,14 +70,12 @@ class PlaybackSessionService(
         commandId: String,
         deviceId: String,
         recordingId: Long,
-        mediaFileId: Long,
     ): PendingPlayState? {
         return lockManager.withAccountLock(accountId) {
             val pendingPlay = pendingPlays[accountId] ?: return@withAccountLock null
             if (
                 pendingPlay.commandId != commandId ||
-                pendingPlay.recordingId != recordingId ||
-                pendingPlay.mediaFileId != mediaFileId
+                pendingPlay.recordingId != recordingId
             ) {
                 return@withAccountLock null
             }
@@ -123,7 +119,6 @@ class PlaybackSessionService(
         accountId: Long,
         commandId: String,
         recordingId: Long?,
-        mediaFileId: Long?,
         positionSeconds: Double,
         nowMs: Long,
         executeAtMs: Long,
@@ -136,7 +131,6 @@ class PlaybackSessionService(
                 action = ScheduledActionType.PAUSE,
                 statusOverride = PlaybackStatus.PAUSED,
                 recordingId = recordingId,
-                mediaFileId = mediaFileId,
                 positionSeconds = positionSeconds,
                 nowMs = nowMs,
                 executeAtMs = executeAtMs,
@@ -148,7 +142,6 @@ class PlaybackSessionService(
         accountId: Long,
         commandId: String,
         recordingId: Long,
-        mediaFileId: Long,
         positionSeconds: Double,
         nowMs: Long,
         executeAtMs: Long,
@@ -161,7 +154,6 @@ class PlaybackSessionService(
                 action = ScheduledActionType.SEEK,
                 statusOverride = null,
                 recordingId = recordingId,
-                mediaFileId = mediaFileId,
                 positionSeconds = positionSeconds,
                 nowMs = nowMs,
                 executeAtMs = executeAtMs,
@@ -235,7 +227,6 @@ class PlaybackSessionService(
                 action = action,
                 status = status,
                 recordingId = recordingId,
-                mediaFileId = mediaFileId,
                 positionSeconds = positionSeconds,
                 version = version,
             ),
@@ -256,7 +247,6 @@ class PlaybackSessionService(
         action: ScheduledActionType,
         statusOverride: PlaybackStatus?,
         recordingId: Long?,
-        mediaFileId: Long?,
         positionSeconds: Double,
         nowMs: Long,
         executeAtMs: Long,
@@ -264,7 +254,6 @@ class PlaybackSessionService(
         val nextState = currentState.copy(
             status = statusOverride ?: currentState.status,
             recordingId = recordingId,
-            mediaFileId = mediaFileId,
             positionSeconds = positionSeconds,
             serverTimeToExecuteMs = executeAtMs,
             version = currentState.version + 1,
@@ -287,7 +276,6 @@ class PlaybackSessionService(
         val nextState = currentState.copy(
             status = PlaybackStatus.PLAYING,
             recordingId = pendingPlay.recordingId,
-            mediaFileId = pendingPlay.mediaFileId,
             positionSeconds = pendingPlay.positionSeconds,
             serverTimeToExecuteMs = executeAtMs,
             version = currentState.version + 1,

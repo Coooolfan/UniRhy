@@ -1,7 +1,7 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import { defineComponent, h, nextTick } from 'vue'
+import { defineComponent, h, nextTick, toRef } from 'vue'
 import type { AsyncTaskLogCountRow } from '@/__generated/model/static'
 
 vi.mock('@/ApiInstance', async (importOriginal) => {
@@ -9,9 +9,6 @@ vi.mock('@/ApiInstance', async (importOriginal) => {
     return {
         ...actual,
         api: {
-            taskController: {
-                listTaskLogs: vi.fn(),
-            },
             playlistController: {
                 listPlaylists: vi.fn(),
             },
@@ -22,13 +19,19 @@ vi.mock('@/ApiInstance', async (importOriginal) => {
 import { api } from '@/ApiInstance'
 import { usePlaylistGenerateMonitor } from '@/composables/usePlaylistGenerateMonitor'
 
-const listTaskLogsMock = vi.mocked(api.taskController.listTaskLogs)
 const listPlaylistsMock = vi.mocked(api.playlistController.listPlaylists)
 
 const MonitorHarness = defineComponent({
     name: 'PlaylistGenerateMonitorHarness',
-    setup() {
-        usePlaylistGenerateMonitor()
+    props: {
+        rows: {
+            type: Array as () => AsyncTaskLogCountRow[],
+            required: true,
+        },
+    },
+    setup(props) {
+        const rows = toRef(props, 'rows')
+        usePlaylistGenerateMonitor(rows)
         return () => h('div')
     },
 })
@@ -69,57 +72,51 @@ describe('usePlaylistGenerateMonitor', () => {
     beforeEach(() => {
         const pinia = createPinia()
         setActivePinia(pinia)
-        vi.useFakeTimers()
-        listTaskLogsMock.mockReset()
         listPlaylistsMock.mockReset()
         listPlaylistsMock.mockResolvedValue([])
     })
 
-    afterEach(() => {
-        vi.useRealTimers()
-    })
-
     it('refreshes playlists when playlist-generate tasks settle into a new completion', async () => {
-        listTaskLogsMock
-            .mockResolvedValueOnce(buildPlaylistGenerateRows({ RUNNING: 1 }))
-            .mockResolvedValueOnce(buildPlaylistGenerateRows({ COMPLETED: 1 }))
-
         const pinia = createPinia()
         setActivePinia(pinia)
         const wrapper = mount(MonitorHarness, {
+            props: {
+                rows: buildPlaylistGenerateRows({ RUNNING: 1 }),
+            },
             global: {
                 plugins: [pinia],
             },
         })
 
         await flushView()
-        expect(listTaskLogsMock).toHaveBeenCalledTimes(1)
         expect(listPlaylistsMock).not.toHaveBeenCalled()
 
-        await vi.advanceTimersByTimeAsync(2000)
+        await wrapper.setProps({
+            rows: buildPlaylistGenerateRows({ COMPLETED: 1 }),
+        })
         await flushView()
 
-        expect(listTaskLogsMock).toHaveBeenCalledTimes(2)
         expect(listPlaylistsMock).toHaveBeenCalledTimes(1)
 
         wrapper.unmount()
     })
 
     it('does not refresh playlists when playlist-generate only fails', async () => {
-        listTaskLogsMock
-            .mockResolvedValueOnce(buildPlaylistGenerateRows({ PENDING: 1 }))
-            .mockResolvedValueOnce(buildPlaylistGenerateRows({ FAILED: 1 }))
-
         const pinia = createPinia()
         setActivePinia(pinia)
         const wrapper = mount(MonitorHarness, {
+            props: {
+                rows: buildPlaylistGenerateRows({ PENDING: 1 }),
+            },
             global: {
                 plugins: [pinia],
             },
         })
 
         await flushView()
-        await vi.advanceTimersByTimeAsync(2000)
+        await wrapper.setProps({
+            rows: buildPlaylistGenerateRows({ FAILED: 1 }),
+        })
         await flushView()
 
         expect(listPlaylistsMock).not.toHaveBeenCalled()
@@ -128,20 +125,21 @@ describe('usePlaylistGenerateMonitor', () => {
     })
 
     it('does not refresh playlists when the queue becomes idle without new completions', async () => {
-        listTaskLogsMock
-            .mockResolvedValueOnce(buildPlaylistGenerateRows({ RUNNING: 1, COMPLETED: 3 }))
-            .mockResolvedValueOnce(buildPlaylistGenerateRows({ COMPLETED: 3 }))
-
         const pinia = createPinia()
         setActivePinia(pinia)
         const wrapper = mount(MonitorHarness, {
+            props: {
+                rows: buildPlaylistGenerateRows({ RUNNING: 1, COMPLETED: 3 }),
+            },
             global: {
                 plugins: [pinia],
             },
         })
 
         await flushView()
-        await vi.advanceTimersByTimeAsync(2000)
+        await wrapper.setProps({
+            rows: buildPlaylistGenerateRows({ COMPLETED: 3 }),
+        })
         await flushView()
 
         expect(listPlaylistsMock).not.toHaveBeenCalled()

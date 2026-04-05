@@ -114,6 +114,13 @@ class RecordingController(private val service: RecordingService) {
                 allScalarFields()
                 url()
             }
+            assets {
+                allScalarFields()
+                mediaFile {
+                    allScalarFields()
+                    url()
+                }
+            }
         }
 
         val SIMILAR_RECORDING_FETCHER = newFetcher(Recording::class).by {

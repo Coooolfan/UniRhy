@@ -3,7 +3,6 @@ package com.coooolfan.unirhy.sync.protocol
 data class CurrentQueueItemDto(
     val entryId: Long,
     val recordingId: Long,
-    val mediaFileId: Long,
     val title: String,
     val artistLabel: String,
     val coverUrl: String? = null,

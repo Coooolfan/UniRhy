@@ -27,7 +27,6 @@ class PlaybackQueueMutationCoordinator(
             accountId = accountId,
             commandId = "queue-current-$nowMs",
             recordingId = currentEntry?.recordingId,
-            mediaFileId = currentEntry?.mediaFileId,
             positionSeconds = 0.0,
             nowMs = nowMs,
             executeAtMs = playbackSchedulerService.calculateExecuteAtMs(accountId, nowMs),
@@ -47,7 +46,6 @@ class PlaybackQueueMutationCoordinator(
             accountId = accountId,
             commandId = "queue-clear-$nowMs",
             recordingId = null,
-            mediaFileId = null,
             positionSeconds = 0.0,
             nowMs = nowMs,
             executeAtMs = playbackSchedulerService.calculateExecuteAtMs(accountId, nowMs),
@@ -64,9 +62,7 @@ class PlaybackQueueMutationCoordinator(
     ) {
         val removedEntry = change.removedEntry ?: return
         val playbackState = playbackSessionService.getOrCreateState(accountId)
-        val removedWasPlaying =
-            playbackState.recordingId == removedEntry.recordingId &&
-                playbackState.mediaFileId == removedEntry.mediaFileId
+        val removedWasPlaying = playbackState.recordingId == removedEntry.recordingId
 
         when {
             change.currentEntry == null -> handleQueueCleared(accountId, nowMs)
@@ -78,7 +74,6 @@ class PlaybackQueueMutationCoordinator(
                     commandId = "queue-remove-current-$nowMs",
                     initiatorDeviceId = null,
                     recordingId = change.currentEntry.recordingId,
-                    mediaFileId = change.currentEntry.mediaFileId,
                     positionSeconds = 0.0,
                     nowMs = nowMs,
                     logDeviceId = null,

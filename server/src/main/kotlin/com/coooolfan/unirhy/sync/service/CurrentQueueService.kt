@@ -25,7 +25,6 @@ data class CurrentQueueChangeResult(
 
 data class ResolvedQueueRecording(
     val recordingId: Long,
-    val mediaFileId: Long,
     val title: String,
     val artistLabel: String,
     val coverMediaFileId: Long?,
@@ -213,9 +212,7 @@ class CurrentQueueService(
         return lockManager.withAccountLock(accountId) {
             val state = getOrCreateStateLocked(accountId)
             val previousCurrent = state.currentEntryId?.let { currentId -> state.items.firstOrNull { it.entryId == currentId } }
-            val matchingEntry = state.items.firstOrNull {
-                it.recordingId == recording.recordingId && it.mediaFileId == recording.mediaFileId
-            }
+            val matchingEntry = state.items.firstOrNull { it.recordingId == recording.recordingId }
 
             when {
                 matchingEntry == null -> {
@@ -278,11 +275,8 @@ class CurrentQueueService(
         }
     }
 
-    fun resolvePlayableRecording(
-        recordingId: Long,
-        mediaFileId: Long,
-    ): ResolvedQueueRecording {
-        return recordingCatalog.loadResolvedRecordings(setOf(recordingId), mediaFileId).firstOrNull()
+    fun resolvePlayableRecording(recordingId: Long): ResolvedQueueRecording {
+        return recordingCatalog.loadResolvedRecordings(setOf(recordingId)).firstOrNull()
             ?: when {
                 recordingId !in recordingCatalog.getExistingRecordingIds(setOf(recordingId)) -> {
                     throw ResponseStatusException(HttpStatus.NOT_FOUND, "Recording $recordingId not found")
@@ -291,7 +285,7 @@ class CurrentQueueService(
                 else -> {
                     throw ResponseStatusException(
                         HttpStatus.BAD_REQUEST,
-                        "Recording $recordingId has no playable audio asset for media file $mediaFileId",
+                        "Recording $recordingId is not playable",
                     )
                 }
             }
@@ -338,7 +332,6 @@ class CurrentQueueService(
         return CurrentQueueItemDto(
             entryId = entry.entryId,
             recordingId = entry.recordingId,
-            mediaFileId = entry.mediaFileId,
             title = entry.title,
             artistLabel = entry.artistLabel,
             coverUrl = entry.coverMediaFileId?.let(urlSigner::generatePresignedPath),
@@ -350,7 +343,6 @@ class CurrentQueueService(
         return CurrentQueueEntry(
             entryId = entryId,
             recordingId = recordingId,
-            mediaFileId = mediaFileId,
             title = title,
             artistLabel = artistLabel,
             coverMediaFileId = coverMediaFileId,
@@ -362,10 +354,7 @@ class CurrentQueueService(
 interface CurrentQueueRecordingCatalog {
     fun getExistingRecordingIds(recordingIds: Set<Long>): Set<Long>
 
-    fun loadResolvedRecordings(
-        recordingIds: Set<Long>,
-        requiredMediaFileId: Long? = null,
-    ): List<ResolvedQueueRecording>
+    fun loadResolvedRecordings(recordingIds: Set<Long>): List<ResolvedQueueRecording>
 }
 
 @Component
@@ -384,7 +373,6 @@ class JimmerCurrentQueueRecordingCatalog(
 
     override fun loadResolvedRecordings(
         recordingIds: Set<Long>,
-        requiredMediaFileId: Long?,
     ): List<ResolvedQueueRecording> {
         if (recordingIds.isEmpty()) {
             return emptyList()
@@ -396,14 +384,15 @@ class JimmerCurrentQueueRecordingCatalog(
         }.execute()
 
         return recordings.mapNotNull { recording ->
-            val playableAsset = recording.assets.firstOrNull { asset ->
-                asset.mediaFile.mimeType.startsWith("audio/") &&
-                    (requiredMediaFileId == null || asset.mediaFile.id == requiredMediaFileId)
-            } ?: return@mapNotNull null
+            val hasPlayableAudio = recording.assets.any { asset ->
+                asset.mediaFile.mimeType.startsWith("audio/")
+            }
+            if (!hasPlayableAudio) {
+                return@mapNotNull null
+            }
 
             ResolvedQueueRecording(
                 recordingId = recording.id,
-                mediaFileId = playableAsset.mediaFile.id,
                 title = recording.title?.takeIf(String::isNotBlank)
                     ?: recording.comment.takeIf(String::isNotBlank)
                     ?: "Untitled Track",

@@ -10,6 +10,7 @@ import type {
     TranscodeTaskRequest,
     VectorizeTaskRequest,
 } from '@/__generated/model/static'
+import { usePlaylistGenerateMonitor } from '@/composables/usePlaylistGenerateMonitor'
 import { TASK_TYPE_LABEL_MAP, useTaskManagement } from '@/composables/useTaskManagement'
 import {
     AlertCircle,
@@ -79,6 +80,7 @@ const {
     clearSubmitError,
     init,
 } = useTaskManagement()
+usePlaylistGenerateMonitor(taskCounts)
 
 const isTaskModalOpen = ref(false)
 const submitFeedbackStatus = ref<SubmitFeedbackStatus>('idle')

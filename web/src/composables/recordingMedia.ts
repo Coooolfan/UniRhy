@@ -1,5 +1,7 @@
 import { buildApiUrl } from '@/runtime/platform'
 
+export type PlaybackPreference = 'RAW' | 'OPUS' | 'MP3'
+
 export type RecordingAsset = {
     mediaFile: {
         id: number
@@ -60,6 +62,7 @@ type NormalizeRecordingsOptions<
 > = {
     fallbackArtist?: string
     fallbackCover?: string
+    playbackPreference?: PlaybackPreference
     transform: (recording: TRecording, base: NormalizedRecordingBase) => TOutput
 }
 
@@ -67,14 +70,39 @@ export const resolveCover = (cover?: { url?: string } | null) => {
     return cover?.url ? buildApiUrl(cover.url) : ''
 }
 
+export const resolveAudioAssetPreference = (asset: RecordingAsset): PlaybackPreference | null => {
+    const mimeType = asset.mediaFile.mimeType.toLowerCase()
+    if (!mimeType.startsWith('audio/')) {
+        return null
+    }
+    if (mimeType === 'audio/opus') {
+        return 'OPUS'
+    }
+    if (mimeType === 'audio/mpeg') {
+        return 'MP3'
+    }
+    return 'RAW'
+}
+
 export const resolvePlayableAudio = (
     assets: readonly RecordingAsset[],
+    playbackPreference: PlaybackPreference = 'OPUS',
 ): PlayableAudioSource | undefined => {
-    const audioAsset = assets.find((asset) => asset.mediaFile.mimeType.startsWith('audio/'))
-    if (audioAsset?.mediaFile.url) {
-        return {
-            src: buildApiUrl(audioAsset.mediaFile.url),
-            mediaFileId: audioAsset.mediaFile.id,
+    const candidatePreferences = [playbackPreference, 'OPUS', 'RAW'] as const
+    for (const candidatePreference of candidatePreferences) {
+        const audioAsset = assets.find((asset) => {
+            const resolvedPreference = resolveAudioAssetPreference(asset)
+            return (
+                resolvedPreference === candidatePreference &&
+                typeof asset.mediaFile.url === 'string' &&
+                asset.mediaFile.url.length > 0
+            )
+        })
+        if (audioAsset?.mediaFile.url) {
+            return {
+                src: buildApiUrl(audioAsset.mediaFile.url),
+                mediaFileId: audioAsset.mediaFile.id,
+            }
         }
     }
     return undefined
@@ -83,6 +111,7 @@ export const resolvePlayableAudio = (
 type NormalizeRecordingsBaseOptions = {
     fallbackArtist?: string
     fallbackCover?: string
+    playbackPreference?: PlaybackPreference
 }
 
 export const resolveArtistName = (artists?: ReadonlyArray<RecordingArtist>) => {
@@ -119,7 +148,10 @@ export function normalizeRecordings<
         | (NormalizeRecordingsBaseOptions & NormalizeRecordingsOptions<TRecording, TOutput>) = {},
 ) {
     return recordings.map((recording) => {
-        const playableAudio = resolvePlayableAudio(recording.assets ?? [])
+        const playableAudio = resolvePlayableAudio(
+            recording.assets ?? [],
+            options.playbackPreference,
+        )
         const base: NormalizedRecordingBase = {
             id: recording.id,
             title: recording.title || recording.comment || 'Untitled Track',
@@ -155,6 +187,7 @@ export const pickInitialRecordingId = (
 
 export const pickPlayableRecordingEntry = <TRecording extends PlayableRecordingCandidate>(
     recordings: readonly TRecording[],
+    playbackPreference: PlaybackPreference = 'OPUS',
 ):
     | {
           recording: TRecording
@@ -169,7 +202,7 @@ export const pickPlayableRecordingEntry = <TRecording extends PlayableRecordingC
         | undefined
 
     for (const recording of recordings) {
-        const playableAudio = resolvePlayableAudio(recording.assets ?? [])
+        const playableAudio = resolvePlayableAudio(recording.assets ?? [], playbackPreference)
         if (!playableAudio) {
             continue
         }

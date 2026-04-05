@@ -31,6 +31,20 @@ export type RecordingDto = {
             readonly height?: number | undefined;
             readonly url: string;
         } | undefined;
+        readonly assets: ReadonlyArray<{
+            readonly id: number;
+            readonly comment: string;
+            readonly mediaFile: {
+                readonly id: number;
+                readonly sha256: string;
+                readonly objectKey: string;
+                readonly mimeType: string;
+                readonly size: number;
+                readonly width?: number | undefined;
+                readonly height?: number | undefined;
+                readonly url: string;
+            };
+        }>;
     }, 
     'RecordingController/SIMILAR_RECORDING_FETCHER': {
         readonly id: number;

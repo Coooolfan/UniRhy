@@ -18,7 +18,6 @@ class PlaybackPlayCoordinator(
         commandId: String,
         initiatorDeviceId: String?,
         recordingId: Long,
-        mediaFileId: Long,
         positionSeconds: Double,
         nowMs: Long,
         logDeviceId: String? = initiatorDeviceId,
@@ -28,7 +27,6 @@ class PlaybackPlayCoordinator(
             commandId = commandId,
             initiatorDeviceId = initiatorDeviceId,
             recordingId = recordingId,
-            mediaFileId = mediaFileId,
             positionSeconds = positionSeconds,
             nowMs = nowMs,
             timeoutAtMs = nowMs + PlaybackSchedulerService.PENDING_PLAY_TIMEOUT_MS,
@@ -39,8 +37,6 @@ class PlaybackPlayCoordinator(
             payload = LoadAudioSourcePayload(
                 commandId = commandId,
                 recordingId = recordingId,
-                mediaFileId = mediaFileId,
-                presignedUrl = "",
             ),
         )
 

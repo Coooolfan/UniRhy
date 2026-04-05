@@ -1,4 +1,5 @@
 export type {AccountCreate} from './AccountCreate';
+export type {AccountPreferences} from './AccountPreferences';
 export type {AccountUpdate} from './AccountUpdate';
 export type {AiModelConfig} from './AiModelConfig';
 export type {AsyncTaskLogCountRow} from './AsyncTaskLogCountRow';

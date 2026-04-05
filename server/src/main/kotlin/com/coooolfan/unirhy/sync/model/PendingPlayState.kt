@@ -4,7 +4,6 @@ data class PendingPlayState(
     val commandId: String,
     val initiatorDeviceId: String?,
     val recordingId: Long,
-    val mediaFileId: Long,
     val positionSeconds: Double,
     val clientsLoaded: MutableSet<String>,
     val createdAtMs: Long,
