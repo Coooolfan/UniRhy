@@ -23,6 +23,8 @@ const audioStore = reactive({
     syncStatusText: '同步重连中',
     canSendRealtimeControl: false,
     canNavigateQueue: false,
+    playbackStrategy: 'SEQUENTIAL',
+    stopStrategy: 'LIST',
     currentQueueEntry: {
         entryId: 101,
     },
@@ -41,6 +43,7 @@ const audioStore = reactive({
     resume: vi.fn(),
     playNext: vi.fn(),
     playPrevious: vi.fn(),
+    updateQueueStrategies: vi.fn(),
     playQueueEntry: vi.fn(),
     clearQueue: vi.fn(),
     reorderQueue: vi.fn(),
@@ -84,6 +87,8 @@ describe('AudioPlayer', () => {
         audioStore.syncStatusText = '同步重连中'
         audioStore.canSendRealtimeControl = false
         audioStore.canNavigateQueue = false
+        audioStore.playbackStrategy = 'SEQUENTIAL'
+        audioStore.stopStrategy = 'LIST'
         audioStore.currentQueueEntry = {
             entryId: 101,
         }
@@ -102,6 +107,7 @@ describe('AudioPlayer', () => {
         audioStore.resume.mockReset()
         audioStore.playNext.mockReset()
         audioStore.playPrevious.mockReset()
+        audioStore.updateQueueStrategies.mockReset()
         audioStore.playQueueEntry.mockReset()
         audioStore.clearQueue.mockReset()
         audioStore.reorderQueue.mockReset()
@@ -234,5 +240,16 @@ describe('AudioPlayer', () => {
         expect(wrapper.find('[data-test="queue-sidebar"]').exists()).toBe(true)
         expect(wrapper.text()).toContain('Current Queue')
         expect(wrapper.text()).toContain('2 tracks')
+    })
+
+    it('updates playback and stop strategies through the store', async () => {
+        const wrapper = mount(AudioPlayer)
+
+        await wrapper.get('[data-test="queue-toggle-button"]').trigger('click')
+        await wrapper.get('[data-test="playback-strategy-select"]').setValue('SHUFFLE')
+        await wrapper.get('[data-test="stop-strategy-select"]').setValue('TRACK')
+
+        expect(audioStore.updateQueueStrategies).toHaveBeenNthCalledWith(1, 'SHUFFLE', 'LIST')
+        expect(audioStore.updateQueueStrategies).toHaveBeenNthCalledWith(2, 'SEQUENTIAL', 'TRACK')
     })
 })

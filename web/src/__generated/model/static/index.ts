@@ -9,6 +9,7 @@ export type {CurrentQueueItemDto} from './CurrentQueueItemDto';
 export type {CurrentQueueReorderRequest} from './CurrentQueueReorderRequest';
 export type {CurrentQueueReplaceRequest} from './CurrentQueueReplaceRequest';
 export type {CurrentQueueSetCurrentRequest} from './CurrentQueueSetCurrentRequest';
+export type {CurrentQueueStrategyUpdateRequest} from './CurrentQueueStrategyUpdateRequest';
 export type {Embedding} from './Embedding';
 export type {FileProviderFileSystemCreate} from './FileProviderFileSystemCreate';
 export type {FileProviderFileSystemUpdate} from './FileProviderFileSystemUpdate';

@@ -55,6 +55,28 @@ class PlaybackQueueMutationCoordinator(
         return scheduledAction
     }
 
+    fun handleQueueNavigation(
+        accountId: Long,
+        change: CurrentQueueChangeResult,
+        nowMs: Long,
+    ) {
+        if (!change.changed) {
+            return
+        }
+        val currentEntry = change.currentEntry ?: return
+        playbackSchedulerService.cancelPendingPlayTimeout(accountId)
+        playbackSessionService.clearPendingPlay(accountId)
+        playCoordinator.initiatePlay(
+            accountId = accountId,
+            commandId = "queue-nav-$nowMs",
+            initiatorDeviceId = null,
+            recordingId = currentEntry.recordingId,
+            positionSeconds = 0.0,
+            nowMs = nowMs,
+            logDeviceId = null,
+        )
+    }
+
     fun handleCurrentEntryRemoved(
         accountId: Long,
         change: CurrentQueueChangeResult,

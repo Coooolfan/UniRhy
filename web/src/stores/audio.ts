@@ -1,6 +1,7 @@
 import { computed, ref, shallowRef } from 'vue'
 import { defineStore } from 'pinia'
-import { api } from '@/ApiInstance'
+import { api, getAuthToken, normalizeApiError } from '@/ApiInstance'
+import { buildApiUrl } from '@/runtime/platform'
 import { useUserStore } from '@/stores/user'
 import {
     PlaybackSyncClient,
@@ -11,11 +12,13 @@ import type {
     CurrentQueueDto,
     DeviceChangePayload,
     LoadAudioSourcePayload,
+    PlaybackStrategy,
     PlaybackSyncStatePayload,
     QueueChangePayload,
     ScheduledActionPayload,
     ServerPlaybackSyncMessage,
     SnapshotPayload,
+    StopStrategy,
 } from '@/services/playbackSyncProtocol'
 import {
     type AudioQueueEntry,
@@ -54,6 +57,25 @@ type QueuedPlayIntent = {
 type BufferLoadState = {
     mediaFileId: number
     promise: Promise<AudioBuffer | null>
+}
+
+const isCurrentQueueDto = (value: unknown): value is CurrentQueueDto => {
+    if (typeof value !== 'object' || value === null) {
+        return false
+    }
+    if (!('items' in value) || !Array.isArray(value.items)) {
+        return false
+    }
+    return (
+        'playbackStrategy' in value &&
+        typeof value.playbackStrategy === 'string' &&
+        'stopStrategy' in value &&
+        typeof value.stopStrategy === 'string' &&
+        'version' in value &&
+        typeof value.version === 'number' &&
+        'updatedAtMs' in value &&
+        typeof value.updatedAtMs === 'number'
+    )
 }
 
 export const useAudioStore = defineStore('audio', () => {
@@ -193,6 +215,9 @@ export const useAudioStore = defineStore('audio', () => {
     const canNavigateQueue = computed(() => {
         return currentQueue.value.items.length > 0 && canSendRealtimeControl.value
     })
+
+    const playbackStrategy = computed(() => currentQueue.value.playbackStrategy)
+    const stopStrategy = computed(() => currentQueue.value.stopStrategy)
 
     const playbackSyncDebugSnapshot = computed<PlaybackSyncDebugSnapshot>(() => {
         const queuedIntent = queuedPlayIntent.value
@@ -1050,6 +1075,64 @@ export const useAudioStore = defineStore('audio', () => {
         sendPlayCommand(track, positionSeconds)
     }
 
+    const requestCurrentQueue = async (
+        path: string,
+        init: {
+            method: 'POST' | 'PUT'
+            body?: Record<string, unknown>
+        },
+    ): Promise<CurrentQueueDto> => {
+        const headers: HeadersInit = {
+            'content-type': 'application/json;charset=UTF-8',
+        }
+        const token = getAuthToken()
+        if (token) {
+            headers['unirhy-token'] = token
+        }
+
+        const response = await fetch(buildApiUrl(path), {
+            method: init.method,
+            credentials: 'include',
+            headers,
+            ...(init.body ? { body: JSON.stringify(init.body) } : {}),
+        })
+
+        if (!response.ok) {
+            let errorBody: unknown = null
+            try {
+                errorBody = await response.json()
+            } catch {
+                errorBody = null
+            }
+            const normalized = normalizeApiError(
+                errorBody ?? new Error(`Request failed: ${response.status}`),
+            )
+            throw new Error(normalized.message ?? `Request failed: ${response.status}`)
+        }
+
+        const data: unknown = await response.json()
+        if (!isCurrentQueueDto(data)) {
+            throw new Error('Invalid current queue response')
+        }
+        return data
+    }
+
+    const normalizeQueueResponse = (queue: {
+        items: CurrentQueueDto['items']
+        currentEntryId?: number
+        version: number
+        updatedAtMs: number
+        playbackStrategy?: PlaybackStrategy
+        stopStrategy?: StopStrategy
+    }): CurrentQueueDto => ({
+        items: queue.items,
+        ...(queue.currentEntryId === undefined ? {} : { currentEntryId: queue.currentEntryId }),
+        playbackStrategy: queue.playbackStrategy ?? currentQueue.value.playbackStrategy,
+        stopStrategy: queue.stopStrategy ?? currentQueue.value.stopStrategy,
+        version: queue.version,
+        updatedAtMs: queue.updatedAtMs,
+    })
+
     async function replaceQueueAndPlay(tracks: AudioTrack[], currentIndex: number) {
         if (tracks.length === 0 || currentIndex < 0 || currentIndex >= tracks.length) {
             return
@@ -1071,7 +1154,7 @@ export const useAudioStore = defineStore('audio', () => {
                     const queue = await api.playbackQueueController.setCurrentEntry({
                         body: { entryId: targetQueueEntry.entryId },
                     })
-                    applyQueueSnapshot(queue)
+                    applyQueueSnapshot(normalizeQueueResponse(queue))
                     await requestPlay(targetTrack, 0)
                     return
                 }
@@ -1099,7 +1182,7 @@ export const useAudioStore = defineStore('audio', () => {
                     currentIndex,
                 },
             })
-            applyQueueSnapshot(queue)
+            applyQueueSnapshot(normalizeQueueResponse(queue))
         } else {
             currentQueue.value = {
                 items: tracks.map((track, index) => ({
@@ -1111,6 +1194,8 @@ export const useAudioStore = defineStore('audio', () => {
                     durationMs: 0,
                 })),
                 currentEntryId: currentIndex + 1,
+                playbackStrategy: 'SEQUENTIAL',
+                stopStrategy: 'LIST',
                 version: currentQueue.value.version + 1,
                 updatedAtMs: nowClientMs(),
             }
@@ -1132,7 +1217,7 @@ export const useAudioStore = defineStore('audio', () => {
                 recordingIds: tracks.map((track) => track.id),
             },
         })
-        applyQueueSnapshot(queue)
+        applyQueueSnapshot(normalizeQueueResponse(queue))
     }
 
     async function reorderQueue(entryIds: number[]) {
@@ -1143,19 +1228,20 @@ export const useAudioStore = defineStore('audio', () => {
         const queue = await api.playbackQueueController.reorderCurrentQueue({
             body: { entryIds },
         })
-        applyQueueSnapshot(queue)
+        applyQueueSnapshot(normalizeQueueResponse(queue))
     }
 
     async function playQueueEntry(entryId: number) {
         const queue = await api.playbackQueueController.setCurrentEntry({
             body: { entryId },
         })
-        applyQueueSnapshot(queue)
-        const nextCurrentEntry = queue.currentEntryId
+        const normalizedQueue = normalizeQueueResponse(queue)
+        applyQueueSnapshot(normalizedQueue)
+        const nextCurrentEntry = normalizedQueue.currentEntryId
         if (nextCurrentEntry === undefined) {
             return
         }
-        const currentItem = queue.items.find((item) => item.entryId === nextCurrentEntry)
+        const currentItem = normalizedQueue.items.find((item) => item.entryId === nextCurrentEntry)
         if (!currentItem) {
             return
         }
@@ -1167,45 +1253,44 @@ export const useAudioStore = defineStore('audio', () => {
         if (currentQueue.value.items.length === 0) {
             return
         }
-
-        const nextIndex =
-            currentQueueIndex.value < 0
-                ? 0
-                : (currentQueueIndex.value + 1) % currentQueue.value.items.length
-        const nextEntry = currentQueue.value.items[nextIndex]
-        if (!nextEntry) {
-            return
-        }
-
-        await playQueueEntry(nextEntry.entryId)
+        const queue = await requestCurrentQueue('/api/playback/current-queue/next', {
+            method: 'POST',
+        })
+        applyQueueSnapshot(queue)
     }
 
     async function playPrevious() {
         if (currentQueue.value.items.length === 0) {
             return
         }
+        const queue = await requestCurrentQueue('/api/playback/current-queue/previous', {
+            method: 'POST',
+        })
+        applyQueueSnapshot(queue)
+    }
 
-        const previousIndex =
-            currentQueueIndex.value < 0
-                ? 0
-                : (currentQueueIndex.value - 1 + currentQueue.value.items.length) %
-                  currentQueue.value.items.length
-        const previousEntry = currentQueue.value.items[previousIndex]
-        if (!previousEntry) {
-            return
-        }
-
-        await playQueueEntry(previousEntry.entryId)
+    async function updateQueueStrategies(
+        nextPlaybackStrategy: PlaybackStrategy,
+        nextStopStrategy: StopStrategy,
+    ) {
+        const queue = await requestCurrentQueue('/api/playback/current-queue/strategy', {
+            method: 'PUT',
+            body: {
+                playbackStrategy: nextPlaybackStrategy,
+                stopStrategy: nextStopStrategy,
+            },
+        })
+        applyQueueSnapshot(queue)
     }
 
     async function removeQueueEntry(entryId: number) {
         const queue = await api.playbackQueueController.removeCurrentQueueEntry({ entryId })
-        applyQueueSnapshot(queue)
+        applyQueueSnapshot(normalizeQueueResponse(queue))
     }
 
     async function clearQueue() {
         const queue = await api.playbackQueueController.clearCurrentQueue()
-        applyQueueSnapshot(queue)
+        applyQueueSnapshot(normalizeQueueResponse(queue))
     }
 
     function pause() {
@@ -1366,6 +1451,8 @@ export const useAudioStore = defineStore('audio', () => {
         syncStatusText,
         canSendRealtimeControl,
         canNavigateQueue,
+        playbackStrategy,
+        stopStrategy,
         play,
         replaceQueueAndPlay,
         appendToQueue,
@@ -1373,6 +1460,7 @@ export const useAudioStore = defineStore('audio', () => {
         playQueueEntry,
         playNext,
         playPrevious,
+        updateQueueStrategies,
         removeQueueEntry,
         clearQueue,
         pause,

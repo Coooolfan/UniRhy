@@ -448,6 +448,8 @@ const buildQueue = (tracks: AudioTrack[], currentIndex = 0) => ({
         durationMs: 180_000,
     })),
     ...(tracks[currentIndex] ? { currentEntryId: currentIndex + 1 } : {}),
+    playbackStrategy: 'SEQUENTIAL' as const,
+    stopStrategy: 'LIST' as const,
     version: 1,
     updatedAtMs: nowClientMs(),
 })
@@ -507,6 +509,10 @@ const buildRecordingMetadata = (
 
 const createResponse = (duration: number, status = 200) => {
     return new Response(new Uint8Array([duration]).buffer, { status })
+}
+
+const createJsonResponse = (body: unknown, status = 200) => {
+    return Response.json(body, { status })
 }
 
 const createDeferred = <T>() => {
@@ -652,7 +658,9 @@ describe('audio store', () => {
     })
 
     it('advances to the next queue entry through the server current queue API', async () => {
-        fetchMock.mockResolvedValue(createResponse(45))
+        fetchMock.mockResolvedValueOnce(
+            createJsonResponse(buildQueue([buildTrack(5), buildTrack(6)], 1)),
+        )
 
         const audioStore = useAudioStore()
         audioStore.connectPlaybackSync()
@@ -671,20 +679,55 @@ describe('audio store', () => {
         })
         await flushPromises()
 
-        setCurrentEntryMock.mockResolvedValueOnce(buildQueue([buildTrack(5), buildTrack(6)], 1))
-
         await audioStore.playNext()
 
-        expect(setCurrentEntryMock).toHaveBeenCalledWith({
-            body: { entryId: 2 },
+        expect(fetchMock).toHaveBeenCalledWith('/api/playback/current-queue/next', {
+            method: 'POST',
+            credentials: 'include',
+            headers: {
+                'content-type': 'application/json;charset=UTF-8',
+            },
         })
-        expect(client.sendPlay).toHaveBeenCalledWith(
-            expect.objectContaining({
-                recordingId: 6,
-                mediaFileId: undefined,
-                positionSeconds: 0,
+        expect(audioStore.currentQueueEntry?.entryId).toBe(2)
+        expect(audioStore.currentTrack?.id).toBe(6)
+        expect(client.sendPlay).not.toHaveBeenCalled()
+    })
+
+    it('updates queue strategies through the server current queue API', async () => {
+        fetchMock.mockResolvedValueOnce(
+            createJsonResponse({
+                ...buildQueue([buildTrack(7)], 0),
+                playbackStrategy: 'RADIO',
+                stopStrategy: 'TRACK',
             }),
         )
+
+        const audioStore = useAudioStore()
+        audioStore.connectPlaybackSync()
+        const client = latestClient()
+        client.emitMessage({
+            type: 'ROOM_EVENT_QUEUE_CHANGE',
+            payload: {
+                queue: buildQueue([buildTrack(7)], 0),
+            },
+        })
+        await flushPromises()
+
+        await audioStore.updateQueueStrategies('RADIO', 'TRACK')
+
+        expect(fetchMock).toHaveBeenCalledWith('/api/playback/current-queue/strategy', {
+            method: 'PUT',
+            credentials: 'include',
+            headers: {
+                'content-type': 'application/json;charset=UTF-8',
+            },
+            body: JSON.stringify({
+                playbackStrategy: 'RADIO',
+                stopStrategy: 'TRACK',
+            }),
+        })
+        expect(audioStore.playbackStrategy).toBe('RADIO')
+        expect(audioStore.stopStrategy).toBe('TRACK')
     })
 
     it('loads audio on load-audio-source and acknowledges after decoding', async () => {

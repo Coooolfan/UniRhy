@@ -570,6 +570,8 @@ class PlaybackSyncWebSocketHandlerTest {
 private class FakeCurrentQueueRecordingCatalog : CurrentQueueRecordingCatalog {
     override fun getExistingRecordingIds(recordingIds: Set<Long>): Set<Long> = recordingIds
 
+    override fun countWorks(): Int = 0
+
     override fun loadResolvedRecordings(
         recordingIds: Set<Long>,
         requiredMediaFileId: Long?,
@@ -586,6 +588,7 @@ private class FakeCurrentQueueRecordingCatalog : CurrentQueueRecordingCatalog {
             ResolvedQueueRecording(
                 recordingId = recordingId,
                 mediaFileId = mediaFileId,
+                workId = recordingId,
                 title = "Track $recordingId",
                 artistLabel = "Artist $recordingId",
                 coverMediaFileId = null,
@@ -593,6 +596,11 @@ private class FakeCurrentQueueRecordingCatalog : CurrentQueueRecordingCatalog {
             )
         }
     }
+
+    override fun findFirstSimilarRecordingId(
+        recordingId: Long,
+        excludedWorkIds: Set<Long>,
+    ): Long? = null
 }
 
 private class FakePlaybackSyncMediaCatalog : PlaybackSyncMediaCatalog {

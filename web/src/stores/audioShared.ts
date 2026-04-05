@@ -181,6 +181,8 @@ export const isSameTrackRef = (left: AudioTrack | null, right: AudioTrack) => {
 
 export const createEmptyQueue = (): CurrentQueueDto => ({
     items: [],
+    playbackStrategy: 'SEQUENTIAL',
+    stopStrategy: 'LIST',
     version: 0,
     updatedAtMs: 0,
 })
@@ -188,6 +190,8 @@ export const createEmptyQueue = (): CurrentQueueDto => ({
 export const cloneQueue = (queue: CurrentQueueDto): CurrentQueueDto => ({
     items: queue.items.map((item) => ({ ...item })),
     ...(queue.currentEntryId === undefined ? {} : { currentEntryId: queue.currentEntryId }),
+    playbackStrategy: queue.playbackStrategy,
+    stopStrategy: queue.stopStrategy,
     version: queue.version,
     updatedAtMs: queue.updatedAtMs,
 })

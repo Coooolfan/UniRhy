@@ -184,11 +184,18 @@ class PlaybackSyncSessionRemovalCoordinatorTest {
             return recordingIds
         }
 
+        override fun countWorks(): Int = 0
+
         override fun loadResolvedRecordings(
             recordingIds: Set<Long>,
             requiredMediaFileId: Long?,
         ): List<ResolvedQueueRecording> {
             return emptyList()
         }
+
+        override fun findFirstSimilarRecordingId(
+            recordingId: Long,
+            excludedWorkIds: Set<Long>,
+        ): Long? = null
     }
 }

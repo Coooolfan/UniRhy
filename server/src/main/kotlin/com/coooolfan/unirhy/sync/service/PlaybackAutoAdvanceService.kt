@@ -2,6 +2,7 @@ package com.coooolfan.unirhy.sync.service
 
 import com.coooolfan.unirhy.sync.protocol.PlaybackStatus
 import com.coooolfan.unirhy.sync.protocol.ScheduledActionPayload
+import com.coooolfan.unirhy.sync.protocol.StopStrategy
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.stereotype.Service
 import java.util.concurrent.ConcurrentHashMap
@@ -66,7 +67,20 @@ class PlaybackAutoAdvanceService(
 
     private fun advanceToNext(accountId: Long) {
         val nowMs = timeProvider.nowMs()
-        val queueChange = currentQueueService.advanceToNext(accountId, nowMs) ?: return
+        val queue = currentQueueService.getQueue(accountId)
+        if (queue.currentEntryId == null) {
+            return
+        }
+        if (queue.stopStrategy == StopStrategy.TRACK) {
+            stopAtCurrentEntry(accountId, nowMs)
+            return
+        }
+
+        val queueChange = currentQueueService.navigateToNext(accountId, nowMs)
+        if (!queueChange.changed) {
+            stopAtCurrentEntry(accountId, nowMs)
+            return
+        }
         messageSender.broadcastQueueChange(accountId, queueChange.queue)
 
         val nextEntry = queueChange.currentEntry ?: return
@@ -100,5 +114,22 @@ class PlaybackAutoAdvanceService(
             scheduledActionDispatcher.broadcastAndLog(accountId, null, scheduledAction, timeoutNowMs)
             syncFromScheduledAction(accountId, scheduledAction, timeoutNowMs)
         }
+    }
+
+    private fun stopAtCurrentEntry(
+        accountId: Long,
+        nowMs: Long,
+    ) {
+        val currentEntry = currentQueueService.getCurrentEntry(accountId)
+        val scheduledAction = playbackSessionService.schedulePause(
+            accountId = accountId,
+            commandId = "auto-stop-$nowMs",
+            recordingId = currentEntry?.recordingId,
+            positionSeconds = 0.0,
+            nowMs = nowMs,
+            executeAtMs = playbackSchedulerService.calculateExecuteAtMs(accountId, nowMs),
+        )
+        scheduledActionDispatcher.broadcastAndLog(accountId, null, scheduledAction, nowMs)
+        syncFromScheduledAction(accountId, scheduledAction, nowMs)
     }
 }

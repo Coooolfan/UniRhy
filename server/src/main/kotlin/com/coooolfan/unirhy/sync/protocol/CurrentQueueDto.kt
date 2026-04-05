@@ -1,5 +1,16 @@
 package com.coooolfan.unirhy.sync.protocol
 
+enum class PlaybackStrategy {
+    SEQUENTIAL,
+    SHUFFLE,
+    RADIO,
+}
+
+enum class StopStrategy {
+    TRACK,
+    LIST,
+}
+
 data class CurrentQueueItemDto(
     val entryId: Long,
     val recordingId: Long,
@@ -12,6 +23,8 @@ data class CurrentQueueItemDto(
 data class CurrentQueueDto(
     val items: List<CurrentQueueItemDto>,
     val currentEntryId: Long? = null,
+    val playbackStrategy: PlaybackStrategy,
+    val stopStrategy: StopStrategy,
     val version: Long,
     val updatedAtMs: Long,
 )

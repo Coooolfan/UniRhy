@@ -4,7 +4,8 @@ import type {
     CurrentQueueDto, 
     CurrentQueueReorderRequest, 
     CurrentQueueReplaceRequest, 
-    CurrentQueueSetCurrentRequest
+    CurrentQueueSetCurrentRequest, 
+    CurrentQueueStrategyUpdateRequest
 } from '../model/static/';
 
 export class PlaybackQueueController {
@@ -30,6 +31,20 @@ export class PlaybackQueueController {
     > = async() => {
         let _uri = '/api/playback/current-queue';
         return (await this.executor({uri: _uri, method: 'GET'})) as Promise<CurrentQueueDto>;
+    }
+    
+    readonly playNextInCurrentQueue: () => Promise<
+        CurrentQueueDto
+    > = async() => {
+        let _uri = '/api/playback/current-queue/next';
+        return (await this.executor({uri: _uri, method: 'POST'})) as Promise<CurrentQueueDto>;
+    }
+    
+    readonly playPreviousInCurrentQueue: () => Promise<
+        CurrentQueueDto
+    > = async() => {
+        let _uri = '/api/playback/current-queue/previous';
+        return (await this.executor({uri: _uri, method: 'POST'})) as Promise<CurrentQueueDto>;
     }
     
     readonly removeCurrentQueueEntry: (options: PlaybackQueueControllerOptions['removeCurrentQueueEntry']) => Promise<
@@ -60,6 +75,13 @@ export class PlaybackQueueController {
         let _uri = '/api/playback/current-queue/current';
         return (await this.executor({uri: _uri, method: 'PUT', body: options.body})) as Promise<CurrentQueueDto>;
     }
+    
+    readonly updateCurrentQueueStrategy: (options: PlaybackQueueControllerOptions['updateCurrentQueueStrategy']) => Promise<
+        CurrentQueueDto
+    > = async(options) => {
+        let _uri = '/api/playback/current-queue/strategy';
+        return (await this.executor({uri: _uri, method: 'PUT', body: options.body})) as Promise<CurrentQueueDto>;
+    }
 }
 
 export type PlaybackQueueControllerOptions = {
@@ -76,6 +98,11 @@ export type PlaybackQueueControllerOptions = {
     'setCurrentEntry': {
         readonly body: CurrentQueueSetCurrentRequest
     }, 
+    'updateCurrentQueueStrategy': {
+        readonly body: CurrentQueueStrategyUpdateRequest
+    }, 
+    'playNextInCurrentQueue': {}, 
+    'playPreviousInCurrentQueue': {}, 
     'removeCurrentQueueEntry': {
         readonly entryId: number
     }, 

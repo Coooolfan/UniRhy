@@ -16,6 +16,8 @@ export type PlaybackSyncMessageType =
 
 export type PlaybackStatus = 'PLAYING' | 'PAUSED'
 export type ScheduledActionType = 'PLAY' | 'PAUSE' | 'SEEK'
+export type PlaybackStrategy = 'SEQUENTIAL' | 'SHUFFLE' | 'RADIO'
+export type StopStrategy = 'TRACK' | 'LIST'
 export type PlaybackSyncErrorCode =
     | 'INVALID_MESSAGE'
     | 'UNSUPPORTED_MESSAGE'
@@ -88,6 +90,8 @@ export type CurrentQueueItemDto = {
 export type CurrentQueueDto = {
     items: readonly CurrentQueueItemDto[]
     currentEntryId?: number
+    playbackStrategy: PlaybackStrategy
+    stopStrategy: StopStrategy
     version: number
     updatedAtMs: number
 }

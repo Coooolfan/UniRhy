@@ -2,10 +2,7 @@ package com.coooolfan.unirhy.controller
 
 import cn.dev33.satoken.annotation.SaCheckLogin
 import cn.dev33.satoken.stp.StpUtil
-import com.coooolfan.unirhy.model.dto.CurrentQueueAppendRequest
-import com.coooolfan.unirhy.model.dto.CurrentQueueReorderRequest
-import com.coooolfan.unirhy.model.dto.CurrentQueueReplaceRequest
-import com.coooolfan.unirhy.model.dto.CurrentQueueSetCurrentRequest
+import com.coooolfan.unirhy.model.dto.*
 import com.coooolfan.unirhy.sync.protocol.CurrentQueueDto
 import com.coooolfan.unirhy.sync.service.CurrentQueueService
 import com.coooolfan.unirhy.sync.service.PlaybackQueueMutationCoordinator
@@ -38,7 +35,7 @@ class PlaybackQueueController(
             recordings = currentQueueService.resolvePlayableRecordings(input.recordingIds),
             currentIndex = input.currentIndex,
         )
-        messageSender.broadcastQueueChange(accountId, change.queue)
+        broadcastQueueIfChanged(accountId, change)
         queueMutationCoordinator.syncPausedPlaybackToCurrentQueue(
             accountId = accountId,
             currentEntry = change.currentEntry,
@@ -57,7 +54,7 @@ class PlaybackQueueController(
             accountId = accountId,
             recordings = currentQueueService.resolvePlayableRecordings(input.recordingIds),
         )
-        messageSender.broadcastQueueChange(accountId, change.queue)
+        broadcastQueueIfChanged(accountId, change)
         return change.queue
     }
 
@@ -71,7 +68,7 @@ class PlaybackQueueController(
             accountId = accountId,
             entryIds = input.entryIds,
         )
-        messageSender.broadcastQueueChange(accountId, change.queue)
+        broadcastQueueIfChanged(accountId, change)
         return change.queue
     }
 
@@ -85,12 +82,47 @@ class PlaybackQueueController(
             accountId = accountId,
             entryId = input.entryId,
         )
-        messageSender.broadcastQueueChange(accountId, change.queue)
+        broadcastQueueIfChanged(accountId, change)
         queueMutationCoordinator.syncPausedPlaybackToCurrentQueue(
             accountId = accountId,
             currentEntry = change.currentEntry,
             nowMs = change.queue.updatedAtMs,
         )
+        return change.queue
+    }
+
+    @PutMapping("/strategy")
+    @ResponseStatus(HttpStatus.OK)
+    fun updateCurrentQueueStrategy(
+        @RequestBody input: CurrentQueueStrategyUpdateRequest,
+    ): CurrentQueueDto {
+        val accountId = currentAccountId()
+        val change = currentQueueService.updateStrategies(
+            accountId = accountId,
+            playbackStrategy = input.playbackStrategy,
+            stopStrategy = input.stopStrategy,
+        )
+        broadcastQueueIfChanged(accountId, change)
+        return change.queue
+    }
+
+    @PostMapping("/next")
+    @ResponseStatus(HttpStatus.OK)
+    fun playNextInCurrentQueue(): CurrentQueueDto {
+        val accountId = currentAccountId()
+        val change = currentQueueService.navigateToNext(accountId)
+        broadcastQueueIfChanged(accountId, change)
+        queueMutationCoordinator.handleQueueNavigation(accountId, change, change.queue.updatedAtMs)
+        return change.queue
+    }
+
+    @PostMapping("/previous")
+    @ResponseStatus(HttpStatus.OK)
+    fun playPreviousInCurrentQueue(): CurrentQueueDto {
+        val accountId = currentAccountId()
+        val change = currentQueueService.navigateToPrevious(accountId)
+        broadcastQueueIfChanged(accountId, change)
+        queueMutationCoordinator.handleQueueNavigation(accountId, change, change.queue.updatedAtMs)
         return change.queue
     }
 
@@ -104,7 +136,7 @@ class PlaybackQueueController(
             accountId = accountId,
             entryId = entryId,
         )
-        messageSender.broadcastQueueChange(accountId, change.queue)
+        broadcastQueueIfChanged(accountId, change)
         queueMutationCoordinator.handleCurrentEntryRemoved(
             accountId = accountId,
             change = change,
@@ -118,12 +150,22 @@ class PlaybackQueueController(
     fun clearCurrentQueue(): CurrentQueueDto {
         val accountId = currentAccountId()
         val change = currentQueueService.clearQueue(accountId)
-        messageSender.broadcastQueueChange(accountId, change.queue)
+        broadcastQueueIfChanged(accountId, change)
         queueMutationCoordinator.handleQueueCleared(
             accountId = accountId,
             nowMs = change.queue.updatedAtMs,
         )
         return change.queue
+    }
+
+    private fun broadcastQueueIfChanged(
+        accountId: Long,
+        change: com.coooolfan.unirhy.sync.service.CurrentQueueChangeResult,
+    ) {
+        if (!change.changed) {
+            return
+        }
+        messageSender.broadcastQueueChange(accountId, change.queue)
     }
 
     private fun currentAccountId(): Long = StpUtil.getLoginIdAsLong()
