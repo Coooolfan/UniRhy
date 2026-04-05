@@ -50,13 +50,15 @@ class VectorizeTaskService(
         queueStore.enqueueIgnoringConflicts(TaskType.VECTORIZE, paramsJsonList)
     }
 
-    fun consumePendingTask() {
-        try {
+    fun consumePendingTask(): Boolean {
+        return try {
+            var consumedTask = false
             transactionTemplate.executeWithoutResult {
                 val claimedTasks = queueStore.claim(TaskType.VECTORIZE, VECTORIZE_CLAIM_LIMIT)
                 if (claimedTasks.isEmpty()) {
                     return@executeWithoutResult
                 }
+                consumedTask = true
 
                 val completionUpdates = mutableListOf<AsyncTaskLog>()
 
@@ -141,8 +143,10 @@ class VectorizeTaskService(
 
                 sql.saveEntities(completionUpdates, SaveMode.UPDATE_ONLY)
             }
+            consumedTask
         } catch (ex: Throwable) {
             logger.error("Failed to consume pending vectorize task", ex)
+            false
         }
     }
 

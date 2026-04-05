@@ -48,13 +48,15 @@ class DataCleanTaskService(
         queueStore.enqueueIgnoringConflicts(TaskType.DATA_CLEAN, paramsJsonList)
     }
 
-    fun consumePendingTask() {
-        try {
+    fun consumePendingTask(): Boolean {
+        return try {
+            var consumedTask = false
             transactionTemplate.executeWithoutResult {
                 val claimedTasks = queueStore.claim(TaskType.DATA_CLEAN, DATA_CLEAN_CLAIM_LIMIT)
                 if (claimedTasks.isEmpty()) {
                     return@executeWithoutResult
                 }
+                consumedTask = true
 
                 val completionUpdates = mutableListOf<AsyncTaskLog>()
 
@@ -152,8 +154,10 @@ class DataCleanTaskService(
 
                 sql.saveEntities(completionUpdates, SaveMode.UPDATE_ONLY)
             }
+            consumedTask
         } catch (ex: Throwable) {
             logger.error("Failed to consume pending data clean task", ex)
+            false
         }
     }
 

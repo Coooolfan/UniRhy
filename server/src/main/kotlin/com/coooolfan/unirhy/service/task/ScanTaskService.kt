@@ -51,10 +51,15 @@ class ScanTaskService(
         queueStore.enqueueIgnoringConflicts(TaskType.METADATA_PARSE, paramsJsonBatch)
     }
 
-    fun consumePendingTask() {
-        try {
+    fun consumePendingTask(): Boolean {
+        return try {
+            var consumedTask = false
             transactionTemplate.executeWithoutResult {
                 val claimedTasks = queueStore.claim(TaskType.METADATA_PARSE, METADATA_PARSE_CLAIM_LIMIT)
+                if (claimedTasks.isEmpty()) {
+                    return@executeWithoutResult
+                }
+                consumedTask = true
 
                 val completionUpdates = mutableListOf<AsyncTaskLog>()
                 for (claimedTask in claimedTasks) {
@@ -79,8 +84,10 @@ class ScanTaskService(
                 }
                 sql.saveEntities(completionUpdates, SaveMode.UPDATE_ONLY)
             }
+            consumedTask
         } catch (ex: Throwable) {
             logger.error("Failed to consume pending scan task", ex)
+            false
         }
     }
 

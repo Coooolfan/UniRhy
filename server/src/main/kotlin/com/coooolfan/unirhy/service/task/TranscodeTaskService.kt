@@ -58,16 +58,18 @@ class TranscodeTaskService(
         queueStore.enqueueIgnoringConflicts(TaskType.TRANSCODE, paramsJsonList)
     }
 
-    fun consumePendingTask() {
+    fun consumePendingTask(): Boolean {
         if (!consumerEnabled) {
-            return
+            return false
         }
-        try {
+        return try {
+            var consumedTask = false
             transactionTemplate.executeWithoutResult {
                 val claimedTasks = queueStore.claim(TaskType.TRANSCODE, TRANSCODE_CLAIM_LIMIT)
                 if (claimedTasks.isEmpty()) {
                     return@executeWithoutResult
                 }
+                consumedTask = true
                 val completionUpdates = mutableListOf<AsyncTaskLog>()
                 for (claimedTask in claimedTasks) {
                     try {
@@ -91,8 +93,10 @@ class TranscodeTaskService(
                 }
                 sql.saveEntities(completionUpdates, SaveMode.UPDATE_ONLY)
             }
+            consumedTask
         } catch (ex: Throwable) {
             logger.error("Failed to consume pending transcode task", ex)
+            false
         }
     }
 

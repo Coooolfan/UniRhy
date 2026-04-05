@@ -50,11 +50,13 @@ class PlaylistGenerateTaskService(
         )
     }
 
-    fun consumePendingTask() {
-        try {
+    fun consumePendingTask(): Boolean {
+        return try {
+            var consumedTask = false
             transactionTemplate.executeWithoutResult {
                 val claimedTasks = queueStore.claim(TaskType.PLAYLIST_GENERATE, CLAIM_LIMIT)
                 if (claimedTasks.isEmpty()) return@executeWithoutResult
+                consumedTask = true
 
                 val task = claimedTasks.first()
                 val payload = objectMapper.readValue(task.params, PlaylistGenerateTaskPayload::class.java)
@@ -172,8 +174,10 @@ class PlaylistGenerateTaskService(
                     )
                 }
             }
+            consumedTask
         } catch (ex: Throwable) {
             logger.error("Failed to consume pending playlist-generate task", ex)
+            false
         }
     }
 

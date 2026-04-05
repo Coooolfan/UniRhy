@@ -182,11 +182,11 @@ const syncStatusClass = computed(() => {
         case 'ready':
             return 'text-[#42653F]'
         case 'audio_locked':
-            return 'bg-[#FAF0E0] text-[#9A6231] border border-[#EBCFA9]'
+            return 'text-[#9A6231]'
         case 'error':
-            return 'bg-[#FFF1F1] text-[#B15A5A] border border-[#F0D0D0]'
+            return 'text-[#B15A5A]'
         default:
-            return 'bg-[#F3EEE6] text-[#8C857B] border border-[#E8E0D4]'
+            return 'text-[#8C857B]'
     }
 })
 </script>
