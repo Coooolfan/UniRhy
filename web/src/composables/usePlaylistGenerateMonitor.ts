@@ -1,4 +1,5 @@
 import { type Ref, watch } from 'vue'
+import { getActivePinia } from 'pinia'
 import type { AsyncTaskLogCountRow } from '@/__generated/model/static'
 import { usePlaylistStore } from '@/stores/playlist'
 
@@ -48,10 +49,15 @@ const readPlaylistGenerateStats = (
 }
 
 export const usePlaylistGenerateMonitor = (rows: Ref<ReadonlyArray<AsyncTaskLogCountRow>>) => {
-    const playlistStore = usePlaylistStore()
-    let previousStats: PlaylistGenerateStats | null = null
+    const playlistStore = getActivePinia() ? usePlaylistStore() : null
+    let previousStats: PlaylistGenerateStats | null = readPlaylistGenerateStats(rows.value)
 
     watch(rows, async (nextRows) => {
+        if (!playlistStore) {
+            previousStats = readPlaylistGenerateStats(nextRows)
+            return
+        }
+
         const nextStats = readPlaylistGenerateStats(nextRows)
         const lastStats = previousStats
         previousStats = nextStats

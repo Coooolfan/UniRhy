@@ -88,7 +88,10 @@ export const resolvePlayableAudio = (
     assets: readonly RecordingAsset[],
     playbackPreference: PlaybackPreference = 'OPUS',
 ): PlayableAudioSource | undefined => {
-    const candidatePreferences = [playbackPreference, 'OPUS', 'RAW'] as const
+    const candidatePreferences =
+        playbackPreference === 'OPUS'
+            ? (['OPUS', 'RAW', 'MP3'] as const)
+            : ([playbackPreference, 'OPUS', 'RAW'] as const)
     for (const candidatePreference of candidatePreferences) {
         const audioAsset = assets.find((asset) => {
             const resolvedPreference = resolveAudioAssetPreference(asset)

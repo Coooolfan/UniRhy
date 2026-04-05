@@ -1,18 +1,7 @@
 <script setup lang="ts">
-import { computed, ref, watch, type Component } from 'vue'
-import {
-    ArrowRight,
-    ChevronDown,
-    Cloud,
-    FileAudio,
-    FolderSearch,
-    HardDrive,
-    Loader2,
-    Music4,
-    X,
-} from 'lucide-vue-next'
+import { computed, ref, watch } from 'vue'
+import { ArrowRight, FileAudio, FolderSearch, HardDrive, Loader2, X } from 'lucide-vue-next'
 import type { CodecType } from '@/__generated/model/enums/CodecType'
-import { type FileProviderType } from '@/__generated/model/enums/FileProviderType'
 import type { VectorizeMode } from '@/__generated/model/enums/VectorizeMode'
 import type {
     PlaylistGenerateTaskRequest,
@@ -20,8 +9,20 @@ import type {
     VectorizeTaskRequest,
 } from '@/__generated/model/static'
 import type { TaskProviderOption } from '@/composables/useTaskManagement'
-
-type TaskKind = 'METADATA_PARSE' | 'TRANSCODE' | 'VECTORIZE' | 'DATA_CLEAN' | 'PLAYLIST_GENERATE'
+import TaskSubmissionDataCleanForm from '@/components/tasks/TaskSubmissionDataCleanForm.vue'
+import TaskSubmissionMetadataParseForm from '@/components/tasks/TaskSubmissionMetadataParseForm.vue'
+import TaskSubmissionPlaylistGenerateForm from '@/components/tasks/TaskSubmissionPlaylistGenerateForm.vue'
+import TaskSubmissionTranscodeForm from '@/components/tasks/TaskSubmissionTranscodeForm.vue'
+import TaskSubmissionVectorizeForm from '@/components/tasks/TaskSubmissionVectorizeForm.vue'
+import {
+    type ProviderSelectionPayload,
+    type TaskAvailability,
+    type TaskDefinition,
+    type TaskKind,
+    TASK_OPTIONS,
+    optionValueOf,
+    syncSelectionValue,
+} from '@/components/tasks/taskSubmissionShared'
 
 type Props = {
     open: boolean
@@ -29,24 +30,6 @@ type Props = {
     isLoadingProviders: boolean
     isSubmitting: boolean
     submitError: string
-}
-
-type TaskDefinition = {
-    id: TaskKind
-    name: string
-    desc: string
-    icon: Component
-}
-
-type TaskAvailability = {
-    title: string
-    description: string
-    icon: Component
-}
-
-type ProviderSelectionPayload = {
-    providerType: FileProviderType
-    providerId: number
 }
 
 const props = defineProps<Props>()
@@ -60,62 +43,6 @@ const emit = defineEmits<{
     (event: 'submit-playlist-generate', payload: PlaylistGenerateTaskRequest): void
 }>()
 
-const TASK_ACTION_LABEL_MAP: Record<TaskKind, string> = {
-    METADATA_PARSE: '元数据解析',
-    TRANSCODE: '媒体转码',
-    VECTORIZE: '向量化',
-    DATA_CLEAN: '数据清洗',
-    PLAYLIST_GENERATE: '歌单生成',
-}
-
-const TASK_OPTIONS: TaskDefinition[] = [
-    {
-        id: 'METADATA_PARSE',
-        name: TASK_ACTION_LABEL_MAP.METADATA_PARSE,
-        desc: '遍历存储节点，发现媒体文件并补充缺失的元数据解析任务',
-        icon: FolderSearch,
-    },
-    {
-        id: 'TRANSCODE',
-        name: TASK_ACTION_LABEL_MAP.TRANSCODE,
-        desc: '按录音拆分为后台任务，批量转码为 Opus 音频资源',
-        icon: FileAudio,
-    },
-    {
-        id: 'VECTORIZE',
-        name: TASK_ACTION_LABEL_MAP.VECTORIZE,
-        desc: '按录音批量补充向量化任务，为录音生成 embedding 数据',
-        icon: Music4,
-    },
-    {
-        id: 'DATA_CLEAN',
-        name: TASK_ACTION_LABEL_MAP.DATA_CLEAN,
-        desc: '按录音批量调用外部模型清洗标题，移除后缀和描述信息',
-        icon: Music4,
-    },
-    {
-        id: 'PLAYLIST_GENERATE',
-        name: TASK_ACTION_LABEL_MAP.PLAYLIST_GENERATE,
-        desc: '根据你的描述创建智能歌单，并自动关联语义匹配的候选录音',
-        icon: Music4,
-    },
-]
-
-const TARGET_CODEC_OPTIONS: Array<{ value: CodecType; label: string; hint: string }> = [
-    { value: 'OPUS', label: 'Opus', hint: '128kbps VBR，用于流媒体播放' },
-    { value: 'MP3', label: 'MP3', hint: '16kbps 单声道，用于低带宽场景' },
-]
-
-const PROVIDER_TYPE_LABEL_MAP: Record<FileProviderType, string> = {
-    FILE_SYSTEM: '本地存储',
-    OSS: '对象存储',
-}
-
-const PROVIDER_TYPE_ICON_MAP: Record<FileProviderType, Component> = {
-    FILE_SYSTEM: HardDrive,
-    OSS: Cloud,
-}
-
 const activeTask = ref<TaskKind>('METADATA_PARSE')
 const metadataParseProviderValue = ref('')
 const transcodeSourceProviderValue = ref('')
@@ -123,25 +50,6 @@ const transcodeDestinationProviderValue = ref('')
 const vectorizeMode = ref<VectorizeMode>('PENDING_ONLY')
 const playlistGenerateDescription = ref('')
 const targetCodec = ref<CodecType>('OPUS')
-
-const optionValueOf = (provider: TaskProviderOption) => `${provider.type}:${provider.id}`
-
-const getDefaultProviderValue = (options: readonly TaskProviderOption[], preferredIndex = 0) => {
-    const provider = options[preferredIndex] ?? options[0]
-    return provider ? optionValueOf(provider) : ''
-}
-
-const syncSelectionValue = (
-    currentValue: typeof metadataParseProviderValue,
-    options: readonly TaskProviderOption[],
-    preferredIndex = 0,
-) => {
-    const validValues = new Set(options.map((option) => optionValueOf(option)))
-
-    if (!validValues.has(currentValue.value)) {
-        currentValue.value = getDefaultProviderValue(options, preferredIndex)
-    }
-}
 
 const metadataParseProviderOptions = computed(() =>
     props.providerOptions.filter((provider) => provider.type === 'FILE_SYSTEM'),
@@ -196,9 +104,9 @@ watch(
     },
 )
 
-const activeTaskOption = computed<TaskDefinition>(
-    () => TASK_OPTIONS.find((option) => option.id === activeTask.value) ?? TASK_OPTIONS[0]!,
-)
+const activeTaskOption = computed<TaskDefinition>(() => {
+    return TASK_OPTIONS.find((option) => option.id === activeTask.value) ?? TASK_OPTIONS[0]!
+})
 
 const selectedMetadataParseProvider = computed(() =>
     resolveProvider(metadataParseProviderOptions.value, metadataParseProviderValue.value),
@@ -505,403 +413,42 @@ const submit = () => {
                                 </p>
                             </div>
 
-                            <div v-else-if="activeTask === 'METADATA_PARSE'" class="space-y-8">
-                                <div class="grid gap-6">
-                                    <label class="block">
-                                        <span
-                                            class="mb-2 block text-xs uppercase tracking-[0.24em] text-[#8A8A8A]"
-                                        >
-                                            解析存储节点
-                                        </span>
-                                        <div class="relative">
-                                            <select
-                                                v-model="metadataParseProviderValue"
-                                                data-test="metadata-parse-provider-select"
-                                                class="w-full appearance-none bg-[#F7F5F0] border-b border-[#D6D1C4] p-3 pr-10 text-sm text-[#2C2C2C] outline-none transition-colors focus:border-[#C27E46]"
-                                            >
-                                                <option
-                                                    v-for="option in metadataParseProviderOptions"
-                                                    :key="optionValueOf(option)"
-                                                    :value="optionValueOf(option)"
-                                                >
-                                                    {{ option.name }}
-                                                </option>
-                                            </select>
-                                            <ChevronDown
-                                                class="pointer-events-none absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 text-[#8A8A8A]"
-                                            />
-                                        </div>
-                                    </label>
+                            <TaskSubmissionMetadataParseForm
+                                v-else-if="activeTask === 'METADATA_PARSE'"
+                                :provider-options="metadataParseProviderOptions"
+                                :provider-value="metadataParseProviderValue"
+                                @update:provider-value="metadataParseProviderValue = $event"
+                            />
 
-                                    <div
-                                        v-if="selectedMetadataParseProvider"
-                                        class="grid gap-4 px-1 py-1 md:grid-cols-2"
-                                    >
-                                        <div>
-                                            <div
-                                                class="text-[11px] uppercase tracking-[0.24em] text-[#8A8A8A]"
-                                            >
-                                                节点类型
-                                            </div>
-                                            <div
-                                                class="mt-2 flex items-center gap-2 text-[#2B221B]"
-                                            >
-                                                <component
-                                                    :is="
-                                                        PROVIDER_TYPE_ICON_MAP[
-                                                            selectedMetadataParseProvider.type
-                                                        ]
-                                                    "
-                                                    class="h-4 w-4 text-[#C27E46]"
-                                                />
-                                                <span class="text-sm">{{
-                                                    PROVIDER_TYPE_LABEL_MAP[
-                                                        selectedMetadataParseProvider.type
-                                                    ]
-                                                }}</span>
-                                            </div>
-                                        </div>
-                                        <div>
-                                            <div
-                                                class="text-[11px] uppercase tracking-[0.24em] text-[#8A8A8A]"
-                                            >
-                                                节点 ID
-                                            </div>
-                                            <div class="mt-2 font-mono text-sm text-[#2C2C2C]">
-                                                #{{ selectedMetadataParseProvider.id }}
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
+                            <TaskSubmissionTranscodeForm
+                                v-else-if="activeTask === 'TRANSCODE'"
+                                :source-provider-options="transcodeSourceProviderOptions"
+                                :destination-provider-options="transcodeDestinationProviderOptions"
+                                :source-provider-value="transcodeSourceProviderValue"
+                                :destination-provider-value="transcodeDestinationProviderValue"
+                                :target-codec="targetCodec"
+                                @update:source-provider-value="
+                                    transcodeSourceProviderValue = $event
+                                "
+                                @update:destination-provider-value="
+                                    transcodeDestinationProviderValue = $event
+                                "
+                                @update:target-codec="targetCodec = $event"
+                            />
 
-                            <div v-else-if="activeTask === 'TRANSCODE'" class="space-y-8">
-                                <div
-                                    class="grid gap-10 lg:grid-cols-[minmax(0,1fr)_128px_minmax(0,1fr)] lg:gap-0"
-                                >
-                                    <div class="space-y-5 lg:col-start-1">
-                                        <div class="flex items-center gap-2">
-                                            <span
-                                                class="flex h-6 w-6 items-center justify-center bg-[#2C2C2C] text-[10px] font-bold text-white"
-                                            >
-                                                IN
-                                            </span>
-                                            <span class="text-sm font-medium text-[#2C2C2C]"
-                                                >源节点</span
-                                            >
-                                        </div>
+                            <TaskSubmissionVectorizeForm
+                                v-else-if="activeTask === 'VECTORIZE'"
+                                :mode="vectorizeMode"
+                                @update:mode="vectorizeMode = $event"
+                            />
 
-                                        <label class="block">
-                                            <span
-                                                class="mb-2 block text-xs uppercase tracking-[0.24em] text-[#8A8A8A]"
-                                            >
-                                                来源存储节点
-                                            </span>
-                                            <div class="relative">
-                                                <select
-                                                    v-model="transcodeSourceProviderValue"
-                                                    data-test="transcode-source-select"
-                                                    class="w-full appearance-none bg-[#F7F5F0] border-b border-[#D6D1C4] p-3 pr-10 text-sm text-[#2C2C2C] outline-none transition-colors focus:border-[#C27E46]"
-                                                >
-                                                    <option
-                                                        v-for="option in transcodeSourceProviderOptions"
-                                                        :key="`src-${optionValueOf(option)}`"
-                                                        :value="optionValueOf(option)"
-                                                    >
-                                                        {{ option.name }}
-                                                    </option>
-                                                </select>
-                                                <ChevronDown
-                                                    class="pointer-events-none absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 text-[#8A8A8A]"
-                                                />
-                                            </div>
-                                        </label>
+                            <TaskSubmissionPlaylistGenerateForm
+                                v-else-if="activeTask === 'PLAYLIST_GENERATE'"
+                                :description="playlistGenerateDescription"
+                                @update:description="playlistGenerateDescription = $event"
+                            />
 
-                                        <div
-                                            v-if="selectedTranscodeSourceProvider"
-                                            class="px-1 py-1"
-                                        >
-                                            <div
-                                                class="text-[11px] uppercase tracking-[0.24em] text-[#8A8A8A]"
-                                            >
-                                                来源节点信息
-                                            </div>
-                                            <div
-                                                class="mt-3 flex items-center gap-2 text-[#2B221B]"
-                                            >
-                                                <component
-                                                    :is="
-                                                        PROVIDER_TYPE_ICON_MAP[
-                                                            selectedTranscodeSourceProvider.type
-                                                        ]
-                                                    "
-                                                    class="h-4 w-4 text-[#C27E46]"
-                                                />
-                                                <span class="text-sm">{{
-                                                    PROVIDER_TYPE_LABEL_MAP[
-                                                        selectedTranscodeSourceProvider.type
-                                                    ]
-                                                }}</span>
-                                                <span class="text-[#D6D1C4]">/</span>
-                                                <span class="font-mono text-sm"
-                                                    >#{{ selectedTranscodeSourceProvider.id }}</span
-                                                >
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div
-                                        class="pointer-events-none hidden lg:relative lg:flex lg:col-start-2 lg:row-start-1 lg:flex-col lg:items-center lg:justify-center"
-                                    >
-                                        <div class="h-40 w-px bg-[#D6D1C4]"></div>
-                                        <ArrowRight
-                                            class="absolute top-1/2 left-1/2 h-5 w-5 -translate-x-1/2 -translate-y-1/2 bg-[#F2EFE9] text-[#C27E46]"
-                                        />
-                                    </div>
-
-                                    <div class="space-y-5 lg:col-start-3">
-                                        <div class="flex items-center gap-2">
-                                            <span
-                                                class="flex h-6 w-6 items-center justify-center bg-[#C27E46] text-[10px] font-bold text-white"
-                                            >
-                                                OUT
-                                            </span>
-                                            <span class="text-sm font-medium text-[#C27E46]"
-                                                >目标节点</span
-                                            >
-                                        </div>
-
-                                        <label class="block">
-                                            <span
-                                                class="mb-2 block text-xs uppercase tracking-[0.24em] text-[#8A8A8A]"
-                                            >
-                                                输出存储节点
-                                            </span>
-                                            <div class="relative">
-                                                <select
-                                                    v-model="transcodeDestinationProviderValue"
-                                                    data-test="transcode-destination-select"
-                                                    class="w-full appearance-none bg-[#F7F5F0] border-b border-[#D6D1C4] p-3 pr-10 text-sm text-[#2C2C2C] outline-none transition-colors focus:border-[#C27E46]"
-                                                >
-                                                    <option
-                                                        v-for="option in transcodeDestinationProviderOptions"
-                                                        :key="`dst-${optionValueOf(option)}`"
-                                                        :value="optionValueOf(option)"
-                                                    >
-                                                        {{ option.name }}
-                                                    </option>
-                                                </select>
-                                                <ChevronDown
-                                                    class="pointer-events-none absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 text-[#8A8A8A]"
-                                                />
-                                            </div>
-                                        </label>
-
-                                        <div
-                                            v-if="selectedTranscodeDestinationProvider"
-                                            class="px-1 py-1"
-                                        >
-                                            <div
-                                                class="text-[11px] uppercase tracking-[0.24em] text-[#8A8A8A]"
-                                            >
-                                                输出节点信息
-                                            </div>
-                                            <div
-                                                class="mt-3 flex items-center gap-2 text-[#2B221B]"
-                                            >
-                                                <component
-                                                    :is="
-                                                        PROVIDER_TYPE_ICON_MAP[
-                                                            selectedTranscodeDestinationProvider
-                                                                .type
-                                                        ]
-                                                    "
-                                                    class="h-4 w-4 text-[#C27E46]"
-                                                />
-                                                <span class="text-sm">{{
-                                                    PROVIDER_TYPE_LABEL_MAP[
-                                                        selectedTranscodeDestinationProvider.type
-                                                    ]
-                                                }}</span>
-                                                <span class="text-[#D6D1C4]">/</span>
-                                                <span class="font-mono text-sm"
-                                                    >#{{
-                                                        selectedTranscodeDestinationProvider.id
-                                                    }}</span
-                                                >
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <label class="block pt-2">
-                                    <span
-                                        class="mb-2 block text-xs uppercase tracking-[0.24em] text-[#8A8A8A]"
-                                    >
-                                        目标编码格式
-                                    </span>
-                                    <div class="relative">
-                                        <select
-                                            v-model="targetCodec"
-                                            data-test="target-codec-select"
-                                            class="w-full appearance-none bg-[#F7F5F0] border-b border-[#D6D1C4] p-3 pr-10 text-sm text-[#2C2C2C] outline-none transition-colors focus:border-[#C27E46]"
-                                            :disabled="TARGET_CODEC_OPTIONS.length === 1"
-                                        >
-                                            <option
-                                                v-for="option in TARGET_CODEC_OPTIONS"
-                                                :key="option.value"
-                                                :value="option.value"
-                                            >
-                                                {{ option.label }}
-                                            </option>
-                                        </select>
-                                        <ChevronDown
-                                            class="pointer-events-none absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 text-[#8A8A8A]"
-                                        />
-                                    </div>
-                                    <div class="mt-3 flex items-start gap-2 text-sm text-[#6B635B]">
-                                        <Music4 class="mt-0.5 h-4 w-4 shrink-0 text-[#C27E46]" />
-                                        <span>
-                                            {{
-                                                TARGET_CODEC_OPTIONS.find(
-                                                    (option) => option.value === targetCodec,
-                                                )?.hint
-                                            }}
-                                        </span>
-                                    </div>
-                                </label>
-                            </div>
-
-                            <div v-else-if="activeTask === 'VECTORIZE'" class="space-y-8">
-                                <div class="space-y-6">
-                                    <div>
-                                        <span
-                                            class="mb-3 block text-xs uppercase tracking-[0.24em] text-[#8A8A8A]"
-                                        >
-                                            向量化模式
-                                        </span>
-                                        <div class="flex gap-4">
-                                            <label
-                                                class="flex cursor-pointer items-center gap-2 rounded-sm border px-4 py-3 text-sm transition-colors"
-                                                :class="
-                                                    vectorizeMode === 'PENDING_ONLY'
-                                                        ? 'border-[#C27E46] bg-[#FBF6F0] text-[#C27E46]'
-                                                        : 'border-[#E0DCD0] bg-[#F7F5F0] text-[#6B635B] hover:border-[#C27E46]/50'
-                                                "
-                                            >
-                                                <input
-                                                    v-model="vectorizeMode"
-                                                    type="radio"
-                                                    value="PENDING_ONLY"
-                                                    class="sr-only"
-                                                />
-                                                补充未向量化
-                                            </label>
-                                            <label
-                                                class="flex cursor-pointer items-center gap-2 rounded-sm border px-4 py-3 text-sm transition-colors"
-                                                :class="
-                                                    vectorizeMode === 'ALL'
-                                                        ? 'border-[#C27E46] bg-[#FBF6F0] text-[#C27E46]'
-                                                        : 'border-[#E0DCD0] bg-[#F7F5F0] text-[#6B635B] hover:border-[#C27E46]/50'
-                                                "
-                                            >
-                                                <input
-                                                    v-model="vectorizeMode"
-                                                    type="radio"
-                                                    value="ALL"
-                                                    class="sr-only"
-                                                />
-                                                全部重新向量化
-                                            </label>
-                                        </div>
-                                    </div>
-
-                                    <div
-                                        class="space-y-5 rounded-sm border border-[#E6E1D8] bg-[#F8F5EE] p-5"
-                                    >
-                                        <div>
-                                            <div
-                                                class="text-[11px] uppercase tracking-[0.24em] text-[#8A8A8A]"
-                                            >
-                                                提交说明
-                                            </div>
-                                            <p class="mt-3 text-sm leading-relaxed text-[#6B635B]">
-                                                {{
-                                                    vectorizeMode === 'PENDING_ONLY'
-                                                        ? '仅为尚未生成 embedding 的录音补充向量化任务。'
-                                                        : '对所有有歌词的录音重新生成 embedding，包括已向量化的。'
-                                                }}
-                                            </p>
-                                        </div>
-                                        <div class="flex items-start gap-2 text-sm text-[#6B635B]">
-                                            <Music4
-                                                class="mt-0.5 h-4 w-4 shrink-0 text-[#C27E46]"
-                                            />
-                                            <span>嵌入模型的 API 配置已移至系统设置页面。</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div v-else-if="activeTask === 'PLAYLIST_GENERATE'" class="space-y-8">
-                                <label class="block">
-                                    <span
-                                        class="mb-2 block text-xs uppercase tracking-[0.24em] text-[#8A8A8A]"
-                                    >
-                                        歌单描述
-                                    </span>
-                                    <textarea
-                                        v-model="playlistGenerateDescription"
-                                        data-test="playlist-generate-description-input"
-                                        rows="6"
-                                        class="w-full resize-none border border-[#D6D1C4] bg-[#F7F5F0] p-4 text-sm leading-relaxed text-[#2C2C2C] outline-none transition-colors focus:border-[#C27E46]"
-                                        placeholder="例如：通勤路上适合傍晚城市灯光、节奏平稳但有一点电子感的音乐"
-                                    />
-                                </label>
-
-                                <div
-                                    class="space-y-5 rounded-sm border border-[#E6E1D8] bg-[#F8F5EE] p-5"
-                                >
-                                    <div>
-                                        <div
-                                            class="text-[11px] uppercase tracking-[0.24em] text-[#8A8A8A]"
-                                        >
-                                            提交说明
-                                        </div>
-                                        <p class="mt-3 text-sm leading-relaxed text-[#6B635B]">
-                                            输入你想听的氛围、场景或风格，系统会在后台生成一个新的智能歌单。
-                                        </p>
-                                    </div>
-                                    <div class="flex items-start gap-2 text-sm text-[#6B635B]">
-                                        <Music4 class="mt-0.5 h-4 w-4 shrink-0 text-[#C27E46]" />
-                                        <span
-                                            >嵌入模型和补全模型的 API
-                                            配置仍在系统设置页面维护。</span
-                                        >
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div v-else class="space-y-8">
-                                <div
-                                    class="space-y-5 rounded-sm border border-[#E6E1D8] bg-[#F8F5EE] p-5"
-                                >
-                                    <div>
-                                        <div
-                                            class="text-[11px] uppercase tracking-[0.24em] text-[#8A8A8A]"
-                                        >
-                                            提交说明
-                                        </div>
-                                        <p class="mt-3 text-sm leading-relaxed text-[#6B635B]">
-                                            提交后系统会为所有录音补充数据清洗任务，批量调用外部模型清洗标题。
-                                        </p>
-                                    </div>
-                                    <div class="flex items-start gap-2 text-sm text-[#6B635B]">
-                                        <Music4 class="mt-0.5 h-4 w-4 shrink-0 text-[#C27E46]" />
-                                        <span>补全模型的 API 配置已移至系统设置页面。</span>
-                                    </div>
-                                </div>
-                            </div>
+                            <TaskSubmissionDataCleanForm v-else />
                         </div>
 
                         <footer

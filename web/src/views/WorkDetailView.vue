@@ -20,6 +20,7 @@ import {
     resolveCover,
     type RecordingAsset,
 } from '@/composables/recordingMedia'
+import { useRecordingEditor } from '@/composables/useRecordingEditor'
 import { useRecordingMergeState } from '@/composables/useRecordingMergeState'
 import { useRecordingPlayback } from '@/composables/useRecordingPlayback'
 
@@ -33,18 +34,6 @@ const isEditModalOpen = ref(false)
 const isEditing = ref(false)
 const editTitle = ref('')
 const editError = ref('')
-
-const isEditRecordingModalOpen = ref(false)
-const isEditingRecording = ref(false)
-const editingRecording = ref<Recording | null>(null)
-const editRecordingForm = ref<RecordingEditForm>({
-    title: '',
-    label: '',
-    comment: '',
-    type: '',
-    isDefault: false,
-})
-const editRecordingError = ref('')
 
 type WorkData = {
     title: string
@@ -78,6 +67,41 @@ const workData = ref<WorkData>({
 const recordings = ref<Recording[]>([])
 const mergeStateActions: { resetState: () => void } = {
     resetState: () => undefined,
+}
+
+const applyRecordingEdit = (
+    currentRecordings: readonly Recording[],
+    recordingId: number,
+    form: RecordingEditForm,
+) => {
+    const nextRecordings = currentRecordings.map((recording) => {
+        if (recording.id === recordingId) {
+            return {
+                ...recording,
+                title: form.title,
+                label: form.label,
+                comment: form.comment,
+                type: form.type,
+                isDefault: form.isDefault,
+            }
+        }
+
+        if (form.isDefault && recording.isDefault) {
+            return {
+                ...recording,
+                isDefault: false,
+            }
+        }
+
+        return recording
+    })
+
+    return nextRecordings.sort((left, right) => {
+        if (left.isDefault === right.isDefault) {
+            return 0
+        }
+        return left.isDefault ? -1 : 1
+    })
 }
 
 async function fetchWork(id: number) {
@@ -146,6 +170,34 @@ const {
         }
         return { workId }
     },
+})
+
+const {
+    isEditRecordingModalOpen,
+    isEditingRecording,
+    editingRecording,
+    editRecordingForm,
+    editRecordingError,
+    openEditRecordingModal,
+    closeEditRecordingModal,
+    updateEditRecordingForm,
+    submitRecordingEdit,
+} = useRecordingEditor<Recording>({
+    recordings,
+    submitUpdate: (recordingId, form) =>
+        api.recordingController.updateRecording({
+            id: recordingId,
+            body: {
+                title: form.title,
+                label: form.label,
+                comment: form.comment,
+                kind: form.type,
+                defaultInWork: form.isDefault,
+            },
+        }),
+    applyLocalUpdate: applyRecordingEdit,
+    parseError: (error) => normalizeApiError(error).message ?? '更新曲目失败',
+    fallbackErrorMessage: '更新曲目失败',
 })
 
 const mergeState = useRecordingMergeState<Recording>({
@@ -245,114 +297,6 @@ const submitEdit = async () => {
         editError.value = normalized.message ?? '更新作品失败'
     } finally {
         isEditing.value = false
-    }
-}
-
-const openEditRecordingModal = (recording: Recording) => {
-    if (isEditingRecording.value) {
-        return
-    }
-
-    editingRecording.value = recording
-    editRecordingForm.value = {
-        title: recording.title,
-        label: recording.label,
-        comment: recording.comment,
-        type: recording.type,
-        isDefault: recording.isDefault,
-    }
-    editRecordingError.value = ''
-    isEditRecordingModalOpen.value = true
-}
-
-const closeEditRecordingModal = () => {
-    if (isEditingRecording.value) {
-        return
-    }
-
-    isEditRecordingModalOpen.value = false
-    editingRecording.value = null
-    editRecordingForm.value = {
-        title: '',
-        label: '',
-        comment: '',
-        type: '',
-        isDefault: false,
-    }
-    editRecordingError.value = ''
-}
-
-const updateEditRecordingForm = (value: RecordingEditForm) => {
-    editRecordingForm.value = value
-}
-
-const submitRecordingEdit = async () => {
-    if (!editingRecording.value || isEditingRecording.value) {
-        return
-    }
-
-    const { title, label, comment, type, isDefault } = editRecordingForm.value
-    if (!title.trim()) {
-        editRecordingError.value = '标题不能为空'
-        return
-    }
-
-    isEditingRecording.value = true
-    editRecordingError.value = ''
-
-    try {
-        await api.recordingController.updateRecording({
-            id: editingRecording.value.id,
-            body: {
-                title: title.trim(),
-                label: label?.trim(),
-                comment: comment?.trim() || '',
-                kind: type.trim(),
-                defaultInWork: isDefault,
-            },
-        })
-
-        const index = recordings.value.findIndex(
-            (recording) => recording.id === editingRecording.value!.id,
-        )
-        if (index !== -1) {
-            const current = recordings.value[index]
-            if (current) {
-                recordings.value[index] = {
-                    ...current,
-                    title: title.trim(),
-                    label: label?.trim() || '',
-                    comment: comment?.trim() || '',
-                    type: type.trim(),
-                    isDefault,
-                }
-            }
-        }
-
-        if (isDefault) {
-            recordings.value.forEach((recording, recordingIndex) => {
-                if (recordingIndex !== index && recording.isDefault) {
-                    recordings.value[recordingIndex] = {
-                        ...recording,
-                        isDefault: false,
-                    }
-                }
-            })
-        }
-
-        recordings.value.sort((left, right) => {
-            if (left.isDefault === right.isDefault) {
-                return 0
-            }
-            return left.isDefault ? -1 : 1
-        })
-
-        closeEditRecordingModal()
-    } catch (error) {
-        const normalized = normalizeApiError(error)
-        editRecordingError.value = normalized.message ?? '更新曲目失败'
-    } finally {
-        isEditingRecording.value = false
     }
 }
 

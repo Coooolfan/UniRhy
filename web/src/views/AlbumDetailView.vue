@@ -19,6 +19,7 @@ import {
     type NormalizedRecordingBase,
     type RecordingAsset,
 } from '@/composables/recordingMedia'
+import { useRecordingEditor } from '@/composables/useRecordingEditor'
 import { useRecordingPlayback } from '@/composables/useRecordingPlayback'
 
 const route = useRoute()
@@ -27,18 +28,6 @@ const isLoading = ref(true)
 const isCdVisible = ref(false)
 const isAddToPlaylistModalOpen = ref(false)
 const selectedRecordingForPlaylist = ref<Recording | null>(null)
-
-const isEditRecordingModalOpen = ref(false)
-const isEditingRecording = ref(false)
-const editingRecording = ref<Recording | null>(null)
-const editRecordingForm = ref<RecordingEditForm>({
-    title: '',
-    label: '',
-    comment: '',
-    type: '',
-    isDefault: false,
-})
-const editRecordingError = ref('')
 
 type AlbumData = {
     title: string
@@ -76,6 +65,26 @@ const albumData = ref<AlbumData>({
 
 const recordings = ref<Recording[]>([])
 
+const applyRecordingEdit = (
+    currentRecordings: readonly Recording[],
+    recordingId: number,
+    form: RecordingEditForm,
+) =>
+    currentRecordings.map((recording) => {
+        if (recording.id !== recordingId) {
+            return recording
+        }
+
+        return {
+            ...recording,
+            title: form.title,
+            label: form.label,
+            comment: form.comment,
+            type: form.type,
+            isDefault: form.isDefault,
+        }
+    })
+
 const {
     audioStore,
     hasPlayableRecording,
@@ -89,6 +98,33 @@ const {
     recordings,
     currentRecordingId,
     fallbackCover: () => albumData.value.cover,
+})
+
+const {
+    isEditRecordingModalOpen,
+    isEditingRecording,
+    editingRecording,
+    editRecordingForm,
+    editRecordingError,
+    openEditRecordingModal,
+    closeEditRecordingModal,
+    updateEditRecordingForm,
+    submitRecordingEdit,
+} = useRecordingEditor<Recording>({
+    recordings,
+    submitUpdate: (recordingId, form) =>
+        api.recordingController.updateRecording({
+            id: recordingId,
+            body: {
+                title: form.title,
+                label: form.label,
+                comment: form.comment,
+                kind: form.type,
+            },
+        }),
+    applyLocalUpdate: applyRecordingEdit,
+    parseError: (error) => normalizeApiError(error).message ?? '更新曲目失败',
+    fallbackErrorMessage: '更新曲目失败',
 })
 
 const fetchAlbum = async (id: number) => {
@@ -157,94 +193,6 @@ const buildRecordingLabel = (recording: Recording) => {
         return recording.label
     }
     return `${recording.label} · ${duration}`
-}
-
-const openEditRecordingModal = (recording: Recording) => {
-    if (isEditingRecording.value) {
-        return
-    }
-
-    editingRecording.value = recording
-    editRecordingForm.value = {
-        title: recording.title,
-        label: recording.label,
-        comment: recording.comment,
-        type: recording.type,
-        isDefault: recording.isDefault,
-    }
-    editRecordingError.value = ''
-    isEditRecordingModalOpen.value = true
-}
-
-const closeEditRecordingModal = () => {
-    if (isEditingRecording.value) {
-        return
-    }
-
-    isEditRecordingModalOpen.value = false
-    editingRecording.value = null
-    editRecordingForm.value = {
-        title: '',
-        label: '',
-        comment: '',
-        type: '',
-        isDefault: false,
-    }
-    editRecordingError.value = ''
-}
-
-const updateEditRecordingForm = (value: RecordingEditForm) => {
-    editRecordingForm.value = value
-}
-
-const submitRecordingEdit = async () => {
-    if (!editingRecording.value || isEditingRecording.value) {
-        return
-    }
-
-    const { title, label, comment, type } = editRecordingForm.value
-    if (!title.trim()) {
-        editRecordingError.value = '标题不能为空'
-        return
-    }
-
-    isEditingRecording.value = true
-    editRecordingError.value = ''
-
-    try {
-        await api.recordingController.updateRecording({
-            id: editingRecording.value.id,
-            body: {
-                title: title.trim(),
-                label: label?.trim(),
-                comment: comment?.trim() || '',
-                kind: type.trim(),
-            },
-        })
-
-        const index = recordings.value.findIndex(
-            (recording) => recording.id === editingRecording.value!.id,
-        )
-        if (index !== -1) {
-            const current = recordings.value[index]
-            if (current) {
-                recordings.value[index] = {
-                    ...current,
-                    title: title.trim(),
-                    label: label?.trim() || '',
-                    comment: comment?.trim() || '',
-                    type: type.trim(),
-                }
-            }
-        }
-
-        closeEditRecordingModal()
-    } catch (error) {
-        const normalized = normalizeApiError(error)
-        editRecordingError.value = normalized.message ?? '更新曲目失败'
-    } finally {
-        isEditingRecording.value = false
-    }
 }
 
 onMounted(() => {

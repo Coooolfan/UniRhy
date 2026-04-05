@@ -523,6 +523,9 @@ const flushPromises = async (times = 8) => {
     for (let index = 0; index < times; index += 1) {
         await Promise.resolve()
     }
+    await new Promise<void>((resolve) => {
+        window.setTimeout(resolve, 0)
+    })
 }
 
 const latestClient = () => {
@@ -678,13 +681,14 @@ describe('audio store', () => {
         expect(client.sendPlay).toHaveBeenCalledWith(
             expect.objectContaining({
                 recordingId: 6,
-                mediaFileId: 1_006,
+                mediaFileId: undefined,
                 positionSeconds: 0,
             }),
         )
     })
 
     it('loads audio on load-audio-source and acknowledges after decoding', async () => {
+        getRecordingMock.mockResolvedValueOnce(buildRecordingMetadata(7))
         fetchMock.mockResolvedValue(createResponse(45))
 
         const audioStore = useAudioStore()
@@ -718,6 +722,24 @@ describe('audio store', () => {
             platform: 'web',
         }
         window.localStorage.setItem('unirhy.auth-token', 'mobile-token')
+        getRecordingMock.mockResolvedValueOnce(
+            buildRecordingMetadata(8, {
+                assets: [
+                    {
+                        id: 48_008,
+                        comment: 'Signed Audio 2008',
+                        mediaFile: {
+                            id: 2_008,
+                            sha256: 'audio-sha-8',
+                            objectKey: 'audio/8.opus',
+                            mimeType: 'audio/opus',
+                            size: 4_096,
+                            url: '/api/media/2008?_sig=abc&_exp=9999999999',
+                        },
+                    },
+                ],
+            }),
+        )
         fetchMock.mockResolvedValue(createResponse(45))
 
         const audioStore = useAudioStore()
@@ -745,6 +767,7 @@ describe('audio store', () => {
     })
 
     it('ignores stale scheduled actions with a lower version', async () => {
+        getRecordingMock.mockResolvedValueOnce(buildRecordingMetadata(5))
         fetchMock.mockResolvedValue(createResponse(90))
 
         const audioStore = useAudioStore()
@@ -907,6 +930,7 @@ describe('audio store', () => {
     })
 
     it('records local execution diagnostics for scheduled playback', async () => {
+        getRecordingMock.mockResolvedValueOnce(buildRecordingMetadata(6))
         fetchMock.mockResolvedValue(createResponse(25))
 
         const audioStore = useAudioStore()
@@ -1003,6 +1027,7 @@ describe('audio store', () => {
     })
 
     it('reuses the loaded buffer for repeated load-audio-source messages of the same track', async () => {
+        getRecordingMock.mockResolvedValue(buildRecordingMetadata(7))
         fetchMock.mockResolvedValue(createResponse(45))
 
         const audioStore = useAudioStore()
@@ -1043,7 +1068,7 @@ describe('audio store', () => {
         expect(audioStore.duration).toBe(45)
     })
 
-    it('hydrates placeholder metadata after passive load-audio-source without delaying preload ack', async () => {
+    it('hydrates placeholder metadata after passive load-audio-source and acknowledges after metadata resolves', async () => {
         fetchMock.mockResolvedValue(createResponse(45))
         const recordingDeferred = createDeferred<ReturnType<typeof buildRecordingMetadata>>()
         getRecordingMock.mockReturnValueOnce(recordingDeferred.promise)
@@ -1070,11 +1095,7 @@ describe('audio store', () => {
                 cover: '',
             }),
         )
-        expect(client.sendAudioSourceLoaded).toHaveBeenCalledWith({
-            commandId: 'cmd-preload-metadata',
-            recordingId: 7,
-            mediaFileId: 2_007,
-        })
+        expect(client.sendAudioSourceLoaded).not.toHaveBeenCalled()
 
         recordingDeferred.resolve(buildRecordingMetadata(7))
         await flushPromises(12)
@@ -1088,6 +1109,11 @@ describe('audio store', () => {
                 workId: 10007,
             }),
         )
+        expect(client.sendAudioSourceLoaded).toHaveBeenCalledWith({
+            commandId: 'cmd-preload-metadata',
+            recordingId: 7,
+            mediaFileId: 2_007,
+        })
     })
 
     it('dedupes metadata requests across snapshot and scheduled action for the same passive track', async () => {
@@ -1246,8 +1272,8 @@ describe('audio store', () => {
         expect(audioStore.currentTrack).toEqual(
             expect.objectContaining({
                 id: 22,
-                title: 'Recording #22',
-                artist: 'Unknown Artist',
+                title: 'Track 22',
+                artist: 'Artist 22',
             }),
         )
 
@@ -1307,10 +1333,11 @@ describe('audio store', () => {
         })
         await flushPromises()
 
-        expect(audioStore.currentTrack?.title).toBe('Recording #1')
+        expect(audioStore.currentTrack?.title).toBe('Track 1')
     })
 
     it('ignores late buffer loads after disconnect tears down local playback state', async () => {
+        getRecordingMock.mockResolvedValueOnce(buildRecordingMetadata(9))
         const deferredResponse = createDeferred<Response>()
         fetchMock.mockReturnValueOnce(deferredResponse.promise)
 
@@ -1345,6 +1372,7 @@ describe('audio store', () => {
     })
 
     it('fully tears down scheduled playback when disconnecting sync', async () => {
+        getRecordingMock.mockResolvedValueOnce(buildRecordingMetadata(6))
         fetchMock.mockResolvedValue(createResponse(25))
 
         const audioStore = useAudioStore()

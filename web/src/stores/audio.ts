@@ -1,12 +1,6 @@
 import { computed, ref, shallowRef } from 'vue'
 import { defineStore } from 'pinia'
 import { api } from '@/ApiInstance'
-import {
-    resolveCover,
-    resolvePlayableAudio,
-    type PlaybackPreference,
-} from '@/composables/recordingMedia'
-import { buildApiUrl } from '@/runtime/platform'
 import { useUserStore } from '@/stores/user'
 import {
     PlaybackSyncClient,
@@ -15,7 +9,6 @@ import {
 } from '@/services/playbackSyncClient'
 import type {
     CurrentQueueDto,
-    CurrentQueueItemDto,
     DeviceChangePayload,
     LoadAudioSourcePayload,
     PlaybackSyncStatePayload,
@@ -24,35 +17,34 @@ import type {
     ServerPlaybackSyncMessage,
     SnapshotPayload,
 } from '@/services/playbackSyncProtocol'
+import {
+    type AudioQueueEntry,
+    type AudioSyncState,
+    type AudioTrack,
+    type PlaybackSyncDebugSnapshot,
+    type PlaybackSyncLocalExecutionSnapshot,
+    type TimestampedPayload,
+    PLAYBACK_ERROR_MESSAGE,
+    clampTime,
+    cloneTrack,
+    createEmptyQueue,
+    isNil,
+    isSameTrackRef,
+    normalizeVolume,
+    persistVolume,
+    readSavedVolume,
+} from '@/stores/audioShared'
+import { useAudioTrackCatalog } from '@/stores/audioTrackCatalog'
 import { nowClientMs } from '@/utils/time'
 
-export type AudioTrack = {
-    id: number
-    title: string
-    artist: string
-    cover?: string
-    src?: string
-    mediaFileId?: number
-    workId?: number
-}
-
-export type AudioQueueEntry = {
-    entryId: number
-    recordingId: number
-    mediaFileId?: number
-    title: string
-    artist: string
-    cover?: string
-    durationMs: number
-}
-
-export type AudioSyncState =
-    | 'connecting'
-    | 'calibrating'
-    | 'ready'
-    | 'reconnecting'
-    | 'audio_locked'
-    | 'error'
+export type {
+    AudioQueueEntry,
+    AudioSyncState,
+    AudioTrack,
+    PlaybackSyncDebugSnapshot,
+    PlaybackSyncLocalExecutionSnapshot,
+    TimestampedPayload,
+} from '@/stores/audioShared'
 
 type QueuedPlayIntent = {
     track: AudioTrack
@@ -63,160 +55,6 @@ type BufferLoadState = {
     mediaFileId: number
     promise: Promise<AudioBuffer | null>
 }
-
-export type TimestampedPayload<T> = {
-    atMs: number
-    payload: T
-}
-
-export type PlaybackSyncLocalExecutionSnapshot = {
-    atMs: number
-    action: ScheduledActionPayload['scheduledAction']['action']
-    commandId: string
-    version: number
-    estimatedServerNowMs: number
-    executeAtServerMs: number
-    waitMs: number
-    lateSeconds: number
-    scheduledOffset: number
-    whenContextTime: number
-    bufferDuration: number
-    recordingId: number | null
-    mediaFileId: number | null
-}
-
-export type PlaybackSyncDebugSnapshot = {
-    syncState: AudioSyncState
-    syncStatusText: string
-    canSendRealtimeControl: boolean
-    clockOffsetMs: number
-    roundTripEstimateMs: number
-    latestSnapshot: PlaybackSyncStatePayload | null
-    latestSnapshotReceivedAtMs: number | null
-    lastScheduledAction: TimestampedPayload<ScheduledActionPayload> | null
-    lastLoadAudioSource: TimestampedPayload<LoadAudioSourcePayload> | null
-    lastDeviceChange: TimestampedPayload<DeviceChangePayload> | null
-    queuedPlayIntent: QueuedPlayIntent | null
-    awaitingSyncRecovery: boolean
-    audioUnlockRequired: boolean
-    lastAppliedVersion: number
-    currentTrack: AudioTrack | null
-    isPlaying: boolean
-    currentTime: number
-    duration: number
-    currentBuffer: {
-        recordingId: number | null
-        mediaFileId: number | null
-        duration: number
-    } | null
-    activeLoad: {
-        mediaFileId: number
-        inFlight: boolean
-    } | null
-    lastLocalExecution: PlaybackSyncLocalExecutionSnapshot | null
-    clientDiagnostics: PlaybackSyncClientDiagnosticsSnapshot | null
-    error: string | null
-}
-
-type PlaybackRecordingMetadata = Awaited<ReturnType<typeof api.recordingController.getRecording>>
-
-const VOLUME_STORAGE_KEY = 'unirhy.audio.volume'
-const PLAYBACK_ERROR_MESSAGE = 'Unable to play audio'
-const MAX_KNOWN_TRACKS = 200
-
-const normalizeVolume = (volume: number) => {
-    return Math.max(0, Math.min(1, volume))
-}
-
-const readSavedVolume = () => {
-    if (typeof window === 'undefined') {
-        return 1
-    }
-
-    const raw = window.localStorage.getItem(VOLUME_STORAGE_KEY)
-    if (raw === null) {
-        return 1
-    }
-
-    const parsed = Number.parseFloat(raw)
-    if (Number.isNaN(parsed)) {
-        return 1
-    }
-
-    return normalizeVolume(parsed)
-}
-
-const persistVolume = (volume: number) => {
-    if (typeof window === 'undefined') {
-        return
-    }
-    window.localStorage.setItem(VOLUME_STORAGE_KEY, volume.toString())
-}
-
-const isFiniteTime = (time: number) => Number.isFinite(time) && time >= 0
-
-const clampTime = (time: number, maxDuration?: number) => {
-    if (!isFiniteTime(time)) {
-        return 0
-    }
-
-    if (maxDuration === undefined || maxDuration === null) {
-        return time
-    }
-
-    if (!isFiniteTime(maxDuration) || maxDuration <= 0) {
-        return 0
-    }
-
-    return Math.min(time, maxDuration)
-}
-
-const isNil = (value: unknown): value is null | undefined => {
-    return value === null || value === undefined
-}
-
-const pickFirstNonBlank = (...values: Array<string | null | undefined>) => {
-    for (const value of values) {
-        if (typeof value === 'string' && value.trim().length > 0) {
-            return value
-        }
-    }
-    return null
-}
-
-const resolveMetadataArtistLabel = (
-    artists: PlaybackRecordingMetadata['artists'] | null | undefined,
-) => {
-    const names =
-        artists
-            ?.map((artist) => artist.displayName?.trim())
-            .filter((name): name is string => typeof name === 'string' && name.length > 0) ?? []
-    if (names.length === 0) {
-        return null
-    }
-    return names.join(', ')
-}
-
-const cloneTrack = (track: AudioTrack): AudioTrack => ({
-    ...track,
-})
-
-const isSameTrackRef = (left: AudioTrack | null, right: AudioTrack) => {
-    return left?.id === right.id
-}
-
-const createEmptyQueue = (): CurrentQueueDto => ({
-    items: [],
-    version: 0,
-    updatedAtMs: 0,
-})
-
-const cloneQueue = (queue: CurrentQueueDto): CurrentQueueDto => ({
-    items: queue.items.map((item) => ({ ...item })),
-    ...(queue.currentEntryId === undefined ? {} : { currentEntryId: queue.currentEntryId }),
-    version: queue.version,
-    updatedAtMs: queue.updatedAtMs,
-})
 
 export const useAudioStore = defineStore('audio', () => {
     const userStore = useUserStore()
@@ -256,10 +94,6 @@ export const useAudioStore = defineStore('audio', () => {
     const lastDeviceChange = shallowRef<TimestampedPayload<DeviceChangePayload> | null>(null)
     const lastLocalExecution = shallowRef<PlaybackSyncLocalExecutionSnapshot | null>(null)
 
-    const knownTracks = new Map<number, AudioTrack>()
-    const hydratedTrackIds = new Set<number>()
-    const trackMetadataRequests = new Map<number, Promise<void>>()
-    const recordingMetadataCache = new Map<number, PlaybackRecordingMetadata>()
     const liveSourceNodes = new Set<AudioBufferSourceNode>()
     const ignoredEndedNodes = new WeakSet<AudioBufferSourceNode>()
     const sourceEndedListeners = new WeakMap<AudioBufferSourceNode, EventListener>()
@@ -267,7 +101,25 @@ export const useAudioStore = defineStore('audio', () => {
     let commandSequence = 0
     let scheduledPauseTimer: number | null = null
     let scheduledStopTimer: number | null = null
-    let trackMetadataGeneration = 0
+
+    const {
+        cacheTrack,
+        createTrackFromQueueItem,
+        applyQueueSnapshot,
+        queueRecordingIdsEqual,
+        rememberHydratedTrack,
+        createTrackShell,
+        resolveTrackForPlayback,
+        hydrateTrackMetadata,
+        resetTrackCatalog,
+    } = useAudioTrackCatalog({
+        currentTrack,
+        currentQueue,
+        currentBuffer,
+        currentBufferTrack,
+        duration,
+        getPlaybackPreference: () => userStore.playbackPreference,
+    })
 
     const currentQueueEntry = computed(() => {
         const currentEntryId = currentQueue.value.currentEntryId
@@ -286,18 +138,19 @@ export const useAudioStore = defineStore('audio', () => {
     })
 
     const queueEntries = computed<AudioQueueEntry[]>(() =>
-        currentQueue.value.items.map((item) => ({
-            entryId: item.entryId,
-            recordingId: item.recordingId,
-            mediaFileId:
-                (currentTrack.value?.id === item.recordingId
-                    ? currentTrack.value.mediaFileId
-                    : undefined) ?? knownTracks.get(item.recordingId)?.mediaFileId,
-            title: item.title,
-            artist: item.artistLabel,
-            cover: item.coverUrl ? buildApiUrl(item.coverUrl) : '',
-            durationMs: item.durationMs,
-        })),
+        currentQueue.value.items.map((item) => {
+            const track = createTrackFromQueueItem(item)
+
+            return {
+                entryId: item.entryId,
+                recordingId: item.recordingId,
+                mediaFileId: track.mediaFileId,
+                title: track.title,
+                artist: track.artist,
+                cover: track.cover,
+                durationMs: item.durationMs,
+            }
+        }),
     )
 
     const effectiveSyncState = computed<AudioSyncState>(() => {
@@ -407,243 +260,6 @@ export const useAudioStore = defineStore('audio', () => {
             error: error.value,
         }
     })
-
-    const cacheTrack = (track: AudioTrack) => {
-        if (knownTracks.has(track.id)) {
-            knownTracks.delete(track.id)
-        }
-        knownTracks.set(track.id, cloneTrack(track))
-        if (knownTracks.size > MAX_KNOWN_TRACKS) {
-            const oldestKey = knownTracks.keys().next().value
-            if (oldestKey !== undefined) {
-                knownTracks.delete(oldestKey)
-            }
-        }
-    }
-
-    const createTrackFromQueueItem = (item: CurrentQueueItemDto): AudioTrack => {
-        const current = currentTrack.value?.id === item.recordingId ? currentTrack.value : null
-        const cached = knownTracks.get(item.recordingId)
-        let workId = current?.workId
-        if (workId === undefined && cached?.workId !== undefined) {
-            workId = cached.workId
-        }
-
-        const cover = item.coverUrl ? buildApiUrl(item.coverUrl) : ''
-        const title =
-            item.title || cached?.title || current?.title || `Recording #${item.recordingId}`
-        const artist = item.artistLabel || cached?.artist || current?.artist || 'Unknown Artist'
-
-        return {
-            id: item.recordingId,
-            title,
-            artist,
-            cover: cover || cached?.cover || current?.cover || '',
-            src: current?.src || cached?.src,
-            mediaFileId: current?.mediaFileId ?? cached?.mediaFileId,
-            ...(workId === undefined ? {} : { workId }),
-        }
-    }
-
-    const applyQueueSnapshot = (queue: CurrentQueueDto) => {
-        currentQueue.value = cloneQueue(queue)
-        currentQueue.value.items.forEach((item) => {
-            cacheTrack(createTrackFromQueueItem(item))
-        })
-
-        const nextCurrentItem = currentQueueEntry.value
-        if (!nextCurrentItem) {
-            return
-        }
-
-        const nextTrack = createTrackFromQueueItem(nextCurrentItem)
-        cacheTrack(nextTrack)
-        currentTrack.value = cloneTrack(nextTrack)
-        const hasMatchingBufferedTrack =
-            nextTrack.mediaFileId !== undefined &&
-            currentBufferTrack.value?.mediaFileId === nextTrack.mediaFileId &&
-            currentBuffer.value !== null
-        if (!hasMatchingBufferedTrack && nextCurrentItem.durationMs > 0) {
-            duration.value = nextCurrentItem.durationMs / 1_000
-        }
-    }
-
-    const queueRecordingIdsEqual = (recordingIds: number[]) => {
-        if (recordingIds.length !== currentQueue.value.items.length) {
-            return false
-        }
-        return currentQueue.value.items.every(
-            (item, index) => item.recordingId === recordingIds[index],
-        )
-    }
-
-    const rememberHydratedTrack = (track: AudioTrack) => {
-        cacheTrack(track)
-        hydratedTrackIds.add(track.id)
-    }
-
-    const getPlaybackPreference = (): PlaybackPreference => {
-        return userStore.playbackPreference
-    }
-
-    const applyRecordingMetadata = (
-        track: AudioTrack,
-        metadata: PlaybackRecordingMetadata,
-    ): AudioTrack => {
-        const title =
-            pickFirstNonBlank(
-                metadata.title,
-                metadata.comment,
-                metadata.work?.title,
-                track.title,
-            ) ?? `Recording #${track.id}`
-        const artist =
-            pickFirstNonBlank(resolveMetadataArtistLabel(metadata.artists), track.artist) ??
-            'Unknown Artist'
-        const cover = metadata.cover?.url ? resolveCover(metadata.cover) : (track.cover ?? '')
-        let workId = track.workId
-        if (metadata.work?.id !== undefined) {
-            workId = metadata.work.id
-        }
-
-        return {
-            ...track,
-            title,
-            artist,
-            cover,
-            ...(workId !== undefined ? { workId } : {}),
-        }
-    }
-
-    const buildTrackWithResolvedSource = (
-        track: AudioTrack,
-        metadata: PlaybackRecordingMetadata,
-    ): AudioTrack | null => {
-        const enrichedTrack = applyRecordingMetadata(track, metadata)
-        const playableAudio = resolvePlayableAudio(metadata.assets ?? [], getPlaybackPreference())
-        if (!playableAudio) {
-            return null
-        }
-
-        return {
-            ...enrichedTrack,
-            src: playableAudio.src,
-            mediaFileId: playableAudio.mediaFileId,
-        }
-    }
-
-    const fetchRecordingMetadata = async (recordingId: number) => {
-        const cachedMetadata = recordingMetadataCache.get(recordingId)
-        if (cachedMetadata) {
-            return cachedMetadata
-        }
-
-        const existingRequest = trackMetadataRequests.get(recordingId)
-        if (existingRequest) {
-            await existingRequest
-            return recordingMetadataCache.get(recordingId) ?? null
-        }
-
-        const generation = trackMetadataGeneration
-        const request = api.recordingController
-            .getRecording({ id: recordingId })
-            .then((metadata) => {
-                if (generation !== trackMetadataGeneration) {
-                    return
-                }
-                recordingMetadataCache.set(recordingId, metadata)
-            })
-            .catch(() => {
-                // Metadata enrichment is best-effort and must not interrupt sync playback.
-            })
-            .finally(() => {
-                if (trackMetadataRequests.get(recordingId) === request) {
-                    trackMetadataRequests.delete(recordingId)
-                }
-            })
-
-        trackMetadataRequests.set(recordingId, request)
-        await request
-        return recordingMetadataCache.get(recordingId) ?? null
-    }
-
-    function hydrateTrackMetadata(track: AudioTrack) {
-        if (hydratedTrackIds.has(track.id)) {
-            return Promise.resolve()
-        }
-
-        const generation = trackMetadataGeneration
-        const request = fetchRecordingMetadata(track.id)
-            .then((metadata) => {
-                if (!metadata || generation !== trackMetadataGeneration) {
-                    return
-                }
-
-                const hydratedTrack =
-                    buildTrackWithResolvedSource(track, metadata) ??
-                    applyRecordingMetadata(track, metadata)
-                rememberHydratedTrack(hydratedTrack)
-
-                if (currentTrack.value?.id === track.id) {
-                    currentTrack.value = cloneTrack({
-                        ...currentTrack.value,
-                        ...hydratedTrack,
-                    })
-                }
-
-                if (currentBufferTrack.value?.id === track.id) {
-                    currentBufferTrack.value = {
-                        ...currentBufferTrack.value,
-                        ...hydratedTrack,
-                    }
-                }
-            })
-            .catch(() => {
-                // Metadata enrichment is best-effort and must not interrupt sync playback.
-            })
-
-        return request
-    }
-
-    const createTrackShell = (recordingId: number): AudioTrack => {
-        const current = currentTrack.value?.id === recordingId ? currentTrack.value : null
-        const cached = knownTracks.get(recordingId)
-        const base = current ?? cached
-        const track: AudioTrack = {
-            id: recordingId,
-            title: base?.title ?? `Recording #${recordingId}`,
-            artist: base?.artist ?? 'Unknown Artist',
-            cover: base?.cover ?? '',
-            src: base?.src,
-            mediaFileId: base?.mediaFileId,
-            ...(base?.workId !== undefined ? { workId: base.workId } : {}),
-        }
-        cacheTrack(track)
-        return track
-    }
-
-    const resolveTrackForPlayback = async (track: AudioTrack) => {
-        if (track.src && track.mediaFileId !== undefined) {
-            return track
-        }
-
-        const metadata = await fetchRecordingMetadata(track.id)
-        if (!metadata) {
-            return null
-        }
-
-        const resolvedTrack = buildTrackWithResolvedSource(track, metadata)
-        if (!resolvedTrack) {
-            rememberHydratedTrack(applyRecordingMetadata(track, metadata))
-            return null
-        }
-
-        rememberHydratedTrack(resolvedTrack)
-        if (currentTrack.value?.id === track.id) {
-            currentTrack.value = cloneTrack(resolvedTrack)
-        }
-        return resolvedTrack
-    }
 
     const getEstimatedServerNowMs = () => {
         return nowClientMs() + clockOffsetMs.value
@@ -1162,14 +778,19 @@ export const useAudioStore = defineStore('audio', () => {
             return
         }
 
-        const track = await resolveTrackForPlayback(createTrackShell(payload.recordingId))
-        if (!track) {
+        const shellTrack = createTrackShell(payload.recordingId)
+        currentTrack.value = cloneTrack(shellTrack)
+        cacheTrack(shellTrack)
+        void hydrateTrackMetadata(shellTrack)
+
+        const track = (await resolveTrackForPlayback(shellTrack)) ?? shellTrack
+        currentTrack.value = cloneTrack(track)
+        cacheTrack(track)
+
+        if (!track.src || track.mediaFileId === undefined) {
             error.value = PLAYBACK_ERROR_MESSAGE
             return
         }
-
-        currentTrack.value = cloneTrack(track)
-        cacheTrack(track)
 
         const buffer = await ensureTrackBuffer(track)
         if (!buffer || track.mediaFileId === undefined) {
@@ -1184,9 +805,13 @@ export const useAudioStore = defineStore('audio', () => {
     }
 
     const handleSnapshot = async (payload: SnapshotPayload) => {
+        const snapshotVersion = payload.state.version
+        const snapshotRecordingId = payload.state.recordingId
         latestSnapshotReceivedAtMs.value = nowClientMs()
         latestSnapshot.value = payload.state
-        applyQueueSnapshot(payload.queue)
+        if ('queue' in payload && payload.queue) {
+            applyQueueSnapshot(payload.queue)
+        }
 
         if (isNil(payload.state.recordingId)) {
             if (!isPlaying.value) {
@@ -1198,6 +823,13 @@ export const useAudioStore = defineStore('audio', () => {
         const shellTrack = createTrackShell(payload.state.recordingId)
         void hydrateTrackMetadata(shellTrack)
         const track = (await resolveTrackForPlayback(shellTrack)) ?? shellTrack
+
+        if (
+            latestSnapshot.value?.version !== snapshotVersion ||
+            latestSnapshot.value.recordingId !== snapshotRecordingId
+        ) {
+            return
+        }
 
         cacheTrack(track)
         currentTrack.value = cloneTrack(track)
@@ -1460,13 +1092,30 @@ export const useAudioStore = defineStore('audio', () => {
             }
         }
 
-        const queue = await api.playbackQueueController.replaceCurrentQueue({
-            body: {
-                recordingIds,
-                currentIndex,
-            },
-        })
-        applyQueueSnapshot(queue)
+        if (api.playbackQueueController?.replaceCurrentQueue) {
+            const queue = await api.playbackQueueController.replaceCurrentQueue({
+                body: {
+                    recordingIds,
+                    currentIndex,
+                },
+            })
+            applyQueueSnapshot(queue)
+        } else {
+            currentQueue.value = {
+                items: tracks.map((track, index) => ({
+                    entryId: index + 1,
+                    recordingId: track.id,
+                    title: track.title,
+                    artistLabel: track.artist,
+                    coverUrl: track.cover,
+                    durationMs: 0,
+                })),
+                currentEntryId: currentIndex + 1,
+                version: currentQueue.value.version + 1,
+                updatedAtMs: nowClientMs(),
+            }
+            currentTrack.value = cloneTrack(targetTrack)
+        }
         await requestPlay(targetTrack, 0)
     }
 
@@ -1695,10 +1344,7 @@ export const useAudioStore = defineStore('audio', () => {
         audioUnlockRequired.value = false
         isPlayerHidden.value = false
         currentQueue.value = createEmptyQueue()
-        trackMetadataGeneration += 1
-        trackMetadataRequests.clear()
-        hydratedTrackIds.clear()
-        knownTracks.clear()
+        resetTrackCatalog()
         clearTrackState()
         destroyAudioContext()
     }
