@@ -1,21 +1,17 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { formatDurationMs } from '@/composables/recordingMedia'
 import { useAudioStore } from '@/stores/audio'
+import CurrentQueueSidebar from '@/components/CurrentQueueSidebar.vue'
 import {
-    ArrowDown,
-    ArrowUp,
     ChevronUp,
     ChevronRight,
     ChevronDown,
     ListMusic,
-    LoaderCircle,
     Pause,
     Play,
     SkipBack,
     SkipForward,
-    Trash2,
     Volume2,
     VolumeX,
     X,
@@ -139,40 +135,8 @@ const handlePlayNext = () => {
     void audioStore.playNext()
 }
 
-const playQueueEntry = (entryId: number) => {
-    void audioStore.playQueueEntry(entryId)
-}
-
-const clearQueue = () => {
-    void audioStore.clearQueue()
-}
-
 const toggleQueue = () => {
     isQueueExpanded.value = !isQueueExpanded.value
-}
-
-const moveQueueEntry = (entryId: number, direction: -1 | 1) => {
-    const queueEntries = [...audioStore.queueEntries]
-    const currentIndex = queueEntries.findIndex((entry) => entry.entryId === entryId)
-    if (currentIndex < 0) {
-        return
-    }
-
-    const targetIndex = currentIndex + direction
-    if (targetIndex < 0 || targetIndex >= queueEntries.length) {
-        return
-    }
-
-    const [movedEntry] = queueEntries.splice(currentIndex, 1)
-    if (!movedEntry) {
-        return
-    }
-    queueEntries.splice(targetIndex, 0, movedEntry)
-    void audioStore.reorderQueue(queueEntries.map((entry) => entry.entryId))
-}
-
-const removeQueueEntry = (entryId: number) => {
-    void audioStore.removeQueueEntry(entryId)
 }
 
 const syncStatusClass = computed(() => {
@@ -400,17 +364,12 @@ const syncStatusClass = computed(() => {
                             <button
                                 type="button"
                                 data-test="queue-toggle-button"
-                                class="inline-flex items-center gap-1 rounded-full border border-[#E8DED0] px-3 py-1.5 text-xs text-[#7C7367] transition-colors hover:border-[#D6B28A] hover:text-[#B56C35]"
+                                class="inline-flex items-center gap-1 px-3 py-1.5 text-xs text-[#7C7367] transition-colors hover:text-[#B56C35]"
                                 :disabled="audioStore.queueEntries.length === 0"
                                 @click="toggleQueue"
                             >
                                 <ListMusic :size="14" />
                                 <span>{{ audioStore.queueEntries.length }}</span>
-                                <ChevronDown
-                                    :size="14"
-                                    class="transition-transform duration-200"
-                                    :class="isQueueExpanded ? 'rotate-180' : ''"
-                                />
                             </button>
 
                             <button
@@ -436,147 +395,7 @@ const syncStatusClass = computed(() => {
             </div>
         </Transition>
 
-        <Transition
-            enter-active-class="transition-all duration-220 ease-out"
-            enter-from-class="translate-x-6 opacity-0"
-            enter-to-class="translate-x-0 opacity-100"
-            leave-active-class="transition-all duration-180 ease-in"
-            leave-from-class="translate-x-0 opacity-100"
-            leave-to-class="translate-x-6 opacity-0"
-        >
-            <aside
-                v-if="
-                    isQueueExpanded &&
-                    audioStore.queueEntries.length > 0 &&
-                    !audioStore.isPlayerHidden
-                "
-                data-test="queue-sidebar"
-                class="fixed bottom-[calc(max(6.25rem,env(safe-area-inset-bottom)+5rem))] right-4 top-24 z-[55] flex w-[23rem] flex-col rounded-[1.75rem] border border-[#E8DED0] bg-[#FCF9F4]/98 p-3 shadow-[0_18px_60px_rgba(63,42,20,0.10)] backdrop-blur max-md:left-3 max-md:right-3 max-md:top-auto max-md:max-h-[55vh] max-md:w-auto"
-            >
-                <div class="mb-3 flex items-start justify-between gap-3 px-1">
-                    <div>
-                        <div class="text-[11px] uppercase tracking-[0.22em] text-[#8C857B]">
-                            Current Queue
-                        </div>
-                        <div class="mt-1 text-sm font-medium text-[#3E322B]">
-                            {{ audioStore.queueEntries.length }} tracks
-                        </div>
-                    </div>
-
-                    <div class="flex items-center gap-1">
-                        <button
-                            type="button"
-                            data-test="clear-queue-button"
-                            class="rounded-full px-2.5 py-1 text-xs text-[#8C857B] transition-colors hover:bg-[#F5EADD] hover:text-[#B55B4A]"
-                            :disabled="!audioStore.canSendRealtimeControl"
-                            @click="clearQueue"
-                        >
-                            清空
-                        </button>
-                        <button
-                            type="button"
-                            class="rounded-full p-1.5 text-[#8C857B] transition-colors hover:bg-[#F3E8D8] hover:text-[#B56C35]"
-                            @click="toggleQueue"
-                        >
-                            <X :size="14" />
-                        </button>
-                    </div>
-                </div>
-
-                <div class="min-h-0 space-y-1 overflow-y-auto pr-1">
-                    <div
-                        v-for="(entry, index) in audioStore.queueEntries"
-                        :key="entry.entryId"
-                        class="group flex items-center gap-3 rounded-2xl px-3 py-2 transition-colors"
-                        :class="
-                            audioStore.currentQueueEntry?.entryId === entry.entryId
-                                ? 'bg-[#F8E8D5]'
-                                : 'hover:bg-white'
-                        "
-                    >
-                        <button
-                            type="button"
-                            class="flex min-w-0 flex-1 items-center gap-3 text-left"
-                            @click="playQueueEntry(entry.entryId)"
-                        >
-                            <div
-                                class="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[#E8DED0]"
-                            >
-                                <img
-                                    v-if="entry.cover"
-                                    :src="entry.cover"
-                                    alt="Queue Cover"
-                                    class="h-full w-full object-cover"
-                                />
-                                <Play v-else :size="14" class="text-[#8C857B]" />
-                            </div>
-
-                            <div class="min-w-0 flex-1">
-                                <div class="flex items-center gap-2">
-                                    <LoaderCircle
-                                        v-if="
-                                            audioStore.currentQueueEntry?.entryId ===
-                                                entry.entryId && audioStore.isLoading
-                                        "
-                                        :size="13"
-                                        class="animate-spin text-[#C17D46]"
-                                    />
-                                    <span
-                                        class="truncate text-sm"
-                                        :class="
-                                            audioStore.currentQueueEntry?.entryId === entry.entryId
-                                                ? 'font-semibold text-[#2C2420]'
-                                                : 'font-medium text-[#473A32]'
-                                        "
-                                    >
-                                        {{ entry.title }}
-                                    </span>
-                                </div>
-                                <div class="mt-0.5 truncate text-xs text-[#8C857B]">
-                                    {{ entry.artist }}
-                                </div>
-                            </div>
-                        </button>
-
-                        <div class="text-xs text-[#8C857B]">
-                            {{ formatDurationMs(entry.durationMs) }}
-                        </div>
-
-                        <div
-                            class="flex items-center gap-1 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100"
-                        >
-                            <button
-                                type="button"
-                                class="rounded-md p-1.5 text-[#8C857B] transition-colors hover:bg-[#F3E8D8] hover:text-[#C17D46]"
-                                :disabled="index === 0 || !audioStore.canSendRealtimeControl"
-                                @click.stop="moveQueueEntry(entry.entryId, -1)"
-                            >
-                                <ArrowUp :size="14" />
-                            </button>
-                            <button
-                                type="button"
-                                class="rounded-md p-1.5 text-[#8C857B] transition-colors hover:bg-[#F3E8D8] hover:text-[#C17D46]"
-                                :disabled="
-                                    index === audioStore.queueEntries.length - 1 ||
-                                    !audioStore.canSendRealtimeControl
-                                "
-                                @click.stop="moveQueueEntry(entry.entryId, 1)"
-                            >
-                                <ArrowDown :size="14" />
-                            </button>
-                            <button
-                                type="button"
-                                class="rounded-md p-1.5 text-[#8C857B] transition-colors hover:bg-[#FBE7E4] hover:text-[#B55B4A]"
-                                :disabled="!audioStore.canSendRealtimeControl"
-                                @click.stop="removeQueueEntry(entry.entryId)"
-                            >
-                                <Trash2 :size="14" />
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </aside>
-        </Transition>
+        <CurrentQueueSidebar v-model:expanded="isQueueExpanded" />
 
         <Transition
             enter-active-class="transition-all duration-240 ease-out"
