@@ -93,6 +93,8 @@ export const useAudioStore = defineStore('audio', () => {
     const audioContext = shallowRef<AudioContext | null>(null)
     const currentBuffer = shallowRef<AudioBuffer | null>(null)
     const currentBufferTrack = shallowRef<AudioTrack | null>(null)
+    const currentBufferFileSizeBytes = ref<number | null>(null)
+    const currentBufferContentType = ref<string | null>(null)
     const sourceNode = shallowRef<AudioBufferSourceNode | null>(null)
     const gainNode = shallowRef<GainNode | null>(null)
     const playbackStartContextTime = ref(0)
@@ -272,6 +274,10 @@ export const useAudioStore = defineStore('audio', () => {
                           recordingId: bufferTrack.id,
                           mediaFileId: bufferTrack.mediaFileId ?? null,
                           duration: currentBuffer.value.duration,
+                          sampleRate: currentBuffer.value.sampleRate,
+                          numberOfChannels: currentBuffer.value.numberOfChannels,
+                          fileSizeBytes: currentBufferFileSizeBytes.value,
+                          contentType: currentBufferContentType.value,
                       }
                     : null,
             activeLoad: activeLoad.value
@@ -515,6 +521,8 @@ export const useAudioStore = defineStore('audio', () => {
     const releaseLoadedBuffer = () => {
         currentBuffer.value = null
         currentBufferTrack.value = null
+        currentBufferFileSizeBytes.value = null
+        currentBufferContentType.value = null
         duration.value = 0
     }
 
@@ -589,7 +597,9 @@ export const useAudioStore = defineStore('audio', () => {
                     throw new Error(`Failed to fetch audio: ${response.status}`)
                 }
 
+                const contentType = response.headers.get('content-type')
                 const arrayBuffer = await response.arrayBuffer()
+                const fileSizeBytes = arrayBuffer.byteLength
                 const buffer = await context.decodeAudioData(arrayBuffer)
                 if (activeLoad.value !== loadState) {
                     return null
@@ -597,6 +607,8 @@ export const useAudioStore = defineStore('audio', () => {
 
                 currentBuffer.value = buffer
                 currentBufferTrack.value = cloneTrack(track)
+                currentBufferFileSizeBytes.value = fileSizeBytes
+                currentBufferContentType.value = contentType
                 if (currentTrack.value?.mediaFileId === track.mediaFileId) {
                     duration.value = buffer.duration
                     updatePausedTime(playbackOffsetSec.value)

@@ -204,6 +204,39 @@ const currentTrackLabel = computed(() => {
     return `${track.title} · ${track.artist}`
 })
 
+const MIME_FORMAT_MAP: Record<string, string> = {
+    'audio/mpeg': 'MP3',
+    'audio/mp3': 'MP3',
+    'audio/flac': 'FLAC',
+    'audio/x-flac': 'FLAC',
+    'audio/wav': 'WAV',
+    'audio/x-wav': 'WAV',
+    'audio/ogg': 'OGG',
+    'audio/aac': 'AAC',
+    'audio/mp4': 'AAC',
+    'audio/x-m4a': 'M4A',
+    'audio/webm': 'WEBM',
+    'audio/opus': 'OPUS',
+}
+
+const audioFormat = computed(() => {
+    const contentType = debugSnapshot.value.currentBuffer?.contentType
+    if (!contentType) return '-'
+    const mimeBase = contentType.split(';')[0].trim().toLowerCase()
+    return MIME_FORMAT_MAP[mimeBase] ?? mimeBase.replace('audio/', '').toUpperCase()
+})
+
+const estimatedBitrateKbps = computed(() => {
+    const buf = debugSnapshot.value.currentBuffer
+    if (!buf?.fileSizeBytes || !buf.duration || buf.duration <= 0) return null
+    return (buf.fileSizeBytes * 8) / buf.duration / 1000
+})
+
+const formatFileSizeKB = (bytes: number | null | undefined) => {
+    if (bytes === null || bytes === undefined) return '-'
+    return `${(bytes / 1024).toFixed(0)} KB`
+}
+
 const lastErrorMessage = computed(() => {
     return (
         debugSnapshot.value.error ??
@@ -806,53 +839,120 @@ onBeforeUnmount(() => {
 
             <section
                 data-test="debug-local-execution"
-                class="mt-10 grid gap-4 border border-[#DCD9D0] bg-white p-4 sm:p-6 md:grid-cols-2 xl:grid-cols-4"
+                class="mt-10 border border-[#DCD9D0] bg-white p-4 sm:p-6"
             >
-                <div>
-                    <div class="text-[9px] uppercase tracking-[0.16em] text-[#1A1917]/40">
-                        Track
+                <div
+                    class="grid gap-4 md:grid-cols-2 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,2fr)]"
+                >
+                    <div>
+                        <div class="text-[9px] uppercase tracking-[0.16em] text-[#1A1917]/40">
+                            Track
+                        </div>
+                        <div class="mt-2 font-serif text-lg text-[#1A1917]">
+                            {{ currentTrackLabel }}
+                        </div>
                     </div>
-                    <div class="mt-2 font-serif text-lg text-[#1A1917]">
-                        {{ currentTrackLabel }}
+                    <div>
+                        <div class="text-[9px] uppercase tracking-[0.16em] text-[#1A1917]/40">
+                            Last Execution
+                        </div>
+                        <div class="mt-2 font-mono text-sm text-[#1A1917]">
+                            {{
+                                debugSnapshot.lastLocalExecution
+                                    ? `${debugSnapshot.lastLocalExecution.action} · ${formatMilliseconds(debugSnapshot.lastLocalExecution.waitMs, 0)}`
+                                    : '-'
+                            }}
+                        </div>
+                    </div>
+                    <div>
+                        <div class="text-[9px] uppercase tracking-[0.16em] text-[#1A1917]/40">
+                            Recent Samples
+                        </div>
+                        <div class="mt-2 font-mono text-sm text-[#1A1917]">
+                            {{
+                                recentMeasurements.length > 0
+                                    ? recentMeasurements
+                                          .map((measurement) =>
+                                              formatMilliseconds(measurement.offsetMs),
+                                          )
+                                          .join(' / ')
+                                    : '-'
+                            }}
+                        </div>
+                    </div>
+                    <div>
+                        <div class="text-[9px] uppercase tracking-[0.16em] text-[#1A1917]/40">
+                            Devices / Error
+                        </div>
+                        <div class="mt-2 font-mono text-sm text-[#1A1917]">
+                            {{ lastDeviceSummary }}
+                        </div>
+                        <div
+                            class="mt-1 break-all font-mono text-xs text-[#C85A3C]"
+                            :title="lastErrorMessage"
+                        >
+                            {{ lastErrorMessage }}
+                        </div>
                     </div>
                 </div>
-                <div>
-                    <div class="text-[9px] uppercase tracking-[0.16em] text-[#1A1917]/40">
-                        Last Execution
+
+                <div
+                    v-if="debugSnapshot.currentBuffer"
+                    class="mt-4 grid gap-4 border-t border-[#DCD9D0] pt-4 md:grid-cols-3 xl:grid-cols-5"
+                >
+                    <div>
+                        <div class="text-[9px] uppercase tracking-[0.16em] text-[#1A1917]/40">
+                            Format
+                        </div>
+                        <div class="mt-2 font-mono text-sm text-[#1A1917]">
+                            {{ audioFormat }}
+                        </div>
                     </div>
-                    <div class="mt-2 font-mono text-sm text-[#1A1917]">
-                        {{
-                            debugSnapshot.lastLocalExecution
-                                ? `${debugSnapshot.lastLocalExecution.action} · ${formatMilliseconds(debugSnapshot.lastLocalExecution.waitMs, 0)}`
-                                : '-'
-                        }}
+                    <div>
+                        <div class="text-[9px] uppercase tracking-[0.16em] text-[#1A1917]/40">
+                            Bitrate
+                        </div>
+                        <div class="mt-2 font-mono text-sm text-[#1A1917]">
+                            {{
+                                estimatedBitrateKbps !== null
+                                    ? `${formatNumber(estimatedBitrateKbps, 0)} kbps`
+                                    : '-'
+                            }}
+                        </div>
                     </div>
-                </div>
-                <div>
-                    <div class="text-[9px] uppercase tracking-[0.16em] text-[#1A1917]/40">
-                        Recent Samples
+                    <div>
+                        <div class="text-[9px] uppercase tracking-[0.16em] text-[#1A1917]/40">
+                            Sample Rate
+                        </div>
+                        <div class="mt-2 font-mono text-sm text-[#1A1917]">
+                            {{
+                                debugSnapshot.currentBuffer.sampleRate
+                                    ? `${debugSnapshot.currentBuffer.sampleRate} Hz`
+                                    : '-'
+                            }}
+                        </div>
                     </div>
-                    <div class="mt-2 font-mono text-sm text-[#1A1917]">
-                        {{
-                            recentMeasurements.length > 0
-                                ? recentMeasurements
-                                      .map((measurement) =>
-                                          formatMilliseconds(measurement.offsetMs),
-                                      )
-                                      .join(' / ')
-                                : '-'
-                        }}
+                    <div>
+                        <div class="text-[9px] uppercase tracking-[0.16em] text-[#1A1917]/40">
+                            Channels
+                        </div>
+                        <div class="mt-2 font-mono text-sm text-[#1A1917]">
+                            {{
+                                debugSnapshot.currentBuffer.numberOfChannels === 1
+                                    ? '1 (Mono)'
+                                    : debugSnapshot.currentBuffer.numberOfChannels === 2
+                                      ? '2 (Stereo)'
+                                      : (debugSnapshot.currentBuffer.numberOfChannels ?? '-')
+                            }}
+                        </div>
                     </div>
-                </div>
-                <div>
-                    <div class="text-[9px] uppercase tracking-[0.16em] text-[#1A1917]/40">
-                        Devices / Error
-                    </div>
-                    <div class="mt-2 truncate font-mono text-sm text-[#1A1917]">
-                        {{ lastDeviceSummary }}
-                    </div>
-                    <div class="mt-1 truncate font-mono text-xs text-[#C85A3C]">
-                        {{ lastErrorMessage }}
+                    <div>
+                        <div class="text-[9px] uppercase tracking-[0.16em] text-[#1A1917]/40">
+                            File Size
+                        </div>
+                        <div class="mt-2 font-mono text-sm text-[#1A1917]">
+                            {{ formatFileSizeKB(debugSnapshot.currentBuffer.fileSizeBytes) }}
+                        </div>
                     </div>
                 </div>
             </section>

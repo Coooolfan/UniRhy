@@ -84,6 +84,10 @@ export type PlaybackSyncDebugSnapshot = {
         recordingId: number | null
         mediaFileId: number | null
         duration: number
+        sampleRate: number
+        numberOfChannels: number
+        fileSizeBytes: number | null
+        contentType: string | null
     } | null
     activeLoad: {
         mediaFileId: number

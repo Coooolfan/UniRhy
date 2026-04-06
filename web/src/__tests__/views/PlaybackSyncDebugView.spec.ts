@@ -69,6 +69,10 @@ const playbackSyncDebugSnapshot = reactive({
         recordingId: 9,
         mediaFileId: 2_009,
         duration: 25,
+        sampleRate: 44100,
+        numberOfChannels: 2,
+        fileSizeBytes: 1_024_000,
+        contentType: 'audio/mpeg',
     },
     activeLoad: null,
     lastLocalExecution: {
