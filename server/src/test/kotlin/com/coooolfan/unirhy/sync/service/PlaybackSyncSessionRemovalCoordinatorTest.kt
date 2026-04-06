@@ -3,9 +3,10 @@ package com.coooolfan.unirhy.sync.service
 import com.coooolfan.unirhy.service.MediaUrlSigner
 import com.coooolfan.unirhy.sync.log.PlaybackSyncLogWriter
 import com.coooolfan.unirhy.sync.protocol.DeviceChangeMessage
+import com.coooolfan.unirhy.sync.protocol.PlaybackStatus
 import com.coooolfan.unirhy.sync.protocol.ScheduledActionMessage
-import com.coooolfan.unirhy.sync.protocol.ServerPlaybackSyncMessage
 import com.coooolfan.unirhy.sync.protocol.ScheduledActionType
+import com.coooolfan.unirhy.sync.protocol.ServerPlaybackSyncMessage
 import com.coooolfan.unirhy.sync.support.TestPlaybackSyncTimeProvider
 import com.coooolfan.unirhy.sync.support.TestWebSocketSession
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
@@ -44,7 +45,7 @@ class PlaybackSyncSessionRemovalCoordinatorTest {
             deviceRuntimeService = deviceRuntimeService,
             scheduler = schedulerExecutor,
         )
-        messageSender = PlaybackSyncMessageSender(objectMapper, deviceRuntimeService, MediaUrlSigner("test-signing-key", 3600))
+        messageSender = PlaybackSyncMessageSender(objectMapper, deviceRuntimeService)
         scheduledActionDispatcher = PlaybackSyncScheduledActionDispatcher(
             messageSender = messageSender,
             logWriter = PlaybackSyncLogWriter(),
@@ -79,22 +80,67 @@ class PlaybackSyncSessionRemovalCoordinatorTest {
     }
 
     @Test
-    fun `handle removal clears pending play when no devices remain`() {
+    fun `handle removal auto pauses playing state when no devices remain`() {
         registerHello("session-1", "web-a")
-        playbackSessionService.createPendingPlay(
+        preparePlayingState()
+
+        val removal = requireNotNull(deviceRuntimeService.removeSession("session-1"))
+        coordinator.handleRemoval(removal, "connection_closed", 2_500L)
+
+        val state = playbackSessionService.getOrCreateState(42L)
+        assertEquals(PlaybackStatus.PAUSED, state.status)
+        assertEquals(1001L, state.recordingId)
+        assertEquals(13.5, state.positionSeconds)
+        assertEquals(2_900L, state.serverTimeToExecuteMs)
+        assertEquals(2L, state.version)
+        assertNull(playbackSessionService.getPendingPlay(42L))
+    }
+
+    @Test
+    fun `handle removal auto pauses paused state when no devices remain`() {
+        registerHello("session-1", "web-a")
+        playbackSessionService.schedulePause(
             accountId = 42L,
-            commandId = "cmd-play-001",
-            initiatorDeviceId = "web-a",
+            commandId = "cmd-pause-001",
             recordingId = 1001L,
-            mediaFileId = 2001L,
             positionSeconds = 12.5,
-            nowMs = 1_000L,
-            timeoutAtMs = 4_000L,
+            nowMs = 1_100L,
+            executeAtMs = 1_500L,
         )
 
         val removal = requireNotNull(deviceRuntimeService.removeSession("session-1"))
-        coordinator.handleRemoval(removal, "connection_closed", 1_200L)
+        coordinator.handleRemoval(removal, "connection_closed", 2_500L)
 
+        val state = playbackSessionService.getOrCreateState(42L)
+        assertEquals(PlaybackStatus.PAUSED, state.status)
+        assertEquals(1001L, state.recordingId)
+        assertEquals(12.5, state.positionSeconds)
+        assertEquals(2_900L, state.serverTimeToExecuteMs)
+        assertEquals(2L, state.version)
+    }
+
+    @Test
+    fun `handle removal clears pending play and pauses committed state when no devices remain`() {
+        registerHello("session-1", "web-a")
+        preparePlayingState()
+        playbackSessionService.createPendingPlay(
+            accountId = 42L,
+            commandId = "cmd-play-002",
+            initiatorDeviceId = "web-a",
+            recordingId = 2002L,
+            positionSeconds = 3.0,
+            nowMs = 2_000L,
+            timeoutAtMs = 5_000L,
+        )
+
+        val removal = requireNotNull(deviceRuntimeService.removeSession("session-1"))
+        coordinator.handleRemoval(removal, "connection_closed", 2_500L)
+
+        val state = playbackSessionService.getOrCreateState(42L)
+        assertEquals(PlaybackStatus.PAUSED, state.status)
+        assertEquals(1001L, state.recordingId)
+        assertEquals(13.5, state.positionSeconds)
+        assertEquals(2L, state.version)
         assertNull(playbackSessionService.getPendingPlay(42L))
     }
 
@@ -107,7 +153,6 @@ class PlaybackSyncSessionRemovalCoordinatorTest {
             commandId = "cmd-play-001",
             initiatorDeviceId = "web-a",
             recordingId = 1001L,
-            mediaFileId = 2001L,
             positionSeconds = 12.5,
             nowMs = 1_000L,
             timeoutAtMs = 4_000L,
@@ -117,7 +162,6 @@ class PlaybackSyncSessionRemovalCoordinatorTest {
             commandId = "cmd-play-001",
             deviceId = "web-b",
             recordingId = 1001L,
-            mediaFileId = 2001L,
         )
 
         val removal = requireNotNull(deviceRuntimeService.removeSession("session-1"))
@@ -140,7 +184,6 @@ class PlaybackSyncSessionRemovalCoordinatorTest {
             commandId = "cmd-play-001",
             initiatorDeviceId = "web-a",
             recordingId = 1001L,
-            mediaFileId = 2001L,
             positionSeconds = 12.5,
             nowMs = 1_000L,
             timeoutAtMs = 4_000L,
@@ -153,6 +196,24 @@ class PlaybackSyncSessionRemovalCoordinatorTest {
         assertEquals(1, messages.size)
         assertTrue(messages.single() is DeviceChangeMessage)
         assertNotNull(playbackSessionService.getPendingPlay(42L))
+    }
+
+    private fun preparePlayingState() {
+        playbackSessionService.createPendingPlay(
+            accountId = 42L,
+            commandId = "cmd-play-001",
+            initiatorDeviceId = "web-a",
+            recordingId = 1001L,
+            positionSeconds = 12.5,
+            nowMs = 1_000L,
+            timeoutAtMs = 4_000L,
+        )
+        playbackSessionService.completePendingPlay(
+            accountId = 42L,
+            commandId = "cmd-play-001",
+            nowMs = 1_100L,
+            executeAtMs = 1_500L,
+        )
     }
 
     private fun registerHello(

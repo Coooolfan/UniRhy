@@ -239,6 +239,8 @@ data class DeviceRuntimeState(
 - 客户端：NTP 请求超过 `3750ms` 未收到响应，判定连接 stale，主动重连
 - 服务端：按 `lastNtpResponseAtMs` 检查，超过 `3750ms`（`1.5 * 2500ms`）清理 stale 设备
 - 设备断开后若存在 `PendingPlayState`，从 `clientsLoaded` 移除该设备，若剩余设备全部就绪则立即触发 `executeScheduledPlay()`
+- 若最后一个已注册设备离线，服务端先取消并清空 `PendingPlayState`，再基于当前 `AccountPlaybackState` 自动生成 `PAUSE`
+- 该自动 `PAUSE` 保留当前权威态的 `recordingId`，播放中时按断开时刻恢复实时 `positionSeconds`，不使用 pending 中的曲目上下文
 
 ---
 

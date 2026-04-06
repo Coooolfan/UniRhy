@@ -47,7 +47,19 @@ class PlaybackSyncSessionRemovalCoordinator(
             scheduledActionDispatcher.broadcastAndLog(accountId, removal.context.deviceId, scheduledAction, nowMs)
             autoAdvanceService.syncFromScheduledAction(accountId, scheduledAction, nowMs)
         } else if (removal.remainingDeviceIds.isEmpty()) {
-            abandonPendingPlay(accountId)
+            if (removal.deviceListChanged) {
+                abandonPendingPlay(accountId)
+                val autoPause = playbackSessionService.schedulePauseFromCurrentState(
+                    accountId = accountId,
+                    commandId = "auto-disconnect-pause-$nowMs",
+                    nowMs = nowMs,
+                    executeAtMs = playbackSchedulerService.calculateExecuteAtMs(accountId, nowMs),
+                )
+                scheduledActionDispatcher.broadcastAndLog(accountId, removal.context.deviceId, autoPause, nowMs)
+                autoAdvanceService.syncFromScheduledAction(accountId, autoPause, nowMs)
+            } else {
+                abandonPendingPlay(accountId)
+            }
         }
 
         if (removal.deviceListChanged) {

@@ -138,6 +138,28 @@ class PlaybackSessionService(
         }
     }
 
+    fun schedulePauseFromCurrentState(
+        accountId: Long,
+        commandId: String,
+        nowMs: Long,
+        executeAtMs: Long,
+    ): ScheduledActionPayload {
+        return lockManager.withAccountLock(accountId) {
+            val currentState = getOrCreateStateLocked(accountId)
+            updateAndSchedule(
+                currentState = currentState,
+                accountId = accountId,
+                commandId = commandId,
+                action = ScheduledActionType.PAUSE,
+                statusOverride = PlaybackStatus.PAUSED,
+                recordingId = currentState.recordingId,
+                positionSeconds = currentState.recoverPositionSeconds(nowMs),
+                nowMs = nowMs,
+                executeAtMs = executeAtMs,
+            )
+        }
+    }
+
     fun scheduleSeek(
         accountId: Long,
         commandId: String,

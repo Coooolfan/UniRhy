@@ -28,7 +28,6 @@ class PlaybackSessionServiceTest {
             commandId = "cmd-play-001",
             initiatorDeviceId = "web-a",
             recordingId = 1001L,
-            mediaFileId = 2001L,
             positionSeconds = 12.5,
             nowMs = 1_000L,
             timeoutAtMs = 4_000L,
@@ -48,7 +47,6 @@ class PlaybackSessionServiceTest {
         val state = service.getOrCreateState(42L)
         assertEquals(PlaybackStatus.PLAYING, state.status)
         assertEquals(1001L, state.recordingId)
-        assertEquals(2001L, state.mediaFileId)
         assertEquals(12.5, state.positionSeconds)
         assertEquals(1_900L, state.serverTimeToExecuteMs)
         assertEquals(1L, state.version)
@@ -62,7 +60,6 @@ class PlaybackSessionServiceTest {
             commandId = "cmd-play-001",
             initiatorDeviceId = "web-a",
             recordingId = 1001L,
-            mediaFileId = 2001L,
             positionSeconds = 12.5,
             nowMs = 1_000L,
             timeoutAtMs = 4_000L,
@@ -95,7 +92,6 @@ class PlaybackSessionServiceTest {
             commandId = "cmd-play-001",
             initiatorDeviceId = "web-a",
             recordingId = 1001L,
-            mediaFileId = 2001L,
             positionSeconds = 12.5,
             nowMs = 1_000L,
             timeoutAtMs = 4_000L,
@@ -105,7 +101,6 @@ class PlaybackSessionServiceTest {
             commandId = "cmd-play-001",
             deviceId = "web-b",
             recordingId = 1001L,
-            mediaFileId = 2001L,
         )
 
         val scheduledAction = service.handleDeviceDisconnected(
@@ -127,7 +122,6 @@ class PlaybackSessionServiceTest {
             commandId = "cmd-play-001",
             initiatorDeviceId = "web-a",
             recordingId = 1001L,
-            mediaFileId = 2001L,
             positionSeconds = 12.5,
             nowMs = 1_000L,
             timeoutAtMs = 4_000L,
@@ -146,12 +140,68 @@ class PlaybackSessionServiceTest {
     }
 
     @Test
+    fun `schedule pause from current state recovers live playing position`() {
+        service.createPendingPlay(
+            accountId = 42L,
+            commandId = "cmd-play-001",
+            initiatorDeviceId = "web-a",
+            recordingId = 1001L,
+            positionSeconds = 12.5,
+            nowMs = 1_000L,
+            timeoutAtMs = 4_000L,
+        )
+        service.completePendingPlay(
+            accountId = 42L,
+            commandId = "cmd-play-001",
+            nowMs = 1_100L,
+            executeAtMs = 1_500L,
+        )
+
+        val scheduledAction = service.schedulePauseFromCurrentState(
+            accountId = 42L,
+            commandId = "auto-disconnect-pause-2500",
+            nowMs = 2_500L,
+            executeAtMs = 2_900L,
+        )
+
+        assertEquals(ScheduledActionType.PAUSE, scheduledAction.scheduledAction.action)
+        assertEquals(PlaybackStatus.PAUSED, scheduledAction.scheduledAction.status)
+        assertEquals(1001L, scheduledAction.scheduledAction.recordingId)
+        assertEquals(13.5, scheduledAction.scheduledAction.positionSeconds)
+        assertEquals(2L, scheduledAction.scheduledAction.version)
+    }
+
+    @Test
+    fun `schedule pause from current state preserves paused position`() {
+        service.schedulePause(
+            accountId = 42L,
+            commandId = "cmd-pause-001",
+            recordingId = 1001L,
+            positionSeconds = 12.5,
+            nowMs = 1_100L,
+            executeAtMs = 1_500L,
+        )
+
+        val scheduledAction = service.schedulePauseFromCurrentState(
+            accountId = 42L,
+            commandId = "auto-disconnect-pause-2500",
+            nowMs = 2_500L,
+            executeAtMs = 2_900L,
+        )
+
+        assertEquals(ScheduledActionType.PAUSE, scheduledAction.scheduledAction.action)
+        assertEquals(PlaybackStatus.PAUSED, scheduledAction.scheduledAction.status)
+        assertEquals(1001L, scheduledAction.scheduledAction.recordingId)
+        assertEquals(12.5, scheduledAction.scheduledAction.positionSeconds)
+        assertEquals(2L, scheduledAction.scheduledAction.version)
+    }
+
+    @Test
     fun `schedule seek preserves paused status`() {
         service.schedulePause(
             accountId = 42L,
             commandId = "cmd-pause-001",
             recordingId = 1001L,
-            mediaFileId = 2001L,
             positionSeconds = 12.5,
             nowMs = 1_100L,
             executeAtMs = 1_500L,
@@ -161,7 +211,6 @@ class PlaybackSessionServiceTest {
             accountId = 42L,
             commandId = "cmd-seek-001",
             recordingId = 1001L,
-            mediaFileId = 2001L,
             positionSeconds = 20.0,
             nowMs = 1_200L,
             executeAtMs = 1_600L,

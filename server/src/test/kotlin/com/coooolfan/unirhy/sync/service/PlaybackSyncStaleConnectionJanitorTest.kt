@@ -2,6 +2,7 @@ package com.coooolfan.unirhy.sync.service
 
 import com.coooolfan.unirhy.service.MediaUrlSigner
 import com.coooolfan.unirhy.sync.log.PlaybackSyncLogWriter
+import com.coooolfan.unirhy.sync.protocol.PlaybackStatus
 import com.coooolfan.unirhy.sync.support.TestPlaybackSyncTimeProvider
 import com.coooolfan.unirhy.sync.support.TestWebSocketSession
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
@@ -41,7 +42,6 @@ class PlaybackSyncStaleConnectionJanitorTest {
         val messageSender = PlaybackSyncMessageSender(
             objectMapper = jacksonObjectMapper(),
             deviceRuntimeService = deviceRuntimeService,
-            urlSigner = MediaUrlSigner("test-signing-key", 3600),
         )
         scheduledActionDispatcher = PlaybackSyncScheduledActionDispatcher(
             messageSender = messageSender,
@@ -84,7 +84,7 @@ class PlaybackSyncStaleConnectionJanitorTest {
     }
 
     @Test
-    fun `stale sweep clears pending play when last device is removed`() {
+    fun `stale sweep auto pauses committed state when last device is removed`() {
         deviceRuntimeService.recordNtpResponse(
             accountId = 42L,
             deviceId = "web-a",
@@ -96,17 +96,37 @@ class PlaybackSyncStaleConnectionJanitorTest {
             commandId = "cmd-play-001",
             initiatorDeviceId = "web-a",
             recordingId = 1001L,
-            mediaFileId = 2001L,
             positionSeconds = 12.5,
             nowMs = 1_000L,
             timeoutAtMs = 4_000L,
+        )
+        playbackSessionService.completePendingPlay(
+            accountId = 42L,
+            commandId = "cmd-play-001",
+            nowMs = 1_100L,
+            executeAtMs = 1_500L,
+        )
+        playbackSessionService.createPendingPlay(
+            accountId = 42L,
+            commandId = "cmd-play-002",
+            initiatorDeviceId = "web-a",
+            recordingId = 2002L,
+            positionSeconds = 3.0,
+            nowMs = 2_000L,
+            timeoutAtMs = 5_000L,
         )
 
         timeProvider.setNowMs(5_000L)
         janitor.sweepStaleConnections()
 
+        val state = playbackSessionService.getOrCreateState(42L)
         assertEquals("stale_connection", staleSession.closeStatus?.reason)
         assertTrue(deviceRuntimeService.listDeviceIds(42L).isEmpty())
+        assertEquals(PlaybackStatus.PAUSED, state.status)
+        assertEquals(1001L, state.recordingId)
+        assertEquals(16.0, state.positionSeconds)
+        assertEquals(5_400L, state.serverTimeToExecuteMs)
+        assertEquals(2L, state.version)
         assertNull(playbackSessionService.getPendingPlay(42L))
     }
 
