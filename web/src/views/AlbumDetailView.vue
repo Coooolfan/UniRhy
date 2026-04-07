@@ -21,6 +21,15 @@ import {
 } from '@/composables/recordingMedia'
 import { useRecordingEditor } from '@/composables/useRecordingEditor'
 import { useRecordingPlayback } from '@/composables/useRecordingPlayback'
+import {
+    applyStoredItemOrder,
+    buildRecordingOrderStorageKey,
+    hasSameItemOrder,
+    loadStoredItemOrder,
+    moveItemById,
+    saveStoredItemOrder,
+    type ReorderPayload,
+} from '@/utils/recordingOrder'
 
 const route = useRoute()
 const currentRecordingId = ref<number | null>(null)
@@ -64,6 +73,8 @@ const albumData = ref<AlbumData>({
 })
 
 const recordings = ref<Recording[]>([])
+
+const buildStorageKey = (albumId: number) => buildRecordingOrderStorageKey('album', albumId)
 
 const applyRecordingEdit = (
     currentRecordings: readonly Recording[],
@@ -148,7 +159,7 @@ const fetchAlbum = async (id: number) => {
             cover: resolveCover(data.cover),
         }
 
-        recordings.value = normalizeRecordings(
+        const normalizedRecordings = normalizeRecordings(
             (data.recordings || []) as readonly AlbumRecordingDto[],
             {
                 fallbackArtist: artistName,
@@ -163,6 +174,16 @@ const fetchAlbum = async (id: number) => {
                     isDefault: recording.defaultInWork,
                 }),
             },
+        )
+        const storageKey = buildStorageKey(id)
+        const orderedRecordings = applyStoredItemOrder(
+            normalizedRecordings,
+            loadStoredItemOrder(storageKey),
+        )
+        recordings.value = orderedRecordings
+        saveStoredItemOrder(
+            storageKey,
+            orderedRecordings.map((recording) => recording.id),
         )
         currentRecordingId.value = pickInitialRecordingId(recordings.value, 'first-playable')
     } catch (error) {
@@ -193,6 +214,24 @@ const buildRecordingLabel = (recording: Recording) => {
         return recording.label
     }
     return `${recording.label} · ${duration}`
+}
+
+const handleRecordingReorder = (payload: ReorderPayload) => {
+    const albumId = Number(route.params.id)
+    if (Number.isNaN(albumId)) {
+        return
+    }
+
+    const nextRecordings = moveItemById(recordings.value, payload)
+    if (hasSameItemOrder(recordings.value, nextRecordings)) {
+        return
+    }
+
+    recordings.value = nextRecordings
+    saveStoredItemOrder(
+        buildStorageKey(albumId),
+        nextRecordings.map((recording) => recording.id),
+    )
 }
 
 onMounted(() => {
@@ -235,9 +274,16 @@ watch(
                 :summary="`${recordings.length} Tracks`"
                 :items="recordings"
                 :playing-id="playingId"
+                enable-reorder
                 @item-double-click="onRecordingDoubleClick"
                 @item-keydown="onRecordingKeydown"
+                @item-reorder="handleRecordingReorder"
             >
+                <template #actions>
+                    <span class="text-[11px] uppercase tracking-[0.24em] text-[#B0AAA0]">
+                        拖拽排序 · 当前设备
+                    </span>
+                </template>
                 <template #item="{ item }">
                     <MediaListItem
                         :title="item.title"

@@ -40,6 +40,12 @@ const flushView = async () => {
     await nextTick()
 }
 
+const createDragTransfer = () => ({
+    effectAllowed: '',
+    dropEffect: '',
+    setData: vi.fn(),
+})
+
 const buildWorkResponse = () => ({
     id: 9,
     title: 'Work One',
@@ -76,6 +82,7 @@ const buildWorkResponse = () => ({
 describe('WorkDetailView', () => {
     beforeEach(() => {
         setActivePinia(createPinia())
+        window.localStorage.clear()
         getWorkByIdMock.mockReset()
         updateRecordingMock.mockReset()
         mergeRecordingMock.mockReset()
@@ -309,5 +316,58 @@ describe('WorkDetailView', () => {
         expect(getWorkByIdMock).toHaveBeenCalledTimes(1)
         expect(wrapper.text()).toContain('合并曲目失败（测试）')
         expect(wrapper.findAll('[data-testid="recording-select-checkbox"]:checked')).toHaveLength(2)
+    })
+
+    it('reorders recordings locally and reuses stored order on remount', async () => {
+        getWorkByIdMock.mockResolvedValue(buildWorkResponse())
+
+        const wrapper = mount(WorkDetailView, {
+            global: {
+                stubs: {
+                    teleport: true,
+                    transition: false,
+                    DashboardTopBar: true,
+                },
+            },
+        })
+
+        await flushView()
+
+        const rows = wrapper.findAll('[data-testid="media-list-row"]')
+        const firstRow = rows[0]
+        const secondRow = rows[1]
+        if (!firstRow || !secondRow) {
+            throw new Error('Missing media list rows in test setup')
+        }
+
+        const dataTransfer = createDragTransfer()
+        await secondRow.trigger('dragstart', { dataTransfer })
+        await firstRow.trigger('dragover', { clientY: 0, dataTransfer })
+        await firstRow.trigger('drop', { clientY: 0, dataTransfer })
+        await nextTick()
+
+        const reorderedIds = wrapper
+            .findAll('[data-testid="media-list-row"]')
+            .map((row) => Number(row.attributes('data-item-id')))
+        expect(reorderedIds).toEqual([22, 21])
+
+        wrapper.unmount()
+
+        const remountedWrapper = mount(WorkDetailView, {
+            global: {
+                stubs: {
+                    teleport: true,
+                    transition: false,
+                    DashboardTopBar: true,
+                },
+            },
+        })
+
+        await flushView()
+
+        const remountedIds = remountedWrapper
+            .findAll('[data-testid="media-list-row"]')
+            .map((row) => Number(row.attributes('data-item-id')))
+        expect(remountedIds).toEqual([22, 21])
     })
 })

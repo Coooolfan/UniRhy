@@ -23,6 +23,15 @@ import {
 import { useRecordingEditor } from '@/composables/useRecordingEditor'
 import { useRecordingMergeState } from '@/composables/useRecordingMergeState'
 import { useRecordingPlayback } from '@/composables/useRecordingPlayback'
+import {
+    applyStoredItemOrder,
+    buildRecordingOrderStorageKey,
+    hasSameItemOrder,
+    loadStoredItemOrder,
+    moveItemById,
+    saveStoredItemOrder,
+    type ReorderPayload,
+} from '@/utils/recordingOrder'
 
 const route = useRoute()
 const currentRecordingId = ref<number | null>(null)
@@ -69,12 +78,14 @@ const mergeStateActions: { resetState: () => void } = {
     resetState: () => undefined,
 }
 
+const buildStorageKey = (workId: number) => buildRecordingOrderStorageKey('work', workId)
+
 const applyRecordingEdit = (
     currentRecordings: readonly Recording[],
     recordingId: number,
     form: RecordingEditForm,
 ) => {
-    const nextRecordings = currentRecordings.map((recording) => {
+    return currentRecordings.map((recording) => {
         if (recording.id === recordingId) {
             return {
                 ...recording,
@@ -95,13 +106,6 @@ const applyRecordingEdit = (
 
         return recording
     })
-
-    return nextRecordings.sort((left, right) => {
-        if (left.isDefault === right.isDefault) {
-            return 0
-        }
-        return left.isDefault ? -1 : 1
-    })
 }
 
 async function fetchWork(id: number) {
@@ -120,7 +124,7 @@ async function fetchWork(id: number) {
             cover: resolveCover(defaultRecording?.cover),
         }
 
-        recordings.value = normalizeRecordings(
+        const normalizedRecordings = normalizeRecordings(
             (data.recordings || []) as readonly WorkRecordingDto[],
             {
                 transform: (recording, base) => ({
@@ -134,12 +138,17 @@ async function fetchWork(id: number) {
                     rawArtists: recording.artists || [],
                 }),
             },
-        ).sort((left, right) => {
-            if (left.isDefault === right.isDefault) {
-                return 0
-            }
-            return left.isDefault ? -1 : 1
-        })
+        )
+        const storageKey = buildStorageKey(id)
+        const orderedRecordings = applyStoredItemOrder(
+            normalizedRecordings,
+            loadStoredItemOrder(storageKey),
+        )
+        recordings.value = orderedRecordings
+        saveStoredItemOrder(
+            storageKey,
+            orderedRecordings.map((recording) => recording.id),
+        )
 
         currentRecordingId.value = pickInitialRecordingId(recordings.value, 'default-first')
 
@@ -325,6 +334,24 @@ const buildRecordingSubtitle = (recording: Recording) => {
     return parts.join(' · ')
 }
 
+const handleRecordingReorder = (payload: ReorderPayload) => {
+    const workId = Number(route.params.id)
+    if (Number.isNaN(workId)) {
+        return
+    }
+
+    const nextRecordings = moveItemById(recordings.value, payload)
+    if (hasSameItemOrder(recordings.value, nextRecordings)) {
+        return
+    }
+
+    recordings.value = nextRecordings
+    saveStoredItemOrder(
+        buildStorageKey(workId),
+        nextRecordings.map((recording) => recording.id),
+    )
+}
+
 onMounted(() => {
     const id = Number(route.params.id)
     if (!Number.isNaN(id)) {
@@ -368,12 +395,17 @@ watch(
                 :items="recordings"
                 :playing-id="playingId"
                 enable-multi-select
+                enable-reorder
                 :selected-ids="selectedRecordingIds"
                 @item-double-click="onRecordingDoubleClick"
                 @item-toggle-select="toggleRecordingSelection"
                 @item-keydown="onRecordingKeydown"
+                @item-reorder="handleRecordingReorder"
             >
                 <template #actions>
+                    <span class="text-[11px] uppercase tracking-[0.24em] text-[#B0AAA0]">
+                        拖拽排序 · 当前设备
+                    </span>
                     <button
                         v-if="hasEnoughSelectedRecordings"
                         type="button"

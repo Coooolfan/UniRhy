@@ -1,14 +1,13 @@
 package com.coooolfan.unirhy.service
 
-import com.coooolfan.unirhy.model.Album
-import com.coooolfan.unirhy.model.id
-import com.coooolfan.unirhy.model.title
+import com.coooolfan.unirhy.model.*
 import org.babyfish.jimmer.Page
 import org.babyfish.jimmer.sql.fetcher.Fetcher
 import org.babyfish.jimmer.sql.kt.KSqlClient
+import org.babyfish.jimmer.sql.kt.ast.expression.count
 import org.babyfish.jimmer.sql.kt.ast.expression.eq
 import org.babyfish.jimmer.sql.kt.ast.expression.ilike
-import org.babyfish.jimmer.sql.kt.ast.expression.ne
+import org.babyfish.jimmer.sql.kt.ast.expression.valueIn
 import org.springframework.stereotype.Service
 
 @Service
@@ -19,14 +18,28 @@ class AlbumService(private val sql: KSqlClient) {
         fetcher: Fetcher<Album>,
         filterSingle: Boolean = false
     ): Page<Album> {
-        return sql.createQuery(Album::class) {
-
-            if (filterSingle)
-                where(
-                    subQueries.forList(Album::albumRecordings) {
-                        selectCount()
-                    } ne 1L
+        val filteredAlbumIds: List<Long>? = if (!filterSingle) {
+            null
+        } else {
+            sql.createQuery(AlbumRecording::class) {
+                groupBy(table.albumId)
+                select(
+                    table.albumId,
+                    count(table.id),
                 )
+            }.execute()
+                .filter { it._2 != 1L }
+                .map { it._1 }
+        }
+
+        return sql.createQuery(Album::class) {
+            if (filteredAlbumIds != null) {
+                if (filteredAlbumIds.isEmpty()) {
+                    where(table.id eq -1L)
+                } else {
+                    where(table.id valueIn filteredAlbumIds)
+                }
+            }
 
             orderBy(table.id)
             select(table.fetch(fetcher))

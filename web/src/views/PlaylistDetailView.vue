@@ -15,6 +15,7 @@ import {
 } from '@/composables/recordingMedia'
 import { useRecordingPlayback, type PlayableRecording } from '@/composables/useRecordingPlayback'
 import { usePlaylistStore } from '@/stores/playlist'
+import { hasSameItemOrder, moveItemById, type ReorderPayload } from '@/utils/recordingOrder'
 
 const route = useRoute()
 const router = useRouter()
@@ -33,6 +34,8 @@ const deletePlaylistError = ref('')
 const recordingPendingRemoval = ref<Recording | null>(null)
 const isRemovingRecording = ref(false)
 const removeRecordingError = ref('')
+const isReorderingRecordings = ref(false)
+const reorderRecordingError = ref('')
 
 type PlaylistData = {
     title: string
@@ -75,6 +78,7 @@ const fetchPlaylist = async (id: number) => {
     try {
         isLoading.value = true
         removeRecordingError.value = ''
+        reorderRecordingError.value = ''
 
         const data = await api.playlistController.getPlaylist({ id })
         const firstCover =
@@ -204,7 +208,7 @@ const submitEdit = async () => {
 }
 
 const openRemoveRecordingModal = (recording: Recording) => {
-    if (isRemovingRecording.value) {
+    if (isRemovingRecording.value || isReorderingRecordings.value) {
         return
     }
     recordingPendingRemoval.value = recording
@@ -260,6 +264,58 @@ const confirmRemoveRecording = async () => {
         removeRecordingError.value = normalized.message ?? '移除曲目失败'
     } finally {
         isRemovingRecording.value = false
+    }
+}
+
+const handleRecordingReorder = async (payload: ReorderPayload) => {
+    const playlistId = Number(route.params.id)
+    if (Number.isNaN(playlistId) || isReorderingRecordings.value || isRemovingRecording.value) {
+        return
+    }
+
+    const previousRecordings = [...recordings.value]
+    const nextRecordings = moveItemById(previousRecordings, payload)
+    if (hasSameItemOrder(previousRecordings, nextRecordings)) {
+        return
+    }
+
+    recordings.value = nextRecordings
+    playlistData.value = {
+        ...playlistData.value,
+        cover: nextRecordings[0]?.cover || '',
+    }
+
+    isReorderingRecordings.value = true
+    reorderRecordingError.value = ''
+
+    try {
+        for (const recording of previousRecordings) {
+            await api.playlistController.removeRecordingFromPlaylist({
+                id: playlistId,
+                recordingId: recording.id,
+            })
+        }
+
+        for (const recording of nextRecordings) {
+            await api.playlistController.addRecordingToPlaylist({
+                id: playlistId,
+                recordingId: recording.id,
+            })
+        }
+    } catch (error) {
+        try {
+            await fetchPlaylist(playlistId)
+        } catch {
+            recordings.value = previousRecordings
+            playlistData.value = {
+                ...playlistData.value,
+                cover: previousRecordings[0]?.cover || '',
+            }
+        }
+        const normalized = normalizeApiError(error)
+        reorderRecordingError.value = normalized.message ?? '调整曲目顺序失败'
+    } finally {
+        isReorderingRecordings.value = false
     }
 }
 
@@ -363,10 +419,18 @@ watch(
                 :summary="`${recordings.length} Tracks`"
                 :items="recordings"
                 :playing-id="playingId"
+                enable-reorder
+                :reorder-disabled="isReorderingRecordings || isRemovingRecording"
                 @item-click="onRecordingClick"
                 @item-double-click="onRecordingDoubleClick"
                 @item-keydown="onRecordingKeydown"
+                @item-reorder="handleRecordingReorder"
             >
+                <template #actions>
+                    <span class="text-[11px] uppercase tracking-[0.24em] text-[#B0AAA0]">
+                        {{ isReorderingRecordings ? '正在保存顺序' : '拖拽排序' }}
+                    </span>
+                </template>
                 <template #empty> 前往 Work 或者 Album 详情页添加曲目到您的歌单 </template>
 
                 <template #item="{ item }">
@@ -385,6 +449,10 @@ watch(
                     />
                 </template>
             </MediaListPanel>
+
+            <p v-if="reorderRecordingError" class="mt-4 text-sm text-[#B95D5D]">
+                {{ reorderRecordingError }}
+            </p>
         </div>
 
         <PlaylistEditModal
