@@ -7,6 +7,7 @@ import org.babyfish.jimmer.sql.ast.mutation.SaveMode
 import org.babyfish.jimmer.sql.fetcher.Fetcher
 import org.babyfish.jimmer.sql.kt.KSqlClient
 import org.babyfish.jimmer.sql.kt.ast.expression.eq
+import org.babyfish.jimmer.sql.kt.ast.expression.max
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -88,8 +89,28 @@ class PlaylistService(private val sql: KSqlClient) {
         }.first() == 0L
         if (playlist) throw ResponseStatusException(HttpStatus.NOT_FOUND, "Playlist not found")
 
-        sql.getAssociations(Playlist::recordings)
-            .save(playlistId, recordingId, ignoreConflict = true)
+        // 幂等：已存在则直接返回，保持原接口语义
+        val alreadyExists = sql.createQuery(PlaylistRecording::class) {
+            where(table.playlistId eq playlistId)
+            where(table.recordingId eq recordingId)
+            selectCount()
+        }.execute().first() > 0L
+        if (alreadyExists) return
+
+        val maxOrder = sql.createQuery(PlaylistRecording::class) {
+            where(table.playlistId eq playlistId)
+            select(max(table.sortOrder))
+        }.execute().first()
+        val nextOrder = (maxOrder ?: -1) + 1
+
+        sql.save(
+            PlaylistRecording {
+                this.playlistId = playlistId
+                this.recordingId = recordingId
+                this.sortOrder = nextOrder
+            },
+            SaveMode.INSERT_ONLY,
+        )
     }
 
     @Transactional
@@ -101,8 +122,10 @@ class PlaylistService(private val sql: KSqlClient) {
         }.first() == 0L
         if (playlist) throw ResponseStatusException(HttpStatus.NOT_FOUND, "Playlist not found")
 
-        sql.getAssociations(Playlist::recordings)
-            .delete(playlistId, recordingId)
+        sql.createDelete(PlaylistRecording::class) {
+            where(table.playlistId eq playlistId)
+            where(table.recordingId eq recordingId)
+        }.execute()
     }
 
 }

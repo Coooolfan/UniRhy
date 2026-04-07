@@ -9,7 +9,6 @@ import org.babyfish.jimmer.sql.kt.KSqlClient
 import org.babyfish.jimmer.sql.kt.ast.expression.eq
 import org.babyfish.jimmer.sql.kt.ast.expression.ilike
 import org.babyfish.jimmer.sql.kt.ast.expression.ne
-import org.babyfish.jimmer.sql.kt.ast.table.sourceId
 import org.springframework.stereotype.Service
 
 @Service
@@ -24,8 +23,7 @@ class AlbumService(private val sql: KSqlClient) {
 
             if (filterSingle)
                 where(
-                    subQueries.forList(Album::recordings) {
-                        where(table.sourceId eq parentTable.id)
+                    subQueries.forList(Album::albumRecordings) {
                         selectCount()
                     } ne 1L
                 )

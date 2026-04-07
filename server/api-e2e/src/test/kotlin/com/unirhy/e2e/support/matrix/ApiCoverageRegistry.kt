@@ -33,6 +33,8 @@ object ApiCoverageRegistry {
         "com.unirhy.e2e.AccountPlaylistContentE2eTest#playlists should support owner scoped crud and recording association"
     private const val CONTENT_SEARCH_UPDATE_MERGE_CASE =
         "com.unirhy.e2e.AccountPlaylistContentE2eTest#content endpoints should support search update recording update and merge flow"
+    private const val RECORDING_MERGE_CASE =
+        "com.unirhy.e2e.AccountPlaylistContentE2eTest#recording merge should move album and playlist associations to target recording"
     private const val PLAYLIST_GENERATE_TASK_AUTH_CASE =
         "com.unirhy.e2e.PlaylistGenerateTaskE2eTest#playlist-generate endpoint should reject unauthenticated access"
     private const val PLAYLIST_GENERATE_TASK_PIPELINE_CASE =
@@ -128,6 +130,12 @@ object ApiCoverageRegistry {
             "/api/recordings/{id}",
             testRef = CONTENT_SEARCH_UPDATE_MERGE_CASE,
             note = "auth: $ACCOUNT_PLAYLIST_CONTENT_AUTH_REQUIRED_CASE",
+        ),
+        full(
+            "PUT",
+            "/api/recordings/merge",
+            testRef = RECORDING_MERGE_CASE,
+            note = "auth: $ACCOUNT_PLAYLIST_CONTENT_AUTH_REQUIRED_CASE; merge: source recording removed and album/playlist associations move to target",
         ),
         full(
             "GET",

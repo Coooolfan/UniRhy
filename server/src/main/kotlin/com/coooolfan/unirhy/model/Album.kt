@@ -5,8 +5,10 @@ import org.babyfish.jimmer.sql.GeneratedValue
 import org.babyfish.jimmer.sql.GenerationType
 import org.babyfish.jimmer.sql.Id
 import org.babyfish.jimmer.sql.Key
-import org.babyfish.jimmer.sql.ManyToMany
+import org.babyfish.jimmer.sql.ManyToManyView
 import org.babyfish.jimmer.sql.ManyToOne
+import org.babyfish.jimmer.sql.OneToMany
+import org.babyfish.jimmer.sql.OrderedProp
 import java.time.LocalDate
 
 @Entity
@@ -18,7 +20,13 @@ interface Album {
     @Key
     val title: String
 
-    @ManyToMany
+    @OneToMany(
+        mappedBy = "album",
+        orderedProps = [OrderedProp("sortOrder")]
+    )
+    val albumRecordings: List<AlbumRecording>
+
+    @ManyToManyView(prop = "albumRecordings", deeperProp = "recording")
     val recordings: List<Recording>
 
     val kind: String

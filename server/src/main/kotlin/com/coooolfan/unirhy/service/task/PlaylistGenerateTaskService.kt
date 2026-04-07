@@ -144,9 +144,15 @@ class PlaylistGenerateTaskService(
                         comment = playlistMeta.comment
                     }, SaveMode.INSERT_ONLY).modifiedEntity
 
-                    for (recordingId in similarRecordingIds) {
-                        sql.getAssociations(Playlist::recordings)
-                            .save(savedPlaylist.id, recordingId, ignoreConflict = true)
+                    val playlistRecordings = similarRecordingIds.mapIndexed { index, recordingId ->
+                        PlaylistRecording {
+                            this.playlistId = savedPlaylist.id
+                            this.recordingId = recordingId
+                            this.sortOrder = index
+                        }
+                    }
+                    if (playlistRecordings.isNotEmpty()) {
+                        sql.saveEntities(playlistRecordings, SaveMode.INSERT_ONLY)
                     }
 
                     logger.info(

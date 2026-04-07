@@ -10,6 +10,7 @@ import com.unirhy.e2e.support.E2eJson
 import com.unirhy.e2e.support.E2eRuntime
 import com.unirhy.e2e.support.SyntheticAudioFixture
 import com.unirhy.e2e.support.bootstrapAdminSession
+import org.springframework.beans.factory.annotation.Autowired
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.MethodOrderer
 import org.junit.jupiter.api.Order
@@ -19,10 +20,13 @@ import org.junit.jupiter.api.TestInstance
 import org.junit.jupiter.api.TestMethodOrder
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.web.server.LocalServerPort
+import org.springframework.jdbc.core.namedparam.MapSqlParameterSource
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate
 import org.springframework.test.annotation.DirtiesContext
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import java.net.http.HttpResponse
+import java.nio.file.Files
 import java.nio.file.Path
 import java.util.UUID
 import kotlin.test.assertEquals
@@ -43,6 +47,9 @@ class AccountPlaylistContentE2eTest {
 
     @LocalServerPort
     private var port: Int = 0
+
+    @Autowired
+    private lateinit var jdbc: NamedParameterJdbcTemplate
 
     private val prepareLock = Any()
     private var preparedData: PreparedData? = null
@@ -160,6 +167,16 @@ class AccountPlaylistContentE2eTest {
         )
         assertAuthenticationFailed(
             api.put(
+                path = "/api/recordings/merge",
+                json = mapOf(
+                    "targetId" to 1L,
+                    "needMergeIds" to listOf(1L, 2L),
+                ),
+            ),
+            "[auth] merge recordings should require login",
+        )
+        assertAuthenticationFailed(
+            api.put(
                 path = "/api/recordings/1",
                 json = mapOf(
                     "kind" to "CD",
@@ -261,8 +278,8 @@ class AccountPlaylistContentE2eTest {
     @Order(3)
     fun `playlists should support owner scoped crud and recording association`() {
         val state = bootstrapAdminSession(baseUrl())
-        val data = ensurePreparedData(state)
         val suffix = suffix()
+        val playlistOrderData = preparePlaylistOrderData(state)
 
         val owner = createAccountByAdmin(
             state = state,
@@ -325,30 +342,61 @@ class AccountPlaylistContentE2eTest {
             "[playlists] owner updated name should match",
         )
 
-        val addRecordingResponse1 = ownerApi.put("/api/playlists/$playlistId/recordings/${data.recordingId}")
+        val addRecordingResponse1 = ownerApi.put("/api/playlists/$playlistId/recordings/${playlistOrderData.firstRecordingId}")
         E2eAssert.status(addRecordingResponse1, 204, "[playlists] first add recording should succeed")
 
-        val addRecordingResponse2 = ownerApi.put("/api/playlists/$playlistId/recordings/${data.recordingId}")
+        val addRecordingResponse2 = ownerApi.put("/api/playlists/$playlistId/recordings/${playlistOrderData.firstRecordingId}")
         E2eAssert.status(addRecordingResponse2, 204, "[playlists] second add recording should stay idempotent")
 
-        val ownerDetailAfterAddResponse = ownerApi.get("/api/playlists/$playlistId")
-        E2eAssert.status(ownerDetailAfterAddResponse, 200, "[playlists] detail after add should succeed")
-        assertTrue(
-            detailContainsRecordingId(ownerDetailAfterAddResponse.body(), data.recordingId),
-            "[playlists] playlist detail should contain added recording",
+        val addRecordingResponse3 = ownerApi.put("/api/playlists/$playlistId/recordings/${playlistOrderData.secondRecordingId}")
+        E2eAssert.status(addRecordingResponse3, 204, "[playlists] append second recording should succeed")
+
+        val ownerDetailAfterAppendResponse = ownerApi.get("/api/playlists/$playlistId")
+        E2eAssert.status(ownerDetailAfterAppendResponse, 200, "[playlists] detail after append should succeed")
+        assertRecordingOrder(
+            responseBody = ownerDetailAfterAppendResponse.body(),
+            expectedRecordingIds = listOf(
+                playlistOrderData.firstRecordingId,
+                playlistOrderData.secondRecordingId,
+            ),
+            step = "[playlists] appended recordings should keep insertion order",
         )
 
-        val removeRecordingResponse1 = ownerApi.delete("/api/playlists/$playlistId/recordings/${data.recordingId}")
-        E2eAssert.status(removeRecordingResponse1, 204, "[playlists] first remove recording should succeed")
+        val removeRecordingResponse1 = ownerApi.delete("/api/playlists/$playlistId/recordings/${playlistOrderData.firstRecordingId}")
+        E2eAssert.status(removeRecordingResponse1, 204, "[playlists] remove first recording should succeed")
 
-        val removeRecordingResponse2 = ownerApi.delete("/api/playlists/$playlistId/recordings/${data.recordingId}")
-        E2eAssert.status(removeRecordingResponse2, 204, "[playlists] second remove recording should stay idempotent")
+        val reAddRecordingResponse = ownerApi.put("/api/playlists/$playlistId/recordings/${playlistOrderData.firstRecordingId}")
+        E2eAssert.status(reAddRecordingResponse, 204, "[playlists] re-add removed recording should append to tail")
+
+        val ownerDetailAfterReAddResponse = ownerApi.get("/api/playlists/$playlistId")
+        E2eAssert.status(ownerDetailAfterReAddResponse, 200, "[playlists] detail after re-add should succeed")
+        assertRecordingOrder(
+            responseBody = ownerDetailAfterReAddResponse.body(),
+            expectedRecordingIds = listOf(
+                playlistOrderData.secondRecordingId,
+                playlistOrderData.firstRecordingId,
+            ),
+            step = "[playlists] re-added recording should move to tail order",
+        )
+
+        val removeRecordingResponse2 = ownerApi.delete("/api/playlists/$playlistId/recordings/${playlistOrderData.secondRecordingId}")
+        E2eAssert.status(removeRecordingResponse2, 204, "[playlists] remove second recording should succeed")
+
+        val removeRecordingResponse3 = ownerApi.delete("/api/playlists/$playlistId/recordings/${playlistOrderData.secondRecordingId}")
+        E2eAssert.status(removeRecordingResponse3, 204, "[playlists] duplicate remove should stay idempotent")
+
+        val removeRecordingResponse4 = ownerApi.delete("/api/playlists/$playlistId/recordings/${playlistOrderData.firstRecordingId}")
+        E2eAssert.status(removeRecordingResponse4, 204, "[playlists] remove last recording should succeed")
 
         val ownerDetailAfterRemoveResponse = ownerApi.get("/api/playlists/$playlistId")
         E2eAssert.status(ownerDetailAfterRemoveResponse, 200, "[playlists] detail after remove should succeed")
         assertFalse(
-            detailContainsRecordingId(ownerDetailAfterRemoveResponse.body(), data.recordingId),
-            "[playlists] playlist detail should not contain removed recording",
+            detailContainsRecordingId(ownerDetailAfterRemoveResponse.body(), playlistOrderData.firstRecordingId),
+            "[playlists] playlist detail should not contain removed first recording",
+        )
+        assertFalse(
+            detailContainsRecordingId(ownerDetailAfterRemoveResponse.body(), playlistOrderData.secondRecordingId),
+            "[playlists] playlist detail should not contain removed second recording",
         )
 
         E2eAssert.status(
@@ -370,12 +418,12 @@ class AccountPlaylistContentE2eTest {
             "[playlists] non-owner delete playlist should return not found",
         )
         E2eAssert.status(
-            visitorApi.put("/api/playlists/$playlistId/recordings/${data.recordingId}"),
+            visitorApi.put("/api/playlists/$playlistId/recordings/${playlistOrderData.firstRecordingId}"),
             404,
             "[playlists] non-owner add recording should return not found",
         )
         E2eAssert.status(
-            visitorApi.delete("/api/playlists/$playlistId/recordings/${data.recordingId}"),
+            visitorApi.delete("/api/playlists/$playlistId/recordings/${playlistOrderData.firstRecordingId}"),
             404,
             "[playlists] non-owner remove recording should return not found",
         )
@@ -389,6 +437,93 @@ class AccountPlaylistContentE2eTest {
             responseBody = ownerListAfterDeleteResponse.body(),
             expectedId = playlistId,
             step = "[playlists] deleted playlist should not remain in list",
+        )
+    }
+
+    @Test
+    @Order(5)
+    fun `recording merge should move album and playlist associations to target recording`() {
+        val state = bootstrapAdminSession(baseUrl())
+        val mergeData = prepareRecordingMergeData(state)
+        val suffix = suffix()
+
+        val createPlaylistResponse = state.api.post(
+            path = "/api/playlists",
+            json = mapOf(
+                "name" to "recording-merge-$suffix",
+                "comment" to "recording-merge-comment-$suffix",
+            ),
+        )
+        E2eAssert.status(createPlaylistResponse, 201, "[recording-merge] create playlist should succeed")
+        val playlistId = readIdFromObject(
+            responseBody = createPlaylistResponse.body(),
+            pointer = "/id",
+            step = "[recording-merge] playlist id should exist",
+        )
+
+        val addSourceRecordingResponse = state.api.put("/api/playlists/$playlistId/recordings/${mergeData.sourceRecordingId}")
+        E2eAssert.status(addSourceRecordingResponse, 204, "[recording-merge] add source recording to playlist should succeed")
+
+        val sourceAlbumBeforeMergeResponse = state.api.get("/api/albums/${mergeData.sourceAlbumId}")
+        E2eAssert.status(sourceAlbumBeforeMergeResponse, 200, "[recording-merge] source album detail before merge should succeed")
+        assertRecordingOrder(
+            responseBody = sourceAlbumBeforeMergeResponse.body(),
+            expectedRecordingIds = listOf(mergeData.sourceRecordingId),
+            step = "[recording-merge] source album should initially contain source recording only",
+        )
+
+        val targetAlbumBeforeMergeResponse = state.api.get("/api/albums/${mergeData.targetAlbumId}")
+        E2eAssert.status(targetAlbumBeforeMergeResponse, 200, "[recording-merge] target album detail before merge should succeed")
+        assertTrue(
+            detailContainsRecordingId(targetAlbumBeforeMergeResponse.body(), mergeData.targetRecordingId),
+            "[recording-merge] target album should initially contain target recording",
+        )
+
+        val playlistBeforeMergeResponse = state.api.get("/api/playlists/$playlistId")
+        E2eAssert.status(playlistBeforeMergeResponse, 200, "[recording-merge] playlist detail before merge should succeed")
+        assertRecordingOrder(
+            responseBody = playlistBeforeMergeResponse.body(),
+            expectedRecordingIds = listOf(mergeData.sourceRecordingId),
+            step = "[recording-merge] playlist should initially contain source recording only",
+        )
+
+        val mergeResponse = state.api.put(
+            path = "/api/recordings/merge",
+            json = mapOf(
+                "targetId" to mergeData.targetRecordingId,
+                "needMergeIds" to listOf(mergeData.targetRecordingId, mergeData.sourceRecordingId),
+            ),
+        )
+        E2eAssert.status(mergeResponse, 200, "[recording-merge] merge recording should succeed")
+
+        val missingSourceRecordingResponse = state.api.get("/api/recordings/${mergeData.sourceRecordingId}")
+        E2eAssert.status(missingSourceRecordingResponse, 404, "[recording-merge] source recording should be deleted after merge")
+
+        val sourceAlbumAfterMergeResponse = state.api.get("/api/albums/${mergeData.sourceAlbumId}")
+        E2eAssert.status(sourceAlbumAfterMergeResponse, 200, "[recording-merge] source album detail after merge should succeed")
+        assertRecordingOrder(
+            responseBody = sourceAlbumAfterMergeResponse.body(),
+            expectedRecordingIds = listOf(mergeData.targetRecordingId),
+            step = "[recording-merge] source album should now reference target recording",
+        )
+
+        val targetAlbumAfterMergeResponse = state.api.get("/api/albums/${mergeData.targetAlbumId}")
+        E2eAssert.status(targetAlbumAfterMergeResponse, 200, "[recording-merge] target album detail after merge should succeed")
+        assertTrue(
+            detailContainsRecordingId(targetAlbumAfterMergeResponse.body(), mergeData.targetRecordingId),
+            "[recording-merge] target album should still contain target recording",
+        )
+        assertFalse(
+            detailContainsRecordingId(targetAlbumAfterMergeResponse.body(), mergeData.sourceRecordingId),
+            "[recording-merge] target album should not keep deleted source recording",
+        )
+
+        val playlistAfterMergeResponse = state.api.get("/api/playlists/$playlistId")
+        E2eAssert.status(playlistAfterMergeResponse, 200, "[recording-merge] playlist detail after merge should succeed")
+        assertRecordingOrder(
+            responseBody = playlistAfterMergeResponse.body(),
+            expectedRecordingIds = listOf(mergeData.targetRecordingId),
+            step = "[recording-merge] playlist should now reference target recording",
         )
     }
 
@@ -613,6 +748,8 @@ class AccountPlaylistContentE2eTest {
             ),
         )
         E2eAssert.status(loginResponse, 200, "[accounts] account login should succeed")
+        val token = E2eJson.mapper.readTree(loginResponse.body()).path("token").asText()
+        api.setAuthToken(token)
         return api
     }
 
@@ -650,7 +787,9 @@ class AccountPlaylistContentE2eTest {
             path = "/api/albums",
             query = mapOf("pageIndex" to 0, "pageSize" to 200),
         )
-        E2eAssert.status(albumsResponse, 200, "[prepare] list albums should succeed for recovery")
+        if (albumsResponse.statusCode() != 200) {
+            return null
+        }
         val albums = pageRows(albumsResponse.body(), "[prepare] albums recovery")
         if (albums.isEmpty()) {
             return null
@@ -715,6 +854,200 @@ class AccountPlaylistContentE2eTest {
             albumId = albumId,
             albumTitle = fixture.albumTitle,
         )
+    }
+
+    private fun preparePlaylistOrderData(state: E2eAdminSession): PlaylistOrderData {
+        val suffix = suffix()
+        val fixtureRoot = state.runtime.scanWorkspace.resolve("playlist-order-$suffix")
+        Files.createDirectories(fixtureRoot)
+
+        val firstTitle = "playlist-order-a-$suffix"
+        val secondTitle = "playlist-order-b-$suffix"
+
+        SyntheticAudioFixture.generateOne(
+            outputDir = fixtureRoot,
+            fileName = "playlist-order-a.mp3",
+            metadata = AudioFixtureMetadata(
+                title = firstTitle,
+                artist = "playlist-order-artist-$suffix",
+                album = "playlist-order-album-$suffix",
+                comment = "playlist-order-fixture-$suffix",
+            ),
+        )
+        SyntheticAudioFixture.generateOne(
+            outputDir = fixtureRoot,
+            fileName = "playlist-order-b.mp3",
+            metadata = AudioFixtureMetadata(
+                title = secondTitle,
+                artist = "playlist-order-artist-$suffix",
+                album = "playlist-order-album-$suffix",
+                comment = "playlist-order-fixture-$suffix",
+            ),
+        )
+
+        submitScanAndAwaitCompletion(state, expectedTaskCount = 2)
+
+        return PlaylistOrderData(
+            firstRecordingId = findSingleRecordingIdByWorkTitle(
+                state = state,
+                workTitle = firstTitle,
+                step = "[playlists] first playlist-order work",
+            ),
+            secondRecordingId = findSingleRecordingIdByWorkTitle(
+                state = state,
+                workTitle = secondTitle,
+                step = "[playlists] second playlist-order work",
+            ),
+        )
+    }
+
+    private fun prepareRecordingMergeData(state: E2eAdminSession): RecordingMergeData {
+        val baseData = ensurePreparedData(state)
+        val suffix = suffix()
+        val targetRecordingResponse = state.api.get("/api/recordings/${baseData.recordingId}")
+        E2eAssert.status(targetRecordingResponse, 200, "[recording-merge] target recording detail should succeed")
+        val targetWorkId = readIdFromObject(
+            responseBody = targetRecordingResponse.body(),
+            pointer = "/work/id",
+            step = "[recording-merge] target recording should expose work id",
+        )
+        val targetAlbumId = findAlbumIdByRecordingId(baseData.recordingId)
+
+        val sourceAlbumId = insertAlbum(
+            title = "recording-merge-album-source-$suffix",
+            comment = "recording-merge-source-album-$suffix",
+        )
+        val sourceRecordingId = insertRecording(
+            workId = targetWorkId,
+            title = "recording-merge-source-$suffix",
+            comment = "recording-merge-source-comment-$suffix",
+        )
+        insertAlbumRecording(albumId = sourceAlbumId, recordingId = sourceRecordingId, sortOrder = 0)
+
+        val sourceAlbumDetailResponse = state.api.get("/api/albums/$sourceAlbumId")
+        E2eAssert.status(sourceAlbumDetailResponse, 200, "[recording-merge] source album detail should succeed")
+        assertEquals(
+            sourceRecordingId,
+            singleRecordingIdFromDetail(
+                responseBody = sourceAlbumDetailResponse.body(),
+                step = "[recording-merge] source album should expose exactly one recording",
+            ),
+            "[recording-merge] source album should reference inserted source recording",
+        )
+
+        val targetAlbumDetailResponse = state.api.get("/api/albums/$targetAlbumId")
+        E2eAssert.status(targetAlbumDetailResponse, 200, "[recording-merge] target album detail should succeed")
+        assertTrue(
+            detailContainsRecordingId(targetAlbumDetailResponse.body(), baseData.recordingId),
+            "[recording-merge] target album should reference prepared target recording",
+        )
+
+        return RecordingMergeData(
+            targetAlbumId = targetAlbumId,
+            sourceAlbumId = sourceAlbumId,
+            targetRecordingId = baseData.recordingId,
+            sourceRecordingId = sourceRecordingId,
+        )
+    }
+
+    private fun insertAlbum(title: String, comment: String): Long {
+        val params = MapSqlParameterSource()
+            .addValue("title", title)
+            .addValue("comment", comment)
+        return jdbc.queryForObject(
+            """
+                INSERT INTO album(title, kind, release_date, comment, cover_id)
+                VALUES (:title, 'CD', NULL, :comment, NULL)
+                RETURNING id
+            """.trimIndent(),
+            params,
+            Long::class.java,
+        ) ?: fail("[recording-merge] failed to insert album fixture")
+    }
+
+    private fun insertRecording(workId: Long, title: String, comment: String): Long {
+        val params = MapSqlParameterSource()
+            .addValue("workId", workId)
+            .addValue("title", title)
+            .addValue("comment", comment)
+        return jdbc.queryForObject(
+            """
+                INSERT INTO recording(work_id, kind, label, title, comment, duration_ms, default_in_work, cover_id, lyrics, embedding)
+                VALUES (:workId, 'CD', 'CD', :title, :comment, 0, false, NULL, '', NULL)
+                RETURNING id
+            """.trimIndent(),
+            params,
+            Long::class.java,
+        ) ?: fail("[recording-merge] failed to insert recording fixture")
+    }
+
+    private fun insertAlbumRecording(albumId: Long, recordingId: Long, sortOrder: Int) {
+        val params = MapSqlParameterSource()
+            .addValue("albumId", albumId)
+            .addValue("recordingId", recordingId)
+            .addValue("sortOrder", sortOrder)
+        val affectedRows = jdbc.update(
+            """
+                INSERT INTO album_recording_mapping(album_id, recording_id, sort_order)
+                VALUES (:albumId, :recordingId, :sortOrder)
+            """.trimIndent(),
+            params,
+        )
+        assertEquals(1, affectedRows, "[recording-merge] album-recording fixture insert should affect one row")
+    }
+
+    private fun findAlbumIdByRecordingId(recordingId: Long): Long {
+        val params = MapSqlParameterSource()
+            .addValue("recordingId", recordingId)
+        return jdbc.queryForObject(
+            """
+                SELECT album_id
+                FROM album_recording_mapping
+                WHERE recording_id = :recordingId
+                ORDER BY sort_order, id
+                LIMIT 1
+            """.trimIndent(),
+            params,
+            Long::class.java,
+        ) ?: fail("[recording-merge] target recording should belong to one album")
+    }
+
+    private fun submitScanAndAwaitCompletion(state: E2eAdminSession, expectedTaskCount: Int) {
+        val baselineStats = fetchTaskStats(state, "[scan-helper] baseline task stats")
+        val baselinePending = taskCount(baselineStats, "METADATA_PARSE", "PENDING")
+        val baselineCompleted = taskCount(baselineStats, "METADATA_PARSE", "COMPLETED")
+        val baselineFailed = taskCount(baselineStats, "METADATA_PARSE", "FAILED")
+
+        val submitResponse = state.api.post(
+            path = "/api/task/scan",
+            json = scanRequestBody(state),
+        )
+        E2eAssert.status(submitResponse, 202, "[scan-helper] submit scan task should return accepted")
+
+        val deadline = System.currentTimeMillis() + scanWaitTimeoutMillis()
+        var lastStatsBody = "[]"
+
+        while (System.currentTimeMillis() <= deadline) {
+            val statsRows = fetchTaskStats(state, "[scan-helper] task stats")
+            val pending = taskCount(statsRows, "METADATA_PARSE", "PENDING")
+            val completed = taskCount(statsRows, "METADATA_PARSE", "COMPLETED")
+            val failed = taskCount(statsRows, "METADATA_PARSE", "FAILED")
+            val terminalDelta = (completed - baselineCompleted) + (failed - baselineFailed)
+            lastStatsBody = statsRows.joinToString(prefix = "[", postfix = "]") { it.toString() }
+
+            if (pending <= baselinePending && terminalDelta >= expectedTaskCount) {
+                assertEquals(
+                    0L,
+                    failed - baselineFailed,
+                    "[scan-helper] scan should not introduce failed tasks, last=$lastStatsBody",
+                )
+                return
+            }
+
+            Thread.sleep(POLL_INTERVAL_MILLIS)
+        }
+
+        fail("[scan-helper] scan task did not finish within timeout ${scanWaitTimeoutMillis()} ms, last=$lastStatsBody")
     }
 
     private fun awaitScanTaskFinished(
@@ -813,6 +1146,32 @@ class AccountPlaylistContentE2eTest {
         }
     }
 
+    private fun assertRecordingOrder(responseBody: String, expectedRecordingIds: List<Long>, step: String) {
+        assertEquals(expectedRecordingIds, recordingIdsFromDetail(responseBody, step), step)
+    }
+
+    private fun recordingIdsFromDetail(responseBody: String, step: String): List<Long> {
+        return recordingIdsFromNode(
+            container = E2eJson.mapper.readTree(responseBody),
+            pointer = "recordings",
+            step = step,
+        )
+    }
+
+    private fun recordingIdsFromNode(container: JsonNode, pointer: String, step: String): List<Long> {
+        val recordingsNode = container.path(pointer)
+        if (!recordingsNode.isArray) {
+            fail("$step expected recordings array")
+        }
+        return recordingsNode.mapIndexed { index, recording ->
+            val idNode = recording.path("id")
+            if (!idNode.isIntegralNumber) {
+                fail("$step expected integral recording id at index=$index")
+            }
+            idNode.longValue()
+        }
+    }
+
     private fun extractFirstRecordingId(workNode: JsonNode, step: String): Long {
         val recordings = workNode.path("recordings")
         if (!recordings.isArray || recordings.isEmpty) {
@@ -851,6 +1210,48 @@ class AccountPlaylistContentE2eTest {
         val root = E2eJson.mapper.readTree(responseBody)
         assertTrue(root.isArray, "$step expected array response")
         assertTrue(root.isEmpty, "$step expected empty array")
+    }
+
+    private fun findSingleRecordingIdByWorkTitle(state: E2eAdminSession, workTitle: String, step: String): Long {
+        val response = state.api.get(
+            path = "/api/works/search",
+            query = mapOf("name" to workTitle),
+        )
+        E2eAssert.status(response, 200, "$step search should succeed")
+        val workNode = findWorkNodeByTitle(
+            responseBody = response.body(),
+            expectedTitle = workTitle,
+            step = step,
+        )
+        val recordingIds = recordingIdsFromNode(workNode, "recordings", step)
+        assertEquals(1, recordingIds.size, "$step should expose exactly one recording")
+        return recordingIds.first()
+    }
+
+    private fun findWorkNodeByTitle(responseBody: String, expectedTitle: String, step: String): JsonNode {
+        val root = E2eJson.mapper.readTree(responseBody)
+        assertTrue(root.isArray, "$step expected array response")
+        return root.firstOrNull { node -> node.path("title").asText() == expectedTitle }
+            ?: fail("$step expected work title=$expectedTitle")
+    }
+
+    private fun findAlbumIdByTitle(state: E2eAdminSession, albumTitle: String, step: String): Long {
+        val response = state.api.get(
+            path = "/api/albums/search",
+            query = mapOf("name" to albumTitle),
+        )
+        E2eAssert.status(response, 200, "$step should succeed")
+        val root = E2eJson.mapper.readTree(response.body())
+        assertTrue(root.isArray, "$step expected array response")
+        val albumNode = root.firstOrNull { node -> node.path("title").asText() == albumTitle }
+            ?: fail("$step expected album title=$albumTitle")
+        return readIdFromNode(albumNode.path("id"), "$step should contain album id")
+    }
+
+    private fun singleRecordingIdFromDetail(responseBody: String, step: String): Long {
+        val recordingIds = recordingIdsFromDetail(responseBody, step)
+        assertEquals(1, recordingIds.size, "$step should expose exactly one recording")
+        return recordingIds.first()
     }
 
     private fun readIdFromObject(responseBody: String, pointer: String, step: String): Long {
@@ -912,6 +1313,18 @@ class AccountPlaylistContentE2eTest {
 
     private data class FixtureInfo(
         val albumTitle: String,
+    )
+
+    private data class PlaylistOrderData(
+        val firstRecordingId: Long,
+        val secondRecordingId: Long,
+    )
+
+    private data class RecordingMergeData(
+        val targetAlbumId: Long,
+        val sourceAlbumId: Long,
+        val targetRecordingId: Long,
+        val sourceRecordingId: Long,
     )
 
     companion object {
