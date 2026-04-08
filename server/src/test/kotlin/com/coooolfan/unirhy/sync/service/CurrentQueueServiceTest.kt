@@ -3,6 +3,7 @@ package com.coooolfan.unirhy.sync.service
 import com.coooolfan.unirhy.service.MediaUrlSigner
 import com.coooolfan.unirhy.sync.protocol.PlaybackStrategy
 import com.coooolfan.unirhy.sync.protocol.StopStrategy
+import com.coooolfan.unirhy.sync.support.InMemoryCurrentQueueStateStore
 import com.coooolfan.unirhy.sync.support.TestPlaybackSyncTimeProvider
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -15,16 +16,19 @@ import kotlin.test.assertTrue
 
 class CurrentQueueServiceTest {
     private lateinit var timeProvider: TestPlaybackSyncTimeProvider
+    private lateinit var stateStore: InMemoryCurrentQueueStateStore
     private lateinit var service: CurrentQueueService
 
     @BeforeEach
     fun setUp() {
         timeProvider = TestPlaybackSyncTimeProvider(1_000L)
+        stateStore = InMemoryCurrentQueueStateStore()
         service = CurrentQueueService(
             lockManager = PlaybackAccountLockManager(),
             recordingCatalog = FakeCatalog(),
             timeProvider = timeProvider,
             urlSigner = MediaUrlSigner("test-signing-key", 3600),
+            stateStore = stateStore,
         )
     }
 
@@ -174,6 +178,99 @@ class CurrentQueueServiceTest {
         }
 
         assertEquals(404, error.statusCode.value())
+    }
+
+    @Test
+    fun `replace queue can be restored by a new service instance`() {
+        val initial = service.replaceQueue(
+            accountId = 42L,
+            recordings = service.resolvePlayableRecordings(listOf(1001L, 1002L, 1003L)),
+            currentIndex = 1,
+        ).queue
+
+        val reloadedService = newServiceInstance()
+        val restored = reloadedService.getQueue(42L)
+
+        assertEquals(initial.items, restored.items)
+        assertEquals(initial.currentEntryId, restored.currentEntryId)
+        assertEquals(initial.version, restored.version)
+        assertEquals(initial.updatedAtMs, restored.updatedAtMs)
+    }
+
+    @Test
+    fun `clear queue persists empty snapshot with incremented version`() {
+        service.replaceQueue(
+            accountId = 42L,
+            recordings = service.resolvePlayableRecordings(listOf(1001L, 1002L)),
+            currentIndex = 0,
+        )
+
+        val cleared = service.clearQueue(42L).queue
+        val reloadedService = newServiceInstance()
+        val restored = reloadedService.getQueue(42L)
+
+        assertTrue(cleared.items.isEmpty())
+        assertEquals(cleared.items, restored.items)
+        assertEquals(cleared.currentEntryId, restored.currentEntryId)
+        assertEquals(cleared.version, restored.version)
+        assertTrue(restored.version > 0L)
+    }
+
+    @Test
+    fun `shuffle order is stable after reload`() {
+        service.replaceQueue(
+            accountId = 42L,
+            recordings = service.resolvePlayableRecordings(listOf(1001L, 1002L, 1003L)),
+            currentIndex = 0,
+        )
+        service.updateStrategies(42L, PlaybackStrategy.SHUFFLE, StopStrategy.LIST)
+
+        val advanced = service.navigateToNext(42L).queue
+        val restoredService = newServiceInstance()
+        val rewound = restoredService.navigateToPrevious(42L).queue
+
+        assertEquals(advanced.items, restoredService.getQueue(42L).items)
+        assertEquals(1L, rewound.currentEntryId)
+    }
+
+    @Test
+    fun `radio appended tail survives reload`() {
+        service.replaceQueue(
+            accountId = 42L,
+            recordings = service.resolvePlayableRecordings(listOf(1001L)),
+            currentIndex = 0,
+        )
+        service.updateStrategies(42L, PlaybackStrategy.RADIO, StopStrategy.LIST)
+
+        val advanced = service.navigateToNext(42L).queue
+        val restored = newServiceInstance().getQueue(42L)
+
+        assertEquals(listOf(1001L, 1002L), restored.items.map { it.recordingId })
+        assertEquals(advanced.currentEntryId, restored.currentEntryId)
+    }
+
+    @Test
+    fun `read-only queue fetch does not create a persisted row`() {
+        val emptyQueue = service.getQueue(42L)
+
+        assertTrue(emptyQueue.items.isEmpty())
+        assertEquals(1, stateStore.loadCount)
+
+        val reloadedService = newServiceInstance()
+        val restored = reloadedService.getQueue(42L)
+
+        assertTrue(restored.items.isEmpty())
+        assertEquals(2, stateStore.loadCount)
+    }
+
+    private fun newServiceInstance(): CurrentQueueService {
+        return CurrentQueueService(
+            lockManager = PlaybackAccountLockManager(),
+            recordingCatalog = FakeCatalog(),
+            timeProvider = timeProvider,
+            urlSigner = MediaUrlSigner("test-signing-key", 3600),
+            stateStore = stateStore,
+        )
     }
 
     private class FakeCatalog : CurrentQueueRecordingCatalog {

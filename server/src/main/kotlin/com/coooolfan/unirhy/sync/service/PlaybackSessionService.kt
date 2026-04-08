@@ -13,13 +13,15 @@ import java.util.concurrent.ConcurrentHashMap
 class PlaybackSessionService(
     private val lockManager: PlaybackAccountLockManager,
     private val timeProvider: PlaybackSyncTimeProvider,
+    private val currentQueueService: CurrentQueueService,
+    private val resumeStateStore: PlaybackResumeStateStore,
 ) {
     private val states = ConcurrentHashMap<Long, AccountPlaybackState>()
     private val pendingPlays = ConcurrentHashMap<Long, PendingPlayState>()
 
     fun getOrCreateState(accountId: Long): AccountPlaybackState {
         return lockManager.withAccountLock(accountId) {
-            getOrCreateStateLocked(accountId)
+            getOrLoadStateLocked(accountId)
         }
     }
 
@@ -125,7 +127,7 @@ class PlaybackSessionService(
     ): ScheduledActionPayload {
         return lockManager.withAccountLock(accountId) {
             updateAndSchedule(
-                currentState = getOrCreateStateLocked(accountId),
+                currentState = getOrLoadStateLocked(accountId),
                 accountId = accountId,
                 commandId = commandId,
                 action = ScheduledActionType.PAUSE,
@@ -145,7 +147,7 @@ class PlaybackSessionService(
         executeAtMs: Long,
     ): ScheduledActionPayload {
         return lockManager.withAccountLock(accountId) {
-            val currentState = getOrCreateStateLocked(accountId)
+            val currentState = getOrLoadStateLocked(accountId)
             updateAndSchedule(
                 currentState = currentState,
                 accountId = accountId,
@@ -170,7 +172,7 @@ class PlaybackSessionService(
     ): ScheduledActionPayload {
         return lockManager.withAccountLock(accountId) {
             updateAndSchedule(
-                currentState = getOrCreateStateLocked(accountId),
+                currentState = getOrLoadStateLocked(accountId),
                 accountId = accountId,
                 commandId = commandId,
                 action = ScheduledActionType.SEEK,
@@ -190,7 +192,7 @@ class PlaybackSessionService(
         executeAtMs: Long,
     ): ScheduledActionPayload {
         return lockManager.withAccountLock(accountId) {
-            val currentState = getOrCreateStateLocked(accountId)
+            val currentState = getOrLoadStateLocked(accountId)
             val action = if (currentState.status == PlaybackStatus.PLAYING) {
                 ScheduledActionType.PLAY
             } else {
@@ -281,7 +283,7 @@ class PlaybackSessionService(
             version = currentState.version + 1,
             updatedAtMs = nowMs,
         )
-        states[accountId] = nextState
+        persistAndCacheState(nextState)
         return nextState.toScheduledActionPayload(
             commandId = commandId,
             action = action,
@@ -294,7 +296,7 @@ class PlaybackSessionService(
         nowMs: Long,
         executeAtMs: Long,
     ): ScheduledActionPayload {
-        val currentState = getOrCreateStateLocked(accountId)
+        val currentState = getOrLoadStateLocked(accountId)
         val nextState = currentState.copy(
             status = PlaybackStatus.PLAYING,
             recordingId = pendingPlay.recordingId,
@@ -303,20 +305,50 @@ class PlaybackSessionService(
             version = currentState.version + 1,
             updatedAtMs = nowMs,
         )
-        states[accountId] = nextState
+        persistAndCacheState(nextState)
         return nextState.toScheduledActionPayload(
             commandId = pendingPlay.commandId,
             action = ScheduledActionType.PLAY,
         )
     }
 
-    private fun getOrCreateStateLocked(accountId: Long): AccountPlaybackState {
+    private fun getOrLoadStateLocked(accountId: Long): AccountPlaybackState {
         return states.computeIfAbsent(accountId) {
-            AccountPlaybackState.initial(
+            loadStateLocked(accountId)
+        }
+    }
+
+    private fun loadStateLocked(accountId: Long): AccountPlaybackState {
+        resumeStateStore.load(accountId)?.let { restored ->
+            return restored.toRecoveredState()
+        }
+        currentQueueService.getCurrentEntry(accountId)?.let { currentEntry ->
+            return AccountPlaybackState(
                 accountId = accountId,
-                nowMs = timeProvider.nowMs(),
+                status = PlaybackStatus.PAUSED,
+                recordingId = currentEntry.recordingId,
+                positionSeconds = 0.0,
+                serverTimeToExecuteMs = 0L,
+                version = 0L,
+                updatedAtMs = timeProvider.nowMs(),
             )
         }
+        return AccountPlaybackState.initial(
+            accountId = accountId,
+            nowMs = timeProvider.nowMs(),
+        )
+    }
+
+    private fun persistAndCacheState(state: AccountPlaybackState) {
+        resumeStateStore.upsert(state)
+        states[state.accountId] = state
+    }
+
+    private fun AccountPlaybackState.toRecoveredState(): AccountPlaybackState {
+        return copy(
+            status = if (status == PlaybackStatus.PLAYING) PlaybackStatus.PAUSED else status,
+            serverTimeToExecuteMs = 0L,
+        )
     }
 }
 

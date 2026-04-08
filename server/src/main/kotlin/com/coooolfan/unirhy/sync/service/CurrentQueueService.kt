@@ -46,18 +46,19 @@ class CurrentQueueService(
     private val recordingCatalog: CurrentQueueRecordingCatalog,
     private val timeProvider: PlaybackSyncTimeProvider,
     private val urlSigner: MediaUrlSigner,
+    private val stateStore: CurrentQueueStateStore,
 ) {
     private val states = ConcurrentHashMap<Long, AccountCurrentQueueState>()
 
     fun getQueue(accountId: Long): CurrentQueueDto {
         return lockManager.withAccountLock(accountId) {
-            buildQueueDto(getOrCreateStateLocked(accountId))
+            buildQueueDto(getOrLoadStateLocked(accountId))
         }
     }
 
     fun getCurrentEntry(accountId: Long): CurrentQueueEntry? {
         return lockManager.withAccountLock(accountId) {
-            currentEntryOf(getOrCreateStateLocked(accountId))
+            currentEntryOf(getOrLoadStateLocked(accountId))
         }
     }
 
@@ -81,8 +82,9 @@ class CurrentQueueService(
         }
 
         return lockManager.withAccountLock(accountId) {
-            val state = getOrCreateStateLocked(accountId)
-            val previousCurrent = currentEntryOf(state)
+            val currentState = getOrLoadStateLocked(accountId)
+            val previousCurrent = currentEntryOf(currentState)
+            val state = currentState.deepCopy()
             state.items.clear()
             recordings.forEach { recording ->
                 state.items += recording.toQueueEntry(state.nextEntryId++)
@@ -90,6 +92,7 @@ class CurrentQueueService(
             state.currentEntryId = state.items[currentIndex].entryId
             resetStrategiesLocked(state)
             touchState(state, nowMs)
+            persistAndCacheState(state)
             buildChangeResult(state, previousCurrent, removedEntry = null)
         }
     }
@@ -117,8 +120,9 @@ class CurrentQueueService(
         }
 
         return lockManager.withAccountLock(accountId) {
-            val state = getOrCreateStateLocked(accountId)
-            val previousCurrent = currentEntryOf(state)
+            val currentState = getOrLoadStateLocked(accountId)
+            val previousCurrent = currentEntryOf(currentState)
+            val state = currentState.deepCopy()
             recordings.forEach { recording ->
                 state.items += recording.toQueueEntry(state.nextEntryId++)
             }
@@ -127,6 +131,7 @@ class CurrentQueueService(
             }
             rebuildShuffleOrderLocked(state)
             touchState(state, nowMs)
+            persistAndCacheState(state)
             buildChangeResult(state, previousCurrent, removedEntry = null)
         }
     }
@@ -137,15 +142,15 @@ class CurrentQueueService(
         nowMs: Long = timeProvider.nowMs(),
     ): CurrentQueueChangeResult {
         return lockManager.withAccountLock(accountId) {
-            val state = getOrCreateStateLocked(accountId)
-            if (entryIds.size != state.items.size) {
+            val currentState = getOrLoadStateLocked(accountId)
+            if (entryIds.size != currentState.items.size) {
                 throw ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
                     "entryIds size does not match queue size",
                 )
             }
 
-            val itemByEntryId = state.items.associateBy(CurrentQueueEntry::entryId)
+            val itemByEntryId = currentState.items.associateBy(CurrentQueueEntry::entryId)
             val reorderedItems = entryIds.map { entryId ->
                 itemByEntryId[entryId]
                     ?: throw ResponseStatusException(
@@ -157,11 +162,13 @@ class CurrentQueueService(
                 throw ResponseStatusException(HttpStatus.BAD_REQUEST, "entryIds must be unique")
             }
 
-            val previousCurrent = currentEntryOf(state)
+            val previousCurrent = currentEntryOf(currentState)
+            val state = currentState.deepCopy()
             state.items.clear()
             state.items += reorderedItems
             rebuildShuffleOrderLocked(state)
             touchState(state, nowMs)
+            persistAndCacheState(state)
             buildChangeResult(state, previousCurrent, removedEntry = null)
         }
     }
@@ -172,17 +179,19 @@ class CurrentQueueService(
         nowMs: Long = timeProvider.nowMs(),
     ): CurrentQueueChangeResult {
         return lockManager.withAccountLock(accountId) {
-            val state = getOrCreateStateLocked(accountId)
-            val previousCurrent = currentEntryOf(state)
+            val currentState = getOrLoadStateLocked(accountId)
+            val previousCurrent = currentEntryOf(currentState)
+            val state = currentState.deepCopy()
             val nextCurrent = state.items.firstOrNull { it.entryId == entryId }
                 ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Queue entry not found")
             if (previousCurrent?.entryId == nextCurrent.entryId) {
-                return@withAccountLock buildNoopChangeResult(state, previousCurrent)
+                return@withAccountLock buildNoopChangeResult(currentState, previousCurrent)
             }
 
             state.currentEntryId = nextCurrent.entryId
             rebuildShuffleOrderLocked(state, anchorEntryId = nextCurrent.entryId)
             touchState(state, nowMs)
+            persistAndCacheState(state)
             buildChangeResult(state, previousCurrent, removedEntry = null)
         }
     }
@@ -194,18 +203,20 @@ class CurrentQueueService(
         nowMs: Long = timeProvider.nowMs(),
     ): CurrentQueueChangeResult {
         return lockManager.withAccountLock(accountId) {
-            val state = getOrCreateStateLocked(accountId)
-            val previousCurrent = currentEntryOf(state)
+            val currentState = getOrLoadStateLocked(accountId)
+            val previousCurrent = currentEntryOf(currentState)
             val changed =
-                state.playbackStrategy != playbackStrategy || state.stopStrategy != stopStrategy
+                currentState.playbackStrategy != playbackStrategy || currentState.stopStrategy != stopStrategy
             if (!changed) {
-                return@withAccountLock buildNoopChangeResult(state, previousCurrent)
+                return@withAccountLock buildNoopChangeResult(currentState, previousCurrent)
             }
 
+            val state = currentState.deepCopy()
             state.playbackStrategy = playbackStrategy
             state.stopStrategy = stopStrategy
             rebuildShuffleOrderLocked(state)
             touchState(state, nowMs)
+            persistAndCacheState(state)
             buildChangeResult(state, previousCurrent, removedEntry = null)
         }
     }
@@ -215,10 +226,11 @@ class CurrentQueueService(
         nowMs: Long = timeProvider.nowMs(),
     ): CurrentQueueChangeResult {
         return lockManager.withAccountLock(accountId) {
-            val state = getOrCreateStateLocked(accountId)
-            val previousCurrent = currentEntryOf(state)
+            val currentState = getOrLoadStateLocked(accountId)
+            val previousCurrent = currentEntryOf(currentState)
+            val state = currentState.deepCopy()
             if (state.items.isEmpty() || previousCurrent == null) {
-                return@withAccountLock buildNoopChangeResult(state, previousCurrent)
+                return@withAccountLock buildNoopChangeResult(currentState, previousCurrent)
             }
 
             val changed = when (state.playbackStrategy) {
@@ -227,10 +239,11 @@ class CurrentQueueService(
                 PlaybackStrategy.RADIO -> moveRadioNextLocked(state, previousCurrent)
             }
             if (!changed) {
-                return@withAccountLock buildNoopChangeResult(state, previousCurrent)
+                return@withAccountLock buildNoopChangeResult(currentState, previousCurrent)
             }
 
             touchState(state, nowMs)
+            persistAndCacheState(state)
             buildChangeResult(state, previousCurrent, removedEntry = null)
         }
     }
@@ -240,10 +253,11 @@ class CurrentQueueService(
         nowMs: Long = timeProvider.nowMs(),
     ): CurrentQueueChangeResult {
         return lockManager.withAccountLock(accountId) {
-            val state = getOrCreateStateLocked(accountId)
-            val previousCurrent = currentEntryOf(state)
+            val currentState = getOrLoadStateLocked(accountId)
+            val previousCurrent = currentEntryOf(currentState)
+            val state = currentState.deepCopy()
             if (state.items.isEmpty() || previousCurrent == null) {
-                return@withAccountLock buildNoopChangeResult(state, previousCurrent)
+                return@withAccountLock buildNoopChangeResult(currentState, previousCurrent)
             }
 
             val changed = when (state.playbackStrategy) {
@@ -252,10 +266,11 @@ class CurrentQueueService(
                 PlaybackStrategy.RADIO -> moveSequentialLocked(state, previousCurrent, -1)
             }
             if (!changed) {
-                return@withAccountLock buildNoopChangeResult(state, previousCurrent)
+                return@withAccountLock buildNoopChangeResult(currentState, previousCurrent)
             }
 
             touchState(state, nowMs)
+            persistAndCacheState(state)
             buildChangeResult(state, previousCurrent, removedEntry = null)
         }
     }
@@ -266,13 +281,14 @@ class CurrentQueueService(
         nowMs: Long = timeProvider.nowMs(),
     ): CurrentQueueChangeResult {
         return lockManager.withAccountLock(accountId) {
-            val state = getOrCreateStateLocked(accountId)
+            val currentState = getOrLoadStateLocked(accountId)
+            val state = currentState.deepCopy()
             val removeIndex = state.items.indexOfFirst { it.entryId == entryId }
             if (removeIndex < 0) {
                 throw ResponseStatusException(HttpStatus.NOT_FOUND, "Queue entry not found")
             }
 
-            val previousCurrent = currentEntryOf(state)
+            val previousCurrent = currentEntryOf(currentState)
             val removedEntry = state.items.removeAt(removeIndex)
 
             when {
@@ -291,6 +307,7 @@ class CurrentQueueService(
             }
 
             touchState(state, nowMs)
+            persistAndCacheState(state)
             buildChangeResult(state, previousCurrent, removedEntry)
         }
     }
@@ -300,13 +317,15 @@ class CurrentQueueService(
         nowMs: Long = timeProvider.nowMs(),
     ): CurrentQueueChangeResult {
         return lockManager.withAccountLock(accountId) {
-            val state = getOrCreateStateLocked(accountId)
-            val previousCurrent = currentEntryOf(state)
+            val currentState = getOrLoadStateLocked(accountId)
+            val previousCurrent = currentEntryOf(currentState)
+            val state = currentState.deepCopy()
             val removedEntry = previousCurrent
             state.items.clear()
             state.currentEntryId = null
             resetStrategiesLocked(state)
             touchState(state, nowMs)
+            persistAndCacheState(state)
             buildChangeResult(state, previousCurrent, removedEntry)
         }
     }
@@ -317,8 +336,9 @@ class CurrentQueueService(
         nowMs: Long = timeProvider.nowMs(),
     ): CurrentQueueChangeResult? {
         return lockManager.withAccountLock(accountId) {
-            val state = getOrCreateStateLocked(accountId)
-            val previousCurrent = currentEntryOf(state)
+            val currentState = getOrLoadStateLocked(accountId)
+            val previousCurrent = currentEntryOf(currentState)
+            val state = currentState.deepCopy()
             val matchingEntry = state.items.firstOrNull { it.recordingId == recording.recordingId }
 
             when {
@@ -338,6 +358,7 @@ class CurrentQueueService(
             }
 
             touchState(state, nowMs)
+            persistAndCacheState(state)
             buildChangeResult(state, previousCurrent, removedEntry = null)
         }
     }
@@ -512,10 +533,17 @@ class CurrentQueueService(
         state.shuffleEntryIds += remainingEntryIds
     }
 
-    private fun getOrCreateStateLocked(accountId: Long): AccountCurrentQueueState {
-        return states.computeIfAbsent(accountId) {
-            AccountCurrentQueueState.initial(accountId = accountId, nowMs = timeProvider.nowMs())
-        }
+    private fun getOrLoadStateLocked(accountId: Long): AccountCurrentQueueState {
+        states[accountId]?.let { return it }
+        val loaded = stateStore.load(accountId)
+            ?: AccountCurrentQueueState.initial(accountId = accountId, nowMs = timeProvider.nowMs())
+        states[accountId] = loaded
+        return loaded
+    }
+
+    private fun persistAndCacheState(state: AccountCurrentQueueState) {
+        stateStore.upsert(state)
+        states[state.accountId] = state
     }
 
     private fun touchState(
@@ -584,6 +612,13 @@ class CurrentQueueService(
             artistLabel = artistLabel,
             coverMediaFileId = coverMediaFileId,
             durationMs = durationMs,
+        )
+    }
+
+    private fun AccountCurrentQueueState.deepCopy(): AccountCurrentQueueState {
+        return copy(
+            items = items.map { it.copy() }.toMutableList(),
+            shuffleEntryIds = shuffleEntryIds.toMutableList(),
         )
     }
 

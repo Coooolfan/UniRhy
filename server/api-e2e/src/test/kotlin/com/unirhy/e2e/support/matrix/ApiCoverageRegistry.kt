@@ -35,6 +35,10 @@ object ApiCoverageRegistry {
         "com.unirhy.e2e.AccountPlaylistContentE2eTest#content endpoints should support search update recording update and merge flow"
     private const val RECORDING_MERGE_CASE =
         "com.unirhy.e2e.AccountPlaylistContentE2eTest#recording merge should move album and playlist associations to target recording"
+    private const val PLAYBACK_QUEUE_AUTH_CASE =
+        "com.unirhy.e2e.PlaybackQueuePersistenceE2eTest#current queue endpoints should reject unauthenticated access"
+    private const val PLAYBACK_QUEUE_PERSISTENCE_CASE =
+        "com.unirhy.e2e.PlaybackQueuePersistenceE2eTest#current queue should survive a fresh application boot"
     private const val PLAYLIST_GENERATE_TASK_AUTH_CASE =
         "com.unirhy.e2e.PlaylistGenerateTaskE2eTest#playlist-generate endpoint should reject unauthenticated access"
     private const val PLAYLIST_GENERATE_TASK_PIPELINE_CASE =
@@ -76,6 +80,18 @@ object ApiCoverageRegistry {
             "/api/albums/search",
             testRef = CONTENT_SEARCH_UPDATE_MERGE_CASE,
             note = "auth: $ACCOUNT_PLAYLIST_CONTENT_AUTH_REQUIRED_CASE; validation: unknown keyword returns empty array",
+        ),
+        full(
+            "GET",
+            "/api/playback/current-queue",
+            testRef = PLAYBACK_QUEUE_PERSISTENCE_CASE,
+            note = "auth: $PLAYBACK_QUEUE_AUTH_CASE; persistence: fresh app boot restores persisted queue snapshot",
+        ),
+        full(
+            "PUT",
+            "/api/playback/current-queue",
+            testRef = PLAYBACK_QUEUE_PERSISTENCE_CASE,
+            note = "auth: $PLAYBACK_QUEUE_AUTH_CASE; persistence: replaced queue is readable from a fresh app boot",
         ),
         full(
             "GET",

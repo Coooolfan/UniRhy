@@ -3,6 +3,8 @@ package com.coooolfan.unirhy.sync.service
 import com.coooolfan.unirhy.service.MediaUrlSigner
 import com.coooolfan.unirhy.sync.log.PlaybackSyncLogWriter
 import com.coooolfan.unirhy.sync.protocol.PlaybackStatus
+import com.coooolfan.unirhy.sync.support.InMemoryCurrentQueueStateStore
+import com.coooolfan.unirhy.sync.support.InMemoryPlaybackResumeStateStore
 import com.coooolfan.unirhy.sync.support.TestPlaybackSyncTimeProvider
 import com.coooolfan.unirhy.sync.support.TestWebSocketSession
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
@@ -23,6 +25,7 @@ class PlaybackSyncStaleConnectionJanitorTest {
     private lateinit var playbackSessionService: PlaybackSessionService
     private lateinit var playbackSchedulerService: PlaybackSchedulerService
     private lateinit var scheduledActionDispatcher: PlaybackSyncScheduledActionDispatcher
+    private lateinit var currentQueueService: CurrentQueueService
     private lateinit var autoAdvanceService: PlaybackAutoAdvanceService
     private lateinit var coordinator: PlaybackSyncSessionRemovalCoordinator
     private lateinit var janitor: PlaybackSyncStaleConnectionJanitor
@@ -34,7 +37,19 @@ class PlaybackSyncStaleConnectionJanitorTest {
         schedulerExecutor = Executors.newSingleThreadScheduledExecutor()
         val lockManager = PlaybackAccountLockManager()
         deviceRuntimeService = DeviceRuntimeService(lockManager, timeProvider)
-        playbackSessionService = PlaybackSessionService(lockManager, timeProvider)
+        currentQueueService = CurrentQueueService(
+            lockManager = lockManager,
+            recordingCatalog = FakeCatalog(),
+            timeProvider = timeProvider,
+            urlSigner = MediaUrlSigner("test-signing-key", 3600),
+            stateStore = InMemoryCurrentQueueStateStore(),
+        )
+        playbackSessionService = PlaybackSessionService(
+            lockManager = lockManager,
+            timeProvider = timeProvider,
+            currentQueueService = currentQueueService,
+            resumeStateStore = InMemoryPlaybackResumeStateStore(),
+        )
         playbackSchedulerService = PlaybackSchedulerService(
             deviceRuntimeService = deviceRuntimeService,
             scheduler = schedulerExecutor,
@@ -48,12 +63,7 @@ class PlaybackSyncStaleConnectionJanitorTest {
             logWriter = PlaybackSyncLogWriter(),
         )
         autoAdvanceService = PlaybackAutoAdvanceService(
-            currentQueueService = CurrentQueueService(
-                lockManager = lockManager,
-                recordingCatalog = FakeCatalog(),
-                timeProvider = timeProvider,
-                urlSigner = MediaUrlSigner("test-signing-key", 3600),
-            ),
+            currentQueueService = currentQueueService,
             playbackSessionService = playbackSessionService,
             playbackSchedulerService = playbackSchedulerService,
             scheduledActionDispatcher = scheduledActionDispatcher,

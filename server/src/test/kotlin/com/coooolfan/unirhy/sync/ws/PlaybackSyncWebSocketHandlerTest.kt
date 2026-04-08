@@ -7,8 +7,11 @@ import ch.qos.logback.core.read.ListAppender
 import com.coooolfan.unirhy.service.MediaUrlSigner
 import com.coooolfan.unirhy.sync.log.PlaybackSyncLogEvents
 import com.coooolfan.unirhy.sync.log.PlaybackSyncLogWriter
+import com.coooolfan.unirhy.sync.model.AccountPlaybackState
 import com.coooolfan.unirhy.sync.protocol.*
 import com.coooolfan.unirhy.sync.service.*
+import com.coooolfan.unirhy.sync.support.InMemoryCurrentQueueStateStore
+import com.coooolfan.unirhy.sync.support.InMemoryPlaybackResumeStateStore
 import com.coooolfan.unirhy.sync.support.TestPlaybackSyncTimeProvider
 import com.coooolfan.unirhy.sync.support.TestWebSocketSession
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
@@ -31,11 +34,14 @@ class PlaybackSyncWebSocketHandlerTest {
 
     private lateinit var timeProvider: TestPlaybackSyncTimeProvider
     private lateinit var schedulerExecutor: ScheduledExecutorService
+    private lateinit var lockManager: PlaybackAccountLockManager
     private lateinit var deviceRuntimeService: DeviceRuntimeService
     private lateinit var playbackSessionService: PlaybackSessionService
     private lateinit var playbackSchedulerService: PlaybackSchedulerService
     private lateinit var sessionRemovalCoordinator: PlaybackSyncSessionRemovalCoordinator
     private lateinit var currentQueueService: CurrentQueueService
+    private lateinit var currentQueueStateStore: InMemoryCurrentQueueStateStore
+    private lateinit var resumeStateStore: InMemoryPlaybackResumeStateStore
     private lateinit var autoAdvanceService: PlaybackAutoAdvanceService
     private lateinit var playCoordinator: PlaybackPlayCoordinator
     private lateinit var scheduledActionDispatcher: PlaybackSyncScheduledActionDispatcher
@@ -58,14 +64,16 @@ class PlaybackSyncWebSocketHandlerTest {
 
         timeProvider = TestPlaybackSyncTimeProvider(1_730_844_000_200)
         schedulerExecutor = Executors.newSingleThreadScheduledExecutor()
-        val lockManager = PlaybackAccountLockManager()
+        lockManager = PlaybackAccountLockManager()
+        currentQueueStateStore = InMemoryCurrentQueueStateStore()
+        resumeStateStore = InMemoryPlaybackResumeStateStore()
         deviceRuntimeService = DeviceRuntimeService(lockManager, timeProvider)
-        playbackSessionService = PlaybackSessionService(lockManager, timeProvider)
-        currentQueueService = CurrentQueueService(
+        currentQueueService = createCurrentQueueService()
+        playbackSessionService = PlaybackSessionService(
             lockManager = lockManager,
-            recordingCatalog = FakeCurrentQueueRecordingCatalog(),
             timeProvider = timeProvider,
-            urlSigner = MediaUrlSigner("test-signing-key", 3600),
+            currentQueueService = currentQueueService,
+            resumeStateStore = resumeStateStore,
         )
         playbackSchedulerService = PlaybackSchedulerService(
             deviceRuntimeService = deviceRuntimeService,
@@ -74,58 +82,7 @@ class PlaybackSyncWebSocketHandlerTest {
         mediaResolver = PlaybackSyncMediaResolver(
             mediaCatalog = FakePlaybackSyncMediaCatalog(),
         )
-        val urlSigner = MediaUrlSigner("test-signing-key", 3600)
-        val messageSender = PlaybackSyncMessageSender(
-            objectMapper = objectMapper,
-            deviceRuntimeService = deviceRuntimeService,
-            urlSigner = urlSigner,
-        )
-        scheduledActionDispatcher = PlaybackSyncScheduledActionDispatcher(
-            messageSender = messageSender,
-            logWriter = PlaybackSyncLogWriter(),
-        )
-        autoAdvanceService = PlaybackAutoAdvanceService(
-            currentQueueService = currentQueueService,
-            playbackSessionService = playbackSessionService,
-            playbackSchedulerService = playbackSchedulerService,
-            scheduledActionDispatcher = scheduledActionDispatcher,
-            messageSender = messageSender,
-            timeProvider = timeProvider,
-            scheduler = schedulerExecutor,
-        )
-        playCoordinator = PlaybackPlayCoordinator(
-            playbackSessionService = playbackSessionService,
-            deviceRuntimeService = deviceRuntimeService,
-            playbackSchedulerService = playbackSchedulerService,
-            scheduledActionDispatcher = scheduledActionDispatcher,
-            messageSender = messageSender,
-            autoAdvanceService = autoAdvanceService,
-        )
-        sessionRemovalCoordinator = PlaybackSyncSessionRemovalCoordinator(
-            playbackSessionService = playbackSessionService,
-            playbackSchedulerService = playbackSchedulerService,
-            scheduledActionDispatcher = scheduledActionDispatcher,
-            messageSender = messageSender,
-            autoAdvanceService = autoAdvanceService,
-            logWriter = PlaybackSyncLogWriter(),
-        )
-        handler = PlaybackSyncWebSocketHandler(
-            objectMapper = objectMapper,
-            authenticator = FakePlaybackSyncAuthenticator(mapOf("valid-token" to 42L)),
-            currentQueueService = currentQueueService,
-            playbackSessionService = playbackSessionService,
-            deviceRuntimeService = deviceRuntimeService,
-            playbackSyncMediaResolver = mediaResolver,
-            playbackSchedulerService = playbackSchedulerService,
-            timeProvider = timeProvider,
-            sessionRemovalCoordinator = sessionRemovalCoordinator,
-            playCoordinator = playCoordinator,
-            autoAdvanceService = autoAdvanceService,
-            scheduledActionDispatcher = scheduledActionDispatcher,
-            messageSender = messageSender,
-            logWriter = PlaybackSyncLogWriter(),
-            scheduler = schedulerExecutor,
-        )
+        handler = createHandler()
     }
 
     @AfterEach
@@ -159,6 +116,39 @@ class PlaybackSyncWebSocketHandlerTest {
         assertEquals(listOf("web-7c2f"), deviceChange.payload.devices.map { it.deviceId })
         assertEquals(listOf("web-7c2f"), deviceRuntimeService.listDeviceIds(42L))
         assertNotNull(deviceRuntimeService.findConnectionContext("session-1"))
+    }
+
+    @Test
+    fun `hello restores persisted playing state as paused snapshot`() {
+        resumeStateStore.upsert(
+            AccountPlaybackState(
+                accountId = 42L,
+                status = PlaybackStatus.PLAYING,
+                recordingId = 1001L,
+                positionSeconds = 27.5,
+                serverTimeToExecuteMs = 1_730_844_001_500,
+                version = 9L,
+                updatedAtMs = 1_730_844_001_200,
+            ),
+        )
+        playbackSessionService = PlaybackSessionService(
+            lockManager = lockManager,
+            timeProvider = timeProvider,
+            currentQueueService = currentQueueService,
+            resumeStateStore = resumeStateStore,
+        )
+        handler = createHandler()
+
+        val session = TestWebSocketSession(sessionId = "session-1", accountId = 42L)
+        handler.afterConnectionEstablished(session)
+        handler.handleMessage(session, textMessage(helloPayload(deviceId = "web-7c2f")))
+
+        val snapshot = session.serverMessages().first() as SnapshotMessage
+        assertEquals(PlaybackStatus.PAUSED, snapshot.payload.state.status)
+        assertEquals(1001L, snapshot.payload.state.recordingId)
+        assertEquals(27.5, snapshot.payload.state.positionSeconds)
+        assertEquals(0L, snapshot.payload.state.serverTimeToExecuteMs)
+        assertEquals(9L, snapshot.payload.state.version)
     }
 
     @Test
@@ -214,8 +204,7 @@ class PlaybackSyncWebSocketHandlerTest {
         assertTrue(messages[0] is QueueChangeMessage)
         val loadAudio = messages[1] as LoadAudioSourceMessage
         val scheduledAction = messages[2] as ScheduledActionMessage
-        assertTrue(loadAudio.payload.presignedUrl.contains("_sig="))
-        assertTrue(loadAudio.payload.presignedUrl.contains("_exp="))
+        assertEquals(1001L, loadAudio.payload.recordingId)
         assertEquals(ScheduledActionType.PLAY, scheduledAction.payload.scheduledAction.action)
         assertEquals(PlaybackStatus.PLAYING, scheduledAction.payload.scheduledAction.status)
         assertEquals(12.5, scheduledAction.payload.scheduledAction.positionSeconds)
@@ -438,6 +427,69 @@ class PlaybackSyncWebSocketHandlerTest {
         assertEquals(listOf("web-a"), remainingMessage.payload.devices.map { it.deviceId })
     }
 
+    private fun createCurrentQueueService(): CurrentQueueService {
+        return CurrentQueueService(
+            lockManager = lockManager,
+            recordingCatalog = FakeCurrentQueueRecordingCatalog(),
+            timeProvider = timeProvider,
+            urlSigner = MediaUrlSigner("test-signing-key", 3600),
+            stateStore = currentQueueStateStore,
+        )
+    }
+
+    private fun createHandler(): PlaybackSyncWebSocketHandler {
+        val messageSender = PlaybackSyncMessageSender(
+            objectMapper = objectMapper,
+            deviceRuntimeService = deviceRuntimeService,
+        )
+        scheduledActionDispatcher = PlaybackSyncScheduledActionDispatcher(
+            messageSender = messageSender,
+            logWriter = PlaybackSyncLogWriter(),
+        )
+        autoAdvanceService = PlaybackAutoAdvanceService(
+            currentQueueService = currentQueueService,
+            playbackSessionService = playbackSessionService,
+            playbackSchedulerService = playbackSchedulerService,
+            scheduledActionDispatcher = scheduledActionDispatcher,
+            messageSender = messageSender,
+            timeProvider = timeProvider,
+            scheduler = schedulerExecutor,
+        )
+        playCoordinator = PlaybackPlayCoordinator(
+            playbackSessionService = playbackSessionService,
+            deviceRuntimeService = deviceRuntimeService,
+            playbackSchedulerService = playbackSchedulerService,
+            scheduledActionDispatcher = scheduledActionDispatcher,
+            messageSender = messageSender,
+            autoAdvanceService = autoAdvanceService,
+        )
+        sessionRemovalCoordinator = PlaybackSyncSessionRemovalCoordinator(
+            playbackSessionService = playbackSessionService,
+            playbackSchedulerService = playbackSchedulerService,
+            scheduledActionDispatcher = scheduledActionDispatcher,
+            messageSender = messageSender,
+            autoAdvanceService = autoAdvanceService,
+            logWriter = PlaybackSyncLogWriter(),
+        )
+        return PlaybackSyncWebSocketHandler(
+            objectMapper = objectMapper,
+            authenticator = FakePlaybackSyncAuthenticator(mapOf("valid-token" to 42L)),
+            currentQueueService = currentQueueService,
+            playbackSessionService = playbackSessionService,
+            deviceRuntimeService = deviceRuntimeService,
+            playbackSyncMediaResolver = mediaResolver,
+            playbackSchedulerService = playbackSchedulerService,
+            timeProvider = timeProvider,
+            sessionRemovalCoordinator = sessionRemovalCoordinator,
+            playCoordinator = playCoordinator,
+            autoAdvanceService = autoAdvanceService,
+            scheduledActionDispatcher = scheduledActionDispatcher,
+            messageSender = messageSender,
+            logWriter = PlaybackSyncLogWriter(),
+            scheduler = schedulerExecutor,
+        )
+    }
+
     private fun textMessage(payload: String): TextMessage = TextMessage(payload)
 
     private fun helloPayload(deviceId: String): String = """
@@ -606,12 +658,7 @@ private class FakeCurrentQueueRecordingCatalog : CurrentQueueRecordingCatalog {
 private class FakePlaybackSyncMediaCatalog : PlaybackSyncMediaCatalog {
     override fun recordingExists(id: Long): Boolean = id == 1001L
 
-    override fun mediaFileExists(id: Long): Boolean = id == 2001L
-
-    override fun recordingHasMediaFile(
-        recordingId: Long,
-        mediaFileId: Long,
-    ): Boolean = recordingId == 1001L && mediaFileId == 2001L
+    override fun recordingHasPlayableAudio(id: Long): Boolean = id == 1001L
 }
 
 private class FakePlaybackSyncAuthenticator(
