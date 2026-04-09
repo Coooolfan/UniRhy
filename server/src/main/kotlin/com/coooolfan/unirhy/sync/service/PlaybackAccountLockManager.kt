@@ -1,6 +1,5 @@
 package com.coooolfan.unirhy.sync.service
 
-import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Primary
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate
@@ -34,8 +33,6 @@ class PlaybackAccountLockManager : PlaybackAccountScope {
 class JdbcPlaybackAccountScope(
     private val jdbc: NamedParameterJdbcTemplate,
     private val transactionTemplate: TransactionTemplate,
-    @Value("\${unirhy.sync.lock-namespace:20260409}")
-    private val lockNamespace: Int,
 ) : PlaybackAccountScope {
     override fun <T> withAccountLock(
         accountId: Long,
@@ -43,10 +40,9 @@ class JdbcPlaybackAccountScope(
     ): T {
         return transactionTemplate.execute { _ ->
             val params = MapSqlParameterSource()
-                .addValue("namespace", lockNamespace)
                 .addValue("accountId", accountId)
             jdbc.query(
-                "SELECT pg_advisory_xact_lock(:namespace, :accountId)",
+                "SELECT pg_advisory_xact_lock(CAST(:accountId AS bigint))",
                 params,
             ) { _, _ -> }
             action()
