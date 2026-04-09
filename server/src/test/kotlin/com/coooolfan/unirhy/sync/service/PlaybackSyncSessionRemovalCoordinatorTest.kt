@@ -66,6 +66,7 @@ class PlaybackSyncSessionRemovalCoordinatorTest {
             logWriter = PlaybackSyncLogWriter(),
         )
         autoAdvanceService = PlaybackAutoAdvanceService(
+            lockManager = lockManager,
             currentQueueService = currentQueueService,
             playbackSessionService = playbackSessionService,
             playbackSchedulerService = playbackSchedulerService,
@@ -100,8 +101,8 @@ class PlaybackSyncSessionRemovalCoordinatorTest {
         val state = playbackSessionService.getOrCreateState(42L)
         assertEquals(PlaybackStatus.PAUSED, state.status)
         assertEquals(1001L, state.recordingId)
-        assertEquals(13.5, state.positionSeconds)
-        assertEquals(2_900L, state.serverTimeToExecuteMs)
+        assertEquals(12.5, state.positionSeconds)
+        assertEquals(0L, state.serverTimeToExecuteMs)
         assertEquals(2L, state.version)
         assertNull(playbackSessionService.getPendingPlay(42L))
     }
@@ -125,7 +126,7 @@ class PlaybackSyncSessionRemovalCoordinatorTest {
         assertEquals(PlaybackStatus.PAUSED, state.status)
         assertEquals(1001L, state.recordingId)
         assertEquals(12.5, state.positionSeconds)
-        assertEquals(2_900L, state.serverTimeToExecuteMs)
+        assertEquals(0L, state.serverTimeToExecuteMs)
         assertEquals(2L, state.version)
     }
 
@@ -149,7 +150,8 @@ class PlaybackSyncSessionRemovalCoordinatorTest {
         val state = playbackSessionService.getOrCreateState(42L)
         assertEquals(PlaybackStatus.PAUSED, state.status)
         assertEquals(1001L, state.recordingId)
-        assertEquals(13.5, state.positionSeconds)
+        assertEquals(12.5, state.positionSeconds)
+        assertEquals(0L, state.serverTimeToExecuteMs)
         assertEquals(2L, state.version)
         assertNull(playbackSessionService.getPendingPlay(42L))
     }

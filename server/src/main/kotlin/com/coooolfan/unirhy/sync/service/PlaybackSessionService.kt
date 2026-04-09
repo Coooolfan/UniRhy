@@ -7,18 +7,15 @@ import com.coooolfan.unirhy.sync.protocol.ScheduledActionType
 import com.coooolfan.unirhy.sync.protocol.ScheduledPlaybackAction
 import com.coooolfan.unirhy.sync.protocol.PlaybackStatus
 import org.springframework.stereotype.Service
-import java.util.concurrent.ConcurrentHashMap
 
 @Service
 class PlaybackSessionService(
-    private val lockManager: PlaybackAccountLockManager,
+    private val lockManager: PlaybackAccountScope,
     private val timeProvider: PlaybackSyncTimeProvider,
     private val currentQueueService: CurrentQueueService,
     private val resumeStateStore: PlaybackResumeStateStore,
+    private val pendingPlayStore: PlaybackPendingPlayStore = InMemoryPlaybackPendingPlayStore(),
 ) {
-    private val states = ConcurrentHashMap<Long, AccountPlaybackState>()
-    private val pendingPlays = ConcurrentHashMap<Long, PendingPlayState>()
-
     fun getOrCreateState(accountId: Long): AccountPlaybackState {
         return lockManager.withAccountLock(accountId) {
             getOrLoadStateLocked(accountId)
@@ -44,10 +41,8 @@ class PlaybackSessionService(
                 createdAtMs = nowMs,
                 timeoutAtMs = timeoutAtMs,
             )
-            val replaced = pendingPlays.put(
-                accountId,
-                pendingPlay,
-            ) != null
+            val replaced = pendingPlayStore.load(accountId) != null
+            pendingPlayStore.save(accountId, pendingPlay)
             PendingPlayCreationResult(
                 pendingPlay = pendingPlay,
                 replaced = replaced,
@@ -57,13 +52,15 @@ class PlaybackSessionService(
 
     fun clearPendingPlay(accountId: Long): PendingPlayState? {
         return lockManager.withAccountLock(accountId) {
-            pendingPlays.remove(accountId)
+            pendingPlayStore.load(accountId)?.also {
+                pendingPlayStore.clear(accountId)
+            }
         }
     }
 
     fun getPendingPlay(accountId: Long): PendingPlayState? {
         return lockManager.withAccountLock(accountId) {
-            pendingPlays[accountId]
+            pendingPlayStore.load(accountId)
         }
     }
 
@@ -74,14 +71,31 @@ class PlaybackSessionService(
         recordingId: Long,
     ): PendingPlayState? {
         return lockManager.withAccountLock(accountId) {
-            val pendingPlay = pendingPlays[accountId] ?: return@withAccountLock null
+            val pendingPlay = pendingPlayStore.load(accountId) ?: return@withAccountLock null
             if (
                 pendingPlay.commandId != commandId ||
                 pendingPlay.recordingId != recordingId
             ) {
                 return@withAccountLock null
             }
+            pendingPlayStore.markLoaded(accountId, commandId, deviceId, timeProvider.nowMs())
             pendingPlay.clientsLoaded += deviceId
+            pendingPlay
+        }
+    }
+
+    fun unmarkAudioSourceLoaded(
+        accountId: Long,
+        commandId: String,
+        deviceId: String,
+    ): PendingPlayState? {
+        return lockManager.withAccountLock(accountId) {
+            val pendingPlay = pendingPlayStore.load(accountId) ?: return@withAccountLock null
+            if (pendingPlay.commandId != commandId) {
+                return@withAccountLock null
+            }
+            pendingPlayStore.unmarkLoaded(accountId, commandId, deviceId)
+            pendingPlay.clientsLoaded.remove(deviceId)
             pendingPlay
         }
     }
@@ -91,7 +105,7 @@ class PlaybackSessionService(
         deviceIds: Collection<String>,
     ): Boolean {
         return lockManager.withAccountLock(accountId) {
-            val pendingPlay = pendingPlays[accountId] ?: return@withAccountLock false
+            val pendingPlay = pendingPlayStore.load(accountId) ?: return@withAccountLock false
             deviceIds.isNotEmpty() && deviceIds.all { it in pendingPlay.clientsLoaded }
         }
     }
@@ -103,11 +117,11 @@ class PlaybackSessionService(
         executeAtMs: Long,
     ): ScheduledActionPayload? {
         return lockManager.withAccountLock(accountId) {
-            val pendingPlay = pendingPlays[accountId] ?: return@withAccountLock null
+            val pendingPlay = pendingPlayStore.load(accountId) ?: return@withAccountLock null
             if (pendingPlay.commandId != commandId) {
                 return@withAccountLock null
             }
-            pendingPlays.remove(accountId)
+            pendingPlayStore.clear(accountId)
             commitPendingPlayLocked(
                 accountId = accountId,
                 pendingPlay = pendingPlay,
@@ -221,16 +235,17 @@ class PlaybackSessionService(
         executeAtMs: Long,
     ): ScheduledActionPayload? {
         return lockManager.withAccountLock(accountId) {
-            val pendingPlay = pendingPlays[accountId] ?: return@withAccountLock null
+            val pendingPlay = pendingPlayStore.load(accountId) ?: return@withAccountLock null
+            pendingPlayStore.unmarkLoaded(accountId, pendingPlay.commandId, deviceId)
             pendingPlay.clientsLoaded.remove(deviceId)
             if (remainingDeviceIds.isEmpty()) {
-                pendingPlays.remove(accountId)
+                pendingPlayStore.clear(accountId)
                 return@withAccountLock null
             }
             if (!remainingDeviceIds.all { it in pendingPlay.clientsLoaded }) {
                 return@withAccountLock null
             }
-            pendingPlays.remove(accountId)
+            pendingPlayStore.clear(accountId)
             commitPendingPlayLocked(
                 accountId = accountId,
                 pendingPlay = pendingPlay,
@@ -313,9 +328,7 @@ class PlaybackSessionService(
     }
 
     private fun getOrLoadStateLocked(accountId: Long): AccountPlaybackState {
-        return states.computeIfAbsent(accountId) {
-            loadStateLocked(accountId)
-        }
+        return loadStateLocked(accountId)
     }
 
     private fun loadStateLocked(accountId: Long): AccountPlaybackState {
@@ -341,7 +354,6 @@ class PlaybackSessionService(
 
     private fun persistAndCacheState(state: AccountPlaybackState) {
         resumeStateStore.upsert(state)
-        states[state.accountId] = state
     }
 
     private fun AccountPlaybackState.toRecoveredState(): AccountPlaybackState {

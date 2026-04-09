@@ -19,7 +19,6 @@ import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate
 import org.springframework.stereotype.Component
 import org.springframework.stereotype.Service
 import org.springframework.web.server.ResponseStatusException
-import java.util.concurrent.ConcurrentHashMap
 import kotlin.random.Random
 
 data class CurrentQueueChangeResult(
@@ -42,14 +41,12 @@ data class ResolvedQueueRecording(
 
 @Service
 class CurrentQueueService(
-    private val lockManager: PlaybackAccountLockManager,
+    private val lockManager: PlaybackAccountScope,
     private val recordingCatalog: CurrentQueueRecordingCatalog,
     private val timeProvider: PlaybackSyncTimeProvider,
     private val urlSigner: MediaUrlSigner,
     private val stateStore: CurrentQueueStateStore,
 ) {
-    private val states = ConcurrentHashMap<Long, AccountCurrentQueueState>()
-
     fun getQueue(accountId: Long): CurrentQueueDto {
         return lockManager.withAccountLock(accountId) {
             buildQueueDto(getOrLoadStateLocked(accountId))
@@ -534,16 +531,13 @@ class CurrentQueueService(
     }
 
     private fun getOrLoadStateLocked(accountId: Long): AccountCurrentQueueState {
-        states[accountId]?.let { return it }
         val loaded = stateStore.load(accountId)
             ?: AccountCurrentQueueState.initial(accountId = accountId, nowMs = timeProvider.nowMs())
-        states[accountId] = loaded
         return loaded
     }
 
     private fun persistAndCacheState(state: AccountCurrentQueueState) {
         stateStore.upsert(state)
-        states[state.accountId] = state
     }
 
     private fun touchState(

@@ -38,7 +38,7 @@ class PlaybackSyncStaleConnectionJanitor(
                 nowMs = nowMs,
                 staleThresholdMs = PlaybackSchedulerService.STALE_THRESHOLD_MS,
             ).forEach { removal ->
-                removal.context.session.close(STALE_CONNECTION_CLOSE_STATUS)
+                removal.context.session?.close(STALE_CONNECTION_CLOSE_STATUS)
                 sessionRemovalCoordinator.handleRemoval(
                     removal = removal,
                     reason = "stale_connection",

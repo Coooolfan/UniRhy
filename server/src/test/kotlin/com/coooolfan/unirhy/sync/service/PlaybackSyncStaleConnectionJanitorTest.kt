@@ -63,6 +63,7 @@ class PlaybackSyncStaleConnectionJanitorTest {
             logWriter = PlaybackSyncLogWriter(),
         )
         autoAdvanceService = PlaybackAutoAdvanceService(
+            lockManager = lockManager,
             currentQueueService = currentQueueService,
             playbackSessionService = playbackSessionService,
             playbackSchedulerService = playbackSchedulerService,
@@ -134,8 +135,8 @@ class PlaybackSyncStaleConnectionJanitorTest {
         assertTrue(deviceRuntimeService.listDeviceIds(42L).isEmpty())
         assertEquals(PlaybackStatus.PAUSED, state.status)
         assertEquals(1001L, state.recordingId)
-        assertEquals(16.0, state.positionSeconds)
-        assertEquals(5_400L, state.serverTimeToExecuteMs)
+        assertEquals(12.5, state.positionSeconds)
+        assertEquals(0L, state.serverTimeToExecuteMs)
         assertEquals(2L, state.version)
         assertNull(playbackSessionService.getPendingPlay(42L))
     }

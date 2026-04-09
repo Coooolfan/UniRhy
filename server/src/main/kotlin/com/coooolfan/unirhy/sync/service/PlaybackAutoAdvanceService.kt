@@ -3,32 +3,27 @@ package com.coooolfan.unirhy.sync.service
 import com.coooolfan.unirhy.sync.protocol.PlaybackStatus
 import com.coooolfan.unirhy.sync.protocol.ScheduledActionPayload
 import com.coooolfan.unirhy.sync.protocol.StopStrategy
-import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.stereotype.Service
-import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ScheduledExecutorService
-import java.util.concurrent.ScheduledFuture
-import java.util.concurrent.TimeUnit
 import kotlin.math.max
 import kotlin.math.roundToLong
 
 @Service
 class PlaybackAutoAdvanceService(
+    private val lockManager: PlaybackAccountScope,
     private val currentQueueService: CurrentQueueService,
     private val playbackSessionService: PlaybackSessionService,
     private val playbackSchedulerService: PlaybackSchedulerService,
     private val scheduledActionDispatcher: PlaybackSyncScheduledActionDispatcher,
     private val messageSender: PlaybackSyncMessageSender,
     private val timeProvider: PlaybackSyncTimeProvider,
-    @Qualifier("playbackSyncScheduledExecutor")
-    private val scheduler: ScheduledExecutorService,
+    @Suppress("UNUSED_PARAMETER")
+    private val scheduler: ScheduledExecutorService? = null,
 ) {
-    private val autoAdvanceTasks = ConcurrentHashMap<Long, ScheduledFuture<*>>()
-
     fun nowMs(): Long = timeProvider.nowMs()
 
     fun cancel(accountId: Long) {
-        autoAdvanceTasks.remove(accountId)?.cancel(false)
+        playbackSchedulerService.cancelAutoAdvance(accountId)
     }
 
     fun syncFromScheduledAction(
@@ -54,65 +49,53 @@ class PlaybackAutoAdvanceService(
         val remainingTrackMs = max(0L, currentEntry.durationMs - (action.positionSeconds * 1000.0).roundToLong())
         val waitUntilPlayMs = max(0L, scheduledAction.serverTimeToExecuteMs - nowMs)
         val totalDelayMs = waitUntilPlayMs + remainingTrackMs
-
-        autoAdvanceTasks[accountId] = scheduler.schedule(
-            {
-                autoAdvanceTasks.remove(accountId)
-                advanceToNext(accountId)
-            },
-            totalDelayMs,
-            TimeUnit.MILLISECONDS,
+        playbackSchedulerService.scheduleAutoAdvance(
+            accountId = accountId,
+            recordingId = action.recordingId,
+            positionSeconds = action.positionSeconds,
+            executeAtMs = nowMs + totalDelayMs,
         )
     }
 
-    private fun advanceToNext(accountId: Long) {
-        val nowMs = timeProvider.nowMs()
-        val queue = currentQueueService.getQueue(accountId)
-        if (queue.currentEntryId == null) {
-            return
-        }
-        if (queue.stopStrategy == StopStrategy.TRACK) {
-            stopAtCurrentEntry(accountId, nowMs)
-            return
-        }
+    fun advanceToNext(accountId: Long) {
+        lockManager.withAccountLock(accountId) {
+            val nowMs = timeProvider.nowMs()
+            val queue = currentQueueService.getQueue(accountId)
+            if (queue.currentEntryId == null) {
+                return@withAccountLock
+            }
+            if (queue.stopStrategy == StopStrategy.TRACK) {
+                stopAtCurrentEntry(accountId, nowMs)
+                return@withAccountLock
+            }
 
-        val queueChange = currentQueueService.navigateToNext(accountId, nowMs)
-        if (!queueChange.changed) {
-            stopAtCurrentEntry(accountId, nowMs)
-            return
-        }
-        messageSender.broadcastQueueChange(accountId, queueChange.queue)
+            val queueChange = currentQueueService.navigateToNext(accountId, nowMs)
+            if (!queueChange.changed) {
+                stopAtCurrentEntry(accountId, nowMs)
+                return@withAccountLock
+            }
+            messageSender.broadcastQueueChange(accountId, queueChange.queue)
 
-        val nextEntry = queueChange.currentEntry ?: return
-        playbackSessionService.createPendingPlay(
-            accountId = accountId,
-            commandId = "auto-next-$nowMs",
-            initiatorDeviceId = null,
-            recordingId = nextEntry.recordingId,
-            positionSeconds = 0.0,
-            nowMs = nowMs,
-            timeoutAtMs = nowMs + PlaybackSchedulerService.PENDING_PLAY_TIMEOUT_MS,
-        )
-
-        messageSender.broadcastLoadAudioSource(
-            accountId = accountId,
-            payload = com.coooolfan.unirhy.sync.protocol.LoadAudioSourcePayload(
-                commandId = "auto-next-$nowMs",
-                recordingId = nextEntry.recordingId,
-            ),
-        )
-
-        playbackSchedulerService.schedulePendingPlayTimeout(accountId, "auto-next-$nowMs") {
-            val timeoutNowMs = timeProvider.nowMs()
-            val scheduledAction = playbackSessionService.completePendingPlay(
+            val nextEntry = queueChange.currentEntry ?: return@withAccountLock
+            playbackSessionService.createPendingPlay(
                 accountId = accountId,
                 commandId = "auto-next-$nowMs",
-                nowMs = timeoutNowMs,
-                executeAtMs = playbackSchedulerService.calculateExecuteAtMs(accountId, timeoutNowMs),
-            ) ?: return@schedulePendingPlayTimeout
+                initiatorDeviceId = null,
+                recordingId = nextEntry.recordingId,
+                positionSeconds = 0.0,
+                nowMs = nowMs,
+                timeoutAtMs = nowMs + PlaybackSchedulerService.PENDING_PLAY_TIMEOUT_MS,
+            )
 
-            scheduledActionDispatcher.broadcastAndLog(accountId, null, scheduledAction, timeoutNowMs)
-            syncFromScheduledAction(accountId, scheduledAction, timeoutNowMs)
+            messageSender.broadcastLoadAudioSource(
+                accountId = accountId,
+                payload = com.coooolfan.unirhy.sync.protocol.LoadAudioSourcePayload(
+                    commandId = "auto-next-$nowMs",
+                    recordingId = nextEntry.recordingId,
+                ),
+            )
+
+            playbackSchedulerService.schedulePendingPlayTimeout(accountId, "auto-next-$nowMs")
         }
     }
 

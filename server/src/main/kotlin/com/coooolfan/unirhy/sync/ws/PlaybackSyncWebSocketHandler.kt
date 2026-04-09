@@ -21,6 +21,7 @@ import java.util.concurrent.TimeUnit
 class PlaybackSyncWebSocketHandler(
     private val objectMapper: ObjectMapper,
     private val authenticator: PlaybackSyncAuthenticator,
+    private val lockManager: PlaybackAccountScope = PlaybackAccountLockManager(),
     private val currentQueueService: CurrentQueueService,
     private val playbackSessionService: PlaybackSessionService,
     private val deviceRuntimeService: DeviceRuntimeService,
@@ -80,22 +81,31 @@ class PlaybackSyncWebSocketHandler(
         }
 
         try {
-            if (!context.helloCompleted && clientMessage.type != PlaybackSyncMessageType.HELLO) {
-                throw PlaybackSyncProtocolException(
-                    code = PlaybackSyncErrorCode.INVALID_MESSAGE,
-                    message = "HELLO must be the first message",
-                    reason = PlaybackSyncErrorReason.HELLO_REQUIRED,
-                )
+            if (
+                context.deviceId != null &&
+                !deviceRuntimeService.isCurrentDeviceSession(context.accountId, context.deviceId!!, context.sessionId)
+            ) {
+                session.close(REPLACED_BY_NEW_CONNECTION_STATUS)
+                return
             }
+            lockManager.withAccountLock(context.accountId) {
+                if (!context.helloCompleted && clientMessage.type != PlaybackSyncMessageType.HELLO) {
+                    throw PlaybackSyncProtocolException(
+                        code = PlaybackSyncErrorCode.INVALID_MESSAGE,
+                        message = "HELLO must be the first message",
+                        reason = PlaybackSyncErrorReason.HELLO_REQUIRED,
+                    )
+                }
 
-            when (clientMessage) {
-                is HelloMessage -> handleHello(context, clientMessage.payload, nowMs)
-                is NtpRequestMessage -> handleNtpRequest(context, clientMessage.payload, nowMs)
-                is PlayMessage -> handlePlay(context, clientMessage.payload, nowMs)
-                is PauseMessage -> handlePause(context, clientMessage.payload, nowMs)
-                is SeekMessage -> handleSeek(context, clientMessage.payload, nowMs)
-                is AudioSourceLoadedMessage -> handleAudioSourceLoaded(context, clientMessage.payload, nowMs)
-                is SyncMessage -> handleSync(context, clientMessage.payload, nowMs)
+                when (clientMessage) {
+                    is HelloMessage -> handleHello(context, clientMessage.payload, nowMs)
+                    is NtpRequestMessage -> handleNtpRequest(context, clientMessage.payload, nowMs)
+                    is PlayMessage -> handlePlay(context, clientMessage.payload, nowMs)
+                    is PauseMessage -> handlePause(context, clientMessage.payload, nowMs)
+                    is SeekMessage -> handleSeek(context, clientMessage.payload, nowMs)
+                    is AudioSourceLoadedMessage -> handleAudioSourceLoaded(context, clientMessage.payload, nowMs)
+                    is SyncMessage -> handleSync(context, clientMessage.payload, nowMs)
+                }
             }
         } catch (ex: PlaybackSyncProtocolException) {
             sendProtocolError(
@@ -160,18 +170,20 @@ class PlaybackSyncWebSocketHandler(
             return
         }
         cancelPendingTimeout(sessionId)
-        val context = deviceRuntimeService.registerConnection(
-            accountId = accountId,
-            tokenValue = token,
-            sessionId = sessionId,
-            session = decoratedSession,
-        )
-        logWriter.info(
-            PlaybackSyncLogEvents.CONNECTION_OPENED,
-            *context.toBaseLogFields(),
-            PlaybackSyncLogFields.RESULT to "accepted",
-        )
-        handleHello(context, clientMessage.payload, timeProvider.nowMs())
+        lockManager.withAccountLock(accountId) {
+            val context = deviceRuntimeService.registerConnection(
+                accountId = accountId,
+                tokenValue = token,
+                sessionId = sessionId,
+                session = decoratedSession,
+            )
+            logWriter.info(
+                PlaybackSyncLogEvents.CONNECTION_OPENED,
+                *context.toBaseLogFields(),
+                PlaybackSyncLogFields.RESULT to "accepted",
+            )
+            handleHello(context, clientMessage.payload, timeProvider.nowMs())
+        }
     }
 
     private fun handleHello(
@@ -475,7 +487,7 @@ class PlaybackSyncWebSocketHandler(
 
     private fun handleReplacedConnection(replacedContext: PlaybackConnectionContext) {
         logWriter.logConnectionClosed(replacedContext, "replaced_by_new_connection")
-        replacedContext.session.close(REPLACED_BY_NEW_CONNECTION_STATUS)
+        replacedContext.session?.close(REPLACED_BY_NEW_CONNECTION_STATUS)
     }
 
     private fun requireValidControlPayload(

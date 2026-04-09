@@ -3,7 +3,6 @@ package com.coooolfan.unirhy.sync.service
 import com.coooolfan.unirhy.sync.model.DeviceRuntimeState
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.stereotype.Service
-import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
@@ -13,11 +12,11 @@ import kotlin.math.roundToLong
 @Service
 class PlaybackSchedulerService(
     private val deviceRuntimeService: DeviceRuntimeService,
+    private val timeProvider: PlaybackSyncTimeProvider = SystemPlaybackSyncTimeProvider(),
+    private val jobStore: PlaybackSyncJobStore = InMemoryPlaybackSyncJobStore(),
     @Qualifier("playbackSyncScheduledExecutor")
     private val scheduler: ScheduledExecutorService,
 ) {
-    private val pendingPlayTimeouts = ConcurrentHashMap<Long, ScheduledFuture<*>>()
-
     fun calculateScheduleDelayMs(accountId: Long): Long {
         return calculateScheduleDelayMs(
             deviceRuntimeService.getActiveRuntimeSnapshot(accountId).runtimeStates,
@@ -66,21 +65,39 @@ class PlaybackSchedulerService(
     fun schedulePendingPlayTimeout(
         accountId: Long,
         commandId: String,
-        task: () -> Unit,
     ) {
-        cancelPendingPlayTimeout(accountId)
-        pendingPlayTimeouts[accountId] = scheduler.schedule(
-            {
-                pendingPlayTimeouts.remove(accountId)
-                task()
-            },
-            PENDING_PLAY_TIMEOUT_MS,
-            TimeUnit.MILLISECONDS,
+        jobStore.schedule(
+            jobType = PlaybackSyncJobType.PENDING_PLAY_TIMEOUT,
+            accountId = accountId,
+            dedupeKey = pendingTimeoutJobKey(accountId),
+            payload = """{"commandId":"$commandId"}""",
+            executeAtMs = timeProvider.nowMs() + PENDING_PLAY_TIMEOUT_MS,
+            nowMs = timeProvider.nowMs(),
         )
     }
 
     fun cancelPendingPlayTimeout(accountId: Long) {
-        pendingPlayTimeouts.remove(accountId)?.cancel(false)
+        jobStore.cancel(pendingTimeoutJobKey(accountId))
+    }
+
+    fun scheduleAutoAdvance(
+        accountId: Long,
+        recordingId: Long,
+        positionSeconds: Double,
+        executeAtMs: Long,
+    ) {
+        jobStore.schedule(
+            jobType = PlaybackSyncJobType.AUTO_ADVANCE,
+            accountId = accountId,
+            dedupeKey = autoAdvanceJobKey(accountId),
+            payload = """{"recordingId":$recordingId,"positionSeconds":$positionSeconds,"executeAtMs":$executeAtMs}""",
+            executeAtMs = executeAtMs,
+            nowMs = timeProvider.nowMs(),
+        )
+    }
+
+    fun cancelAutoAdvance(accountId: Long) {
+        jobStore.cancel(autoAdvanceJobKey(accountId))
     }
 
     fun scheduleWithFixedDelay(
@@ -101,5 +118,9 @@ class PlaybackSchedulerService(
 
         private const val RTT_MULTIPLIER = 1.5
         private const val BASE_SCHEDULE_BUFFER_MS = 200.0
+
+        fun pendingTimeoutJobKey(accountId: Long): String = "pending-play-timeout:$accountId"
+
+        fun autoAdvanceJobKey(accountId: Long): String = "auto-advance:$accountId"
     }
 }

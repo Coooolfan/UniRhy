@@ -6,7 +6,9 @@ import org.springframework.stereotype.Service
 
 @Service
 class PlaybackSyncSessionRemovalCoordinator(
+    private val lockManager: PlaybackAccountScope = PlaybackAccountLockManager(),
     private val playbackSessionService: PlaybackSessionService,
+    private val pendingPlayReconciler: PendingPlayReconciler? = null,
     private val playbackSchedulerService: PlaybackSchedulerService,
     private val scheduledActionDispatcher: PlaybackSyncScheduledActionDispatcher,
     private val messageSender: PlaybackSyncMessageSender,
@@ -32,38 +34,48 @@ class PlaybackSyncSessionRemovalCoordinator(
         nowMs: Long,
     ) {
         val accountId = removal.context.accountId
-        val scheduledAction = removal.context.deviceId?.let { deviceId ->
-            playbackSessionService.handleDeviceDisconnected(
-                accountId = accountId,
-                deviceId = deviceId,
-                remainingDeviceIds = removal.remainingDeviceIds,
-                nowMs = nowMs,
-                executeAtMs = playbackSchedulerService.calculateExecuteAtMs(accountId, nowMs),
-            )
-        }
-
-        if (scheduledAction != null) {
-            playbackSchedulerService.cancelPendingPlayTimeout(accountId)
-            scheduledActionDispatcher.broadcastAndLog(accountId, removal.context.deviceId, scheduledAction, nowMs)
-            autoAdvanceService.syncFromScheduledAction(accountId, scheduledAction, nowMs)
-        } else if (removal.remainingDeviceIds.isEmpty()) {
-            if (removal.deviceListChanged) {
-                abandonPendingPlay(accountId)
-                val autoPause = playbackSessionService.schedulePauseFromCurrentState(
-                    accountId = accountId,
-                    commandId = "auto-disconnect-pause-$nowMs",
-                    nowMs = nowMs,
-                    executeAtMs = playbackSchedulerService.calculateExecuteAtMs(accountId, nowMs),
-                )
-                scheduledActionDispatcher.broadcastAndLog(accountId, removal.context.deviceId, autoPause, nowMs)
-                autoAdvanceService.syncFromScheduledAction(accountId, autoPause, nowMs)
-            } else {
-                abandonPendingPlay(accountId)
+        lockManager.withAccountLock(accountId) {
+            val pendingPlay = playbackSessionService.getPendingPlay(accountId)
+            val scheduledAction = removal.context.deviceId?.let { deviceId ->
+                pendingPlay?.let {
+                    pendingPlayReconciler?.reconcile(
+                        accountId = accountId,
+                        commandId = it.commandId,
+                        nowMs = nowMs,
+                        removedDeviceId = deviceId,
+                    ) ?: playbackSessionService.handleDeviceDisconnected(
+                        accountId = accountId,
+                        deviceId = deviceId,
+                        remainingDeviceIds = removal.remainingDeviceIds,
+                        nowMs = nowMs,
+                        executeAtMs = playbackSchedulerService.calculateExecuteAtMs(accountId, nowMs),
+                    )
+                }
             }
-        }
 
-        if (removal.deviceListChanged) {
-            messageSender.broadcastDeviceChange(accountId, removal.remainingDeviceIds)
+            if (scheduledAction != null) {
+                playbackSchedulerService.cancelPendingPlayTimeout(accountId)
+                scheduledActionDispatcher.broadcastAndLog(accountId, removal.context.deviceId, scheduledAction, nowMs)
+                autoAdvanceService.syncFromScheduledAction(accountId, scheduledAction, nowMs)
+            } else if (removal.remainingDeviceIds.isEmpty()) {
+                if (removal.deviceListChanged) {
+                    abandonPendingPlay(accountId)
+                    val autoPause = playbackSessionService.schedulePauseFromCurrentState(
+                        accountId = accountId,
+                        commandId = "auto-disconnect-pause-$nowMs",
+                        nowMs = nowMs,
+                        executeAtMs = playbackSchedulerService.calculateExecuteAtMs(accountId, nowMs),
+                    )
+                    scheduledActionDispatcher.broadcastAndLog(accountId, removal.context.deviceId, autoPause, nowMs)
+                    autoAdvanceService.syncFromScheduledAction(accountId, autoPause, nowMs)
+                } else {
+                    abandonPendingPlay(accountId)
+                }
+            }
+
+            if (removal.deviceListChanged) {
+                messageSender.broadcastDeviceChange(accountId, removal.remainingDeviceIds)
+            }
         }
     }
 }

@@ -279,7 +279,7 @@ class PlaybackSyncWebSocketHandlerTest {
     }
 
     @Test
-    fun `pause with mixed media context is rejected`() {
+    fun `pause without media file context is accepted`() {
         val session = TestWebSocketSession(sessionId = "session-1", accountId = 42L)
         handler.afterConnectionEstablished(session)
         handler.handleMessage(session, textMessage(helloPayload(deviceId = "web-7c2f")))
@@ -296,7 +296,11 @@ class PlaybackSyncWebSocketHandlerTest {
             ),
         )
 
-        assertError(session.lastServerMessage(), PlaybackSyncErrorCode.INVALID_MESSAGE)
+        val message = session.lastServerMessage()
+        assertTrue(message is ScheduledActionMessage)
+        assertEquals(ScheduledActionType.PAUSE, message.payload.scheduledAction.action)
+        assertEquals(1001L, message.payload.scheduledAction.recordingId)
+        assertEquals(36.25, message.payload.scheduledAction.positionSeconds)
     }
 
     @Test
@@ -447,6 +451,7 @@ class PlaybackSyncWebSocketHandlerTest {
             logWriter = PlaybackSyncLogWriter(),
         )
         autoAdvanceService = PlaybackAutoAdvanceService(
+            lockManager = lockManager,
             currentQueueService = currentQueueService,
             playbackSessionService = playbackSessionService,
             playbackSchedulerService = playbackSchedulerService,

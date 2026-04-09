@@ -1,19 +1,20 @@
 package com.coooolfan.unirhy.sync.service
 
 import com.coooolfan.unirhy.sync.model.DeviceRuntimeState
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
 import org.springframework.web.socket.handler.ConcurrentWebSocketSessionDecorator
 import java.util.concurrent.ConcurrentHashMap
 
 @Service
 class DeviceRuntimeService(
-    private val lockManager: PlaybackAccountLockManager,
+    private val lockManager: PlaybackAccountScope,
     private val timeProvider: PlaybackSyncTimeProvider,
+    private val runtimeStore: PlaybackRuntimeStore = InMemoryPlaybackRuntimeStore(),
+    @Value("\${unirhy.sync.node-id:\${HOSTNAME:\${random.uuid}}}")
+    private val nodeId: String = "test-node",
 ) {
-    private val sessionIdsByAccountId = ConcurrentHashMap<Long, MutableSet<String>>()
-    private val connectionContextsBySessionId = ConcurrentHashMap<String, PlaybackConnectionContext>()
-    private val sessionIdByDeviceKey = ConcurrentHashMap<PlaybackDeviceKey, String>()
-    private val runtimeStateByDeviceKey = ConcurrentHashMap<PlaybackDeviceKey, DeviceRuntimeState>()
+    private val localContextsBySessionId = ConcurrentHashMap<String, PlaybackConnectionContext>()
 
     fun registerConnection(
         accountId: Long,
@@ -22,19 +23,31 @@ class DeviceRuntimeService(
         session: ConcurrentWebSocketSessionDecorator,
     ): PlaybackConnectionContext {
         return lockManager.withAccountLock(accountId) {
+            val nowMs = timeProvider.nowMs()
             val context = PlaybackConnectionContext(
                 accountId = accountId,
                 tokenValue = tokenValue,
                 sessionId = sessionId,
                 session = session,
             )
-            connectionContextsBySessionId[sessionId] = context
-            sessionIdsByAccountId.computeIfAbsent(accountId) { ConcurrentHashMap.newKeySet() }.add(sessionId)
+            localContextsBySessionId[sessionId] = context
+            runtimeStore.upsertConnection(
+                StoredPlaybackConnection(
+                    sessionId = sessionId,
+                    accountId = accountId,
+                    deviceId = null,
+                    nodeId = nodeId,
+                    clientVersion = null,
+                    helloCompleted = false,
+                    createdAtMs = nowMs,
+                    updatedAtMs = nowMs,
+                ),
+            )
             context
         }
     }
 
-    fun findConnectionContext(sessionId: String): PlaybackConnectionContext? = connectionContextsBySessionId[sessionId]
+    fun findConnectionContext(sessionId: String): PlaybackConnectionContext? = localContextsBySessionId[sessionId]
 
     fun registerHello(
         accountId: Long,
@@ -43,12 +56,12 @@ class DeviceRuntimeService(
         clientVersion: String?,
     ): DeviceRegistrationResult {
         return lockManager.withAccountLock(accountId) {
-            val context = requireNotNull(connectionContextsBySessionId[sessionId]) {
+            val nowMs = timeProvider.nowMs()
+            val context = requireNotNull(localContextsBySessionId[sessionId]) {
                 "Playback connection context not found for sessionId=$sessionId"
             }
 
-            val deviceKey = PlaybackDeviceKey(accountId = accountId, deviceId = deviceId)
-            val previousSessionId = sessionIdByDeviceKey.put(deviceKey, sessionId)
+            val previousSessionId = runtimeStore.findCurrentSessionId(accountId, deviceId)
             val replacedContext = if (previousSessionId != null && previousSessionId != sessionId) {
                 removeConnectionLocked(accountId, previousSessionId)
             } else {
@@ -59,27 +72,45 @@ class DeviceRuntimeService(
             context.clientVersion = clientVersion
             context.helloCompleted = true
 
-            runtimeStateByDeviceKey[deviceKey] = DeviceRuntimeState(
-                deviceId = deviceId,
-                accountId = accountId,
-                lastSeenAtMs = timeProvider.nowMs(),
+            runtimeStore.upsertConnection(
+                StoredPlaybackConnection(
+                    sessionId = sessionId,
+                    accountId = accountId,
+                    deviceId = deviceId,
+                    nodeId = nodeId,
+                    clientVersion = clientVersion,
+                    helloCompleted = true,
+                    createdAtMs = nowMs,
+                    updatedAtMs = nowMs,
+                ),
+            )
+            runtimeStore.upsertRuntimeState(
+                state = DeviceRuntimeState(
+                    deviceId = deviceId,
+                    accountId = accountId,
+                    lastSeenAtMs = nowMs,
+                ),
+                sessionId = sessionId,
+                nodeId = nodeId,
             )
 
             DeviceRegistrationResult(
                 context = context,
                 replacedContext = replacedContext,
-                deviceIds = listDeviceIdsLocked(accountId),
+                deviceIds = runtimeStore.listHelloCompletedDeviceIds(accountId),
             )
         }
     }
 
     fun removeSession(sessionId: String): SessionRemovalResult? {
-        val context = connectionContextsBySessionId[sessionId] ?: return null
-        return lockManager.withAccountLock(context.accountId) {
-            val removedContext = removeConnectionLocked(context.accountId, sessionId) ?: return@withAccountLock null
+        val accountId = localContextsBySessionId[sessionId]?.accountId
+            ?: runtimeStore.findConnection(sessionId)?.accountId
+            ?: return null
+        return lockManager.withAccountLock(accountId) {
+            val removedContext = removeConnectionLocked(accountId, sessionId) ?: return@withAccountLock null
             SessionRemovalResult(
                 context = removedContext,
-                remainingDeviceIds = listDeviceIdsLocked(removedContext.accountId),
+                remainingDeviceIds = runtimeStore.listHelloCompletedDeviceIds(accountId),
                 deviceListChanged = removedContext.deviceId != null,
             )
         }
@@ -87,19 +118,25 @@ class DeviceRuntimeService(
 
     fun listHelloCompletedConnections(accountId: Long): List<PlaybackConnectionContext> {
         return lockManager.withAccountLock(accountId) {
-            listHelloCompletedContextsLocked(accountId)
+            runtimeStore.listHelloCompletedConnections(accountId, nodeId)
+                .mapNotNull { connection -> localContextsBySessionId[connection.sessionId] }
+                .sortedBy { it.deviceId.orEmpty() }
         }
     }
 
     fun getActiveRuntimeSnapshot(accountId: Long): PlaybackAccountRuntimeSnapshot {
         return lockManager.withAccountLock(accountId) {
-            buildActiveRuntimeSnapshotLocked(accountId)
+            val runtimeStates = runtimeStore.listActiveRuntimeStates(accountId)
+            PlaybackAccountRuntimeSnapshot(
+                deviceIds = runtimeStore.listHelloCompletedDeviceIds(accountId),
+                runtimeStates = runtimeStates.sortedBy(DeviceRuntimeState::deviceId),
+            )
         }
     }
 
     fun listDeviceIds(accountId: Long): List<String> {
         return lockManager.withAccountLock(accountId) {
-            listDeviceIdsLocked(accountId)
+            runtimeStore.listHelloCompletedDeviceIds(accountId)
         }
     }
 
@@ -114,8 +151,9 @@ class DeviceRuntimeService(
         nowMs: Long,
     ): DeviceRuntimeState {
         return lockManager.withAccountLock(accountId) {
-            val deviceKey = PlaybackDeviceKey(accountId = accountId, deviceId = deviceId)
-            val state = requireNotNull(runtimeStateByDeviceKey[deviceKey]) {
+            val currentSessionId = runtimeStore.findCurrentSessionId(accountId, deviceId)
+                ?: error("Playback runtime session not found for accountId=$accountId, deviceId=$deviceId")
+            val state = requireNotNull(runtimeStore.findRuntimeState(accountId, deviceId)) {
                 "Playback runtime state not found for accountId=$accountId, deviceId=$deviceId"
             }
             state.lastSeenAtMs = nowMs
@@ -127,6 +165,7 @@ class DeviceRuntimeService(
                     state.rttEmaMs * (1 - EMA_ALPHA) + clientRttMs * EMA_ALPHA
                 }
             }
+            runtimeStore.upsertRuntimeState(state, currentSessionId, nodeId)
             state
         }
     }
@@ -137,8 +176,7 @@ class DeviceRuntimeService(
         nowMs: Long,
     ) {
         lockManager.withAccountLock(accountId) {
-            runtimeStateByDeviceKey[PlaybackDeviceKey(accountId = accountId, deviceId = deviceId)]
-                ?.lastSeenAtMs = nowMs
+            runtimeStore.touchRuntimeState(accountId, deviceId, nowMs)
         }
     }
 
@@ -147,7 +185,7 @@ class DeviceRuntimeService(
         deviceId: String,
     ): Boolean {
         return lockManager.withAccountLock(accountId) {
-            runtimeStateByDeviceKey[PlaybackDeviceKey(accountId = accountId, deviceId = deviceId)]
+            runtimeStore.findRuntimeState(accountId, deviceId)
                 ?.lastNtpResponseAtMs
                 ?.let { it > 0L }
                 ?: false
@@ -158,81 +196,51 @@ class DeviceRuntimeService(
         nowMs: Long,
         staleThresholdMs: Long,
     ): List<SessionRemovalResult> {
-        return sessionIdsByAccountId.keys.toList()
-            .flatMap { accountId ->
-                lockManager.withAccountLock(accountId) {
-                    val sessionIds = sessionIdsByAccountId[accountId].orEmpty().toList()
-                    sessionIds.mapNotNull { sessionId ->
-                        val context = connectionContextsBySessionId[sessionId] ?: return@mapNotNull null
-                        val deviceId = context.deviceId ?: return@mapNotNull null
-                        val runtimeState = runtimeStateByDeviceKey[PlaybackDeviceKey(accountId = accountId, deviceId = deviceId)]
-                            ?: return@mapNotNull null
-                        if (runtimeState.lastNtpResponseAtMs == 0L) {
-                            return@mapNotNull null
-                        }
-                        if (nowMs - runtimeState.lastNtpResponseAtMs <= staleThresholdMs) {
-                            return@mapNotNull null
-                        }
-
-                        val removedContext = removeConnectionLocked(accountId, sessionId) ?: return@mapNotNull null
-                        SessionRemovalResult(
-                            context = removedContext,
-                            remainingDeviceIds = listDeviceIdsLocked(accountId),
-                            deviceListChanged = removedContext.deviceId != null,
-                        )
-                    }
+        return runtimeStore.listStaleConnections(nowMs, staleThresholdMs).mapNotNull { connection ->
+            lockManager.withAccountLock(connection.accountId) {
+                val latest = runtimeStore.findConnection(connection.sessionId) ?: return@withAccountLock null
+                val deviceId = latest.deviceId ?: return@withAccountLock null
+                val runtimeState = runtimeStore.findRuntimeState(latest.accountId, deviceId) ?: return@withAccountLock null
+                if (runtimeState.lastNtpResponseAtMs == 0L || nowMs - runtimeState.lastNtpResponseAtMs <= staleThresholdMs) {
+                    return@withAccountLock null
                 }
+                val removedContext = removeConnectionLocked(latest.accountId, latest.sessionId) ?: return@withAccountLock null
+                SessionRemovalResult(
+                    context = removedContext,
+                    remainingDeviceIds = runtimeStore.listHelloCompletedDeviceIds(latest.accountId),
+                    deviceListChanged = removedContext.deviceId != null,
+                )
             }
+        }
     }
 
-    fun hasConnection(sessionId: String): Boolean = connectionContextsBySessionId.containsKey(sessionId)
+    fun hasConnection(sessionId: String): Boolean = localContextsBySessionId.containsKey(sessionId)
 
-    private fun listDeviceIdsLocked(accountId: Long): List<String> {
-        return sessionIdsByAccountId[accountId]
-            .orEmpty()
-            .mapNotNull(connectionContextsBySessionId::get)
-            .mapNotNull { it.deviceId }
-            .sorted()
-    }
-
-    private fun listHelloCompletedContextsLocked(accountId: Long): List<PlaybackConnectionContext> {
-        return sessionIdsByAccountId[accountId]
-            .orEmpty()
-            .mapNotNull(connectionContextsBySessionId::get)
-            .filter { it.helloCompleted }
-            .sortedBy { it.deviceId.orEmpty() }
-    }
-
-    private fun buildActiveRuntimeSnapshotLocked(accountId: Long): PlaybackAccountRuntimeSnapshot {
-        val contexts = listHelloCompletedContextsLocked(accountId)
-        return PlaybackAccountRuntimeSnapshot(
-            deviceIds = contexts.mapNotNull { it.deviceId },
-            runtimeStates = contexts.mapNotNull { context ->
-                context.deviceId?.let { deviceId ->
-                    runtimeStateByDeviceKey[PlaybackDeviceKey(accountId = accountId, deviceId = deviceId)]
-                }
-            },
-        )
+    fun isCurrentDeviceSession(
+        accountId: Long,
+        deviceId: String,
+        sessionId: String,
+    ): Boolean {
+        return lockManager.withAccountLock(accountId) {
+            runtimeStore.isCurrentDeviceSession(accountId, deviceId, sessionId)
+        }
     }
 
     private fun removeConnectionLocked(
         accountId: Long,
         sessionId: String,
     ): PlaybackConnectionContext? {
-        val context = connectionContextsBySessionId.remove(sessionId) ?: return null
-
-        sessionIdsByAccountId[accountId]?.remove(sessionId)
-        if (sessionIdsByAccountId[accountId].isNullOrEmpty()) {
-            sessionIdsByAccountId.remove(accountId)
-        }
-
-        context.deviceId?.let { deviceId ->
-            val deviceKey = PlaybackDeviceKey(accountId = accountId, deviceId = deviceId)
-            sessionIdByDeviceKey.remove(deviceKey, sessionId)
-            runtimeStateByDeviceKey.remove(deviceKey)
-        }
-
-        return context
+        val removedStoreConnection = runtimeStore.removeConnection(sessionId) ?: return null
+        val localContext = localContextsBySessionId.remove(sessionId)
+        return localContext ?: PlaybackConnectionContext(
+            accountId = accountId,
+            tokenValue = "",
+            sessionId = removedStoreConnection.sessionId,
+            session = null,
+            deviceId = removedStoreConnection.deviceId,
+            clientVersion = removedStoreConnection.clientVersion,
+            helloCompleted = removedStoreConnection.helloCompleted,
+        )
     }
 }
 
@@ -240,7 +248,7 @@ class PlaybackConnectionContext(
     val accountId: Long,
     val tokenValue: String,
     val sessionId: String,
-    val session: ConcurrentWebSocketSessionDecorator,
+    val session: ConcurrentWebSocketSessionDecorator?,
     var deviceId: String? = null,
     var clientVersion: String? = null,
     var helloCompleted: Boolean = false,
@@ -261,11 +269,6 @@ data class SessionRemovalResult(
     val context: PlaybackConnectionContext,
     val remainingDeviceIds: List<String>,
     val deviceListChanged: Boolean,
-)
-
-private data class PlaybackDeviceKey(
-    val accountId: Long,
-    val deviceId: String,
 )
 
 private const val EMA_ALPHA = 0.2

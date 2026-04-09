@@ -241,8 +241,6 @@ class PlaybackSyncProtocolSerializationTest {
                     state = AccountPlaybackStateDto(
                         status = PlaybackStatus.PLAYING,
                         recordingId = 1001,
-                        mediaFileId = 2001,
-                        presignedUrl = "/api/media/2001",
                         positionSeconds = 12.5,
                         serverTimeToExecuteMs = 1730844001500,
                         version = 8,
@@ -253,7 +251,6 @@ class PlaybackSyncProtocolSerializationTest {
                             CurrentQueueItemDto(
                                 entryId = 1,
                                 recordingId = 1001,
-                                mediaFileId = 2001,
                                 title = "Track 1",
                                 artistLabel = "Artist 1",
                                 coverUrl = "/api/media/3001",
@@ -261,6 +258,8 @@ class PlaybackSyncProtocolSerializationTest {
                             ),
                         ),
                         currentEntryId = 1,
+                        playbackStrategy = PlaybackStrategy.SEQUENTIAL,
+                        stopStrategy = StopStrategy.TRACK,
                         version = 3,
                         updatedAtMs = 1730844000090,
                     ),
@@ -274,8 +273,6 @@ class PlaybackSyncProtocolSerializationTest {
                     "state": {
                       "status": "PLAYING",
                       "recordingId": 1001,
-                      "mediaFileId": 2001,
-                      "presignedUrl": "/api/media/2001",
                       "positionSeconds": 12.5,
                       "serverTimeToExecuteMs": 1730844001500,
                       "version": 8,
@@ -286,7 +283,6 @@ class PlaybackSyncProtocolSerializationTest {
                         {
                           "entryId": 1,
                           "recordingId": 1001,
-                          "mediaFileId": 2001,
                           "title": "Track 1",
                           "artistLabel": "Artist 1",
                           "coverUrl": "/api/media/3001",
@@ -294,6 +290,8 @@ class PlaybackSyncProtocolSerializationTest {
                         }
                       ],
                       "currentEntryId": 1,
+                      "playbackStrategy": "SEQUENTIAL",
+                      "stopStrategy": "TRACK",
                       "version": 3,
                       "updatedAtMs": 1730844000090
                     },
@@ -308,8 +306,6 @@ class PlaybackSyncProtocolSerializationTest {
                 payload = LoadAudioSourcePayload(
                     commandId = "cmd-play-001",
                     recordingId = 1001,
-                    mediaFileId = 2001,
-                    presignedUrl = "/api/media/2001",
                 ),
             ),
             expectedJson = """
@@ -317,9 +313,7 @@ class PlaybackSyncProtocolSerializationTest {
                   "type": "ROOM_EVENT_LOAD_AUDIO_SOURCE",
                   "payload": {
                     "commandId": "cmd-play-001",
-                    "recordingId": 1001,
-                    "mediaFileId": 2001,
-                    "presignedUrl": "/api/media/2001"
+                    "recordingId": 1001
                   }
                 }
             """.trimIndent(),
@@ -333,7 +327,6 @@ class PlaybackSyncProtocolSerializationTest {
                             CurrentQueueItemDto(
                                 entryId = 1,
                                 recordingId = 1001,
-                                mediaFileId = 2001,
                                 title = "Track 1",
                                 artistLabel = "Artist 1",
                                 coverUrl = "/api/media/3001",
@@ -342,7 +335,6 @@ class PlaybackSyncProtocolSerializationTest {
                             CurrentQueueItemDto(
                                 entryId = 2,
                                 recordingId = 1002,
-                                mediaFileId = 2002,
                                 title = "Track 2",
                                 artistLabel = "Artist 2",
                                 coverUrl = null,
@@ -350,6 +342,8 @@ class PlaybackSyncProtocolSerializationTest {
                             ),
                         ),
                         currentEntryId = 2,
+                        playbackStrategy = PlaybackStrategy.SHUFFLE,
+                        stopStrategy = StopStrategy.LIST,
                         version = 4,
                         updatedAtMs = 1730844000500,
                     ),
@@ -364,7 +358,6 @@ class PlaybackSyncProtocolSerializationTest {
                         {
                           "entryId": 1,
                           "recordingId": 1001,
-                          "mediaFileId": 2001,
                           "title": "Track 1",
                           "artistLabel": "Artist 1",
                           "coverUrl": "/api/media/3001",
@@ -373,7 +366,6 @@ class PlaybackSyncProtocolSerializationTest {
                         {
                           "entryId": 2,
                           "recordingId": 1002,
-                          "mediaFileId": 2002,
                           "title": "Track 2",
                           "artistLabel": "Artist 2",
                           "coverUrl": null,
@@ -381,6 +373,8 @@ class PlaybackSyncProtocolSerializationTest {
                         }
                       ],
                       "currentEntryId": 2,
+                      "playbackStrategy": "SHUFFLE",
+                      "stopStrategy": "LIST",
                       "version": 4,
                       "updatedAtMs": 1730844000500
                     }
@@ -398,8 +392,6 @@ class PlaybackSyncProtocolSerializationTest {
                         action = ScheduledActionType.SEEK,
                         status = PlaybackStatus.PAUSED,
                         recordingId = 1001,
-                        mediaFileId = 2001,
-                        presignedUrl = "/api/media/2001",
                         positionSeconds = 91.0,
                         version = 9,
                     ),
@@ -415,8 +407,6 @@ class PlaybackSyncProtocolSerializationTest {
                       "action": "SEEK",
                       "status": "PAUSED",
                       "recordingId": 1001,
-                      "mediaFileId": 2001,
-                      "presignedUrl": "/api/media/2001",
                       "positionSeconds": 91.0,
                       "version": 9
                     }

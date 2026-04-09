@@ -6,8 +6,11 @@ import org.springframework.stereotype.Service
 
 @Service
 class PlaybackPlayCoordinator(
+    private val lockManager: PlaybackAccountScope = PlaybackAccountLockManager(),
     private val playbackSessionService: PlaybackSessionService,
-    private val deviceRuntimeService: DeviceRuntimeService,
+    @Suppress("UNUSED_PARAMETER")
+    private val deviceRuntimeService: DeviceRuntimeService? = null,
+    private val pendingPlayReconciler: PendingPlayReconciler? = null,
     private val playbackSchedulerService: PlaybackSchedulerService,
     private val scheduledActionDispatcher: PlaybackSyncScheduledActionDispatcher,
     private val messageSender: PlaybackSyncMessageSender,
@@ -22,34 +25,34 @@ class PlaybackPlayCoordinator(
         nowMs: Long,
         logDeviceId: String? = initiatorDeviceId,
     ) {
-        playbackSessionService.createPendingPlay(
-            accountId = accountId,
-            commandId = commandId,
-            initiatorDeviceId = initiatorDeviceId,
-            recordingId = recordingId,
-            positionSeconds = positionSeconds,
-            nowMs = nowMs,
-            timeoutAtMs = nowMs + PlaybackSchedulerService.PENDING_PLAY_TIMEOUT_MS,
-        )
-
-        messageSender.broadcastLoadAudioSource(
-            accountId = accountId,
-            payload = LoadAudioSourcePayload(
+        lockManager.withAccountLock(accountId) {
+            playbackSessionService.createPendingPlay(
+                accountId = accountId,
                 commandId = commandId,
+                initiatorDeviceId = initiatorDeviceId,
                 recordingId = recordingId,
-            ),
-        )
+                positionSeconds = positionSeconds,
+                nowMs = nowMs,
+                timeoutAtMs = nowMs + PlaybackSchedulerService.PENDING_PLAY_TIMEOUT_MS,
+            )
 
-        val scheduledAction = maybeCompletePendingPlay(accountId, nowMs) ?: run {
-            playbackSchedulerService.schedulePendingPlayTimeout(accountId, commandId) {
-                handlePendingPlayTimeout(accountId, commandId)
+            messageSender.broadcastLoadAudioSource(
+                accountId = accountId,
+                payload = LoadAudioSourcePayload(
+                    commandId = commandId,
+                    recordingId = recordingId,
+                ),
+            )
+
+            val scheduledAction = reconcile(accountId, commandId, nowMs) ?: run {
+                playbackSchedulerService.schedulePendingPlayTimeout(accountId, commandId)
+                return@withAccountLock
             }
-            return
-        }
 
-        playbackSchedulerService.cancelPendingPlayTimeout(accountId)
-        scheduledActionDispatcher.broadcastAndLog(accountId, logDeviceId, scheduledAction, nowMs)
-        autoAdvanceService.syncFromScheduledAction(accountId, scheduledAction, nowMs)
+            playbackSchedulerService.cancelPendingPlayTimeout(accountId)
+            scheduledActionDispatcher.broadcastAndLog(accountId, logDeviceId, scheduledAction, nowMs)
+            autoAdvanceService.syncFromScheduledAction(accountId, scheduledAction, nowMs)
+        }
     }
 
     fun completePendingPlayIfReady(
@@ -58,17 +61,9 @@ class PlaybackPlayCoordinator(
         nowMs: Long,
         logDeviceId: String?,
     ): ScheduledActionPayload? {
-        val runtimeSnapshot = deviceRuntimeService.getActiveRuntimeSnapshot(accountId)
-        if (!playbackSessionService.areAllDevicesLoaded(accountId, runtimeSnapshot.deviceIds)) {
-            return null
-        }
-
-        val scheduledAction = playbackSessionService.completePendingPlay(
-            accountId = accountId,
-            commandId = commandId,
-            nowMs = nowMs,
-            executeAtMs = playbackSchedulerService.calculateExecuteAtMs(runtimeSnapshot.runtimeStates, nowMs),
-        ) ?: return null
+        val scheduledAction = lockManager.withAccountLock(accountId) {
+            reconcile(accountId, commandId, nowMs)
+        } ?: return null
 
         playbackSchedulerService.cancelPendingPlayTimeout(accountId)
         scheduledActionDispatcher.broadcastAndLog(accountId, logDeviceId, scheduledAction, nowMs)
@@ -81,30 +76,46 @@ class PlaybackPlayCoordinator(
         commandId: String,
     ) {
         val nowMs = autoAdvanceService.nowMs()
-        val scheduledAction = playbackSessionService.completePendingPlay(
-            accountId = accountId,
-            commandId = commandId,
-            nowMs = nowMs,
-            executeAtMs = playbackSchedulerService.calculateExecuteAtMs(accountId, nowMs),
-        ) ?: return
+        lockManager.withAccountLock(accountId) {
+            val scheduledAction = reconcile(
+                accountId = accountId,
+                commandId = commandId,
+                nowMs = nowMs,
+                forceTimeout = true,
+            ) ?: return@withAccountLock
 
-        scheduledActionDispatcher.broadcastAndLog(accountId, null, scheduledAction, nowMs)
-        autoAdvanceService.syncFromScheduledAction(accountId, scheduledAction, nowMs)
+            scheduledActionDispatcher.broadcastAndLog(accountId, null, scheduledAction, nowMs)
+            autoAdvanceService.syncFromScheduledAction(accountId, scheduledAction, nowMs)
+        }
     }
 
-    private fun maybeCompletePendingPlay(
+    private fun reconcile(
         accountId: Long,
+        commandId: String,
         nowMs: Long,
+        forceTimeout: Boolean = false,
     ): ScheduledActionPayload? {
-        val pendingPlay = playbackSessionService.getPendingPlay(accountId) ?: return null
-        val runtimeSnapshot = deviceRuntimeService.getActiveRuntimeSnapshot(accountId)
-        if (!playbackSessionService.areAllDevicesLoaded(accountId, runtimeSnapshot.deviceIds)) {
-            return null
+        pendingPlayReconciler?.let {
+            return it.reconcile(
+                accountId = accountId,
+                commandId = commandId,
+                nowMs = nowMs,
+                forceTimeout = forceTimeout,
+            )
         }
 
+        val pendingPlay = playbackSessionService.getPendingPlay(accountId) ?: return null
+        if (pendingPlay.commandId != commandId) {
+            return null
+        }
+        val runtimeSnapshot = deviceRuntimeService?.getActiveRuntimeSnapshot(accountId)
+            ?: return null
+        if (!forceTimeout && !playbackSessionService.areAllDevicesLoaded(accountId, runtimeSnapshot.deviceIds)) {
+            return null
+        }
         return playbackSessionService.completePendingPlay(
             accountId = accountId,
-            commandId = pendingPlay.commandId,
+            commandId = commandId,
             nowMs = nowMs,
             executeAtMs = playbackSchedulerService.calculateExecuteAtMs(runtimeSnapshot.runtimeStates, nowMs),
         )
