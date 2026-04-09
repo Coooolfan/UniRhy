@@ -7,7 +7,7 @@ ksp = "2.3.4"
 jimmer = "0.9.120"
 saToken = "1.44.0"
 jAudioTagger = "3.0.1"
-s3 = "2.32.2"
+s3 = "2.42.30"
 pgvector = "0.1.6"
 
 [libraries]
@@ -28,6 +28,7 @@ jimmer-ksp = { group = "org.babyfish.jimmer", name = "jimmer-ksp", version.ref =
 
 # Sa-Token
 sa-token-starter = { group = "cn.dev33", name = "sa-token-spring-boot3-starter", version.ref = "saToken" }
+sa-token-jwt ={ group="cn.dev33", name = "sa-token-jwt", version.ref = "saToken" }
 
 # PostgreSQL
 postgresql = { module = "org.postgresql:postgresql" }

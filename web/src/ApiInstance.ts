@@ -75,10 +75,13 @@ export const api = new Api(async ({ uri, method, headers, body }) => {
         ...headers,
         ...(tenant !== undefined && tenant !== '' ? { tenant } : {}),
     }
+
+    // TODO: 这里有点怀疑，需要验证tauri下是不是必要的
     const token = getAuthToken()
     if (token) {
         fetchHeaders[TOKEN_HEADER_NAME] = token
     }
+
     if (!isFormData) {
         // 仅在非FormData时设置content-type，携带二进制文件时，浏览器会自动设置content-type
         fetchHeaders['content-type'] = 'application/json;charset=UTF-8'
