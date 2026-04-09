@@ -162,6 +162,143 @@ class PlaybackQueuePersistenceE2eTest {
         }
     }
 
+    @Test
+    @Order(3)
+    fun `playback sync should coordinate play across two instances`() {
+        val adminState = bootstrapAdminSession(baseUrl())
+        val recordingIds = prepareQueueRecordingIds(adminState)
+        val suffix = suffix()
+        val account = createAccountByAdmin(
+            state = adminState,
+            name = "sync-user-$suffix",
+            email = "sync-user-$suffix@example.invalid",
+            password = "sync-user-$suffix-password",
+        )
+        val primarySession = loginAccount(baseUrl(), account.email, account.password)
+        val primaryDeviceId = "web-primary-$suffix"
+        val secondaryDeviceId = "web-secondary-$suffix"
+        val recordingId = recordingIds.first()
+        val commandId = "play-cross-node-$suffix"
+
+        startFreshApplication(nodeId = "api-e2e-playback-secondary-$suffix").use { secondary ->
+            val secondarySession = loginAccount(secondary.baseUrl, account.email, account.password)
+
+            openPlaybackSync(
+                baseUrl = baseUrl(),
+                token = primarySession.token,
+                deviceId = primaryDeviceId,
+            ).use { primaryPlayback ->
+                primaryPlayback.awaitMessage("SNAPSHOT", "[sync] primary playback snapshot")
+
+                openPlaybackSync(
+                    baseUrl = secondary.baseUrl,
+                    token = secondarySession.token,
+                    deviceId = secondaryDeviceId,
+                ).use { secondaryPlayback ->
+                    secondaryPlayback.awaitMessage("SNAPSHOT", "[sync] secondary playback snapshot")
+
+                    val expectedDevices = listOf(primaryDeviceId, secondaryDeviceId).sorted()
+                    assertEquals(
+                        expectedDevices,
+                        deviceIdsFromMessage(
+                            primaryPlayback.awaitMessage(
+                                type = "ROOM_EVENT_DEVICE_CHANGE",
+                                step = "[sync] primary should observe cross-node device list",
+                            ) { message ->
+                                deviceIdsFromMessage(message) == expectedDevices
+                            },
+                        ),
+                    )
+                    assertEquals(
+                        expectedDevices,
+                        deviceIdsFromMessage(
+                            secondaryPlayback.awaitMessage(
+                                type = "ROOM_EVENT_DEVICE_CHANGE",
+                                step = "[sync] secondary should observe cross-node device list",
+                            ) { message ->
+                                deviceIdsFromMessage(message) == expectedDevices
+                            },
+                        ),
+                    )
+
+                    primaryPlayback.sendJson(
+                        mapOf(
+                            "type" to "PLAY",
+                            "payload" to mapOf(
+                                "commandId" to commandId,
+                                "deviceId" to primaryDeviceId,
+                                "recordingId" to recordingId,
+                                "positionSeconds" to 12.5,
+                            ),
+                        ),
+                    )
+
+                    val queueChange = secondaryPlayback.awaitMessage(
+                        type = "ROOM_EVENT_QUEUE_CHANGE",
+                        step = "[sync] secondary should receive queue change from primary instance",
+                    ) { message ->
+                        message.path("payload")
+                            .path("queue")
+                            .path("items")
+                            .firstOrNull()
+                            ?.path("recordingId")
+                            ?.longValue() == recordingId
+                    }
+                    val queueItems = queueChange.path("payload").path("queue").path("items")
+                    assertEquals(1, queueItems.size(), "[sync] queue change should expose one current item")
+                    assertEquals(recordingId, queueItems.first().path("recordingId").longValue(), "[sync] queue change should target played recording")
+
+                    val loadAudioSource = secondaryPlayback.awaitMessage(
+                        type = "ROOM_EVENT_LOAD_AUDIO_SOURCE",
+                        step = "[sync] secondary should receive load-audio-source from primary instance",
+                    ) { message ->
+                        message.path("payload").path("commandId").asText() == commandId
+                    }
+                    assertEquals(commandId, loadAudioSource.path("payload").path("commandId").asText())
+                    assertEquals(recordingId, loadAudioSource.path("payload").path("recordingId").longValue())
+
+                    secondaryPlayback.sendJson(
+                        mapOf(
+                            "type" to "AUDIO_SOURCE_LOADED",
+                            "payload" to mapOf(
+                                "commandId" to commandId,
+                                "deviceId" to secondaryDeviceId,
+                                "recordingId" to recordingId,
+                                "mediaFileId" to 0L,
+                            ),
+                        ),
+                    )
+
+                    val primaryScheduledAction = primaryPlayback.awaitMessage(
+                        type = "SCHEDULED_ACTION",
+                        step = "[sync] primary should receive scheduled action after remote load completes",
+                    ) { message ->
+                        message.path("payload").path("commandId").asText() == commandId
+                    }
+                    val secondaryScheduledAction = secondaryPlayback.awaitMessage(
+                        type = "SCHEDULED_ACTION",
+                        step = "[sync] secondary should receive scheduled action after remote load completes",
+                    ) { message ->
+                        message.path("payload").path("commandId").asText() == commandId
+                    }
+
+                    assertScheduledPlay(primaryScheduledAction, commandId, recordingId, "[sync] primary scheduled action")
+                    assertScheduledPlay(secondaryScheduledAction, commandId, recordingId, "[sync] secondary scheduled action")
+                    assertEquals(
+                        primaryScheduledAction.path("payload").path("serverTimeToExecuteMs").longValue(),
+                        secondaryScheduledAction.path("payload").path("serverTimeToExecuteMs").longValue(),
+                        "[sync] both instances should emit the same execute time",
+                    )
+                    assertEquals(
+                        primaryScheduledAction.path("payload").path("scheduledAction").path("version").longValue(),
+                        secondaryScheduledAction.path("payload").path("scheduledAction").path("version").longValue(),
+                        "[sync] both instances should emit the same playback version",
+                    )
+                }
+            }
+        }
+    }
+
     private fun prepareQueueRecordingIds(state: E2eAdminSession): List<Long> {
         val suffix = suffix()
         val fixtureRoot = state.runtime.scanWorkspace.resolve("queue-persistence-$suffix")
@@ -317,6 +454,27 @@ class PlaybackQueuePersistenceE2eTest {
         assertTrue(queueNode.path("updatedAtMs").longValue() > 0L, "$step updatedAtMs should be positive")
     }
 
+    private fun assertScheduledPlay(
+        message: JsonNode,
+        commandId: String,
+        recordingId: Long,
+        step: String,
+    ) {
+        assertEquals("SCHEDULED_ACTION", message.path("type").asText(), "$step should be a scheduled action message")
+        assertEquals(commandId, message.path("payload").path("commandId").asText(), "$step commandId should match")
+        assertEquals("PLAY", message.path("payload").path("scheduledAction").path("action").asText(), "$step action should be PLAY")
+        assertEquals("PLAYING", message.path("payload").path("scheduledAction").path("status").asText(), "$step status should be PLAYING")
+        assertEquals(recordingId, message.path("payload").path("scheduledAction").path("recordingId").longValue(), "$step recordingId should match")
+        assertEquals(12.5, message.path("payload").path("scheduledAction").path("positionSeconds").doubleValue(), 0.0001, "$step positionSeconds should match")
+    }
+
+    private fun deviceIdsFromMessage(message: JsonNode): List<String> {
+        return message.path("payload")
+            .path("devices")
+            .map { it.path("deviceId").asText() }
+            .sorted()
+    }
+
     private fun createAccountByAdmin(
         state: E2eAdminSession,
         name: String,
@@ -418,7 +576,7 @@ class PlaybackQueuePersistenceE2eTest {
         return node.longValue()
     }
 
-    private fun startFreshApplication(): FreshAppHandle {
+    private fun startFreshApplication(nodeId: String = "api-e2e-playback-secondary"): FreshAppHandle {
         val runtime = E2eRuntime.context
         val context = SpringApplicationBuilder(UnirhyApplication::class.java)
             .run(
@@ -429,6 +587,7 @@ class PlaybackQueuePersistenceE2eTest {
                 "--spring.flyway.url=${runtime.database.jdbcUrl}",
                 "--spring.flyway.user=${runtime.database.user}",
                 "--spring.flyway.password=${runtime.database.password}",
+                "--unirhy.sync.node-id=$nodeId",
             )
         val localPort = context.environment.getProperty("local.server.port")?.toIntOrNull()
             ?: fail("[queue] fresh application should expose web server port")
@@ -460,6 +619,7 @@ class PlaybackQueuePersistenceE2eTest {
         @DynamicPropertySource
         fun registerDatasource(registry: DynamicPropertyRegistry) {
             E2eRuntime.registerDatasource(registry)
+            registry.add("unirhy.sync.node-id") { "api-e2e-playback-primary" }
         }
     }
 }
@@ -492,11 +652,15 @@ private class PlaybackSyncProbe(
         listener.sendJson(webSocket, json)
     }
 
-    fun awaitMessage(type: String, step: String): JsonNode {
+    fun awaitMessage(
+        type: String,
+        step: String,
+        predicate: (JsonNode) -> Boolean = { true },
+    ): JsonNode {
         val deadline = System.currentTimeMillis() + 10_000L
         while (System.currentTimeMillis() <= deadline) {
             val message = listener.pollMessage(250L) ?: continue
-            if (message.path("type").asText() == type) {
+            if (message.path("type").asText() == type && predicate(message)) {
                 return message
             }
         }
