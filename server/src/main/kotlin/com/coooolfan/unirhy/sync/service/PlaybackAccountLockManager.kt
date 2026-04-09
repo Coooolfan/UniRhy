@@ -16,6 +16,20 @@ interface PlaybackAccountScope {
     ): T
 }
 
+internal data class AccountLockExecution<T>(
+    val value: T,
+)
+
+internal fun <T> unwrapAccountLockExecution(
+    accountId: Long,
+    execution: AccountLockExecution<T>?,
+): T {
+    if (execution == null) {
+        error("Account lock transaction returned null for accountId=$accountId")
+    }
+    return execution.value
+}
+
 class PlaybackAccountLockManager : PlaybackAccountScope {
     private val locks = ConcurrentHashMap<Long, ReentrantLock>()
 
@@ -38,14 +52,15 @@ class JdbcPlaybackAccountScope(
         accountId: Long,
         action: () -> T,
     ): T {
-        return transactionTemplate.execute { _ ->
+        val execution = transactionTemplate.execute<AccountLockExecution<T>> { _ ->
             val params = MapSqlParameterSource()
                 .addValue("accountId", accountId)
             jdbc.query(
                 "SELECT pg_advisory_xact_lock(CAST(:accountId AS bigint))",
                 params,
             ) { _, _ -> }
-            action()
-        } ?: error("Account lock transaction returned null for accountId=$accountId")
+            AccountLockExecution(action())
+        }
+        return unwrapAccountLockExecution(accountId, execution)
     }
 }
