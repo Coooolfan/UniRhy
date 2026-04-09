@@ -46,6 +46,7 @@ sa-token:
   token-name: ${SA_TOKEN_NAME:unirhy-token}
   is-read-cookie: ${SA_TOKEN_IS_READ_COOKIE:true}
   is-read-header: ${SA_TOKEN_IS_READ_HEADER:true}
+  jwt-secret-key: ${SA_TOKEN_JWT_SECRET_KEY:}
 
 logging:
   pattern:

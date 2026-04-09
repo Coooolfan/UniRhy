@@ -1,16 +1,19 @@
 package com.coooolfan.unirhy.config
 
-import cn.dev33.satoken.`fun`.strategy.SaCorsHandleFunction
 import cn.dev33.satoken.context.model.SaRequest
 import cn.dev33.satoken.context.model.SaResponse
+import cn.dev33.satoken.`fun`.strategy.SaCorsHandleFunction
 import cn.dev33.satoken.interceptor.SaInterceptor
+import cn.dev33.satoken.jwt.StpLogicJwtForStateless
 import cn.dev33.satoken.router.SaHttpMethod
 import cn.dev33.satoken.router.SaRouter
+import cn.dev33.satoken.stp.StpLogic
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer
+
 
 @Configuration
 class SaTokenConfig(
@@ -24,6 +27,11 @@ class SaTokenConfig(
         registry.addInterceptor(SaInterceptor())
             // 所有接口都会检查是否登录
             .addPathPatterns("/**")
+    }
+
+    @Bean
+    fun getStpLogicJwt(): StpLogic {
+        return StpLogicJwtForStateless()
     }
 
     /**

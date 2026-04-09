@@ -27,6 +27,7 @@ jimmer-ksp = { group = "org.babyfish.jimmer", name = "jimmer-ksp", version.ref =
 
 # Sa-Token
 sa-token-starter = { group = "cn.dev33", name = "sa-token-spring-boot3-starter", version.ref = "saToken" }
+sa-token-jwt ={ group="cn.dev33", name = "sa-token-jwt", version.ref = "saToken" }
 
 # PostgreSQL
 postgresql = { module = "org.postgresql:postgresql" }
