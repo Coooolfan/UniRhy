@@ -41,7 +41,7 @@
                                 管理员档案
                             </h2>
                             <p class="text-xs text-[#888888] font-light leading-relaxed max-w-xs">
-                                此账户将拥有对 UniRhy 实例的完全控制权。包括回溯。
+                                此账户将拥有对 UniRhy 实例的完全控制权。
                             </p>
                         </div>
 
@@ -50,7 +50,7 @@
                             <div class="group">
                                 <label
                                     class="text-xs text-[#A0A0A0] uppercase tracking-wider mb-2 block"
-                                    >Account Name</label
+                                    >账号名</label
                                 >
                                 <div
                                     class="flex items-center pb-2 border-b border-[#E0E0E0] group-focus-within:border-[#D4A373] transition-colors relative"
@@ -72,7 +72,7 @@
                             <div class="group">
                                 <label
                                     class="text-xs text-[#A0A0A0] uppercase tracking-wider mb-2 block"
-                                    >Email Address</label
+                                    >邮箱</label
                                 >
                                 <div
                                     class="flex items-center pb-2 border-b border-[#E0E0E0] group-focus-within:border-[#D4A373] transition-colors relative"
@@ -94,7 +94,7 @@
                             <div class="group">
                                 <label
                                     class="text-xs text-[#A0A0A0] uppercase tracking-wider mb-2 block"
-                                    >Password</label
+                                    >密码</label
                                 >
                                 <div
                                     class="flex items-center pb-2 border-b border-[#E0E0E0] group-focus-within:border-[#D4A373] transition-colors relative"
@@ -154,10 +154,10 @@
                                     <p
                                         class="text-xs font-bold text-[#555] uppercase tracking-wider mb-1"
                                     >
-                                        Local File System
+                                        本地文件系统
                                     </p>
                                     <p class="text-[11px] text-[#999] truncate font-mono">
-                                        Status: Unobservable
+                                        状态：不可观测
                                     </p>
                                 </div>
                                 <div class="w-2 h-2 rounded-full bg-[#D4A373] animate-pulse"></div>
@@ -167,7 +167,7 @@
                             <div class="group">
                                 <label
                                     class="text-xs text-[#A0A0A0] uppercase tracking-wider mb-2 block"
-                                    >Root Path</label
+                                    >存储节点根路径</label
                                 >
                                 <div
                                     class="flex items-center pb-2 border-b border-[#E0E0E0] group-focus-within:border-[#D4A373] transition-colors relative"
@@ -197,7 +197,7 @@
                                 class="group flex w-full items-center justify-center gap-2 rounded-[2px] bg-[#2C2C2C] px-8 py-3 text-[#F0ECE6] shadow-lg transition-all duration-300 hover:bg-[#D4A373] disabled:cursor-not-allowed disabled:opacity-70 sm:w-auto"
                             >
                                 <span class="font-medium tracking-widest text-xs uppercase">{{
-                                    isSubmitting ? 'INITIALIZING...' : 'INITIALIZE'
+                                    isSubmitting ? '正在初始化...' : '初始化'
                                 }}</span>
                                 <ArrowRight
                                     :size="14"
@@ -212,7 +212,27 @@
 
         <!-- Footer Info -->
         <div class="mt-8 text-center opacity-40 hover:opacity-100 transition-opacity duration-500">
-            <p class="text-[10px] tracking-[0.3em] uppercase">UniRhy System v2.0</p>
+            <p class="text-[10px]">
+                UniRhy使用AGPL v3.0许可证。源代码可在
+                <a
+                    href="https://github.com/coooolfan/unirhy"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="text-[#D4A373] hover:underline"
+                    >GitHub</a
+                >
+                获取
+            </p>
+            <!-- <p class="text-[10px]">
+                UniRhy is AGPL v3.0 licensed. Source code available on
+                <a
+                    href="https://github.com/coooolfan/unirhy"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="text-[#D4A373] hover:underline"
+                    >GitHub</a
+                >
+            </p> -->
         </div>
     </div>
 </template>
@@ -230,7 +250,7 @@ const form = reactive({
     adminAccountName: '',
     adminAccountEmail: '',
     adminPassword: '',
-    storageProviderPath: '',
+    storageProviderPath: './data',
 })
 
 const handleInit = async () => {
@@ -246,7 +266,6 @@ const handleInit = async () => {
                 storageProviderPath: form.storageProviderPath,
             },
         })
-        alert('系统初始化成功，请登录')
         router.push('/login')
     } catch (error) {
         const normalizedError = normalizeApiError(error)
