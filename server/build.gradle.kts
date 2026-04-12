@@ -7,7 +7,7 @@ plugins {
   alias(libs.plugins.kotlin.spring)
   alias(libs.plugins.spring.boot)
   alias(libs.plugins.spring.dependency.management)
-  alias(libs.plugins.graalvm.native)
+//alias(libs.plugins.graalvm.native)
   alias(libs.plugins.ksp)
 }
 
