@@ -38,6 +38,7 @@ dependencies {
     ksp(libs.jimmer.ksp)
 
     implementation(libs.sa.token.starter)
+    implementation(libs.sa.token.jwt)
     implementation(libs.spring.security.crypto)
 
     implementation(libs.jAudioTagger)
