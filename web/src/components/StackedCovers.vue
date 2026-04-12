@@ -25,7 +25,7 @@ const displayCovers = computed(() => {
 
 const getStackStyle = (index: number, total: number) => {
     // Stacked State (Default)
-    let base = ''
+    let base: string
     if (total === 1) {
         base = 'rotate-0 translate-x-0'
     } else {

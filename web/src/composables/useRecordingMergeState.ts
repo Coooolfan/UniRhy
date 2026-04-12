@@ -17,7 +17,7 @@ export type UseRecordingMergeStateOptions<T extends { id: number }> = {
 export const useRecordingMergeState = <T extends { id: number }>(
     options: UseRecordingMergeStateOptions<T>,
 ) => {
-    const selectedIds = ref<Set<number>>(new Set())
+    const selectedIds = ref(new Set<number>())
     const lastSelectedId = ref<number | null>(null)
     const mergeModalOpen = ref(false)
     const mergeTargetId = ref<number | null>(null)

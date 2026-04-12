@@ -118,7 +118,8 @@ const readOnlyModel = computed({
                                     UniRhy 仅扫描此节点中的媒体文件，不会对其进行任何写入或修改操作
                                 </span>
                                 <span v-else>
-                                    将此节点配置为系统节点后，UniRhy 将会在此节点中写入缓存、元数据等文件
+                                    将此节点配置为系统节点后，UniRhy
+                                    将会在此节点中写入缓存、元数据等文件
                                 </span>
                             </p>
                         </div>

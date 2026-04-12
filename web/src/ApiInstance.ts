@@ -76,7 +76,8 @@ export const api = new Api(async ({ uri, method, headers, body }) => {
         ...(tenant !== undefined && tenant !== '' ? { tenant } : {}),
     }
 
-    // TODO: 这里有点怀疑，需要验证tauri下是不是必要的
+    // eslint-disable-next-line no-warning-comments
+    // TODO: 这里有点怀疑，需要验证 tauri 下是不是必要的
     const token = getAuthToken()
     if (token) {
         fetchHeaders[TOKEN_HEADER_NAME] = token

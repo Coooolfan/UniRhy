@@ -309,8 +309,8 @@ type RecordingMetadataOverrides = Partial<Omit<RecordingMetadata, 'cover'>> & {
     cover?: RecordingMetadata['cover'] | null
 }
 
-let nextAnimationFrameId = 1
-let animationFrameCallbacks = new Map<number, FrameRequestCallback>()
+let nextAnimationFrameId!: number
+let animationFrameCallbacks!: Map<number, FrameRequestCallback>
 let resumeError: Error | null = null
 
 type MockAudioBuffer = {

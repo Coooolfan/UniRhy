@@ -71,6 +71,19 @@ const submitFeedbackStatus = ref<SubmitFeedbackStatus>('idle')
 let submitFeedbackTimer: ReturnType<typeof setTimeout> | null = null
 let autoRefreshTimer: ReturnType<typeof setInterval> | null = null
 
+const lastRefreshedAt = ref<Date | null>(null)
+const relativeTimeNow = ref(Date.now())
+let relativeTimeTimer: ReturnType<typeof setInterval> | null = null
+
+const lastRefreshedText = computed(() => {
+    if (!lastRefreshedAt.value) return ''
+    const diffSec = Math.floor((relativeTimeNow.value - lastRefreshedAt.value.getTime()) / 1000)
+    if (diffSec < 60) return `${diffSec} 秒前刷新`
+    const diffMin = Math.floor(diffSec / 60)
+    if (diffMin < 60) return `${diffMin} 分钟前刷新`
+    return `${Math.floor(diffMin / 60)} 小时前刷新`
+})
+
 const taskActionButtonLabel = computed(() =>
     submitFeedbackStatus.value === 'success' ? '任务已提交' : '发起新任务',
 )
@@ -237,13 +250,27 @@ const showSubmitFeedback = () => {
     }, SUBMIT_FEEDBACK_DURATION_MS)
 }
 
+watch(isLoadingTaskCounts, (newVal, oldVal) => {
+    if (oldVal === true && newVal === false) {
+        lastRefreshedAt.value = new Date()
+        relativeTimeNow.value = Date.now()
+    }
+})
+
 onMounted(() => {
     init()
+    relativeTimeTimer = setInterval(() => {
+        relativeTimeNow.value = Date.now()
+    }, 1000)
 })
 
 onUnmounted(() => {
     clearSubmitFeedbackTimer()
     clearAutoRefreshTimer()
+    if (relativeTimeTimer) {
+        clearInterval(relativeTimeTimer)
+        relativeTimeTimer = null
+    }
 })
 
 watch(activeTaskCount, () => {
@@ -303,9 +330,7 @@ const refreshAll = () => {
             >
                 <div>
                     <h2 class="mb-1 font-serif text-3xl text-[#2B221B]">任务管理</h2>
-                    <p class="font-serif text-sm italic text-[#8A8A8A]">
-                        System Tasks & Background Queue
-                    </p>
+                    <p class="font-serif text-sm italic text-[#8A8A8A]">发起或管理后台任务队列</p>
                 </div>
                 <button
                     class="text-[#8A8A8A] transition-colors hover:text-[#C67C4E] disabled:opacity-50"
@@ -388,7 +413,9 @@ const refreshAll = () => {
             <div class="mb-16">
                 <div class="mb-8 flex items-center justify-between px-1">
                     <h3 class="text-lg font-medium text-[#2B221B]">状态概览</h3>
-                    <span class="font-serif text-xs text-[#8A8A8A]">Queue Snapshot</span>
+                    <span v-if="lastRefreshedText" class="font-serif text-xs text-[#8A8A8A]">{{
+                        lastRefreshedText
+                    }}</span>
                 </div>
 
                 <div
