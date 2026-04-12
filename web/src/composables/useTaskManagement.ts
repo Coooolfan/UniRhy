@@ -13,6 +13,7 @@ export type TaskProviderOption = {
     name: string
     type: FileProviderType
     readonly: boolean
+    isSystemNode: boolean
 }
 
 export const TASK_TYPE_LABEL_MAP: Record<TaskType, string> = {
@@ -69,9 +70,10 @@ export const useTaskManagement = () => {
     const fetchProviders = async () => {
         isLoadingProviders.value = true
         try {
-            const [fsNodes, ossNodes] = await Promise.all([
+            const [fsNodes, ossNodes, systemConfig] = await Promise.all([
                 api.fileSystemStorageController.list(),
                 api.ossStorageController.list(),
+                api.systemConfigController.get(),
             ])
 
             const options: TaskProviderOption[] = []
@@ -82,6 +84,7 @@ export const useTaskManagement = () => {
                     name: `[本地] ${node.name}`,
                     type: 'FILE_SYSTEM',
                     readonly: node.readonly,
+                    isSystemNode: node.id === systemConfig.fsProviderId,
                 })
             })
 
@@ -91,6 +94,7 @@ export const useTaskManagement = () => {
                     name: `[OSS] ${node.name}`,
                     type: 'OSS',
                     readonly: node.readonly,
+                    isSystemNode: node.id === systemConfig.ossProviderId,
                 })
             })
 

@@ -112,7 +112,9 @@ const syncSelectionValue = (
 }
 
 const metadataParseProviderOptions = computed(() =>
-    props.providerOptions.filter((provider) => provider.type === 'FILE_SYSTEM'),
+    props.providerOptions.filter(
+        (provider) => provider.type === 'FILE_SYSTEM' && !provider.isSystemNode,
+    ),
 )
 
 const transcodeSourceProviderOptions = computed(() =>
