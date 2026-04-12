@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch, type Component } from 'vue'
+import { useRouter } from 'vue-router'
 import {
     ArrowRight,
     ChevronDown,
@@ -10,6 +11,7 @@ import {
     Loader2,
     Music4,
     X,
+    Settings,
 } from 'lucide-vue-next'
 import type { CodecType } from '@/__generated/model/enums/CodecType'
 import { type FileProviderType } from '@/__generated/model/enums/FileProviderType'
@@ -61,19 +63,19 @@ const TASK_OPTIONS: TaskDefinition[] = [
     {
         id: 'METADATA_PARSE',
         name: TASK_ACTION_LABEL_MAP.METADATA_PARSE,
-        desc: '遍历存储节点，发现媒体文件并补充缺失的元数据解析任务',
+        desc: '遍历存储节点，发现媒体文件并补充缺失的元数据解析',
         icon: FolderSearch,
     },
     {
         id: 'TRANSCODE',
         name: TASK_ACTION_LABEL_MAP.TRANSCODE,
-        desc: '按录音拆分为后台任务，批量转码为 Opus 音频资源',
+        desc: '遍历源存储节点中的所有已导入文件，转码为指定格式并保存到目标存储节点',
         icon: FileAudio,
     },
 ]
 
 const TARGET_CODEC_OPTIONS: Array<{ value: CodecType; label: string; hint: string }> = [
-    { value: 'OPUS', label: 'Opus', hint: '当前后端固定输出 Opus，用于流媒体播放' },
+    { value: 'OPUS', label: 'Opus', hint: '现代音频编码。转码目标为128Kbps可变码率。' },
 ]
 
 const PROVIDER_TYPE_LABEL_MAP: Record<FileProviderType, string> = {
@@ -118,7 +120,9 @@ const metadataParseProviderOptions = computed(() =>
 )
 
 const transcodeSourceProviderOptions = computed(() =>
-    props.providerOptions.filter((provider) => provider.type === 'FILE_SYSTEM'),
+    props.providerOptions.filter(
+        (provider) => provider.type === 'FILE_SYSTEM' && !provider.isSystemNode,
+    ),
 )
 
 const transcodeDestinationProviderOptions = computed(() =>
@@ -238,17 +242,18 @@ const activeTaskAvailability = computed<TaskAvailability | null>(() => {
     return null
 })
 
-const submitHelperText = computed(() =>
-    activeTask.value === 'METADATA_PARSE'
-        ? '提交后系统会遍历所选节点，并按文件补充缺失的元数据解析任务。'
-        : '提交后会按录音拆分为多个后台转码任务，状态看板会显示排队与完成进度。',
-)
+const router = useRouter()
 
 const closeModal = () => {
     if (props.isSubmitting) {
         return
     }
     emit('close')
+}
+
+const navigateToSettings = () => {
+    emit('close')
+    router.push({ name: 'settings' })
 }
 
 const submit = () => {
@@ -403,6 +408,14 @@ const submit = () => {
                                 <p class="mt-2 max-w-md text-sm leading-relaxed text-[#6B635B]">
                                     {{ activeTaskAvailability.description }}
                                 </p>
+                                <button
+                                    type="button"
+                                    class="mt-4 px-8 py-3 border border-[#C27E46] text-[#C27E46] text-sm hover:bg-[#C27E46] hover:text-white transition-all duration-500 rounded-sm font-medium tracking-wide uppercase inline-flex items-center gap-2"
+                                    @click="navigateToSettings"
+                                >
+                                    <Settings :size="16" />
+                                    <span>前往设置</span>
+                                </button>
                             </div>
 
                             <div v-else-if="activeTask === 'METADATA_PARSE'" class="space-y-8">
@@ -674,38 +687,32 @@ const submit = () => {
                         </div>
 
                         <footer
-                            class="flex flex-col gap-4 pt-8 lg:flex-row lg:items-center lg:justify-between"
+                            class="flex flex-col gap-4 pt-8 lg:flex-row lg:items-center lg:justify-end"
                         >
-                            <p class="text-sm text-[#6B635B]">
-                                {{ submitHelperText }}
-                            </p>
-
-                            <div class="flex items-center gap-3">
-                                <button
-                                    type="button"
-                                    class="px-4 py-2.5 text-sm uppercase tracking-wide text-[#8A8A8A] transition-colors hover:bg-[#F5F2EB] hover:text-[#2C2C2C] disabled:cursor-not-allowed disabled:opacity-60"
-                                    :disabled="isSubmitting"
-                                    @click="closeModal"
-                                >
-                                    取消
-                                </button>
-                                <button
-                                    data-test="task-submit-button"
-                                    type="button"
-                                    class="flex items-center gap-2 bg-[#C27E46] px-5 py-3 text-sm uppercase tracking-[0.18em] text-[#F8F5EF] shadow-md transition-colors hover:bg-[#B36F38] disabled:cursor-not-allowed disabled:opacity-60"
-                                    :disabled="!canSubmit || isSubmitting"
-                                    @click="submit"
-                                >
-                                    <template v-if="isSubmitting">
-                                        <Loader2 class="h-4 w-4 animate-spin" />
-                                        <span>提交中...</span>
-                                    </template>
-                                    <template v-else>
-                                        <span>{{ submitButtonLabel }}</span>
-                                        <ArrowRight class="h-4 w-4" />
-                                    </template>
-                                </button>
-                            </div>
+                            <button
+                                type="button"
+                                class="px-4 py-2.5 text-sm uppercase tracking-wide text-[#8A8A8A] transition-colors hover:bg-[#F5F2EB] hover:text-[#2C2C2C] disabled:cursor-not-allowed disabled:opacity-60"
+                                :disabled="isSubmitting"
+                                @click="closeModal"
+                            >
+                                取消
+                            </button>
+                            <button
+                                data-test="task-submit-button"
+                                type="button"
+                                class="flex items-center gap-2 bg-[#C27E46] px-5 py-3 text-sm uppercase tracking-[0.18em] text-[#F8F5EF] shadow-md transition-colors hover:bg-[#B36F38] disabled:cursor-not-allowed disabled:opacity-60"
+                                :disabled="!canSubmit || isSubmitting"
+                                @click="submit"
+                            >
+                                <template v-if="isSubmitting">
+                                    <Loader2 class="h-4 w-4 animate-spin" />
+                                    <span>提交中...</span>
+                                </template>
+                                <template v-else>
+                                    <span>{{ submitButtonLabel }}</span>
+                                    <ArrowRight class="h-4 w-4" />
+                                </template>
+                            </button>
                         </footer>
                     </section>
                 </div>

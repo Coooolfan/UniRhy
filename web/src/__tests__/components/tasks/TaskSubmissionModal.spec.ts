@@ -67,15 +67,52 @@ describe('TaskSubmissionModal', () => {
         ])
     })
 
-    it('excludes system nodes from metadata parse provider options', async () => {
+    it('excludes system nodes from metadata parse provider options', () => {
         const optionsWithSystemNode: TaskProviderOption[] = [
-            { id: 1, name: '[本地] Library A', type: 'FILE_SYSTEM', readonly: false, isSystemNode: true },
-            { id: 2, name: '[本地] Archive B', type: 'FILE_SYSTEM', readonly: true, isSystemNode: false },
+            {
+                id: 1,
+                name: '[本地] Library A',
+                type: 'FILE_SYSTEM',
+                readonly: false,
+                isSystemNode: true,
+            },
+            {
+                id: 2,
+                name: '[本地] Archive B',
+                type: 'FILE_SYSTEM',
+                readonly: true,
+                isSystemNode: false,
+            },
         ]
         const wrapper = mountModal({ providerOptions: optionsWithSystemNode })
 
         const options = getOptionTexts(wrapper, '[data-test="metadata-parse-provider-select"]')
         expect(options).toEqual(['[本地] Archive B'])
+    })
+
+    it('excludes system nodes from transcode source provider options', async () => {
+        const optionsWithSystemNode: TaskProviderOption[] = [
+            {
+                id: 1,
+                name: '[本地] Library A',
+                type: 'FILE_SYSTEM',
+                readonly: false,
+                isSystemNode: true,
+            },
+            {
+                id: 2,
+                name: '[本地] Archive B',
+                type: 'FILE_SYSTEM',
+                readonly: false,
+                isSystemNode: false,
+            },
+        ]
+        const wrapper = mountModal({ providerOptions: optionsWithSystemNode })
+
+        await wrapper.get('[data-test="task-type-transcode"]').trigger('click')
+
+        const sourceOptions = getOptionTexts(wrapper, '[data-test="transcode-source-select"]')
+        expect(sourceOptions).toEqual(['[本地] Archive B'])
     })
 
     it('limits transcode targets to writable local providers and emits an OPUS payload', async () => {

@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import DashboardTopBar from '@/components/dashboard/DashboardTopBar.vue'
+import LibraryEmptyHint from '@/components/dashboard/LibraryEmptyHint.vue'
 import AlbumGridCard from '@/components/media/AlbumGridCard.vue'
 import WorkGridCard from '@/components/media/WorkGridCard.vue'
 import MergeSelectModal from '@/components/modals/MergeSelectModal.vue'
@@ -387,7 +388,12 @@ const playItem = async (item: SearchResultItem) => {
 
             <div v-if="isLoading" class="text-[#8C857B] text-sm">搜索中...</div>
 
-            <div v-else-if="!hasResults" class="text-[#8C857B] text-sm">未找到匹配的内容。</div>
+            <LibraryEmptyHint
+                v-else-if="!hasResults"
+                :showSettingsButton="false"
+                title="没有找到相关结果"
+                :description="['尝试调整搜索关键词']"
+            />
 
             <div v-else class="space-y-12">
                 <div v-if="filteredResults.artists.length > 0">

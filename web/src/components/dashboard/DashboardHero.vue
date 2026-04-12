@@ -214,7 +214,7 @@ onMounted(async () => {
                             <div
                                 class="mb-3 text-[11px] font-medium uppercase tracking-widest text-[#9C968B] md:mb-4"
                             >
-                                Editor's Choice
+                                今日推荐
                             </div>
                             <h3
                                 class="mb-3 font-serif text-3xl leading-tight tracking-tight text-[#2C2C2C] sm:text-4xl md:mb-4 md:text-5xl"
@@ -232,7 +232,7 @@ onMounted(async () => {
                             <div
                                 class="mb-3 text-[11px] font-medium uppercase tracking-widest text-[#9C968B] md:mb-4"
                             >
-                                Daily Pick
+                                今日推荐
                             </div>
                             <h3
                                 class="mb-3 font-serif text-3xl leading-tight tracking-tight text-[#2C2C2C] sm:text-4xl md:mb-4"

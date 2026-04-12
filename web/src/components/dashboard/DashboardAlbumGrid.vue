@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { Disc3, Pause, Play, Settings } from 'lucide-vue-next'
+import { Pause, Play } from 'lucide-vue-next'
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '@/ApiInstance'
 import { pickPlayableRecordingEntry, resolveCover } from '@/composables/recordingMedia'
 import { useAudioStore } from '@/stores/audio'
+import LibraryEmptyHint from '@/components/dashboard/LibraryEmptyHint.vue'
 
 const router = useRouter()
 const audioStore = useAudioStore()
@@ -32,10 +33,6 @@ const showAlbumEmptyNote = computed(() => !isLoadingAlbums.value && albums.value
 
 const navigateToAlbum = (id: number) => {
     router.push({ name: 'album-detail', params: { id } })
-}
-
-const navigateToSettings = () => {
-    router.push({ name: 'settings' })
 }
 
 const isAlbumPlaying = (album: AlbumCard) => {
@@ -130,39 +127,7 @@ onMounted(() => {
 
 <template>
     <div class="mb-8">
-        <div v-if="showAlbumEmptyNote" class="px-2 py-2">
-            <div class="w-full max-w-md mx-auto text-center">
-                <div
-                    class="w-20 h-20 rounded-full bg-[#FCFBF9] shadow-sm border border-[#E5DFD3] flex items-center justify-center mx-auto mb-6 relative"
-                >
-                    <Disc3 class="w-10 h-10 text-[#D6CEC0]" />
-                    <div class="absolute -bottom-1 -right-1 bg-[#F4F2EC] rounded-full p-1">
-                        <Settings class="w-5 h-5 text-[#C27E46]" />
-                    </div>
-                </div>
-
-                <h3 class="text-lg font-medium text-[#3D3935] tracking-wider mb-2 font-serif">
-                    唱片架空空如也
-                </h3>
-                <p class="text-sm text-[#8A847A] leading-relaxed mb-8">
-                    我们将旋律的有序集合，称之为唱片。<br />
-                    连接存储节点，发起元数据解析任务，UniRhy 将自动发现唱片。
-                </p>
-
-                <p v-if="hasAlbumError" class="text-xs text-[#A17855] mb-4">
-                    数据加载失败，请检查配置后重试。
-                </p>
-
-                <button
-                    type="button"
-                    class="px-8 py-3 border border-[#C27E46] text-[#C27E46] text-sm hover:bg-[#C27E46] hover:text-white transition-all duration-500 rounded-sm font-medium tracking-wide uppercase inline-flex items-center gap-2"
-                    @click="navigateToSettings"
-                >
-                    <Settings :size="16" />
-                    <span>前往设置</span>
-                </button>
-            </div>
-        </div>
+        <LibraryEmptyHint v-if="showAlbumEmptyNote" :has-error="hasAlbumError" />
 
         <div
             v-else
@@ -210,7 +175,6 @@ onMounted(() => {
                     {{ album.title }}
                 </h4>
                 <p class="text-xs text-[#9C968B] mt-1">{{ album.artist }}</p>
-                <p class="text-[10px] text-[#B0AAA0] mt-0.5 font-mono">--:--</p>
             </div>
         </div>
     </div>

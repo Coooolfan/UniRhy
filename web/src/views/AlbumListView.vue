@@ -10,6 +10,7 @@ import {
     Play,
 } from 'lucide-vue-next'
 import DashboardTopBar from '@/components/dashboard/DashboardTopBar.vue'
+import LibraryEmptyHint from '@/components/dashboard/LibraryEmptyHint.vue'
 import AlbumGridCard from '@/components/media/AlbumGridCard.vue'
 import WorkGridCard from '@/components/media/WorkGridCard.vue'
 import { api, normalizeApiError } from '@/ApiInstance'
@@ -302,9 +303,18 @@ const playItem = async (item: DisplayItem) => {
             </div>
 
             <div v-else :class="{ 'opacity-50 pointer-events-none': isLoading }">
-                <div v-if="displayItems.length === 0" class="text-[#8C857B] text-sm">
-                    未找到匹配的内容。
-                </div>
+                <LibraryEmptyHint
+                    v-if="displayItems.length === 0"
+                    :title="activeTab === 'Works' ? '作品库空空如也' : undefined"
+                    :description="
+                        activeTab === 'Works'
+                            ? [
+                                  '我们将旋律的不同演绎版本，称之为作品。',
+                                  '连接存储节点，发起元数据解析任务，UniRhy 将自动发现作品。',
+                              ]
+                            : undefined
+                    "
+                />
 
                 <div
                     v-else-if="viewMode === 'grid'"
