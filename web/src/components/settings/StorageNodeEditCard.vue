@@ -37,7 +37,7 @@ const readOnlyModel = computed({
         <div class="space-y-4">
             <div>
                 <label class="text-xs uppercase tracking-wider text-[#8A8A8A] font-serif"
-                    >Name</label
+                    >节点名称</label
                 >
                 <input
                     v-model="nameModel"
@@ -47,7 +47,7 @@ const readOnlyModel = computed({
             </div>
             <div>
                 <label class="text-xs uppercase tracking-wider text-[#8A8A8A] font-serif">
-                    Root Path
+                    存储节点根路径
                 </label>
                 <input
                     v-model="parentPathModel"
@@ -57,7 +57,7 @@ const readOnlyModel = computed({
             </div>
             <label class="flex items-center gap-2 cursor-pointer mt-2">
                 <input v-model="readOnlyModel" type="checkbox" class="accent-[#C67C4E] w-4 h-4" />
-                <span class="text-sm text-[#5A5A5A]">只读模式 (Read-Only)</span>
+                <span class="text-sm text-[#5A5A5A]">只读模式</span>
             </label>
             <div class="flex gap-2 mt-4 justify-end border-t border-[#EAE6D9] pt-4">
                 <button

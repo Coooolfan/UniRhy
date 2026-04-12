@@ -47,7 +47,7 @@ onMounted(() => {
             <header class="mb-10 sm:mb-12">
                 <h1 class="font-serif text-3xl text-[#2B221B] tracking-tight mb-2">系统设置</h1>
                 <p class="text-[#8A8A8A] font-serif italic text-sm">
-                    System Configuration & Storage Management
+                    管理实例级配置与存储节点
                 </p>
             </header>
         </div>

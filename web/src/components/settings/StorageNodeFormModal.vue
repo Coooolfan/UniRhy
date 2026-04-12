@@ -64,7 +64,7 @@ const readOnlyModel = computed({
                         </div>
                         <h3 class="font-serif text-2xl text-[#2B221B]">新增存储节点</h3>
                         <p class="text-xs text-[#8A8A8A] mt-2 font-serif italic">
-                            Add New Storage Node
+                            UniRhy 可以扫描其中的媒体文件并进行管理
                         </p>
                     </div>
 
@@ -73,12 +73,12 @@ const readOnlyModel = computed({
                             <label
                                 class="text-xs uppercase tracking-wider text-[#8A8A8A] font-serif block mb-2"
                             >
-                                Name
+                                节点名称
                             </label>
                             <input
                                 v-model="nameModel"
                                 type="text"
-                                placeholder="e.g. Local Backup"
+                                placeholder="专辑刻录"
                                 class="w-full bg-[#F7F5F0] border-b border-[#D6D1C4] p-3 text-[#3D3D3D] focus:outline-none focus:border-[#C67C4E] transition-colors font-serif placeholder:text-[#BDB9AE]"
                             />
                         </div>
@@ -86,7 +86,7 @@ const readOnlyModel = computed({
                             <label
                                 class="text-xs uppercase tracking-wider text-[#8A8A8A] font-serif block mb-2"
                             >
-                                Root Path
+                                存储节点根路径
                             </label>
                             <input
                                 v-model="parentPathModel"
@@ -95,23 +95,33 @@ const readOnlyModel = computed({
                                 class="w-full bg-[#F7F5F0] border-b border-[#D6D1C4] p-3 text-[#3D3D3D] focus:outline-none focus:border-[#C67C4E] transition-colors font-serif placeholder:text-[#BDB9AE]"
                             />
                         </div>
-                        <label class="flex items-center gap-3 cursor-pointer group">
-                            <div class="relative flex items-center">
-                                <input
-                                    v-model="readOnlyModel"
-                                    type="checkbox"
-                                    class="peer sr-only"
-                                />
-                                <div
-                                    class="w-9 h-5 bg-[#EAE6DE] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#C67C4E]"
-                                ></div>
-                            </div>
-                            <span
-                                class="text-sm text-[#5A5A5A] group-hover:text-[#2B221B] transition-colors"
-                            >
-                                只读模式 (Read-Only)
-                            </span>
-                        </label>
+                        <div class="flex flex-col gap-1.5">
+                            <label class="flex items-center gap-3 cursor-pointer group">
+                                <div class="relative flex items-center">
+                                    <input
+                                        v-model="readOnlyModel"
+                                        type="checkbox"
+                                        class="peer sr-only"
+                                    />
+                                    <div
+                                        class="w-9 h-5 bg-[#EAE6DE] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#C67C4E]"
+                                    ></div>
+                                </div>
+                                <span
+                                    class="text-sm text-[#5A5A5A] group-hover:text-[#2B221B] transition-colors"
+                                >
+                                    只读模式
+                                </span>
+                            </label>
+                            <p class="text-xs text-[#8A8A8A] leading-relaxed italic">
+                                <span v-if="readOnlyModel">
+                                    UniRhy 仅扫描此节点中的媒体文件，不会对其进行任何写入或修改操作
+                                </span>
+                                <span v-else>
+                                    将此节点配置为系统节点后，UniRhy 将会在此节点中写入缓存、元数据等文件
+                                </span>
+                            </p>
+                        </div>
 
                         <div class="flex gap-3 mt-8 pt-6 border-t border-[#EAE6DE]">
                             <button
@@ -125,7 +135,7 @@ const readOnlyModel = computed({
                                 :disabled="isSaving"
                                 @click="emit('save')"
                             >
-                                <span v-if="isSaving">Creating...</span>
+                                <span v-if="isSaving">正在创建...</span>
                                 <span v-else>创建节点</span>
                             </button>
                         </div>

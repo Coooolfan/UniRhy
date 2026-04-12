@@ -61,7 +61,7 @@ const nodePath = computed(() => {
                         ></span>
                         <span class="relative inline-flex rounded-full h-2 w-2 bg-[#B87A5B]"></span>
                     </span>
-                    <span class="text-[10px] text-[#8A857B] tracking-wider">ONLINE</span>
+                    <span class="text-[10px] text-[#8A857B] tracking-wider">在线</span>
                 </div>
             </div>
 
@@ -72,7 +72,7 @@ const nodePath = computed(() => {
                     <div
                         class="text-[10px] tracking-[0.2em] text-[#A39E93] uppercase mb-2 font-medium"
                     >
-                        Current System Node
+                        当前系统节点
                     </div>
 
                     <div class="mb-4 flex flex-col gap-1 sm:flex-row sm:items-baseline sm:gap-4">
@@ -97,7 +97,7 @@ const nodePath = computed(() => {
                         class="bg-[#B87A5B] text-white text-[10px] tracking-widest px-3 py-1.5 rounded-sm shadow-sm flex items-center gap-1.5"
                     >
                         <Activity :size="12" stroke-width="2.5" />
-                        ACTIVE
+                        在线
                     </div>
                 </div>
 

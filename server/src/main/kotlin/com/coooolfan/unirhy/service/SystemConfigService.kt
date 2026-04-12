@@ -37,7 +37,7 @@ class SystemConfigService(
         }
         val storageProvider = FileProviderFileSystem {
             id = SYSTEM_CONFIG_ID
-            name = "Default"
+            name = "System Storage Node"
             parentPath = create.storageProviderPath
             readonly = false
         }
