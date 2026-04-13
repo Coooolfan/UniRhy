@@ -232,9 +232,7 @@ const playItem = async (item: DisplayItem) => {
             >
                 <div>
                     <h2 class="mb-2 text-3xl font-serif text-[#2C2420] sm:text-4xl">资料库</h2>
-                    <p class="text-[#8C857B] font-serif italic">
-                        所有旋律归于此处
-                    </p>
+                    <p class="text-[#8C857B] font-serif italic">所有旋律归于此处</p>
                 </div>
 
                 <div class="flex items-center justify-between gap-4 sm:justify-start">

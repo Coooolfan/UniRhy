@@ -20,6 +20,7 @@ const router = useRouter()
 const audioStore = useAudioStore()
 
 const searchQuery = ref('')
+const searchedQuery = ref('')
 const isLoading = ref(false)
 const searchTabs = ['All', 'Artists', 'Albums', 'Works'] as const
 type SearchTab = (typeof searchTabs)[number]
@@ -120,6 +121,7 @@ const performSearch = async (query: string) => {
     }
 
     isLoading.value = true
+    searchedQuery.value = keyword
 
     try {
         const [artistResults, albumResults, workResults] = await Promise.all([
@@ -347,7 +349,7 @@ const playItem = async (item: SearchResultItem) => {
                 <div>
                     <h2 class="mb-2 text-3xl font-serif text-[#2C2420] sm:text-4xl">搜索结果</h2>
                     <p class="text-[#8C857B] font-serif italic">
-                        Search results for "{{ searchQuery }}"
+                        Search results for "{{ searchedQuery }}"
                     </p>
                 </div>
                 <button
