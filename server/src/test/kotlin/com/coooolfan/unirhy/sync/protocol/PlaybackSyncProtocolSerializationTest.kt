@@ -108,7 +108,6 @@ class PlaybackSyncProtocolSerializationTest {
                     commandId = "cmd-play-001",
                     deviceId = "web-7c2f",
                     recordingId = 1001,
-                    mediaFileId = 2001,
                     positionSeconds = 12.5,
                 ),
             ),
@@ -119,7 +118,6 @@ class PlaybackSyncProtocolSerializationTest {
                     "commandId": "cmd-play-001",
                     "deviceId": "web-7c2f",
                     "recordingId": 1001,
-                    "mediaFileId": 2001,
                     "positionSeconds": 12.5
                   }
                 }
@@ -132,7 +130,6 @@ class PlaybackSyncProtocolSerializationTest {
                     commandId = "cmd-pause-001",
                     deviceId = "web-7c2f",
                     recordingId = 1001,
-                    mediaFileId = 2001,
                     positionSeconds = 36.25,
                 ),
             ),
@@ -143,7 +140,6 @@ class PlaybackSyncProtocolSerializationTest {
                     "commandId": "cmd-pause-001",
                     "deviceId": "web-7c2f",
                     "recordingId": 1001,
-                    "mediaFileId": 2001,
                     "positionSeconds": 36.25
                   }
                 }
@@ -156,7 +152,6 @@ class PlaybackSyncProtocolSerializationTest {
                     commandId = "cmd-seek-001",
                     deviceId = "web-7c2f",
                     recordingId = 1001,
-                    mediaFileId = 2001,
                     positionSeconds = 91.0,
                 ),
             ),
@@ -167,7 +162,6 @@ class PlaybackSyncProtocolSerializationTest {
                     "commandId": "cmd-seek-001",
                     "deviceId": "web-7c2f",
                     "recordingId": 1001,
-                    "mediaFileId": 2001,
                     "positionSeconds": 91.0
                   }
                 }
@@ -180,7 +174,6 @@ class PlaybackSyncProtocolSerializationTest {
                     commandId = "cmd-play-001",
                     deviceId = "web-85ab",
                     recordingId = 1001,
-                    mediaFileId = 2001,
                 ),
             ),
             expectedJson = """
@@ -189,8 +182,7 @@ class PlaybackSyncProtocolSerializationTest {
                   "payload": {
                     "commandId": "cmd-play-001",
                     "deviceId": "web-85ab",
-                    "recordingId": 1001,
-                    "mediaFileId": 2001
+                    "recordingId": 1001
                   }
                 }
             """.trimIndent(),
@@ -241,12 +233,27 @@ class PlaybackSyncProtocolSerializationTest {
                     state = AccountPlaybackStateDto(
                         status = PlaybackStatus.PLAYING,
                         recordingId = 1001,
-                        mediaFileId = 2001,
-                        presignedUrl = "/api/media/2001",
                         positionSeconds = 12.5,
                         serverTimeToExecuteMs = 1730844001500,
                         version = 8,
                         updatedAtMs = 1730844000100,
+                    ),
+                    queue = CurrentQueueDto(
+                        items = listOf(
+                            CurrentQueueItemDto(
+                                entryId = 1,
+                                recordingId = 1001,
+                                title = "Track 1",
+                                artistLabel = "Artist 1",
+                                coverUrl = "/api/media/3001",
+                                durationMs = 180000,
+                            ),
+                        ),
+                        currentEntryId = 1,
+                        playbackStrategy = PlaybackStrategy.SEQUENTIAL,
+                        stopStrategy = StopStrategy.LIST,
+                        version = 3,
+                        updatedAtMs = 1730844000090,
                     ),
                     serverNowMs = 1730844000200,
                 ),
@@ -258,12 +265,27 @@ class PlaybackSyncProtocolSerializationTest {
                     "state": {
                       "status": "PLAYING",
                       "recordingId": 1001,
-                      "mediaFileId": 2001,
-                      "presignedUrl": "/api/media/2001",
                       "positionSeconds": 12.5,
                       "serverTimeToExecuteMs": 1730844001500,
                       "version": 8,
                       "updatedAtMs": 1730844000100
+                    },
+                    "queue": {
+                      "items": [
+                        {
+                          "entryId": 1,
+                          "recordingId": 1001,
+                          "title": "Track 1",
+                          "artistLabel": "Artist 1",
+                          "coverUrl": "/api/media/3001",
+                          "durationMs": 180000
+                        }
+                      ],
+                      "currentEntryId": 1,
+                      "playbackStrategy": "SEQUENTIAL",
+                      "stopStrategy": "LIST",
+                      "version": 3,
+                      "updatedAtMs": 1730844000090
                     },
                     "serverNowMs": 1730844000200
                   }
@@ -276,8 +298,6 @@ class PlaybackSyncProtocolSerializationTest {
                 payload = LoadAudioSourcePayload(
                     commandId = "cmd-play-001",
                     recordingId = 1001,
-                    mediaFileId = 2001,
-                    presignedUrl = "/api/media/2001",
                 ),
             ),
             expectedJson = """
@@ -285,13 +305,75 @@ class PlaybackSyncProtocolSerializationTest {
                   "type": "ROOM_EVENT_LOAD_AUDIO_SOURCE",
                   "payload": {
                     "commandId": "cmd-play-001",
-                    "recordingId": 1001,
-                    "mediaFileId": 2001,
-                    "presignedUrl": "/api/media/2001"
+                    "recordingId": 1001
                   }
                 }
             """.trimIndent(),
             expectedType = LoadAudioSourceMessage::class,
+        ),
+        ServerSample(
+            message = QueueChangeMessage(
+                payload = QueueChangePayload(
+                    queue = CurrentQueueDto(
+                        items = listOf(
+                            CurrentQueueItemDto(
+                                entryId = 1,
+                                recordingId = 1001,
+                                title = "Track 1",
+                                artistLabel = "Artist 1",
+                                coverUrl = "/api/media/3001",
+                                durationMs = 180000,
+                            ),
+                            CurrentQueueItemDto(
+                                entryId = 2,
+                                recordingId = 1002,
+                                title = "Track 2",
+                                artistLabel = "Artist 2",
+                                coverUrl = null,
+                                durationMs = 210000,
+                            ),
+                        ),
+                        currentEntryId = 2,
+                        playbackStrategy = PlaybackStrategy.SEQUENTIAL,
+                        stopStrategy = StopStrategy.LIST,
+                        version = 4,
+                        updatedAtMs = 1730844000500,
+                    ),
+                ),
+            ),
+            expectedJson = """
+                {
+                  "type": "ROOM_EVENT_QUEUE_CHANGE",
+                  "payload": {
+                    "queue": {
+                      "items": [
+                        {
+                          "entryId": 1,
+                          "recordingId": 1001,
+                          "title": "Track 1",
+                          "artistLabel": "Artist 1",
+                          "coverUrl": "/api/media/3001",
+                          "durationMs": 180000
+                        },
+                        {
+                          "entryId": 2,
+                          "recordingId": 1002,
+                          "title": "Track 2",
+                          "artistLabel": "Artist 2",
+                          "coverUrl": null,
+                          "durationMs": 210000
+                        }
+                      ],
+                      "currentEntryId": 2,
+                      "playbackStrategy": "SEQUENTIAL",
+                      "stopStrategy": "LIST",
+                      "version": 4,
+                      "updatedAtMs": 1730844000500
+                    }
+                  }
+                }
+            """.trimIndent(),
+            expectedType = QueueChangeMessage::class,
         ),
         ServerSample(
             message = ScheduledActionMessage(
@@ -302,8 +384,6 @@ class PlaybackSyncProtocolSerializationTest {
                         action = ScheduledActionType.SEEK,
                         status = PlaybackStatus.PAUSED,
                         recordingId = 1001,
-                        mediaFileId = 2001,
-                        presignedUrl = "/api/media/2001",
                         positionSeconds = 91.0,
                         version = 9,
                     ),
@@ -319,8 +399,6 @@ class PlaybackSyncProtocolSerializationTest {
                       "action": "SEEK",
                       "status": "PAUSED",
                       "recordingId": 1001,
-                      "mediaFileId": 2001,
-                      "presignedUrl": "/api/media/2001",
                       "positionSeconds": 91.0,
                       "version": 9
                     }

@@ -22,6 +22,27 @@ export const useRecordingPlayback = <T extends PlayableRecording>(
 ) => {
     const audioStore = useAudioStore()
 
+    const buildPlayableTracks = () => {
+        return options.recordings.value.flatMap((recording) => {
+            if (!recording.audioSrc || recording.mediaFileId === undefined) {
+                return []
+            }
+
+            const trackExtra = options.trackExtra?.(recording)
+            return [
+                {
+                    id: recording.id,
+                    title: recording.title,
+                    artist: recording.artist,
+                    cover: recording.cover || options.fallbackCover(),
+                    src: recording.audioSrc,
+                    mediaFileId: recording.mediaFileId,
+                    ...trackExtra,
+                } satisfies AudioTrack,
+            ]
+        })
+    }
+
     const hasPlayableRecording = computed(() =>
         options.recordings.value.some((recording) => !!recording.audioSrc),
     )
@@ -54,17 +75,14 @@ export const useRecordingPlayback = <T extends PlayableRecording>(
         }
 
         options.currentRecordingId.value = targetRecording.id
-        const trackExtra = options.trackExtra?.(targetRecording)
+        const playableTracks = buildPlayableTracks()
+        const targetIndex = playableTracks.findIndex((track) => track.id === targetRecording.id)
+        if (targetIndex < 0) {
+            console.warn('No playable queue entry for recording', targetRecordingId)
+            return
+        }
 
-        audioStore.play({
-            id: targetRecording.id,
-            title: targetRecording.title,
-            artist: targetRecording.artist,
-            cover: targetRecording.cover || options.fallbackCover(),
-            src: targetRecording.audioSrc,
-            mediaFileId: targetRecording.mediaFileId,
-            ...trackExtra,
-        })
+        void audioStore.replaceQueueAndPlay(playableTracks, targetIndex)
     }
 
     const onRecordingClick = (recording: T) => {

@@ -1,6 +1,5 @@
 package com.coooolfan.unirhy.sync.service
 
-import com.coooolfan.unirhy.service.MediaUrlSigner
 import com.coooolfan.unirhy.sync.protocol.ServerPlaybackSyncMessage
 import com.coooolfan.unirhy.sync.support.TestPlaybackSyncTimeProvider
 import com.coooolfan.unirhy.sync.support.TestWebSocketSession
@@ -29,7 +28,6 @@ class PlaybackSyncMessageSenderTest {
         messageSender = PlaybackSyncMessageSender(
             objectMapper = objectMapper,
             deviceRuntimeService = deviceRuntimeService,
-            urlSigner = MediaUrlSigner("test-signing-key", 3600),
         )
         sessionA = registerHello("session-1", "web-a")
         sessionB = registerHello("session-2", "web-b")

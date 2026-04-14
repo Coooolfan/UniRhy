@@ -32,6 +32,8 @@ export type ApiErrors = {
     }, 
     'mediaFileController': {
     }, 
+    'playbackQueueController': {
+    }, 
     'playlistController': {
     }, 
     'recordingController': {

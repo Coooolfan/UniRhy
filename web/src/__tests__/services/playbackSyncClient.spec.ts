@@ -72,10 +72,15 @@ const emitSnapshot = (socket: MockWebSocket | undefined) => {
                 state: {
                     status: 'PAUSED',
                     recordingId: null,
-                    mediaFileId: null,
-                    presignedUrl: null,
                     positionSeconds: 0,
                     serverTimeToExecuteMs: 0,
+                    version: 0,
+                    updatedAtMs: 0,
+                },
+                queue: {
+                    items: [],
+                    playbackStrategy: 'SEQUENTIAL',
+                    stopStrategy: 'LIST',
                     version: 0,
                     updatedAtMs: 0,
                 },

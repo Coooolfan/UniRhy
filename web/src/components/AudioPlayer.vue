@@ -2,9 +2,12 @@
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAudioStore } from '@/stores/audio'
+import CurrentQueueSidebar from '@/components/CurrentQueueSidebar.vue'
 import {
     ChevronUp,
     ChevronRight,
+    ChevronDown,
+    ListMusic,
     Pause,
     Play,
     SkipBack,
@@ -17,6 +20,7 @@ import {
 const audioStore = useAudioStore()
 const router = useRouter()
 const pendingSeekValue = ref<number | null>(null)
+const isQueueExpanded = ref(false)
 
 const updateSeekPreview = (e: Event) => {
     const target = e.target as HTMLInputElement
@@ -52,6 +56,7 @@ const toggleMute = () => {
 }
 
 const hidePlayer = () => {
+    isQueueExpanded.value = false
     audioStore.hidePlayer()
 }
 
@@ -67,6 +72,7 @@ const togglePlayerVisibility = () => {
     if (audioStore.isPlayerHidden) {
         audioStore.showPlayer()
     } else {
+        isQueueExpanded.value = false
         audioStore.hidePlayer()
     }
 }
@@ -117,6 +123,22 @@ const seekDisabled = computed(() => {
     return !audioStore.canSendRealtimeControl || audioStore.duration <= 0
 })
 
+const queueTransportDisabled = computed(() => {
+    return !audioStore.canNavigateQueue
+})
+
+const handlePlayPrevious = () => {
+    void audioStore.playPrevious()
+}
+
+const handlePlayNext = () => {
+    void audioStore.playNext()
+}
+
+const toggleQueue = () => {
+    isQueueExpanded.value = !isQueueExpanded.value
+}
+
 const syncStatusClass = computed(() => {
     switch (audioStore.syncState) {
         case 'calibrating':
@@ -124,11 +146,11 @@ const syncStatusClass = computed(() => {
         case 'ready':
             return 'text-[#42653F]'
         case 'audio_locked':
-            return 'bg-[#FAF0E0] text-[#9A6231] border border-[#EBCFA9]'
+            return 'text-[#9A6231]'
         case 'error':
-            return 'bg-[#FFF1F1] text-[#B15A5A] border border-[#F0D0D0]'
+            return 'text-[#B15A5A]'
         default:
-            return 'bg-[#F3EEE6] text-[#8C857B] border border-[#E8E0D4]'
+            return 'text-[#8C857B]'
     }
 })
 </script>
@@ -193,8 +215,10 @@ const syncStatusClass = computed(() => {
                         <div class="ml-auto flex items-center gap-4 mr- md:hidden">
                             <button
                                 type="button"
+                                data-test="previous-button-mobile"
                                 class="text-[#8C857B] transition-colors hover:text-[#C17D46]"
-                                disabled
+                                :disabled="queueTransportDisabled"
+                                @click="handlePlayPrevious"
                             >
                                 <SkipBack :size="18" />
                             </button>
@@ -218,8 +242,10 @@ const syncStatusClass = computed(() => {
 
                             <button
                                 type="button"
+                                data-test="next-button-mobile"
                                 class="text-[#8C857B] transition-colors hover:text-[#C17D46]"
-                                disabled
+                                :disabled="queueTransportDisabled"
+                                @click="handlePlayNext"
                             >
                                 <SkipForward :size="18" />
                             </button>
@@ -229,8 +255,10 @@ const syncStatusClass = computed(() => {
                     <div class="flex w-full flex-col items-center gap-1 md:max-w-2xl md:flex-1">
                         <div class="hidden items-center gap-5 sm:gap-6 md:flex">
                             <button
+                                data-test="previous-button"
                                 class="text-[#8C857B] hover:text-[#C17D46] transition-colors"
-                                disabled
+                                :disabled="queueTransportDisabled"
+                                @click="handlePlayPrevious"
                             >
                                 <SkipBack :size="20" />
                             </button>
@@ -253,8 +281,10 @@ const syncStatusClass = computed(() => {
                             </button>
 
                             <button
+                                data-test="next-button"
                                 class="text-[#8C857B] hover:text-[#C17D46] transition-colors"
-                                disabled
+                                :disabled="queueTransportDisabled"
+                                @click="handlePlayNext"
                             >
                                 <SkipForward :size="20" />
                             </button>
@@ -332,6 +362,17 @@ const syncStatusClass = computed(() => {
 
                         <div class="ml-auto flex items-center gap-3 md:gap-4">
                             <button
+                                type="button"
+                                data-test="queue-toggle-button"
+                                class="inline-flex items-center gap-1 px-3 py-1.5 text-xs text-[#7C7367] transition-colors hover:text-[#B56C35]"
+                                :disabled="audioStore.queueEntries.length === 0"
+                                @click="toggleQueue"
+                            >
+                                <ListMusic :size="14" />
+                                <span>{{ audioStore.queueEntries.length }}</span>
+                            </button>
+
+                            <button
                                 @click="audioStore.stop()"
                                 class="p-1 text-[#DCD6CC] hover:text-[#8C857B] transition-colors"
                             >
@@ -353,6 +394,8 @@ const syncStatusClass = computed(() => {
                 </div>
             </div>
         </Transition>
+
+        <CurrentQueueSidebar v-model:expanded="isQueueExpanded" />
 
         <Transition
             enter-active-class="transition-all duration-240 ease-out"

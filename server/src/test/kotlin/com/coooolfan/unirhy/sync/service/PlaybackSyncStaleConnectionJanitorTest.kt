@@ -2,6 +2,9 @@ package com.coooolfan.unirhy.sync.service
 
 import com.coooolfan.unirhy.service.MediaUrlSigner
 import com.coooolfan.unirhy.sync.log.PlaybackSyncLogWriter
+import com.coooolfan.unirhy.sync.protocol.PlaybackStatus
+import com.coooolfan.unirhy.sync.support.InMemoryCurrentQueueStateStore
+import com.coooolfan.unirhy.sync.support.InMemoryPlaybackResumeStateStore
 import com.coooolfan.unirhy.sync.support.TestPlaybackSyncTimeProvider
 import com.coooolfan.unirhy.sync.support.TestWebSocketSession
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
@@ -22,6 +25,8 @@ class PlaybackSyncStaleConnectionJanitorTest {
     private lateinit var playbackSessionService: PlaybackSessionService
     private lateinit var playbackSchedulerService: PlaybackSchedulerService
     private lateinit var scheduledActionDispatcher: PlaybackSyncScheduledActionDispatcher
+    private lateinit var currentQueueService: CurrentQueueService
+    private lateinit var autoAdvanceService: PlaybackAutoAdvanceService
     private lateinit var coordinator: PlaybackSyncSessionRemovalCoordinator
     private lateinit var janitor: PlaybackSyncStaleConnectionJanitor
     private lateinit var staleSession: TestWebSocketSession
@@ -32,7 +37,19 @@ class PlaybackSyncStaleConnectionJanitorTest {
         schedulerExecutor = Executors.newSingleThreadScheduledExecutor()
         val lockManager = PlaybackAccountLockManager()
         deviceRuntimeService = DeviceRuntimeService(lockManager, timeProvider)
-        playbackSessionService = PlaybackSessionService(lockManager, timeProvider)
+        currentQueueService = CurrentQueueService(
+            lockManager = lockManager,
+            recordingCatalog = FakeCatalog(),
+            timeProvider = timeProvider,
+            urlSigner = MediaUrlSigner("test-signing-key", 3600),
+            stateStore = InMemoryCurrentQueueStateStore(),
+        )
+        playbackSessionService = PlaybackSessionService(
+            lockManager = lockManager,
+            timeProvider = timeProvider,
+            currentQueueService = currentQueueService,
+            resumeStateStore = InMemoryPlaybackResumeStateStore(),
+        )
         playbackSchedulerService = PlaybackSchedulerService(
             deviceRuntimeService = deviceRuntimeService,
             scheduler = schedulerExecutor,
@@ -40,17 +57,26 @@ class PlaybackSyncStaleConnectionJanitorTest {
         val messageSender = PlaybackSyncMessageSender(
             objectMapper = jacksonObjectMapper(),
             deviceRuntimeService = deviceRuntimeService,
-            urlSigner = MediaUrlSigner("test-signing-key", 3600),
         )
         scheduledActionDispatcher = PlaybackSyncScheduledActionDispatcher(
             messageSender = messageSender,
             logWriter = PlaybackSyncLogWriter(),
+        )
+        autoAdvanceService = PlaybackAutoAdvanceService(
+            currentQueueService = currentQueueService,
+            playbackSessionService = playbackSessionService,
+            playbackSchedulerService = playbackSchedulerService,
+            scheduledActionDispatcher = scheduledActionDispatcher,
+            messageSender = messageSender,
+            timeProvider = timeProvider,
+            scheduler = schedulerExecutor,
         )
         coordinator = PlaybackSyncSessionRemovalCoordinator(
             playbackSessionService = playbackSessionService,
             playbackSchedulerService = playbackSchedulerService,
             scheduledActionDispatcher = scheduledActionDispatcher,
             messageSender = messageSender,
+            autoAdvanceService = autoAdvanceService,
             logWriter = PlaybackSyncLogWriter(),
         )
         janitor = PlaybackSyncStaleConnectionJanitor(
@@ -68,7 +94,7 @@ class PlaybackSyncStaleConnectionJanitorTest {
     }
 
     @Test
-    fun `stale sweep clears pending play when last device is removed`() {
+    fun `stale sweep auto pauses committed state when last device is removed`() {
         deviceRuntimeService.recordNtpResponse(
             accountId = 42L,
             deviceId = "web-a",
@@ -80,17 +106,37 @@ class PlaybackSyncStaleConnectionJanitorTest {
             commandId = "cmd-play-001",
             initiatorDeviceId = "web-a",
             recordingId = 1001L,
-            mediaFileId = 2001L,
             positionSeconds = 12.5,
             nowMs = 1_000L,
             timeoutAtMs = 4_000L,
+        )
+        playbackSessionService.completePendingPlay(
+            accountId = 42L,
+            commandId = "cmd-play-001",
+            nowMs = 1_100L,
+            executeAtMs = 1_500L,
+        )
+        playbackSessionService.createPendingPlay(
+            accountId = 42L,
+            commandId = "cmd-play-002",
+            initiatorDeviceId = "web-a",
+            recordingId = 2002L,
+            positionSeconds = 3.0,
+            nowMs = 2_000L,
+            timeoutAtMs = 5_000L,
         )
 
         timeProvider.setNowMs(5_000L)
         janitor.sweepStaleConnections()
 
+        val state = playbackSessionService.getOrCreateState(42L)
         assertEquals("stale_connection", staleSession.closeStatus?.reason)
         assertTrue(deviceRuntimeService.listDeviceIds(42L).isEmpty())
+        assertEquals(PlaybackStatus.PAUSED, state.status)
+        assertEquals(1001L, state.recordingId)
+        assertEquals(16.0, state.positionSeconds)
+        assertEquals(5_400L, state.serverTimeToExecuteMs)
+        assertEquals(2L, state.version)
         assertNull(playbackSessionService.getPendingPlay(42L))
     }
 
@@ -112,5 +158,22 @@ class PlaybackSyncStaleConnectionJanitorTest {
             clientVersion = "web@0.1.0",
         )
         return session
+    }
+
+    private class FakeCatalog : CurrentQueueRecordingCatalog {
+        override fun getExistingRecordingIds(recordingIds: Set<Long>): Set<Long> {
+            return recordingIds
+        }
+
+        override fun countWorks(): Int = 0
+
+        override fun loadResolvedRecordings(recordingIds: Set<Long>): List<ResolvedQueueRecording> {
+            return emptyList()
+        }
+
+        override fun findFirstSimilarRecordingId(
+            recordingId: Long,
+            excludedWorkIds: Set<Long>,
+        ): Long? = null
     }
 }

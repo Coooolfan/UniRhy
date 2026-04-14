@@ -1,34 +1,63 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { ref } from 'vue'
-import { createPinia, setActivePinia } from 'pinia'
+import { reactive, ref } from 'vue'
 import { useRecordingPlayback, type PlayableRecording } from '@/composables/useRecordingPlayback'
 
 type TestRecording = PlayableRecording
 
+const audioStore = reactive({
+    currentTrack: null as {
+        id: number
+        title: string
+        artist: string
+        cover: string
+        src: string
+        mediaFileId: number
+        workId?: number
+    } | null,
+    isPlaying: false,
+    replaceQueueAndPlay: vi.fn((tracks: TestRecording[], currentIndex: number) => {
+        const targetTrack = tracks[currentIndex]
+        if (targetTrack?.mediaFileId === undefined || targetTrack?.audioSrc === undefined) {
+            return Promise.resolve()
+        }
+
+        audioStore.currentTrack = {
+            id: targetTrack.id,
+            title: targetTrack.title,
+            artist: targetTrack.artist,
+            cover: targetTrack.cover,
+            src: targetTrack.audioSrc,
+            mediaFileId: targetTrack.mediaFileId,
+        }
+        return Promise.resolve()
+    }),
+})
+
+vi.mock('@/stores/audio', () => ({
+    useAudioStore: () => audioStore,
+}))
+
 describe('useRecordingPlayback', () => {
     beforeEach(() => {
-        setActivePinia(createPinia())
-        vi.stubGlobal(
-            'WebSocket',
-            class MockWebSocket {
-                static readonly CONNECTING = 0
-                static readonly OPEN = 1
-                static readonly CLOSING = 2
-                static readonly CLOSED = 3
-                readonly readyState = MockWebSocket.CONNECTING
-                readonly listeners: unknown[] = []
+        audioStore.currentTrack = null
+        audioStore.isPlaying = false
+        audioStore.replaceQueueAndPlay.mockReset()
+        audioStore.replaceQueueAndPlay.mockImplementation(
+            (tracks: TestRecording[], currentIndex: number) => {
+                const targetTrack = tracks[currentIndex]
+                if (targetTrack?.mediaFileId === undefined || targetTrack?.audioSrc === undefined) {
+                    return Promise.resolve()
+                }
 
-                readonly addEventListener = vi.fn((_type: string, listener: unknown) => {
-                    this.listeners.push(listener)
-                })
-
-                readonly close = vi.fn(() => {
-                    this.listeners.length = 0
-                })
-
-                readonly send = vi.fn(() => {
-                    return undefined
-                })
+                audioStore.currentTrack = {
+                    id: targetTrack.id,
+                    title: targetTrack.title,
+                    artist: targetTrack.artist,
+                    cover: targetTrack.cover,
+                    src: targetTrack.audioSrc,
+                    mediaFileId: targetTrack.mediaFileId,
+                }
+                return Promise.resolve()
             },
         )
     })
@@ -39,19 +68,21 @@ describe('useRecordingPlayback', () => {
         ])
         const currentRecordingId = ref<number | null>(null)
 
-        const { audioStore, handlePlay } = useRecordingPlayback({
+        const { audioStore: store, handlePlay } = useRecordingPlayback({
             recordings,
             currentRecordingId,
             fallbackCover: () => '/fallback.jpg',
         })
 
         handlePlay()
-        expect(audioStore.currentTrack).toBeNull()
+        expect(store.currentTrack).toBeNull()
+        expect(store.replaceQueueAndPlay).not.toHaveBeenCalled()
 
         currentRecordingId.value = 1
         handlePlay()
-        expect(audioStore.currentTrack).toBeNull()
-        expect(audioStore.isPlaying).toBe(false)
+        expect(store.currentTrack).toBeNull()
+        expect(store.isPlaying).toBe(false)
+        expect(store.replaceQueueAndPlay).not.toHaveBeenCalled()
     })
 
     it('queues target recording with fallback cover and trackExtra while sync is not ready', () => {
@@ -67,7 +98,7 @@ describe('useRecordingPlayback', () => {
         ])
         const currentRecordingId = ref<number | null>(1)
 
-        const { audioStore, handlePlay } = useRecordingPlayback({
+        const { audioStore: store, handlePlay } = useRecordingPlayback({
             recordings,
             currentRecordingId,
             fallbackCover: () => '/fallback.jpg',
@@ -76,16 +107,20 @@ describe('useRecordingPlayback', () => {
 
         handlePlay()
 
-        expect(audioStore.currentTrack).toEqual({
-            id: 1,
-            title: 'Rec 1',
-            artist: 'Artist 1',
-            cover: '/fallback.jpg',
-            src: '/audio/1.mp3',
-            mediaFileId: 2001,
-            workId: 42,
-        })
-        expect(audioStore.isPlaying).toBe(false)
+        expect(store.replaceQueueAndPlay).toHaveBeenCalledWith(
+            [
+                {
+                    id: 1,
+                    title: 'Rec 1',
+                    artist: 'Artist 1',
+                    cover: '/fallback.jpg',
+                    src: '/audio/1.mp3',
+                    mediaFileId: 2001,
+                    workId: 42,
+                },
+            ],
+            0,
+        )
     })
 
     it('double click updates current selection and queues the chosen recording', () => {
@@ -109,7 +144,7 @@ describe('useRecordingPlayback', () => {
         ])
         const currentRecordingId = ref<number | null>(null)
 
-        const { audioStore, onRecordingDoubleClick } = useRecordingPlayback({
+        const { audioStore: store, onRecordingDoubleClick } = useRecordingPlayback({
             recordings,
             currentRecordingId,
             fallbackCover: () => '/fallback.jpg',
@@ -123,8 +158,27 @@ describe('useRecordingPlayback', () => {
         onRecordingDoubleClick(secondRecording)
 
         expect(currentRecordingId.value).toBe(2)
-        expect(audioStore.currentTrack?.id).toBe(2)
-        expect(audioStore.currentTrack?.cover).toBe('/cover/2.jpg')
+        expect(store.replaceQueueAndPlay).toHaveBeenCalledWith(
+            [
+                {
+                    id: 1,
+                    title: 'Rec 1',
+                    artist: 'Artist 1',
+                    cover: '/fallback.jpg',
+                    src: '/audio/1.mp3',
+                    mediaFileId: 2001,
+                },
+                {
+                    id: 2,
+                    title: 'Rec 2',
+                    artist: 'Artist 2',
+                    cover: '/cover/2.jpg',
+                    src: '/audio/2.mp3',
+                    mediaFileId: 2002,
+                },
+            ],
+            1,
+        )
     })
 
     it('computes playable and current-playing states', () => {
@@ -141,18 +195,34 @@ describe('useRecordingPlayback', () => {
         ])
         const currentRecordingId = ref<number | null>(1)
 
-        const { audioStore, hasPlayableRecording, isCurrentRecordingPlaying, handlePlay } =
-            useRecordingPlayback({
-                recordings,
-                currentRecordingId,
-                fallbackCover: () => '/fallback.jpg',
-            })
+        const {
+            audioStore: store,
+            hasPlayableRecording,
+            isCurrentRecordingPlaying,
+            handlePlay,
+        } = useRecordingPlayback({
+            recordings,
+            currentRecordingId,
+            fallbackCover: () => '/fallback.jpg',
+        })
 
         expect(hasPlayableRecording.value).toBe(true)
         expect(isCurrentRecordingPlaying.value).toBe(false)
 
         handlePlay()
-        expect(audioStore.currentTrack?.id).toBe(1)
+        expect(store.replaceQueueAndPlay).toHaveBeenCalledWith(
+            [
+                {
+                    id: 1,
+                    title: 'Rec 1',
+                    artist: 'Artist 1',
+                    cover: '/fallback.jpg',
+                    src: '/audio/1.mp3',
+                    mediaFileId: 2001,
+                },
+            ],
+            0,
+        )
         expect(isCurrentRecordingPlaying.value).toBe(false)
 
         currentRecordingId.value = 2

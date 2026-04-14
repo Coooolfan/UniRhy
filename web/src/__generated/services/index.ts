@@ -4,6 +4,7 @@ export {ArtistController} from './ArtistController';
 export {FileSystemStorageController} from './FileSystemStorageController';
 export {MediaFileController} from './MediaFileController';
 export {OssStorageController} from './OssStorageController';
+export {PlaybackQueueController} from './PlaybackQueueController';
 export {PlaylistController} from './PlaylistController';
 export {RecordingController} from './RecordingController';
 export {SystemConfigController} from './SystemConfigController';

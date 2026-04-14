@@ -9,12 +9,15 @@ export type PlaybackSyncMessageType =
     | 'NTP_RESPONSE'
     | 'SNAPSHOT'
     | 'ROOM_EVENT_LOAD_AUDIO_SOURCE'
+    | 'ROOM_EVENT_QUEUE_CHANGE'
     | 'SCHEDULED_ACTION'
     | 'ROOM_EVENT_DEVICE_CHANGE'
     | 'ERROR'
 
 export type PlaybackStatus = 'PLAYING' | 'PAUSED'
 export type ScheduledActionType = 'PLAY' | 'PAUSE' | 'SEEK'
+export type PlaybackStrategy = 'SEQUENTIAL' | 'SHUFFLE' | 'RADIO'
+export type StopStrategy = 'TRACK' | 'LIST'
 export type PlaybackSyncErrorCode =
     | 'INVALID_MESSAGE'
     | 'UNSUPPORTED_MESSAGE'
@@ -27,8 +30,6 @@ export type PlaybackSyncErrorCode =
 export type PlaybackSyncStatePayload = {
     status: PlaybackStatus
     recordingId: number | null
-    mediaFileId: number | null
-    presignedUrl: string | null
     positionSeconds: number
     serverTimeToExecuteMs: number
     version: number
@@ -50,7 +51,6 @@ export type PlaybackControlPayload = {
     commandId: string
     deviceId: string
     recordingId?: number | null
-    mediaFileId?: number | null
     positionSeconds: number
 }
 
@@ -58,7 +58,6 @@ export type AudioSourceLoadedPayload = {
     commandId: string
     deviceId: string
     recordingId: number
-    mediaFileId: number
 }
 
 export type SyncPayload = {
@@ -73,22 +72,41 @@ export type NtpResponsePayload = {
 
 export type SnapshotPayload = {
     state: PlaybackSyncStatePayload
+    queue: CurrentQueueDto
     serverNowMs: number
+}
+
+export type CurrentQueueItemDto = {
+    entryId: number
+    recordingId: number
+    title: string
+    artistLabel: string
+    coverUrl?: string
+    durationMs: number
+}
+
+export type CurrentQueueDto = {
+    items: readonly CurrentQueueItemDto[]
+    currentEntryId?: number
+    playbackStrategy: PlaybackStrategy
+    stopStrategy: StopStrategy
+    version: number
+    updatedAtMs: number
+}
+
+export type QueueChangePayload = {
+    queue: CurrentQueueDto
 }
 
 export type LoadAudioSourcePayload = {
     commandId: string
     recordingId: number
-    mediaFileId: number
-    presignedUrl: string
 }
 
 export type ScheduledPlaybackAction = {
     action: ScheduledActionType
     status: PlaybackStatus
     recordingId: number | null
-    mediaFileId: number | null
-    presignedUrl: string | null
     positionSeconds: number
     version: number
 }
@@ -169,6 +187,11 @@ export type LoadAudioSourceMessage = {
     payload: LoadAudioSourcePayload
 }
 
+export type QueueChangeMessage = {
+    type: 'ROOM_EVENT_QUEUE_CHANGE'
+    payload: QueueChangePayload
+}
+
 export type ScheduledActionMessage = {
     type: 'SCHEDULED_ACTION'
     payload: ScheduledActionPayload
@@ -188,6 +211,7 @@ export type ServerPlaybackSyncMessage =
     | NtpResponseMessage
     | SnapshotMessage
     | LoadAudioSourceMessage
+    | QueueChangeMessage
     | ScheduledActionMessage
     | DeviceChangeMessage
     | ErrorMessage

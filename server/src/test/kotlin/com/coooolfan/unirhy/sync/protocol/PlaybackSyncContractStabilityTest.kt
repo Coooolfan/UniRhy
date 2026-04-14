@@ -35,6 +35,7 @@ class PlaybackSyncContractStabilityTest {
                 "NTP_RESPONSE",
                 "SNAPSHOT",
                 "ROOM_EVENT_LOAD_AUDIO_SOURCE",
+                "ROOM_EVENT_QUEUE_CHANGE",
                 "SCHEDULED_ACTION",
                 "ROOM_EVENT_DEVICE_CHANGE",
                 "ERROR",

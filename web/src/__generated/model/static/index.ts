@@ -1,6 +1,13 @@
 export type {AccountCreate} from './AccountCreate';
 export type {AccountUpdate} from './AccountUpdate';
 export type {AsyncTaskLogCountRow} from './AsyncTaskLogCountRow';
+export type {CurrentQueueAppendRequest} from './CurrentQueueAppendRequest';
+export type {CurrentQueueDto} from './CurrentQueueDto';
+export type {CurrentQueueItemDto} from './CurrentQueueItemDto';
+export type {CurrentQueueReorderRequest} from './CurrentQueueReorderRequest';
+export type {CurrentQueueReplaceRequest} from './CurrentQueueReplaceRequest';
+export type {CurrentQueueSetCurrentRequest} from './CurrentQueueSetCurrentRequest';
+export type {CurrentQueueStrategyUpdateRequest} from './CurrentQueueStrategyUpdateRequest';
 export type {FileProviderFileSystemCreate} from './FileProviderFileSystemCreate';
 export type {FileProviderFileSystemUpdate} from './FileProviderFileSystemUpdate';
 export type {FileProviderOssCreate} from './FileProviderOssCreate';

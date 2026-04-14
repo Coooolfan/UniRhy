@@ -362,14 +362,25 @@ const refreshAll = () => {
                     <button
                         type="button"
                         data-test="open-task-button"
-                        class="mt-6 flex w-full items-center justify-center gap-2 bg-[#C67C4E] px-4 py-3 text-sm uppercase tracking-[0.18em] text-[#F7F5F0] shadow-md transition-colors hover:bg-[#B46B3A] disabled:cursor-not-allowed disabled:opacity-60"
+                        class="relative mt-6 flex w-full items-center justify-center gap-2 overflow-hidden bg-[#C67C4E] px-4 py-3 text-sm uppercase tracking-[0.18em] text-[#F7F5F0] shadow-md transition-colors hover:bg-[#B46B3A] disabled:cursor-not-allowed"
+                        :class="{
+                            'opacity-60': isSubmitting && submitFeedbackStatus !== 'success',
+                            'hover:bg-[#C67C4E]': submitFeedbackStatus === 'success',
+                        }"
                         :disabled="isTaskActionButtonDisabled"
                         @click="openTaskModal"
                     >
-                        <span>{{ taskActionButtonLabel }}</span>
+                        <span
+                            v-if="submitFeedbackStatus === 'success'"
+                            data-test="submit-feedback-progress"
+                            class="task-action-progress pointer-events-none absolute inset-y-0 left-0 bg-black/30"
+                            :style="{ animationDuration: `${SUBMIT_FEEDBACK_DURATION_MS}ms` }"
+                            aria-hidden="true"
+                        />
+                        <span class="relative z-10">{{ taskActionButtonLabel }}</span>
                         <component
                             :is="submitFeedbackStatus === 'success' ? CheckCircle2 : ArrowRight"
-                            class="h-4 w-4"
+                            class="relative z-10 h-4 w-4"
                         />
                     </button>
                 </div>
@@ -596,3 +607,19 @@ const refreshAll = () => {
         />
     </div>
 </template>
+
+<style scoped>
+.task-action-progress {
+    animation: task-action-progress-deplete linear forwards;
+    will-change: width;
+}
+
+@keyframes task-action-progress-deplete {
+    from {
+        width: 100%;
+    }
+    to {
+        width: 0%;
+    }
+}
+</style>

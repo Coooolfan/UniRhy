@@ -18,11 +18,36 @@ const audioStore = reactive({
     currentTime: 12,
     duration: 120,
     volume: 1,
+    isLoading: false,
     syncState: 'reconnecting',
     syncStatusText: '同步重连中',
     canSendRealtimeControl: false,
+    canNavigateQueue: false,
+    playbackStrategy: 'SEQUENTIAL',
+    stopStrategy: 'LIST',
+    currentQueueEntry: {
+        entryId: 101,
+    },
+    queueEntries: [
+        {
+            entryId: 101,
+            recordingId: 1,
+            mediaFileId: 2_001,
+            title: 'Track 1',
+            artist: 'Artist 1',
+            cover: '/cover/1.jpg',
+            durationMs: 120_000,
+        },
+    ],
     pause: vi.fn(),
     resume: vi.fn(),
+    playNext: vi.fn(),
+    playPrevious: vi.fn(),
+    updateQueueStrategies: vi.fn(),
+    playQueueEntry: vi.fn(),
+    clearQueue: vi.fn(),
+    reorderQueue: vi.fn(),
+    removeQueueEntry: vi.fn(),
     stop: vi.fn(),
     seek: vi.fn(),
     setVolume: vi.fn(),
@@ -57,11 +82,36 @@ describe('AudioPlayer', () => {
         audioStore.currentTime = 12
         audioStore.duration = 120
         audioStore.volume = 1
+        audioStore.isLoading = false
         audioStore.syncState = 'reconnecting'
         audioStore.syncStatusText = '同步重连中'
         audioStore.canSendRealtimeControl = false
+        audioStore.canNavigateQueue = false
+        audioStore.playbackStrategy = 'SEQUENTIAL'
+        audioStore.stopStrategy = 'LIST'
+        audioStore.currentQueueEntry = {
+            entryId: 101,
+        }
+        audioStore.queueEntries = [
+            {
+                entryId: 101,
+                recordingId: 1,
+                mediaFileId: 2_001,
+                title: 'Track 1',
+                artist: 'Artist 1',
+                cover: '/cover/1.jpg',
+                durationMs: 120_000,
+            },
+        ]
         audioStore.pause.mockReset()
         audioStore.resume.mockReset()
+        audioStore.playNext.mockReset()
+        audioStore.playPrevious.mockReset()
+        audioStore.updateQueueStrategies.mockReset()
+        audioStore.playQueueEntry.mockReset()
+        audioStore.clearQueue.mockReset()
+        audioStore.reorderQueue.mockReset()
+        audioStore.removeQueueEntry.mockReset()
         audioStore.stop.mockReset()
         audioStore.seek.mockReset()
         audioStore.setVolume.mockReset()
@@ -153,5 +203,56 @@ describe('AudioPlayer', () => {
         expect(wrapper.text()).toContain('Hydrated Track 7')
         expect(wrapper.text()).toContain('Hydrated Artist 7')
         expect(wrapper.get('img[alt="Cover"]').attributes('src')).toBe('/api/media/30007')
+    })
+
+    it('uses queue navigation controls when realtime control is available', async () => {
+        audioStore.canSendRealtimeControl = true
+        audioStore.canNavigateQueue = true
+        audioStore.queueEntries = [
+            {
+                entryId: 101,
+                recordingId: 1,
+                mediaFileId: 2_001,
+                title: 'Track 1',
+                artist: 'Artist 1',
+                cover: '/cover/1.jpg',
+                durationMs: 120_000,
+            },
+            {
+                entryId: 102,
+                recordingId: 2,
+                mediaFileId: 2_002,
+                title: 'Track 2',
+                artist: 'Artist 2',
+                cover: '/cover/2.jpg',
+                durationMs: 180_000,
+            },
+        ]
+
+        const wrapper = mount(AudioPlayer)
+
+        await wrapper.get('[data-test="previous-button"]').trigger('click')
+        await wrapper.get('[data-test="next-button"]').trigger('click')
+        await wrapper.get('[data-test="queue-toggle-button"]').trigger('click')
+
+        expect(audioStore.playPrevious).toHaveBeenCalledTimes(1)
+        expect(audioStore.playNext).toHaveBeenCalledTimes(1)
+        expect(wrapper.find('[data-test="queue-sidebar"]').exists()).toBe(true)
+        expect(wrapper.text()).toContain('Current Queue')
+        expect(wrapper.text()).toContain('2 tracks')
+    })
+
+    it('updates playback and stop strategies through the store', async () => {
+        audioStore.canSendRealtimeControl = true
+        audioStore.canNavigateQueue = true
+
+        const wrapper = mount(AudioPlayer)
+
+        await wrapper.get('[data-test="queue-toggle-button"]').trigger('click')
+        await wrapper.get('[data-test="playback-strategy-select"]').setValue('SHUFFLE')
+        await wrapper.get('[data-test="stop-strategy-select"]').setValue('TRACK')
+
+        expect(audioStore.updateQueueStrategies).toHaveBeenNthCalledWith(1, 'SHUFFLE', 'LIST')
+        expect(audioStore.updateQueueStrategies).toHaveBeenNthCalledWith(2, 'SEQUENTIAL', 'TRACK')
     })
 })

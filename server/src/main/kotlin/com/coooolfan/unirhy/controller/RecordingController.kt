@@ -96,6 +96,13 @@ class RecordingController(private val service: RecordingService) {
                 allScalarFields()
                 url()
             }
+            assets {
+                allScalarFields()
+                mediaFile {
+                    allScalarFields()
+                    url()
+                }
+            }
         }
     }
 }

@@ -3,6 +3,15 @@ import { createPinia, setActivePinia } from 'pinia'
 
 const apiMockState = vi.hoisted(() => ({
     getRecording: vi.fn(),
+    replaceCurrentQueue: vi.fn(),
+    appendToCurrentQueue: vi.fn(),
+    reorderCurrentQueue: vi.fn(),
+    setCurrentEntry: vi.fn(),
+    updateCurrentQueueStrategy: vi.fn(),
+    playNextInCurrentQueue: vi.fn(),
+    playPreviousInCurrentQueue: vi.fn(),
+    removeCurrentQueueEntry: vi.fn(),
+    clearCurrentQueue: vi.fn(),
 }))
 
 type MockPlaybackSyncClientState = {
@@ -203,8 +212,24 @@ vi.mock('@/ApiInstance', async (importOriginal) => {
             getRecording: apiMockState.getRecording,
         },
     )
+    const playbackQueueController = Object.assign(
+        Object.create(Object.getPrototypeOf(actual.api.playbackQueueController)),
+        actual.api.playbackQueueController,
+        {
+            replaceCurrentQueue: apiMockState.replaceCurrentQueue,
+            appendToCurrentQueue: apiMockState.appendToCurrentQueue,
+            reorderCurrentQueue: apiMockState.reorderCurrentQueue,
+            setCurrentEntry: apiMockState.setCurrentEntry,
+            updateCurrentQueueStrategy: apiMockState.updateCurrentQueueStrategy,
+            playNextInCurrentQueue: apiMockState.playNextInCurrentQueue,
+            playPreviousInCurrentQueue: apiMockState.playPreviousInCurrentQueue,
+            removeCurrentQueueEntry: apiMockState.removeCurrentQueueEntry,
+            clearCurrentQueue: apiMockState.clearCurrentQueue,
+        },
+    )
     const api = Object.assign(Object.create(Object.getPrototypeOf(actual.api)), actual.api, {
         recordingController,
+        playbackQueueController,
     })
 
     return {
@@ -304,13 +329,37 @@ import type {
 import { nowClientMs } from '@/utils/time'
 
 const getRecordingMock = vi.mocked(api.recordingController.getRecording)
-type RecordingMetadata = Awaited<ReturnType<typeof api.recordingController.getRecording>>
+const replaceCurrentQueueMock = apiMockState.replaceCurrentQueue
+const appendToCurrentQueueMock = apiMockState.appendToCurrentQueue
+const reorderCurrentQueueMock = apiMockState.reorderCurrentQueue
+const setCurrentEntryMock = apiMockState.setCurrentEntry
+const updateCurrentQueueStrategyMock = apiMockState.updateCurrentQueueStrategy
+const playNextInCurrentQueueMock = apiMockState.playNextInCurrentQueue
+const playPreviousInCurrentQueueMock = apiMockState.playPreviousInCurrentQueue
+const removeCurrentQueueEntryMock = apiMockState.removeCurrentQueueEntry
+const clearCurrentQueueMock = apiMockState.clearCurrentQueue
+type TestRecordingAsset = {
+    id: number
+    comment: string
+    mediaFile: {
+        id: number
+        sha256?: string
+        objectKey: string
+        mimeType: string
+        size: number
+        url?: string
+    }
+}
+type RecordingMetadata = Awaited<ReturnType<typeof api.recordingController.getRecording>> & {
+    lyrics?: string
+    assets?: readonly TestRecordingAsset[]
+}
 type RecordingMetadataOverrides = Partial<Omit<RecordingMetadata, 'cover'>> & {
     cover?: RecordingMetadata['cover'] | null
 }
 
-let nextAnimationFrameId!: number
-let animationFrameCallbacks!: Map<number, FrameRequestCallback>
+let nextAnimationFrameId: number
+let animationFrameCallbacks: Map<number, FrameRequestCallback>
 let resumeError: Error | null = null
 
 type MockAudioBuffer = {
@@ -413,6 +462,22 @@ const buildTrack = (id: number, src = `/audio/${id}.mp3`): AudioTrack => ({
     mediaFileId: id + 1_000,
 })
 
+const buildQueue = (tracks: AudioTrack[], currentIndex = 0) => ({
+    items: tracks.map((track, index) => ({
+        entryId: index + 1,
+        recordingId: track.id,
+        title: track.title,
+        artistLabel: track.artist,
+        coverUrl: track.cover,
+        durationMs: 180_000,
+    })),
+    ...(tracks[currentIndex] ? { currentEntryId: currentIndex + 1 } : {}),
+    playbackStrategy: 'SEQUENTIAL' as const,
+    stopStrategy: 'LIST' as const,
+    version: 1,
+    updatedAtMs: nowClientMs(),
+})
+
 const buildRecordingMetadata = (
     id: number,
     overrides: RecordingMetadataOverrides = {},
@@ -428,12 +493,27 @@ const buildRecordingMetadata = (
         comment: rest.comment ?? `Comment ${id}`,
         durationMs: rest.durationMs ?? id * 1_000,
         defaultInWork: rest.defaultInWork ?? false,
+        lyrics: rest.lyrics ?? '',
         artists: rest.artists ?? [
             {
                 id: id + 20_000,
                 displayName: `Hydrated Artist ${id}`,
                 alias: [],
                 comment: '',
+            },
+        ],
+        assets: rest.assets ?? [
+            {
+                id: id + 40_000,
+                comment: `Asset ${id}`,
+                mediaFile: {
+                    id: id + 2_000,
+                    sha256: `audio-sha-${id}`,
+                    objectKey: `audio/${id}.opus`,
+                    mimeType: 'audio/opus',
+                    size: 4_096,
+                    url: `/api/media/${id + 2_000}`,
+                },
             },
         ],
         ...(cover === null
@@ -469,6 +549,9 @@ const flushPromises = async (times = 8) => {
     for (let index = 0; index < times; index += 1) {
         await Promise.resolve()
     }
+    await new Promise<void>((resolve) => {
+        window.setTimeout(resolve, 0)
+    })
 }
 
 const latestClient = () => {
@@ -493,7 +576,27 @@ describe('audio store', () => {
         MockAudioContext.defaultState = 'running'
         fetchMock.mockReset()
         getRecordingMock.mockReset()
+        replaceCurrentQueueMock.mockReset()
+        appendToCurrentQueueMock.mockReset()
+        reorderCurrentQueueMock.mockReset()
+        setCurrentEntryMock.mockReset()
+        removeCurrentQueueEntryMock.mockReset()
+        clearCurrentQueueMock.mockReset()
         getRecordingMock.mockRejectedValue(new Error('metadata unavailable'))
+        replaceCurrentQueueMock.mockImplementation(
+            ({ body }: { body: { recordingIds: number[]; currentIndex: number } }) =>
+                Promise.resolve(
+                    buildQueue(
+                        body.recordingIds.map((recordingId: number) => buildTrack(recordingId)),
+                        body.currentIndex,
+                    ),
+                ),
+        )
+        appendToCurrentQueueMock.mockResolvedValue(buildQueue([]))
+        reorderCurrentQueueMock.mockResolvedValue(buildQueue([]))
+        setCurrentEntryMock.mockResolvedValue(buildQueue([]))
+        removeCurrentQueueEntryMock.mockResolvedValue(buildQueue([]))
+        clearCurrentQueueMock.mockResolvedValue(buildQueue([]))
 
         vi.stubGlobal('fetch', fetchMock)
         vi.stubGlobal('AudioContext', MockAudioContext)
@@ -538,13 +641,105 @@ describe('audio store', () => {
         expect(client.sendPlay).toHaveBeenCalledWith(
             expect.objectContaining({
                 recordingId: secondTrack.id,
-                mediaFileId: secondTrack.mediaFileId,
                 positionSeconds: 0,
             }),
         )
+        expect(replaceCurrentQueueMock).toHaveBeenNthCalledWith(1, {
+            body: {
+                recordingIds: [1],
+                currentIndex: 0,
+            },
+        })
+        expect(replaceCurrentQueueMock).toHaveBeenNthCalledWith(2, {
+            body: {
+                recordingIds: [2],
+                currentIndex: 0,
+            },
+        })
+    })
+
+    it('updates local queue state from queue change broadcasts', async () => {
+        const audioStore = useAudioStore()
+        audioStore.connectPlaybackSync()
+        const client = latestClient()
+
+        client.emitMessage({
+            type: 'ROOM_EVENT_QUEUE_CHANGE',
+            payload: {
+                queue: buildQueue([buildTrack(3), buildTrack(4)], 1),
+            },
+        })
+        await flushPromises()
+
+        expect(audioStore.queueEntries).toHaveLength(2)
+        expect(audioStore.currentQueueEntry?.entryId).toBe(2)
+        expect(audioStore.currentTrack?.id).toBe(4)
+        expect(audioStore.currentTrack?.title).toBe('Track 4')
+    })
+
+    it('advances to the next queue entry through the server current queue API', async () => {
+        playNextInCurrentQueueMock.mockResolvedValueOnce(
+            buildQueue([buildTrack(5), buildTrack(6)], 1),
+        )
+
+        const audioStore = useAudioStore()
+        audioStore.connectPlaybackSync()
+        const client = latestClient()
+        client.setState({
+            phase: 'ready',
+            clockOffsetMs: 0,
+            roundTripEstimateMs: 10,
+        })
+
+        client.emitMessage({
+            type: 'ROOM_EVENT_QUEUE_CHANGE',
+            payload: {
+                queue: buildQueue([buildTrack(5), buildTrack(6)], 0),
+            },
+        })
+        await flushPromises()
+
+        await audioStore.playNext()
+
+        expect(playNextInCurrentQueueMock).toHaveBeenCalledWith()
+        expect(playPreviousInCurrentQueueMock).not.toHaveBeenCalled()
+        expect(audioStore.currentQueueEntry?.entryId).toBe(2)
+        expect(audioStore.currentTrack?.id).toBe(6)
+        expect(client.sendPlay).not.toHaveBeenCalled()
+    })
+
+    it('updates queue strategies through the server current queue API', async () => {
+        updateCurrentQueueStrategyMock.mockResolvedValueOnce({
+            ...buildQueue([buildTrack(7)], 0),
+            playbackStrategy: 'RADIO',
+            stopStrategy: 'TRACK',
+        })
+
+        const audioStore = useAudioStore()
+        audioStore.connectPlaybackSync()
+        const client = latestClient()
+        client.emitMessage({
+            type: 'ROOM_EVENT_QUEUE_CHANGE',
+            payload: {
+                queue: buildQueue([buildTrack(7)], 0),
+            },
+        })
+        await flushPromises()
+
+        await audioStore.updateQueueStrategies('RADIO', 'TRACK')
+
+        expect(updateCurrentQueueStrategyMock).toHaveBeenCalledWith({
+            body: {
+                playbackStrategy: 'RADIO',
+                stopStrategy: 'TRACK',
+            },
+        })
+        expect(audioStore.playbackStrategy).toBe('RADIO')
+        expect(audioStore.stopStrategy).toBe('TRACK')
     })
 
     it('loads audio on load-audio-source and acknowledges after decoding', async () => {
+        getRecordingMock.mockResolvedValueOnce(buildRecordingMetadata(7))
         fetchMock.mockResolvedValue(createResponse(45))
 
         const audioStore = useAudioStore()
@@ -556,8 +751,6 @@ describe('audio store', () => {
             payload: {
                 commandId: 'cmd-play-1',
                 recordingId: 7,
-                mediaFileId: 2_007,
-                presignedUrl: '/api/media/2007',
             },
         }
 
@@ -568,7 +761,6 @@ describe('audio store', () => {
         expect(client.sendAudioSourceLoaded).toHaveBeenCalledWith({
             commandId: 'cmd-play-1',
             recordingId: 7,
-            mediaFileId: 2_007,
         })
         expect(audioStore.currentTrack?.id).toBe(7)
         expect(audioStore.duration).toBe(45)
@@ -580,6 +772,24 @@ describe('audio store', () => {
             platform: 'web',
         }
         window.localStorage.setItem('unirhy.auth-token', 'mobile-token')
+        getRecordingMock.mockResolvedValueOnce(
+            buildRecordingMetadata(8, {
+                assets: [
+                    {
+                        id: 48_008,
+                        comment: 'Signed Audio 2008',
+                        mediaFile: {
+                            id: 2_008,
+                            sha256: 'audio-sha-8',
+                            objectKey: 'audio/8.opus',
+                            mimeType: 'audio/opus',
+                            size: 4_096,
+                            url: '/api/media/2008?_sig=abc&_exp=9999999999',
+                        },
+                    },
+                ],
+            }),
+        )
         fetchMock.mockResolvedValue(createResponse(45))
 
         const audioStore = useAudioStore()
@@ -591,8 +801,6 @@ describe('audio store', () => {
             payload: {
                 commandId: 'cmd-play-2',
                 recordingId: 8,
-                mediaFileId: 2_008,
-                presignedUrl: '/api/media/2008?_sig=abc&_exp=9999999999',
             },
         } satisfies LoadAudioSourceMessage)
         await flushPromises(12)
@@ -604,11 +812,11 @@ describe('audio store', () => {
         expect(client.sendAudioSourceLoaded).toHaveBeenCalledWith({
             commandId: 'cmd-play-2',
             recordingId: 8,
-            mediaFileId: 2_008,
         })
     })
 
     it('ignores stale scheduled actions with a lower version', async () => {
+        getRecordingMock.mockResolvedValueOnce(buildRecordingMetadata(5))
         fetchMock.mockResolvedValue(createResponse(90))
 
         const audioStore = useAudioStore()
@@ -630,8 +838,6 @@ describe('audio store', () => {
                     action: 'PLAY',
                     status: 'PLAYING',
                     recordingId: 5,
-                    mediaFileId: 2_005,
-                    presignedUrl: '/api/media/2005',
                     positionSeconds: 12,
                     version: 2,
                 },
@@ -653,8 +859,6 @@ describe('audio store', () => {
                     action: 'PAUSE',
                     status: 'PAUSED',
                     recordingId: null,
-                    mediaFileId: null,
-                    presignedUrl: null,
                     positionSeconds: 0,
                     version: 1,
                 },
@@ -664,6 +868,53 @@ describe('audio store', () => {
 
         expect(audioStore.currentTrack?.id).toBe(5)
         expect(audioStore.isPlaying).toBe(true)
+    })
+
+    it('ignores stale scheduled actions that arrive after a newer paused snapshot', async () => {
+        const audioStore = useAudioStore()
+        audioStore.connectPlaybackSync()
+        const client = latestClient()
+
+        client.emitMessage({
+            type: 'SNAPSHOT',
+            payload: {
+                state: {
+                    status: 'PAUSED',
+                    recordingId: 7,
+                    positionSeconds: 12,
+                    serverTimeToExecuteMs: nowClientMs(),
+                    version: 5,
+                    updatedAtMs: nowClientMs(),
+                },
+                queue: buildQueue([buildTrack(7)], 0),
+                serverNowMs: nowClientMs(),
+            },
+        })
+        await flushPromises(12)
+
+        expect(audioStore.currentTrack?.id).toBe(7)
+        expect(audioStore.currentTime).toBe(12)
+        expect(audioStore.isPlaying).toBe(false)
+
+        client.emitMessage({
+            type: 'SCHEDULED_ACTION',
+            payload: {
+                commandId: 'cmd-stale-clear',
+                serverTimeToExecuteMs: nowClientMs(),
+                scheduledAction: {
+                    action: 'PAUSE',
+                    status: 'PAUSED',
+                    recordingId: null,
+                    positionSeconds: 0,
+                    version: 4,
+                },
+            },
+        } satisfies ScheduledActionMessage)
+        await flushPromises(12)
+
+        expect(audioStore.currentTrack?.id).toBe(7)
+        expect(audioStore.currentTime).toBe(12)
+        expect(audioStore.isPlaying).toBe(false)
     })
 
     it('requests sync recovery when a snapshot exists and sync becomes ready', async () => {
@@ -677,13 +928,12 @@ describe('audio store', () => {
                 state: {
                     status: 'PLAYING',
                     recordingId: 8,
-                    mediaFileId: 2_008,
-                    presignedUrl: '/api/media/2008',
                     positionSeconds: 16,
                     serverTimeToExecuteMs: performance.timeOrigin + performance.now(),
                     version: 3,
                     updatedAtMs: performance.timeOrigin + performance.now(),
                 },
+                queue: buildQueue([buildTrack(8)], 0),
                 serverNowMs: performance.timeOrigin + performance.now(),
             },
         })
@@ -699,6 +949,60 @@ describe('audio store', () => {
         expect(client.requestSync).toHaveBeenCalledTimes(1)
         expect(audioStore.currentTrack?.id).toBe(8)
         expect(audioStore.playbackSyncDebugSnapshot.awaitingSyncRecovery).toBe(true)
+    })
+
+    it('keeps paused progress after sync recovery replays the same pause action', async () => {
+        const audioStore = useAudioStore()
+        audioStore.connectPlaybackSync()
+        const client = latestClient()
+
+        client.emitMessage({
+            type: 'SNAPSHOT',
+            payload: {
+                state: {
+                    status: 'PAUSED',
+                    recordingId: 8,
+                    positionSeconds: 16,
+                    serverTimeToExecuteMs: nowClientMs(),
+                    version: 3,
+                    updatedAtMs: nowClientMs(),
+                },
+                queue: buildQueue([buildTrack(8)], 0),
+                serverNowMs: nowClientMs(),
+            },
+        })
+        await flushPromises(12)
+
+        expect(audioStore.currentTime).toBe(16)
+        expect(audioStore.duration).toBe(180)
+
+        client.setState({
+            phase: 'ready',
+            clockOffsetMs: 0,
+            roundTripEstimateMs: 10,
+        })
+        await flushPromises()
+
+        client.emitMessage({
+            type: 'SCHEDULED_ACTION',
+            payload: {
+                commandId: 'sync-web-test',
+                serverTimeToExecuteMs: nowClientMs(),
+                scheduledAction: {
+                    action: 'PAUSE',
+                    status: 'PAUSED',
+                    recordingId: 8,
+                    positionSeconds: 16,
+                    version: 3,
+                },
+            },
+        } satisfies ScheduledActionMessage)
+        await flushPromises(12)
+
+        expect(audioStore.currentTrack?.id).toBe(8)
+        expect(audioStore.isPlaying).toBe(false)
+        expect(audioStore.currentTime).toBe(16)
+        expect(audioStore.duration).toBe(180)
     })
 
     it('aggregates playback sync debug snapshot from diagnostics and inbound messages', async () => {
@@ -728,13 +1032,12 @@ describe('audio store', () => {
                 state: {
                     status: 'PAUSED',
                     recordingId: 7,
-                    mediaFileId: 2_007,
-                    presignedUrl: '/api/media/2007',
                     positionSeconds: 12,
                     serverTimeToExecuteMs: nowClientMs(),
                     version: 5,
                     updatedAtMs: nowClientMs(),
                 },
+                queue: buildQueue([buildTrack(7)], 0),
                 serverNowMs: nowClientMs(),
             },
         })
@@ -743,8 +1046,6 @@ describe('audio store', () => {
             payload: {
                 commandId: 'cmd-load-debug',
                 recordingId: 7,
-                mediaFileId: 2_007,
-                presignedUrl: '/api/media/2007',
             },
         } satisfies LoadAudioSourceMessage)
         await flushPromises(12)
@@ -779,6 +1080,7 @@ describe('audio store', () => {
     })
 
     it('records local execution diagnostics for scheduled playback', async () => {
+        getRecordingMock.mockResolvedValueOnce(buildRecordingMetadata(6))
         fetchMock.mockResolvedValue(createResponse(25))
 
         const audioStore = useAudioStore()
@@ -799,8 +1101,6 @@ describe('audio store', () => {
                     action: 'PLAY',
                     status: 'PLAYING',
                     recordingId: 6,
-                    mediaFileId: 2_006,
-                    presignedUrl: '/api/media/2006',
                     positionSeconds: 4,
                     version: 6,
                 },
@@ -833,8 +1133,6 @@ describe('audio store', () => {
                 state: {
                     status: 'PLAYING',
                     recordingId: 11,
-                    mediaFileId: 2_011,
-                    presignedUrl: '/api/media/2011',
                     positionSeconds: 3,
                     serverTimeToExecuteMs: nowClientMs(),
                     version: 8,
@@ -879,6 +1177,7 @@ describe('audio store', () => {
     })
 
     it('reuses the loaded buffer for repeated load-audio-source messages of the same track', async () => {
+        getRecordingMock.mockResolvedValue(buildRecordingMetadata(7))
         fetchMock.mockResolvedValue(createResponse(45))
 
         const audioStore = useAudioStore()
@@ -890,8 +1189,6 @@ describe('audio store', () => {
             payload: {
                 commandId: 'cmd-preload-1',
                 recordingId: 7,
-                mediaFileId: 2_007,
-                presignedUrl: '/api/media/2007',
             },
         }
 
@@ -911,17 +1208,15 @@ describe('audio store', () => {
         expect(client.sendAudioSourceLoaded).toHaveBeenNthCalledWith(1, {
             commandId: 'cmd-preload-1',
             recordingId: 7,
-            mediaFileId: 2_007,
         })
         expect(client.sendAudioSourceLoaded).toHaveBeenNthCalledWith(2, {
             commandId: 'cmd-preload-2',
             recordingId: 7,
-            mediaFileId: 2_007,
         })
         expect(audioStore.duration).toBe(45)
     })
 
-    it('hydrates placeholder metadata after passive load-audio-source without delaying preload ack', async () => {
+    it('hydrates placeholder metadata after passive load-audio-source and acknowledges after metadata resolves', async () => {
         fetchMock.mockResolvedValue(createResponse(45))
         const recordingDeferred = createDeferred<ReturnType<typeof buildRecordingMetadata>>()
         getRecordingMock.mockReturnValueOnce(recordingDeferred.promise)
@@ -935,8 +1230,6 @@ describe('audio store', () => {
             payload: {
                 commandId: 'cmd-preload-metadata',
                 recordingId: 7,
-                mediaFileId: 2_007,
-                presignedUrl: '/api/media/2007',
             },
         } satisfies LoadAudioSourceMessage)
         await flushPromises(12)
@@ -950,11 +1243,7 @@ describe('audio store', () => {
                 cover: '',
             }),
         )
-        expect(client.sendAudioSourceLoaded).toHaveBeenCalledWith({
-            commandId: 'cmd-preload-metadata',
-            recordingId: 7,
-            mediaFileId: 2_007,
-        })
+        expect(client.sendAudioSourceLoaded).not.toHaveBeenCalled()
 
         recordingDeferred.resolve(buildRecordingMetadata(7))
         await flushPromises(12)
@@ -968,6 +1257,10 @@ describe('audio store', () => {
                 workId: 10007,
             }),
         )
+        expect(client.sendAudioSourceLoaded).toHaveBeenCalledWith({
+            commandId: 'cmd-preload-metadata',
+            recordingId: 7,
+        })
     })
 
     it('dedupes metadata requests across snapshot and scheduled action for the same passive track', async () => {
@@ -984,13 +1277,12 @@ describe('audio store', () => {
                 state: {
                     status: 'PAUSED',
                     recordingId: 12,
-                    mediaFileId: 2_012,
-                    presignedUrl: '/api/media/2012',
                     positionSeconds: 1,
                     serverTimeToExecuteMs: nowClientMs(),
                     version: 1,
                     updatedAtMs: nowClientMs(),
                 },
+                queue: buildQueue([buildTrack(12)], 0),
                 serverNowMs: nowClientMs(),
             },
         })
@@ -1005,8 +1297,6 @@ describe('audio store', () => {
                     action: 'PAUSE',
                     status: 'PAUSED',
                     recordingId: 12,
-                    mediaFileId: 2_012,
-                    presignedUrl: '/api/media/2012',
                     positionSeconds: 1,
                     version: 2,
                 },
@@ -1045,27 +1335,26 @@ describe('audio store', () => {
                 state: {
                     status: 'PAUSED',
                     recordingId: 14,
-                    mediaFileId: 2_014,
-                    presignedUrl: '/api/media/2014',
                     positionSeconds: 0,
                     serverTimeToExecuteMs: nowClientMs(),
                     version: 1,
                     updatedAtMs: nowClientMs(),
                 },
+                queue: buildQueue([buildTrack(14)], 0),
                 serverNowMs: nowClientMs(),
             },
         })
         await flushPromises(12)
 
-        expect(audioStore.currentTrack?.title).toBe('Recording #14')
+        expect(audioStore.currentTrack?.title).toBe('Track 14')
+        expect(audioStore.currentTrack?.artist).toBe('Artist 14')
+        expect(audioStore.currentTrack?.cover).toBe('/cover/14.jpg')
 
         client.emitMessage({
             type: 'ROOM_EVENT_LOAD_AUDIO_SOURCE',
             payload: {
                 commandId: 'cmd-retry-metadata',
                 recordingId: 14,
-                mediaFileId: 2_014,
-                presignedUrl: '/api/media/2014',
             },
         } satisfies LoadAudioSourceMessage)
         await flushPromises(12)
@@ -1076,7 +1365,10 @@ describe('audio store', () => {
                 id: 14,
                 title: 'Hydrated Track 14',
                 artist: 'Hydrated Artist 14',
-                cover: '',
+                cover: '/cover/14.jpg',
+                src: '/api/media/2014',
+                mediaFileId: 2_014,
+                workId: 10014,
             }),
         )
     })
@@ -1098,13 +1390,12 @@ describe('audio store', () => {
                 state: {
                     status: 'PAUSED',
                     recordingId: 21,
-                    mediaFileId: 2_021,
-                    presignedUrl: '/api/media/2021',
                     positionSeconds: 0,
                     serverTimeToExecuteMs: nowClientMs(),
                     version: 1,
                     updatedAtMs: nowClientMs(),
                 },
+                queue: buildQueue([buildTrack(21)], 0),
                 serverNowMs: nowClientMs(),
             },
         })
@@ -1116,13 +1407,12 @@ describe('audio store', () => {
                 state: {
                     status: 'PAUSED',
                     recordingId: 22,
-                    mediaFileId: 2_022,
-                    presignedUrl: '/api/media/2022',
                     positionSeconds: 0,
                     serverTimeToExecuteMs: nowClientMs(),
                     version: 2,
                     updatedAtMs: nowClientMs(),
                 },
+                queue: buildQueue([buildTrack(22)], 0),
                 serverNowMs: nowClientMs(),
             },
         })
@@ -1134,8 +1424,8 @@ describe('audio store', () => {
         expect(audioStore.currentTrack).toEqual(
             expect.objectContaining({
                 id: 22,
-                title: 'Recording #22',
-                artist: 'Unknown Artist',
+                title: 'Track 22',
+                artist: 'Artist 22',
             }),
         )
 
@@ -1165,13 +1455,12 @@ describe('audio store', () => {
                 state: {
                     status: 'PAUSED',
                     recordingId: 2,
-                    mediaFileId: 1_002,
-                    presignedUrl: '/api/media/1002',
                     positionSeconds: 0,
                     serverTimeToExecuteMs: nowClientMs(),
                     version: 1,
                     updatedAtMs: nowClientMs(),
                 },
+                queue: buildQueue([buildTrack(2)], 0),
                 serverNowMs: nowClientMs(),
             },
         })
@@ -1185,22 +1474,22 @@ describe('audio store', () => {
                 state: {
                     status: 'PAUSED',
                     recordingId: 1,
-                    mediaFileId: 1_001,
-                    presignedUrl: '/api/media/1001',
                     positionSeconds: 0,
                     serverTimeToExecuteMs: nowClientMs(),
                     version: 2,
                     updatedAtMs: nowClientMs(),
                 },
+                queue: buildQueue([buildTrack(1)], 0),
                 serverNowMs: nowClientMs(),
             },
         })
         await flushPromises()
 
-        expect(audioStore.currentTrack?.title).toBe('Recording #1')
+        expect(audioStore.currentTrack?.title).toBe('Track 1')
     })
 
     it('ignores late buffer loads after disconnect tears down local playback state', async () => {
+        getRecordingMock.mockResolvedValueOnce(buildRecordingMetadata(9))
         const deferredResponse = createDeferred<Response>()
         fetchMock.mockReturnValueOnce(deferredResponse.promise)
 
@@ -1213,8 +1502,6 @@ describe('audio store', () => {
             payload: {
                 commandId: 'cmd-late-load',
                 recordingId: 9,
-                mediaFileId: 2_009,
-                presignedUrl: '/api/media/2009',
             },
         } satisfies LoadAudioSourceMessage)
         await flushPromises()
@@ -1237,6 +1524,7 @@ describe('audio store', () => {
     })
 
     it('fully tears down scheduled playback when disconnecting sync', async () => {
+        getRecordingMock.mockResolvedValueOnce(buildRecordingMetadata(6))
         fetchMock.mockResolvedValue(createResponse(25))
 
         const audioStore = useAudioStore()
@@ -1257,8 +1545,6 @@ describe('audio store', () => {
                     action: 'PLAY',
                     status: 'PLAYING',
                     recordingId: 6,
-                    mediaFileId: 2_006,
-                    presignedUrl: '/api/media/2006',
                     positionSeconds: 4,
                     version: 6,
                 },
