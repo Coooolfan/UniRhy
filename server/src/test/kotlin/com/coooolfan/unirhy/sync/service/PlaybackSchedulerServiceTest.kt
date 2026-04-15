@@ -89,7 +89,6 @@ class PlaybackSchedulerServiceTest {
     ) {
         deviceRuntimeService.registerConnection(
             accountId = 42L,
-            tokenValue = "token-$sessionId",
             sessionId = sessionId,
             session = ConcurrentWebSocketSessionDecorator(
                 TestWebSocketSession(sessionId = sessionId, accountId = 42L),

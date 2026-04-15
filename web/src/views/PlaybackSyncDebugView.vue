@@ -128,6 +128,7 @@ const summarizeEventPayload = (payload: unknown) => {
 
     const record = payload as Record<string, unknown>
     const commandId = typeof record.commandId === 'string' ? record.commandId : null
+    const currentIndex = typeof record.currentIndex === 'number' ? record.currentIndex : null
     const recordingId = typeof record.recordingId === 'number' ? record.recordingId : null
     const mediaFileId = typeof record.mediaFileId === 'number' ? record.mediaFileId : null
     const deviceId = typeof record.deviceId === 'string' ? record.deviceId : null
@@ -137,6 +138,9 @@ const summarizeEventPayload = (payload: unknown) => {
     const parts: string[] = []
     if (commandId !== null) {
         parts.push(commandId)
+    }
+    if (currentIndex !== null) {
+        parts.push(`idx=${currentIndex}`)
     }
     if (recordingId !== null) {
         parts.push(`rec=${recordingId}`)

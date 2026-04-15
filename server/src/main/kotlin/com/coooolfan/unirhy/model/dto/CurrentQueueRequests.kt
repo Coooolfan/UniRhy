@@ -6,21 +6,36 @@ import com.coooolfan.unirhy.sync.protocol.StopStrategy
 data class CurrentQueueReplaceRequest(
     val recordingIds: List<Long>,
     val currentIndex: Int,
+    val version: Long,
 )
 
 data class CurrentQueueAppendRequest(
     val recordingIds: List<Long>,
+    val version: Long,
 )
 
 data class CurrentQueueReorderRequest(
-    val entryIds: List<Long>,
+    val recordingIds: List<Long>,
+    val currentIndex: Int,
+    val version: Long,
 )
 
 data class CurrentQueueSetCurrentRequest(
-    val entryId: Long,
+    val currentIndex: Int,
+    val version: Long,
 )
 
 data class CurrentQueueStrategyUpdateRequest(
     val playbackStrategy: PlaybackStrategy,
     val stopStrategy: StopStrategy,
+    val version: Long,
+)
+
+data class CurrentQueueVersionRequest(
+    val version: Long,
+)
+
+data class CurrentQueueRemoveRequest(
+    val index: Int,
+    val version: Long,
 )

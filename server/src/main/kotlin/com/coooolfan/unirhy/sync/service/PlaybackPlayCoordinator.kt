@@ -17,6 +17,7 @@ class PlaybackPlayCoordinator(
         accountId: Long,
         commandId: String,
         initiatorDeviceId: String?,
+        currentIndex: Int,
         recordingId: Long,
         positionSeconds: Double,
         nowMs: Long,
@@ -26,6 +27,7 @@ class PlaybackPlayCoordinator(
             accountId = accountId,
             commandId = commandId,
             initiatorDeviceId = initiatorDeviceId,
+            currentIndex = currentIndex,
             recordingId = recordingId,
             positionSeconds = positionSeconds,
             nowMs = nowMs,
@@ -36,12 +38,13 @@ class PlaybackPlayCoordinator(
             accountId = accountId,
             payload = LoadAudioSourcePayload(
                 commandId = commandId,
+                currentIndex = currentIndex,
                 recordingId = recordingId,
             ),
         )
 
         val scheduledAction = maybeCompletePendingPlay(accountId, nowMs) ?: run {
-            playbackSchedulerService.schedulePendingPlayTimeout(accountId, commandId) {
+            playbackSchedulerService.schedulePendingPlayTimeout(accountId) {
                 handlePendingPlayTimeout(accountId, commandId)
             }
             return

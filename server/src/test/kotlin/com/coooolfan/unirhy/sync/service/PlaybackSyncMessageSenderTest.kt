@@ -53,7 +53,6 @@ class PlaybackSyncMessageSenderTest {
         val session = TestWebSocketSession(sessionId = sessionId, accountId = 42L)
         deviceRuntimeService.registerConnection(
             accountId = 42L,
-            tokenValue = "token-$sessionId",
             sessionId = sessionId,
             session = ConcurrentWebSocketSessionDecorator(session, 10_000, 512 * 1024),
         )

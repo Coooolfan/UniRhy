@@ -252,3 +252,47 @@ CREATE UNIQUE INDEX uq_async_task_log_transcode_active
     WHERE task_type = 'TRANSCODE'
         AND status IN ('PENDING', 'RUNNING')
         AND params::jsonb ? 'recordingId';
+
+CREATE TABLE public.play_queue
+(
+    account_id                BIGINT PRIMARY KEY REFERENCES public.account (id) ON DELETE CASCADE,
+    recording_ids             BIGINT[]    NOT NULL DEFAULT '{}',
+    current_index             INTEGER     NOT NULL DEFAULT 0,
+    shuffle_indices           INTEGER[]   NOT NULL DEFAULT '{}',
+    playback_strategy         VARCHAR     NOT NULL DEFAULT 'SEQUENTIAL',
+    stop_strategy             VARCHAR     NOT NULL DEFAULT 'LIST',
+    playback_status           VARCHAR     NOT NULL DEFAULT 'PAUSED',
+    position_ms               BIGINT      NOT NULL DEFAULT 0,
+    server_time_to_execute_ms BIGINT      NOT NULL DEFAULT 0,
+    updated_at                TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    version                   BIGINT      NOT NULL DEFAULT 0,
+    CONSTRAINT play_queue_current_index_check CHECK (
+        current_index >= 0 AND
+        (
+            (cardinality(recording_ids) = 0 AND current_index = 0) OR
+            (cardinality(recording_ids) > 0 AND current_index < cardinality(recording_ids))
+            )
+        ),
+    CONSTRAINT play_queue_shuffle_indices_check CHECK (
+        playback_strategy = 'SHUFFLE' OR cardinality(shuffle_indices) = 0
+        ),
+    CONSTRAINT play_queue_position_ms_check CHECK (position_ms >= 0),
+    CONSTRAINT play_queue_empty_state_check CHECK (
+        cardinality(recording_ids) > 0 OR
+        (
+            current_index = 0 AND
+            playback_status = 'PAUSED' AND
+            position_ms = 0 AND
+            server_time_to_execute_ms = 0
+            )
+        ),
+    CONSTRAINT play_queue_strategy_check CHECK (
+        playback_strategy IN ('SEQUENTIAL', 'SHUFFLE', 'RADIO')
+        ),
+    CONSTRAINT play_queue_stop_strategy_check CHECK (
+        stop_strategy IN ('TRACK', 'LIST')
+        ),
+    CONSTRAINT play_queue_status_check CHECK (
+        playback_status IN ('PLAYING', 'PAUSED')
+        )
+);

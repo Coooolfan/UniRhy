@@ -1,6 +1,5 @@
 package com.coooolfan.unirhy.sync.service
 
-import com.coooolfan.unirhy.sync.model.CurrentQueueEntry
 import com.coooolfan.unirhy.sync.protocol.ScheduledActionPayload
 import org.springframework.stereotype.Service
 
@@ -14,7 +13,7 @@ class PlaybackQueueMutationCoordinator(
 ) {
     fun syncPausedPlaybackToCurrentQueue(
         accountId: Long,
-        currentEntry: CurrentQueueEntry?,
+        currentIndex: Int?,
         nowMs: Long,
     ): ScheduledActionPayload? {
         playbackSchedulerService.cancelPendingPlayTimeout(accountId)
@@ -27,7 +26,7 @@ class PlaybackQueueMutationCoordinator(
         val scheduledAction = playbackSessionService.schedulePause(
             accountId = accountId,
             commandId = "queue-current-$nowMs",
-            recordingId = currentEntry?.recordingId,
+            currentIndex = currentIndex,
             positionSeconds = 0.0,
             nowMs = nowMs,
             executeAtMs = playbackSchedulerService.calculateExecuteAtMs(accountId, nowMs),
@@ -46,7 +45,7 @@ class PlaybackQueueMutationCoordinator(
         val scheduledAction = playbackSessionService.schedulePause(
             accountId = accountId,
             commandId = "queue-clear-$nowMs",
-            recordingId = null,
+            currentIndex = null,
             positionSeconds = 0.0,
             nowMs = nowMs,
             executeAtMs = playbackSchedulerService.calculateExecuteAtMs(accountId, nowMs),
@@ -64,14 +63,16 @@ class PlaybackQueueMutationCoordinator(
         if (!change.changed) {
             return
         }
-        val currentEntry = change.currentEntry ?: return
+        val currentIndex = change.currentIndex ?: return
+        val currentRecordingId = change.currentRecordingId ?: return
         playbackSchedulerService.cancelPendingPlayTimeout(accountId)
         playbackSessionService.clearPendingPlay(accountId)
         playCoordinator.initiatePlay(
             accountId = accountId,
             commandId = "queue-nav-$nowMs",
             initiatorDeviceId = null,
-            recordingId = currentEntry.recordingId,
+            currentIndex = currentIndex,
+            recordingId = currentRecordingId,
             positionSeconds = 0.0,
             nowMs = nowMs,
             logDeviceId = null,
@@ -83,12 +84,15 @@ class PlaybackQueueMutationCoordinator(
         change: CurrentQueueChangeResult,
         nowMs: Long,
     ) {
-        val removedEntry = change.removedEntry ?: return
         val playbackState = playbackSessionService.getOrCreateState(accountId)
-        val removedWasPlaying = playbackState.recordingId == removedEntry.recordingId
+        val removedWasPlaying =
+            playbackState.currentIndex != null && playbackState.currentIndex == change.removedIndex
+
+        val currentIndex = change.currentIndex
+        val currentRecordingId = change.currentRecordingId
 
         when {
-            change.currentEntry == null -> handleQueueCleared(accountId, nowMs)
+            currentIndex == null || currentRecordingId == null -> handleQueueCleared(accountId, nowMs)
             removedWasPlaying && playbackState.status == com.coooolfan.unirhy.sync.protocol.PlaybackStatus.PLAYING -> {
                 playbackSchedulerService.cancelPendingPlayTimeout(accountId)
                 playbackSessionService.clearPendingPlay(accountId)
@@ -96,15 +100,16 @@ class PlaybackQueueMutationCoordinator(
                     accountId = accountId,
                     commandId = "queue-remove-current-$nowMs",
                     initiatorDeviceId = null,
-                    recordingId = change.currentEntry.recordingId,
+                    currentIndex = currentIndex,
+                    recordingId = currentRecordingId,
                     positionSeconds = 0.0,
                     nowMs = nowMs,
                     logDeviceId = null,
                 )
             }
 
-            removedWasPlaying || change.previousCurrentEntry?.entryId != change.currentEntry.entryId -> {
-                syncPausedPlaybackToCurrentQueue(accountId, change.currentEntry, nowMs)
+            removedWasPlaying || change.previousCurrentIndex != change.currentIndex -> {
+                syncPausedPlaybackToCurrentQueue(accountId, currentIndex, nowMs)
             }
         }
     }

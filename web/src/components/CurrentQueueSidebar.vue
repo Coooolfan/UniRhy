@@ -45,36 +45,46 @@ const close = () => {
     emit('update:expanded', false)
 }
 
-const playQueueEntry = (entryId: number) => {
-    void audioStore.playQueueEntry(entryId)
+const playQueueEntry = (queueIndex: number) => {
+    void audioStore.playQueueEntry(queueIndex)
 }
 
 const clearQueue = () => {
     void audioStore.clearQueue()
 }
 
-const moveQueueEntry = (entryId: number, direction: -1 | 1) => {
+const moveQueueEntry = (queueIndex: number, direction: -1 | 1) => {
     const queueEntries = [...audioStore.queueEntries]
-    const currentIndex = queueEntries.findIndex((entry) => entry.entryId === entryId)
-    if (currentIndex < 0) {
+    if (queueIndex < 0 || queueIndex >= queueEntries.length) {
         return
     }
 
-    const targetIndex = currentIndex + direction
+    const targetIndex = queueIndex + direction
     if (targetIndex < 0 || targetIndex >= queueEntries.length) {
         return
     }
 
-    const [movedEntry] = queueEntries.splice(currentIndex, 1)
+    const [movedEntry] = queueEntries.splice(queueIndex, 1)
     if (!movedEntry) {
         return
     }
     queueEntries.splice(targetIndex, 0, movedEntry)
-    void audioStore.reorderQueue(queueEntries.map((entry) => entry.entryId))
+    let nextCurrentIndex = audioStore.currentQueueIndex
+    if (nextCurrentIndex === queueIndex) {
+        nextCurrentIndex = targetIndex
+    } else if (queueIndex < nextCurrentIndex && targetIndex >= nextCurrentIndex) {
+        nextCurrentIndex -= 1
+    } else if (queueIndex > nextCurrentIndex && targetIndex <= nextCurrentIndex) {
+        nextCurrentIndex += 1
+    }
+    void audioStore.reorderQueue(
+        queueEntries.map((entry) => entry.recordingId),
+        nextCurrentIndex,
+    )
 }
 
-const removeQueueEntry = (entryId: number) => {
-    void audioStore.removeQueueEntry(entryId)
+const removeQueueEntry = (queueIndex: number) => {
+    void audioStore.removeQueueEntry(queueIndex)
 }
 
 const updatePlaybackStrategy = (value: 'SEQUENTIAL' | 'SHUFFLE' | 'RADIO') => {
@@ -199,10 +209,10 @@ const updateStopStrategy = (value: 'TRACK' | 'LIST') => {
             <div class="min-h-0 space-y-1 overflow-y-auto pr-1">
                 <div
                     v-for="(entry, index) in audioStore.queueEntries"
-                    :key="entry.entryId"
+                    :key="`${entry.recordingId}-${entry.queueIndex}`"
                     class="group flex items-center gap-3 px-3 py-2 transition-colors"
                     :class="
-                        audioStore.currentQueueEntry?.entryId === entry.entryId
+                        audioStore.currentQueueIndex === entry.queueIndex
                             ? 'bg-[#F8E8D5]'
                             : 'hover:bg-white'
                     "
@@ -210,7 +220,7 @@ const updateStopStrategy = (value: 'TRACK' | 'LIST') => {
                     <button
                         type="button"
                         class="flex min-w-0 flex-1 items-center gap-3 text-left"
-                        @click="playQueueEntry(entry.entryId)"
+                        @click="playQueueEntry(entry.queueIndex)"
                     >
                         <div
                             class="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[#E8DED0]"
@@ -228,7 +238,7 @@ const updateStopStrategy = (value: 'TRACK' | 'LIST') => {
                             <div class="flex items-center gap-2">
                                 <LoaderCircle
                                     v-if="
-                                        audioStore.currentQueueEntry?.entryId === entry.entryId &&
+                                        audioStore.currentQueueIndex === entry.queueIndex &&
                                         audioStore.isLoading
                                     "
                                     :size="13"
@@ -237,7 +247,7 @@ const updateStopStrategy = (value: 'TRACK' | 'LIST') => {
                                 <span
                                     class="truncate text-sm"
                                     :class="
-                                        audioStore.currentQueueEntry?.entryId === entry.entryId
+                                        audioStore.currentQueueIndex === entry.queueIndex
                                             ? 'font-semibold text-[#2C2420]'
                                             : 'font-medium text-[#473A32]'
                                     "
@@ -262,7 +272,7 @@ const updateStopStrategy = (value: 'TRACK' | 'LIST') => {
                             type="button"
                             class="p-1.5 text-[#8C857B] transition-colors hover:text-[#C17D46]"
                             :disabled="index === 0 || !audioStore.canSendRealtimeControl"
-                            @click.stop="moveQueueEntry(entry.entryId, -1)"
+                            @click.stop="moveQueueEntry(entry.queueIndex, -1)"
                         >
                             <ArrowUp :size="14" />
                         </button>
@@ -273,7 +283,7 @@ const updateStopStrategy = (value: 'TRACK' | 'LIST') => {
                                 index === audioStore.queueEntries.length - 1 ||
                                 !audioStore.canSendRealtimeControl
                             "
-                            @click.stop="moveQueueEntry(entry.entryId, 1)"
+                            @click.stop="moveQueueEntry(entry.queueIndex, 1)"
                         >
                             <ArrowDown :size="14" />
                         </button>
@@ -281,7 +291,7 @@ const updateStopStrategy = (value: 'TRACK' | 'LIST') => {
                             type="button"
                             class="p-1.5 text-[#8C857B] transition-colors hover:text-[#B55B4A]"
                             :disabled="!audioStore.canSendRealtimeControl"
-                            @click.stop="removeQueueEntry(entry.entryId)"
+                            @click.stop="removeQueueEntry(entry.queueIndex)"
                         >
                             <Trash2 :size="14" />
                         </button>

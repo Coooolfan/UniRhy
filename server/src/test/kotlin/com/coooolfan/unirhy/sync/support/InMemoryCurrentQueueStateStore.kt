@@ -1,26 +1,42 @@
 package com.coooolfan.unirhy.sync.support
 
-import com.coooolfan.unirhy.sync.model.AccountCurrentQueueState
+import com.coooolfan.unirhy.sync.model.AccountPlayQueueState
 import com.coooolfan.unirhy.sync.service.CurrentQueueStateStore
 
 class InMemoryCurrentQueueStateStore : CurrentQueueStateStore {
-    private val states = linkedMapOf<Long, AccountCurrentQueueState>()
+    private val states = linkedMapOf<Long, AccountPlayQueueState>()
     var loadCount: Int = 0
         private set
 
-    override fun load(accountId: Long): AccountCurrentQueueState? {
+    override fun load(accountId: Long): AccountPlayQueueState? {
         loadCount += 1
         return states[accountId]?.deepCopy()
     }
 
-    override fun upsert(state: AccountCurrentQueueState) {
-        states[state.accountId] = state.deepCopy()
+    override fun save(
+        expectedVersion: Long,
+        state: AccountPlayQueueState,
+    ): Boolean {
+        val existing = states[state.accountId]
+        return when {
+            existing == null && expectedVersion == 0L -> {
+                states[state.accountId] = state.deepCopy()
+                true
+            }
+
+            existing != null && existing.version == expectedVersion -> {
+                states[state.accountId] = state.deepCopy()
+                true
+            }
+
+            else -> false
+        }
     }
 
-    private fun AccountCurrentQueueState.deepCopy(): AccountCurrentQueueState {
+    private fun AccountPlayQueueState.deepCopy(): AccountPlayQueueState {
         return copy(
-            items = items.map { it.copy() }.toMutableList(),
-            shuffleEntryIds = shuffleEntryIds.toMutableList(),
+            recordingIds = recordingIds.toMutableList(),
+            shuffleIndices = shuffleIndices.toMutableList(),
         )
     }
 }

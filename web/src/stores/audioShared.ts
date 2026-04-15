@@ -18,7 +18,7 @@ export type AudioTrack = {
 }
 
 export type AudioQueueEntry = {
-    entryId: number
+    queueIndex: number
     recordingId: number
     mediaFileId?: number
     title: string
@@ -52,7 +52,7 @@ export type PlaybackSyncLocalExecutionSnapshot = {
     scheduledOffset: number
     whenContextTime: number
     bufferDuration: number
-    recordingId: number | null
+    currentIndex: number | null
     mediaFileId: number | null
 }
 
@@ -185,17 +185,26 @@ export const isSameTrackRef = (left: AudioTrack | null, right: AudioTrack) => {
 
 export const createEmptyQueue = (): CurrentQueueDto => ({
     items: [],
+    recordingIds: [],
+    currentIndex: 0,
     playbackStrategy: 'SEQUENTIAL',
     stopStrategy: 'LIST',
+    playbackStatus: 'PAUSED',
+    positionMs: 0,
+    serverTimeToExecuteMs: 0,
     version: 0,
     updatedAtMs: 0,
 })
 
 export const cloneQueue = (queue: CurrentQueueDto): CurrentQueueDto => ({
     items: queue.items.map((item) => ({ ...item })),
-    ...(queue.currentEntryId === undefined ? {} : { currentEntryId: queue.currentEntryId }),
+    recordingIds: [...queue.recordingIds],
+    currentIndex: queue.currentIndex,
     playbackStrategy: queue.playbackStrategy,
     stopStrategy: queue.stopStrategy,
+    playbackStatus: queue.playbackStatus,
+    positionMs: queue.positionMs,
+    serverTimeToExecuteMs: queue.serverTimeToExecuteMs,
     version: queue.version,
     updatedAtMs: queue.updatedAtMs,
 })

@@ -122,27 +122,27 @@ export const useAudioStore = defineStore('audio', () => {
     })
 
     const currentQueueEntry = computed(() => {
-        const currentEntryId = currentQueue.value.currentEntryId
-        if (currentEntryId === undefined) {
+        const { currentIndex, items } = currentQueue.value
+        if (currentIndex < 0) {
             return null
         }
-        return currentQueue.value.items.find((item) => item.entryId === currentEntryId) ?? null
+        return items[currentIndex] ?? null
     })
 
     const currentQueueIndex = computed(() => {
-        const currentEntryId = currentQueue.value.currentEntryId
-        if (currentEntryId === undefined) {
+        const { currentIndex, items } = currentQueue.value
+        if (currentIndex < 0 || currentIndex >= items.length) {
             return -1
         }
-        return currentQueue.value.items.findIndex((item) => item.entryId === currentEntryId)
+        return currentIndex
     })
 
     const queueEntries = computed<AudioQueueEntry[]>(() =>
-        currentQueue.value.items.map((item) => {
+        currentQueue.value.items.map((item, index) => {
             const track = createTrackFromQueueItem(item)
 
             return {
-                entryId: item.entryId,
+                queueIndex: index,
                 recordingId: item.recordingId,
                 mediaFileId: track.mediaFileId,
                 title: track.title,
@@ -270,6 +270,40 @@ export const useAudioStore = defineStore('audio', () => {
 
     const getEstimatedServerNowMs = () => {
         return nowClientMs() + clockOffsetMs.value
+    }
+
+    const syncQueuePlaybackState = (state: PlaybackSyncStatePayload) => {
+        currentQueue.value = {
+            ...currentQueue.value,
+            currentIndex: state.currentIndex ?? currentQueue.value.currentIndex,
+            playbackStatus: state.status,
+            positionMs: Math.max(0, Math.round(state.positionSeconds * 1_000)),
+            serverTimeToExecuteMs: state.serverTimeToExecuteMs,
+            version: state.version,
+            updatedAtMs: state.updatedAtMs,
+        }
+    }
+
+    const getCurrentQueueVersion = () => {
+        return Math.max(currentQueue.value.version, latestSnapshot.value?.version ?? 0)
+    }
+
+    const getQueueRecordingId = (queueIndex: number | null | undefined) => {
+        if (queueIndex === null || queueIndex === undefined || queueIndex < 0) {
+            return null
+        }
+        return currentQueue.value.recordingIds[queueIndex] ?? null
+    }
+
+    const getCurrentQueueControlContext = () => {
+        const currentIndex = currentQueueIndex.value
+        if (currentIndex < 0) {
+            return null
+        }
+        return {
+            currentIndex,
+            version: getCurrentQueueVersion(),
+        }
     }
 
     const clearScheduledTimers = () => {
@@ -632,10 +666,15 @@ export const useAudioStore = defineStore('audio', () => {
 
         queuedPlayIntent.value = null
         awaitingSyncRecovery.value = false
+        const controlContext = getCurrentQueueControlContext()
+        if (!controlContext) {
+            return
+        }
         playbackSyncClient.value.sendPlay({
             commandId: nextCommandId('play'),
-            recordingId: queued.track.id,
+            currentIndex: controlContext.currentIndex,
             positionSeconds: queued.positionSeconds,
+            version: controlContext.version,
         })
     }
 
@@ -753,7 +792,7 @@ export const useAudioStore = defineStore('audio', () => {
             scheduledOffset,
             whenContextTime: when,
             bufferDuration: buffer.duration,
-            recordingId: payload.scheduledAction.recordingId,
+            currentIndex: payload.scheduledAction.currentIndex,
             mediaFileId: track.mediaFileId ?? null,
         }
         const nextNode = createSourceNode(buffer)
@@ -811,34 +850,37 @@ export const useAudioStore = defineStore('audio', () => {
 
         playbackSyncClient.value.sendAudioSourceLoaded({
             commandId: payload.commandId,
+            currentIndex: payload.currentIndex,
             recordingId: payload.recordingId,
         })
     }
 
     const handleSnapshot = async (payload: SnapshotPayload) => {
         const snapshotVersion = payload.state.version
-        const snapshotRecordingId = payload.state.recordingId
+        const snapshotCurrentIndex = payload.state.currentIndex
         latestSnapshotReceivedAtMs.value = nowClientMs()
         latestSnapshot.value = payload.state
         lastAppliedVersion.value = Math.max(lastAppliedVersion.value, snapshotVersion)
         if ('queue' in payload && payload.queue) {
             applyQueueSnapshot(payload.queue)
         }
+        syncQueuePlaybackState(payload.state)
 
-        if (isNil(payload.state.recordingId)) {
+        const snapshotRecordingId = getQueueRecordingId(payload.state.currentIndex)
+        if (isNil(snapshotCurrentIndex) || isNil(snapshotRecordingId)) {
             if (!isPlaying.value) {
                 applyPausedState(null, 0)
             }
             return
         }
 
-        const shellTrack = createTrackShell(payload.state.recordingId)
+        const shellTrack = createTrackShell(snapshotRecordingId)
         void hydrateTrackMetadata(shellTrack)
         const track = (await resolveTrackForPlayback(shellTrack)) ?? shellTrack
 
         if (
             latestSnapshot.value?.version !== snapshotVersion ||
-            latestSnapshot.value.recordingId !== snapshotRecordingId
+            latestSnapshot.value.currentIndex !== snapshotCurrentIndex
         ) {
             return
         }
@@ -877,18 +919,18 @@ export const useAudioStore = defineStore('audio', () => {
         latestSnapshotReceivedAtMs.value = nowClientMs()
         latestSnapshot.value = {
             status: scheduledAction.status,
-            recordingId: scheduledAction.recordingId,
+            currentIndex: scheduledAction.currentIndex,
             positionSeconds: scheduledAction.positionSeconds,
             serverTimeToExecuteMs: payload.serverTimeToExecuteMs,
             version: scheduledAction.version,
             updatedAtMs: nowClientMs(),
         }
+        syncQueuePlaybackState(latestSnapshot.value)
 
         const actionToken = scheduledAction.version
+        const scheduledRecordingId = getQueueRecordingId(scheduledAction.currentIndex)
         const shellTrack =
-            scheduledAction.recordingId === null
-                ? null
-                : createTrackShell(scheduledAction.recordingId)
+            scheduledRecordingId === null ? null : createTrackShell(scheduledRecordingId)
         if (shellTrack) {
             void hydrateTrackMetadata(shellTrack)
         }
@@ -1009,13 +1051,18 @@ export const useAudioStore = defineStore('audio', () => {
     }
 
     const sendPlayCommand = (track: AudioTrack, positionSeconds: number) => {
+        const controlContext = getCurrentQueueControlContext()
+        if (!controlContext) {
+            return
+        }
         primeTrackState(track, positionSeconds)
         queuedPlayIntent.value = null
         awaitingSyncRecovery.value = false
         ensureSyncClient().sendPlay({
             commandId: nextCommandId('play'),
-            recordingId: track.id,
+            currentIndex: controlContext.currentIndex,
             positionSeconds,
+            version: controlContext.version,
         })
     }
 
@@ -1031,10 +1078,15 @@ export const useAudioStore = defineStore('audio', () => {
 
         const isSameTrack = isSameTrackRef(currentTrack.value, track)
         if (toggleIfSameTrack && isSameTrack && isPlaying.value) {
+            const controlContext = getCurrentQueueControlContext()
+            if (!controlContext) {
+                return
+            }
             ensureSyncClient().sendPause({
                 commandId: nextCommandId('pause'),
-                recordingId: currentTrack.value?.id ?? null,
+                currentIndex: controlContext.currentIndex,
                 positionSeconds: currentTime.value,
+                version: controlContext.version,
             })
             return
         }
@@ -1078,28 +1130,34 @@ export const useAudioStore = defineStore('audio', () => {
 
         if (queueRecordingIdsEqual(recordingIds)) {
             const targetQueueEntry = currentQueue.value.items[currentIndex]
-            if (targetQueueEntry) {
-                if (currentQueue.value.currentEntryId !== targetQueueEntry.entryId) {
-                    const queue = await api.playbackQueueController.setCurrentEntry({
-                        body: { entryId: targetQueueEntry.entryId },
-                    })
-                    applyQueueSnapshot(queue)
-                    await requestPlay(targetTrack, 0)
-                    return
-                }
+            if (!targetQueueEntry) {
+                return
+            }
+            if (currentQueue.value.currentIndex !== currentIndex) {
+                const queue = await api.playbackQueueController.setCurrentIndex({
+                    body: { currentIndex, version: getCurrentQueueVersion() },
+                })
+                applyQueueSnapshot(queue)
+                await requestPlay(targetTrack, 0)
+                return
+            }
 
-                if (isSameTrackRef(currentTrack.value, targetTrack)) {
-                    if (isPlaying.value) {
-                        ensureSyncClient().sendPause({
-                            commandId: nextCommandId('pause'),
-                            recordingId: currentTrack.value?.id ?? null,
-                            positionSeconds: currentTime.value,
-                        })
-                    } else {
-                        await requestPlay(targetTrack, currentTime.value)
+            if (isSameTrackRef(currentTrack.value, targetTrack)) {
+                if (isPlaying.value) {
+                    const controlContext = getCurrentQueueControlContext()
+                    if (!controlContext) {
+                        return
                     }
-                    return
+                    ensureSyncClient().sendPause({
+                        commandId: nextCommandId('pause'),
+                        currentIndex: controlContext.currentIndex,
+                        positionSeconds: currentTime.value,
+                        version: controlContext.version,
+                    })
+                } else {
+                    await requestPlay(targetTrack, currentTime.value)
                 }
+                return
             }
         }
 
@@ -1107,6 +1165,7 @@ export const useAudioStore = defineStore('audio', () => {
             body: {
                 recordingIds,
                 currentIndex,
+                version: getCurrentQueueVersion(),
             },
         })
         applyQueueSnapshot(queue)
@@ -1124,32 +1183,29 @@ export const useAudioStore = defineStore('audio', () => {
         const queue = await api.playbackQueueController.appendToCurrentQueue({
             body: {
                 recordingIds: tracks.map((track) => track.id),
+                version: getCurrentQueueVersion(),
             },
         })
         applyQueueSnapshot(queue)
     }
 
-    async function reorderQueue(entryIds: number[]) {
-        if (entryIds.length === 0) {
+    async function reorderQueue(recordingIds: number[], currentIndex: number) {
+        if (recordingIds.length === 0 || currentIndex < 0 || currentIndex >= recordingIds.length) {
             return
         }
 
         const queue = await api.playbackQueueController.reorderCurrentQueue({
-            body: { entryIds },
+            body: { recordingIds, currentIndex, version: getCurrentQueueVersion() },
         })
         applyQueueSnapshot(queue)
     }
 
-    async function playQueueEntry(entryId: number) {
-        const queue = await api.playbackQueueController.setCurrentEntry({
-            body: { entryId },
+    async function playQueueEntry(currentIndex: number) {
+        const queue = await api.playbackQueueController.setCurrentIndex({
+            body: { currentIndex, version: getCurrentQueueVersion() },
         })
         applyQueueSnapshot(queue)
-        const nextCurrentEntry = queue.currentEntryId
-        if (nextCurrentEntry === undefined) {
-            return
-        }
-        const currentItem = queue.items.find((item) => item.entryId === nextCurrentEntry)
+        const currentItem = queue.items[queue.currentIndex]
         if (!currentItem) {
             return
         }
@@ -1161,7 +1217,9 @@ export const useAudioStore = defineStore('audio', () => {
         if (currentQueue.value.items.length === 0) {
             return
         }
-        const queue = await api.playbackQueueController.playNextInCurrentQueue()
+        const queue = await api.playbackQueueController.playNextInCurrentQueue({
+            body: { version: getCurrentQueueVersion() },
+        })
         applyQueueSnapshot(queue)
     }
 
@@ -1169,7 +1227,9 @@ export const useAudioStore = defineStore('audio', () => {
         if (currentQueue.value.items.length === 0) {
             return
         }
-        const queue = await api.playbackQueueController.playPreviousInCurrentQueue()
+        const queue = await api.playbackQueueController.playPreviousInCurrentQueue({
+            body: { version: getCurrentQueueVersion() },
+        })
         applyQueueSnapshot(queue)
     }
 
@@ -1181,30 +1241,37 @@ export const useAudioStore = defineStore('audio', () => {
             body: {
                 playbackStrategy: nextPlaybackStrategy,
                 stopStrategy: nextStopStrategy,
+                version: getCurrentQueueVersion(),
             },
         })
         applyQueueSnapshot(queue)
     }
 
-    async function removeQueueEntry(entryId: number) {
-        const queue = await api.playbackQueueController.removeCurrentQueueEntry({ entryId })
+    async function removeQueueEntry(index: number) {
+        const queue = await api.playbackQueueController.removeCurrentQueueEntry({
+            body: { index, version: getCurrentQueueVersion() },
+        })
         applyQueueSnapshot(queue)
     }
 
     async function clearQueue() {
-        const queue = await api.playbackQueueController.clearCurrentQueue()
+        const queue = await api.playbackQueueController.clearCurrentQueue({
+            body: { version: getCurrentQueueVersion() },
+        })
         applyQueueSnapshot(queue)
     }
 
     function pause() {
-        if (!currentTrack.value || !canSendRealtimeControl.value) {
+        const controlContext = getCurrentQueueControlContext()
+        if (!currentTrack.value || !canSendRealtimeControl.value || !controlContext) {
             return
         }
 
         ensureSyncClient().sendPause({
             commandId: nextCommandId('pause'),
-            recordingId: currentTrack.value.id,
+            currentIndex: controlContext.currentIndex,
             positionSeconds: currentTime.value,
+            version: controlContext.version,
         })
     }
 
@@ -1250,10 +1317,15 @@ export const useAudioStore = defineStore('audio', () => {
             return
         }
 
+        const controlContext = getCurrentQueueControlContext()
+        if (!controlContext) {
+            return
+        }
         ensureSyncClient().sendPause({
             commandId: nextCommandId('stop'),
-            recordingId: null,
+            currentIndex: controlContext.currentIndex,
             positionSeconds: 0,
+            version: controlContext.version,
         })
     }
 
@@ -1268,7 +1340,8 @@ export const useAudioStore = defineStore('audio', () => {
     }
 
     function seek(time: number) {
-        if (!currentTrack.value || !canSendRealtimeControl.value) {
+        const controlContext = getCurrentQueueControlContext()
+        if (!currentTrack.value || !canSendRealtimeControl.value || !controlContext) {
             return
         }
 
@@ -1276,8 +1349,9 @@ export const useAudioStore = defineStore('audio', () => {
         const nextTime = clampTime(time, bufferDuration)
         ensureSyncClient().sendSeek({
             commandId: nextCommandId('seek'),
-            recordingId: currentTrack.value.id,
+            currentIndex: controlContext.currentIndex,
             positionSeconds: nextTime,
+            version: controlContext.version,
         })
     }
 

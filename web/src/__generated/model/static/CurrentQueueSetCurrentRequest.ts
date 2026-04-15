@@ -1,3 +1,4 @@
 export interface CurrentQueueSetCurrentRequest {
-    readonly entryId: number;
+    readonly currentIndex: number;
+    readonly version: number;
 }

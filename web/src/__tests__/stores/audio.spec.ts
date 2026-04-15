@@ -6,7 +6,7 @@ const apiMockState = vi.hoisted(() => ({
     replaceCurrentQueue: vi.fn(),
     appendToCurrentQueue: vi.fn(),
     reorderCurrentQueue: vi.fn(),
-    setCurrentEntry: vi.fn(),
+    setCurrentIndex: vi.fn(),
     updateCurrentQueueStrategy: vi.fn(),
     playNextInCurrentQueue: vi.fn(),
     playPreviousInCurrentQueue: vi.fn(),
@@ -219,7 +219,7 @@ vi.mock('@/ApiInstance', async (importOriginal) => {
             replaceCurrentQueue: apiMockState.replaceCurrentQueue,
             appendToCurrentQueue: apiMockState.appendToCurrentQueue,
             reorderCurrentQueue: apiMockState.reorderCurrentQueue,
-            setCurrentEntry: apiMockState.setCurrentEntry,
+            setCurrentIndex: apiMockState.setCurrentIndex,
             updateCurrentQueueStrategy: apiMockState.updateCurrentQueueStrategy,
             playNextInCurrentQueue: apiMockState.playNextInCurrentQueue,
             playPreviousInCurrentQueue: apiMockState.playPreviousInCurrentQueue,
@@ -332,7 +332,7 @@ const getRecordingMock = vi.mocked(api.recordingController.getRecording)
 const replaceCurrentQueueMock = apiMockState.replaceCurrentQueue
 const appendToCurrentQueueMock = apiMockState.appendToCurrentQueue
 const reorderCurrentQueueMock = apiMockState.reorderCurrentQueue
-const setCurrentEntryMock = apiMockState.setCurrentEntry
+const setCurrentIndexMock = apiMockState.setCurrentIndex
 const updateCurrentQueueStrategyMock = apiMockState.updateCurrentQueueStrategy
 const playNextInCurrentQueueMock = apiMockState.playNextInCurrentQueue
 const playPreviousInCurrentQueueMock = apiMockState.playPreviousInCurrentQueue
@@ -463,17 +463,20 @@ const buildTrack = (id: number, src = `/audio/${id}.mp3`): AudioTrack => ({
 })
 
 const buildQueue = (tracks: AudioTrack[], currentIndex = 0) => ({
-    items: tracks.map((track, index) => ({
-        entryId: index + 1,
+    items: tracks.map((track) => ({
         recordingId: track.id,
         title: track.title,
         artistLabel: track.artist,
         coverUrl: track.cover,
         durationMs: 180_000,
     })),
-    ...(tracks[currentIndex] ? { currentEntryId: currentIndex + 1 } : {}),
+    recordingIds: tracks.map((track) => track.id),
+    currentIndex: tracks[currentIndex] ? currentIndex : 0,
     playbackStrategy: 'SEQUENTIAL' as const,
     stopStrategy: 'LIST' as const,
+    playbackStatus: 'PAUSED' as const,
+    positionMs: 0,
+    serverTimeToExecuteMs: 0,
     version: 1,
     updatedAtMs: nowClientMs(),
 })
@@ -579,12 +582,16 @@ describe('audio store', () => {
         replaceCurrentQueueMock.mockReset()
         appendToCurrentQueueMock.mockReset()
         reorderCurrentQueueMock.mockReset()
-        setCurrentEntryMock.mockReset()
+        setCurrentIndexMock.mockReset()
         removeCurrentQueueEntryMock.mockReset()
         clearCurrentQueueMock.mockReset()
         getRecordingMock.mockRejectedValue(new Error('metadata unavailable'))
         replaceCurrentQueueMock.mockImplementation(
-            ({ body }: { body: { recordingIds: number[]; currentIndex: number } }) =>
+            ({
+                body,
+            }: {
+                body: { recordingIds: number[]; currentIndex: number; version: number }
+            }) =>
                 Promise.resolve(
                     buildQueue(
                         body.recordingIds.map((recordingId: number) => buildTrack(recordingId)),
@@ -594,7 +601,7 @@ describe('audio store', () => {
         )
         appendToCurrentQueueMock.mockResolvedValue(buildQueue([]))
         reorderCurrentQueueMock.mockResolvedValue(buildQueue([]))
-        setCurrentEntryMock.mockResolvedValue(buildQueue([]))
+        setCurrentIndexMock.mockResolvedValue(buildQueue([]))
         removeCurrentQueueEntryMock.mockResolvedValue(buildQueue([]))
         clearCurrentQueueMock.mockResolvedValue(buildQueue([]))
 
@@ -640,20 +647,23 @@ describe('audio store', () => {
         expect(client.sendPlay).toHaveBeenCalledTimes(1)
         expect(client.sendPlay).toHaveBeenCalledWith(
             expect.objectContaining({
-                recordingId: secondTrack.id,
+                currentIndex: 0,
                 positionSeconds: 0,
+                version: 1,
             }),
         )
         expect(replaceCurrentQueueMock).toHaveBeenNthCalledWith(1, {
             body: {
                 recordingIds: [1],
                 currentIndex: 0,
+                version: 0,
             },
         })
         expect(replaceCurrentQueueMock).toHaveBeenNthCalledWith(2, {
             body: {
                 recordingIds: [2],
                 currentIndex: 0,
+                version: 0,
             },
         })
     })
@@ -672,7 +682,8 @@ describe('audio store', () => {
         await flushPromises()
 
         expect(audioStore.queueEntries).toHaveLength(2)
-        expect(audioStore.currentQueueEntry?.entryId).toBe(2)
+        expect(audioStore.currentQueueIndex).toBe(1)
+        expect(audioStore.currentQueueEntry?.recordingId).toBe(4)
         expect(audioStore.currentTrack?.id).toBe(4)
         expect(audioStore.currentTrack?.title).toBe('Track 4')
     })
@@ -701,9 +712,14 @@ describe('audio store', () => {
 
         await audioStore.playNext()
 
-        expect(playNextInCurrentQueueMock).toHaveBeenCalledWith()
+        expect(playNextInCurrentQueueMock).toHaveBeenCalledWith({
+            body: {
+                version: 1,
+            },
+        })
         expect(playPreviousInCurrentQueueMock).not.toHaveBeenCalled()
-        expect(audioStore.currentQueueEntry?.entryId).toBe(2)
+        expect(audioStore.currentQueueIndex).toBe(1)
+        expect(audioStore.currentQueueEntry?.recordingId).toBe(6)
         expect(audioStore.currentTrack?.id).toBe(6)
         expect(client.sendPlay).not.toHaveBeenCalled()
     })
@@ -732,6 +748,7 @@ describe('audio store', () => {
             body: {
                 playbackStrategy: 'RADIO',
                 stopStrategy: 'TRACK',
+                version: 1,
             },
         })
         expect(audioStore.playbackStrategy).toBe('RADIO')
@@ -750,6 +767,7 @@ describe('audio store', () => {
             type: 'ROOM_EVENT_LOAD_AUDIO_SOURCE',
             payload: {
                 commandId: 'cmd-play-1',
+                currentIndex: 0,
                 recordingId: 7,
             },
         }
@@ -760,6 +778,7 @@ describe('audio store', () => {
         expect(fetchMock).toHaveBeenCalledWith('/api/media/2007', { credentials: 'include' })
         expect(client.sendAudioSourceLoaded).toHaveBeenCalledWith({
             commandId: 'cmd-play-1',
+            currentIndex: 0,
             recordingId: 7,
         })
         expect(audioStore.currentTrack?.id).toBe(7)
@@ -800,6 +819,7 @@ describe('audio store', () => {
             type: 'ROOM_EVENT_LOAD_AUDIO_SOURCE',
             payload: {
                 commandId: 'cmd-play-2',
+                currentIndex: 0,
                 recordingId: 8,
             },
         } satisfies LoadAudioSourceMessage)
@@ -811,6 +831,7 @@ describe('audio store', () => {
         )
         expect(client.sendAudioSourceLoaded).toHaveBeenCalledWith({
             commandId: 'cmd-play-2',
+            currentIndex: 0,
             recordingId: 8,
         })
     })
@@ -837,7 +858,7 @@ describe('audio store', () => {
                 scheduledAction: {
                     action: 'PLAY',
                     status: 'PLAYING',
-                    recordingId: 5,
+                    currentIndex: 0,
                     positionSeconds: 12,
                     version: 2,
                 },
@@ -858,7 +879,7 @@ describe('audio store', () => {
                 scheduledAction: {
                     action: 'PAUSE',
                     status: 'PAUSED',
-                    recordingId: null,
+                    currentIndex: null,
                     positionSeconds: 0,
                     version: 1,
                 },
@@ -880,7 +901,7 @@ describe('audio store', () => {
             payload: {
                 state: {
                     status: 'PAUSED',
-                    recordingId: 7,
+                    currentIndex: 0,
                     positionSeconds: 12,
                     serverTimeToExecuteMs: nowClientMs(),
                     version: 5,
@@ -904,7 +925,7 @@ describe('audio store', () => {
                 scheduledAction: {
                     action: 'PAUSE',
                     status: 'PAUSED',
-                    recordingId: null,
+                    currentIndex: null,
                     positionSeconds: 0,
                     version: 4,
                 },
@@ -927,7 +948,7 @@ describe('audio store', () => {
             payload: {
                 state: {
                     status: 'PLAYING',
-                    recordingId: 8,
+                    currentIndex: 0,
                     positionSeconds: 16,
                     serverTimeToExecuteMs: performance.timeOrigin + performance.now(),
                     version: 3,
@@ -961,7 +982,7 @@ describe('audio store', () => {
             payload: {
                 state: {
                     status: 'PAUSED',
-                    recordingId: 8,
+                    currentIndex: 0,
                     positionSeconds: 16,
                     serverTimeToExecuteMs: nowClientMs(),
                     version: 3,
@@ -991,7 +1012,7 @@ describe('audio store', () => {
                 scheduledAction: {
                     action: 'PAUSE',
                     status: 'PAUSED',
-                    recordingId: 8,
+                    currentIndex: 0,
                     positionSeconds: 16,
                     version: 3,
                 },
@@ -1031,7 +1052,7 @@ describe('audio store', () => {
             payload: {
                 state: {
                     status: 'PAUSED',
-                    recordingId: 7,
+                    currentIndex: 0,
                     positionSeconds: 12,
                     serverTimeToExecuteMs: nowClientMs(),
                     version: 5,
@@ -1045,6 +1066,7 @@ describe('audio store', () => {
             type: 'ROOM_EVENT_LOAD_AUDIO_SOURCE',
             payload: {
                 commandId: 'cmd-load-debug',
+                currentIndex: 0,
                 recordingId: 7,
             },
         } satisfies LoadAudioSourceMessage)
@@ -1100,7 +1122,7 @@ describe('audio store', () => {
                 scheduledAction: {
                     action: 'PLAY',
                     status: 'PLAYING',
-                    recordingId: 6,
+                    currentIndex: 0,
                     positionSeconds: 4,
                     version: 6,
                 },
@@ -1115,6 +1137,59 @@ describe('audio store', () => {
         expect(debug.lastLocalExecution?.waitMs).toBeGreaterThanOrEqual(0)
         expect(debug.lastLocalExecution?.scheduledOffset).toBe(4)
         expect(debug.currentBuffer?.mediaFileId).toBe(2_006)
+    })
+
+    it('uses the latest scheduled-action version for subsequent control commands', async () => {
+        const audioStore = useAudioStore()
+        audioStore.connectPlaybackSync()
+        const client = latestClient()
+        client.setState({
+            phase: 'ready',
+            clockOffsetMs: 0,
+            roundTripEstimateMs: 10,
+        })
+
+        client.emitMessage({
+            type: 'SNAPSHOT',
+            payload: {
+                state: {
+                    status: 'PAUSED',
+                    currentIndex: 0,
+                    positionSeconds: 12,
+                    serverTimeToExecuteMs: nowClientMs(),
+                    version: 8,
+                    updatedAtMs: nowClientMs(),
+                },
+                queue: buildQueue([buildTrack(6)], 0),
+                serverNowMs: nowClientMs(),
+            },
+        })
+        await flushPromises(12)
+
+        client.emitMessage({
+            type: 'SCHEDULED_ACTION',
+            payload: {
+                commandId: 'cmd-seek-version-bump',
+                serverTimeToExecuteMs: nowClientMs(),
+                scheduledAction: {
+                    action: 'SEEK',
+                    status: 'PAUSED',
+                    currentIndex: 0,
+                    positionSeconds: 18,
+                    version: 9,
+                },
+            },
+        } satisfies ScheduledActionMessage)
+        await flushPromises(12)
+
+        audioStore.pause()
+
+        expect(client.sendPause).toHaveBeenLastCalledWith(
+            expect.objectContaining({
+                currentIndex: 0,
+                version: 9,
+            }),
+        )
     })
 
     it('reflects queued play and disconnect in the debug snapshot', async () => {
@@ -1132,7 +1207,7 @@ describe('audio store', () => {
             payload: {
                 state: {
                     status: 'PLAYING',
-                    recordingId: 11,
+                    currentIndex: 0,
                     positionSeconds: 3,
                     serverTimeToExecuteMs: nowClientMs(),
                     version: 8,
@@ -1188,6 +1263,7 @@ describe('audio store', () => {
             type: 'ROOM_EVENT_LOAD_AUDIO_SOURCE',
             payload: {
                 commandId: 'cmd-preload-1',
+                currentIndex: 0,
                 recordingId: 7,
             },
         }
@@ -1207,10 +1283,12 @@ describe('audio store', () => {
         expect(fetchMock).toHaveBeenCalledTimes(1)
         expect(client.sendAudioSourceLoaded).toHaveBeenNthCalledWith(1, {
             commandId: 'cmd-preload-1',
+            currentIndex: 0,
             recordingId: 7,
         })
         expect(client.sendAudioSourceLoaded).toHaveBeenNthCalledWith(2, {
             commandId: 'cmd-preload-2',
+            currentIndex: 0,
             recordingId: 7,
         })
         expect(audioStore.duration).toBe(45)
@@ -1229,6 +1307,7 @@ describe('audio store', () => {
             type: 'ROOM_EVENT_LOAD_AUDIO_SOURCE',
             payload: {
                 commandId: 'cmd-preload-metadata',
+                currentIndex: 0,
                 recordingId: 7,
             },
         } satisfies LoadAudioSourceMessage)
@@ -1259,6 +1338,7 @@ describe('audio store', () => {
         )
         expect(client.sendAudioSourceLoaded).toHaveBeenCalledWith({
             commandId: 'cmd-preload-metadata',
+            currentIndex: 0,
             recordingId: 7,
         })
     })
@@ -1276,7 +1356,7 @@ describe('audio store', () => {
             payload: {
                 state: {
                     status: 'PAUSED',
-                    recordingId: 12,
+                    currentIndex: 0,
                     positionSeconds: 1,
                     serverTimeToExecuteMs: nowClientMs(),
                     version: 1,
@@ -1296,7 +1376,7 @@ describe('audio store', () => {
                 scheduledAction: {
                     action: 'PAUSE',
                     status: 'PAUSED',
-                    recordingId: 12,
+                    currentIndex: 0,
                     positionSeconds: 1,
                     version: 2,
                 },
@@ -1334,7 +1414,7 @@ describe('audio store', () => {
             payload: {
                 state: {
                     status: 'PAUSED',
-                    recordingId: 14,
+                    currentIndex: 0,
                     positionSeconds: 0,
                     serverTimeToExecuteMs: nowClientMs(),
                     version: 1,
@@ -1354,6 +1434,7 @@ describe('audio store', () => {
             type: 'ROOM_EVENT_LOAD_AUDIO_SOURCE',
             payload: {
                 commandId: 'cmd-retry-metadata',
+                currentIndex: 0,
                 recordingId: 14,
             },
         } satisfies LoadAudioSourceMessage)
@@ -1389,7 +1470,7 @@ describe('audio store', () => {
             payload: {
                 state: {
                     status: 'PAUSED',
-                    recordingId: 21,
+                    currentIndex: 0,
                     positionSeconds: 0,
                     serverTimeToExecuteMs: nowClientMs(),
                     version: 1,
@@ -1406,7 +1487,7 @@ describe('audio store', () => {
             payload: {
                 state: {
                     status: 'PAUSED',
-                    recordingId: 22,
+                    currentIndex: 0,
                     positionSeconds: 0,
                     serverTimeToExecuteMs: nowClientMs(),
                     version: 2,
@@ -1454,7 +1535,7 @@ describe('audio store', () => {
             payload: {
                 state: {
                     status: 'PAUSED',
-                    recordingId: 2,
+                    currentIndex: 0,
                     positionSeconds: 0,
                     serverTimeToExecuteMs: nowClientMs(),
                     version: 1,
@@ -1473,7 +1554,7 @@ describe('audio store', () => {
             payload: {
                 state: {
                     status: 'PAUSED',
-                    recordingId: 1,
+                    currentIndex: 0,
                     positionSeconds: 0,
                     serverTimeToExecuteMs: nowClientMs(),
                     version: 2,
@@ -1501,6 +1582,7 @@ describe('audio store', () => {
             type: 'ROOM_EVENT_LOAD_AUDIO_SOURCE',
             payload: {
                 commandId: 'cmd-late-load',
+                currentIndex: 0,
                 recordingId: 9,
             },
         } satisfies LoadAudioSourceMessage)
@@ -1544,7 +1626,7 @@ describe('audio store', () => {
                 scheduledAction: {
                     action: 'PLAY',
                     status: 'PLAYING',
-                    recordingId: 6,
+                    currentIndex: 0,
                     positionSeconds: 4,
                     version: 6,
                 },

@@ -41,13 +41,14 @@ class PlaybackAutoAdvanceService(
         val action = scheduledAction.scheduledAction
         if (
             action.status != PlaybackStatus.PLAYING ||
-            action.recordingId == null
+            action.currentIndex == null
         ) {
             return
         }
 
         val currentEntry = currentQueueService.getCurrentEntry(accountId) ?: return
-        if (currentEntry.recordingId != action.recordingId) {
+        val currentState = playbackSessionService.getOrCreateState(accountId)
+        if (currentState.currentIndex != action.currentIndex) {
             return
         }
 
@@ -68,7 +69,7 @@ class PlaybackAutoAdvanceService(
     private fun advanceToNext(accountId: Long) {
         val nowMs = timeProvider.nowMs()
         val queue = currentQueueService.getQueue(accountId)
-        if (queue.currentEntryId == null) {
+        if (queue.recordingIds.isEmpty()) {
             return
         }
         if (queue.stopStrategy == StopStrategy.TRACK) {
@@ -76,19 +77,21 @@ class PlaybackAutoAdvanceService(
             return
         }
 
-        val queueChange = currentQueueService.navigateToNext(accountId, nowMs)
+        val queueChange = currentQueueService.navigateToNext(accountId = accountId, nowMs = nowMs)
         if (!queueChange.changed) {
             stopAtCurrentEntry(accountId, nowMs)
             return
         }
         messageSender.broadcastQueueChange(accountId, queueChange.queue)
 
-        val nextEntry = queueChange.currentEntry ?: return
+        val nextIndex = queueChange.currentIndex ?: return
+        val nextRecordingId = queueChange.currentRecordingId ?: return
         playbackSessionService.createPendingPlay(
             accountId = accountId,
             commandId = "auto-next-$nowMs",
             initiatorDeviceId = null,
-            recordingId = nextEntry.recordingId,
+            currentIndex = nextIndex,
+            recordingId = nextRecordingId,
             positionSeconds = 0.0,
             nowMs = nowMs,
             timeoutAtMs = nowMs + PlaybackSchedulerService.PENDING_PLAY_TIMEOUT_MS,
@@ -98,11 +101,12 @@ class PlaybackAutoAdvanceService(
             accountId = accountId,
             payload = com.coooolfan.unirhy.sync.protocol.LoadAudioSourcePayload(
                 commandId = "auto-next-$nowMs",
-                recordingId = nextEntry.recordingId,
+                currentIndex = nextIndex,
+                recordingId = nextRecordingId,
             ),
         )
 
-        playbackSchedulerService.schedulePendingPlayTimeout(accountId, "auto-next-$nowMs") {
+        playbackSchedulerService.schedulePendingPlayTimeout(accountId) {
             val timeoutNowMs = timeProvider.nowMs()
             val scheduledAction = playbackSessionService.completePendingPlay(
                 accountId = accountId,
@@ -120,11 +124,10 @@ class PlaybackAutoAdvanceService(
         accountId: Long,
         nowMs: Long,
     ) {
-        val currentEntry = currentQueueService.getCurrentEntry(accountId)
         val scheduledAction = playbackSessionService.schedulePause(
             accountId = accountId,
             commandId = "auto-stop-$nowMs",
-            recordingId = currentEntry?.recordingId,
+            currentIndex = playbackSessionService.getOrCreateState(accountId).currentIndex,
             positionSeconds = 0.0,
             nowMs = nowMs,
             executeAtMs = playbackSchedulerService.calculateExecuteAtMs(accountId, nowMs),

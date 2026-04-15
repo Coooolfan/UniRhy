@@ -1,3 +1,5 @@
 export interface CurrentQueueReorderRequest {
-    readonly entryIds: ReadonlyArray<number>;
+    readonly recordingIds: ReadonlyArray<number>;
+    readonly currentIndex: number;
+    readonly version: number;
 }

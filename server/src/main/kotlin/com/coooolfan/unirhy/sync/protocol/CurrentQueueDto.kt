@@ -12,7 +12,6 @@ enum class StopStrategy {
 }
 
 data class CurrentQueueItemDto(
-    val entryId: Long,
     val recordingId: Long,
     val title: String,
     val artistLabel: String,
@@ -22,9 +21,13 @@ data class CurrentQueueItemDto(
 
 data class CurrentQueueDto(
     val items: List<CurrentQueueItemDto>,
-    val currentEntryId: Long? = null,
+    val recordingIds: List<Long>,
+    val currentIndex: Int,
     val playbackStrategy: PlaybackStrategy,
     val stopStrategy: StopStrategy,
+    val playbackStatus: PlaybackStatus,
+    val positionMs: Long,
+    val serverTimeToExecuteMs: Long,
     val version: Long,
     val updatedAtMs: Long,
 )

@@ -1,154 +1,146 @@
 package com.coooolfan.unirhy.sync.service
 
-import com.coooolfan.unirhy.sync.model.AccountCurrentQueueState
-import com.coooolfan.unirhy.sync.model.CurrentQueueEntry
+import com.coooolfan.unirhy.sync.model.AccountPlayQueueState
+import com.coooolfan.unirhy.sync.protocol.PlaybackStatus
 import com.coooolfan.unirhy.sync.protocol.PlaybackStrategy
 import com.coooolfan.unirhy.sync.protocol.StopStrategy
-import com.fasterxml.jackson.databind.ObjectMapper
-import org.slf4j.LoggerFactory
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate
 import org.springframework.stereotype.Service
+import java.sql.Timestamp
+import java.time.Instant
 
 interface CurrentQueueStateStore {
-    fun load(accountId: Long): AccountCurrentQueueState?
+    fun load(accountId: Long): AccountPlayQueueState?
 
-    fun upsert(state: AccountCurrentQueueState)
+    fun save(
+        expectedVersion: Long,
+        state: AccountPlayQueueState,
+    ): Boolean
 }
 
 @Service
 class JdbcCurrentQueueStateStore(
     private val jdbc: NamedParameterJdbcTemplate,
-    private val objectMapper: ObjectMapper,
 ) : CurrentQueueStateStore {
-    private val logger = LoggerFactory.getLogger(JdbcCurrentQueueStateStore::class.java)
-
-    override fun load(accountId: Long): AccountCurrentQueueState? {
+    override fun load(accountId: Long): AccountPlayQueueState? {
         val params = MapSqlParameterSource().addValue("accountId", accountId)
-        val row = jdbc.query(
+        return jdbc.query(
             """
-                SELECT state::text AS state,
-                       version,
-                       updated_at_ms
-                FROM public.account_current_queue
+                SELECT account_id,
+                       recording_ids,
+                       current_index,
+                       shuffle_indices,
+                       playback_strategy,
+                       stop_strategy,
+                       playback_status,
+                       position_ms,
+                       server_time_to_execute_ms,
+                       updated_at,
+                       version
+                FROM public.play_queue
                 WHERE account_id = :accountId
             """.trimIndent(),
             params,
         ) { rs, _ ->
-            StoredCurrentQueueRow(
-                state = rs.getString("state"),
+            AccountPlayQueueState(
+                accountId = rs.getLong("account_id"),
+                recordingIds = readLongArray(rs.getArray("recording_ids")),
+                currentIndex = rs.getInt("current_index"),
+                shuffleIndices = readIntArray(rs.getArray("shuffle_indices")),
+                playbackStrategy = PlaybackStrategy.valueOf(rs.getString("playback_strategy")),
+                stopStrategy = StopStrategy.valueOf(rs.getString("stop_strategy")),
+                playbackStatus = PlaybackStatus.valueOf(rs.getString("playback_status")),
+                positionMs = rs.getLong("position_ms"),
+                serverTimeToExecuteMs = rs.getLong("server_time_to_execute_ms"),
                 version = rs.getLong("version"),
-                updatedAtMs = rs.getLong("updated_at_ms"),
+                updatedAtMs = rs.getTimestamp("updated_at").toInstant().toEpochMilli(),
             )
-        }.singleOrNull() ?: return null
-
-        return try {
-            row.toAccountCurrentQueueState(accountId, objectMapper)
-        } catch (ex: Exception) {
-            logger.warn("Failed to deserialize current queue state for accountId={}", accountId, ex)
-            null
-        }
+        }.singleOrNull()
     }
 
-    override fun upsert(state: AccountCurrentQueueState) {
+    override fun save(
+        expectedVersion: Long,
+        state: AccountPlayQueueState,
+    ): Boolean {
         val params = MapSqlParameterSource()
             .addValue("accountId", state.accountId)
-            .addValue("state", objectMapper.writeValueAsString(state.toSnapshot()))
-            .addValue("version", state.version)
-            .addValue("updatedAtMs", state.updatedAtMs)
-        jdbc.update(
+            .addValue("recordingIds", state.recordingIds.toTypedArray())
+            .addValue("currentIndex", state.currentIndex)
+            .addValue("shuffleIndices", state.shuffleIndices.toTypedArray())
+            .addValue("playbackStrategy", state.playbackStrategy.name)
+            .addValue("stopStrategy", state.stopStrategy.name)
+            .addValue("playbackStatus", state.playbackStatus.name)
+            .addValue("positionMs", state.positionMs)
+            .addValue("serverTimeToExecuteMs", state.serverTimeToExecuteMs)
+            .addValue("updatedAt", Timestamp.from(Instant.ofEpochMilli(state.updatedAtMs)))
+            .addValue("nextVersion", state.version)
+            .addValue("expectedVersion", expectedVersion)
+
+        if (expectedVersion == 0L) {
+            val inserted = jdbc.update(
+                """
+                    INSERT INTO public.play_queue (
+                        account_id,
+                        recording_ids,
+                        current_index,
+                        shuffle_indices,
+                        playback_strategy,
+                        stop_strategy,
+                        playback_status,
+                        position_ms,
+                        server_time_to_execute_ms,
+                        updated_at,
+                        version
+                    ) VALUES (
+                        :accountId,
+                        :recordingIds,
+                        :currentIndex,
+                        :shuffleIndices,
+                        :playbackStrategy,
+                        :stopStrategy,
+                        :playbackStatus,
+                        :positionMs,
+                        :serverTimeToExecuteMs,
+                        :updatedAt,
+                        :nextVersion
+                    )
+                    ON CONFLICT (account_id) DO NOTHING
+                """.trimIndent(),
+                params,
+            )
+            if (inserted > 0) {
+                return true
+            }
+        }
+
+        return jdbc.update(
             """
-                INSERT INTO public.account_current_queue (
-                    account_id,
-                    state,
-                    version,
-                    updated_at_ms
-                ) VALUES (
-                    :accountId,
-                    CAST(:state AS jsonb),
-                    :version,
-                    :updatedAtMs
-                )
-                ON CONFLICT (account_id) DO UPDATE
-                SET state = EXCLUDED.state,
-                    version = EXCLUDED.version,
-                    updated_at_ms = EXCLUDED.updated_at_ms
+                UPDATE public.play_queue
+                SET recording_ids = :recordingIds,
+                    current_index = :currentIndex,
+                    shuffle_indices = :shuffleIndices,
+                    playback_strategy = :playbackStrategy,
+                    stop_strategy = :stopStrategy,
+                    playback_status = :playbackStatus,
+                    position_ms = :positionMs,
+                    server_time_to_execute_ms = :serverTimeToExecuteMs,
+                    updated_at = :updatedAt,
+                    version = :nextVersion
+                WHERE account_id = :accountId
+                  AND version = :expectedVersion
             """.trimIndent(),
             params,
-        )
+        ) > 0
     }
-}
 
-internal data class CurrentQueueStateSnapshot(
-    val items: List<CurrentQueueEntrySnapshot>,
-    val currentEntryId: Long? = null,
-    val playbackStrategy: PlaybackStrategy,
-    val stopStrategy: StopStrategy,
-    val shuffleEntryIds: List<Long>,
-    val nextEntryId: Long,
-)
+    private fun readLongArray(array: java.sql.Array?): MutableList<Long> {
+        val values = array?.array as? Array<*> ?: return mutableListOf()
+        return values.map { (it as Number).toLong() }.toMutableList()
+    }
 
-internal data class CurrentQueueEntrySnapshot(
-    val entryId: Long,
-    val recordingId: Long,
-    val workId: Long,
-    val title: String,
-    val artistLabel: String,
-    val coverMediaFileId: Long? = null,
-    val durationMs: Long,
-)
-
-private data class StoredCurrentQueueRow(
-    val state: String,
-    val version: Long,
-    val updatedAtMs: Long,
-)
-
-internal fun AccountCurrentQueueState.toSnapshot(): CurrentQueueStateSnapshot {
-    return CurrentQueueStateSnapshot(
-        items = items.map { entry ->
-            CurrentQueueEntrySnapshot(
-                entryId = entry.entryId,
-                recordingId = entry.recordingId,
-                workId = entry.workId,
-                title = entry.title,
-                artistLabel = entry.artistLabel,
-                coverMediaFileId = entry.coverMediaFileId,
-                durationMs = entry.durationMs,
-            )
-        },
-        currentEntryId = currentEntryId,
-        playbackStrategy = playbackStrategy,
-        stopStrategy = stopStrategy,
-        shuffleEntryIds = shuffleEntryIds.toList(),
-        nextEntryId = nextEntryId,
-    )
-}
-
-private fun StoredCurrentQueueRow.toAccountCurrentQueueState(
-    accountId: Long,
-    objectMapper: ObjectMapper,
-): AccountCurrentQueueState {
-    val snapshot = objectMapper.readValue(state, CurrentQueueStateSnapshot::class.java)
-    return AccountCurrentQueueState(
-        accountId = accountId,
-        items = snapshot.items.map { entry ->
-            CurrentQueueEntry(
-                entryId = entry.entryId,
-                recordingId = entry.recordingId,
-                workId = entry.workId,
-                title = entry.title,
-                artistLabel = entry.artistLabel,
-                coverMediaFileId = entry.coverMediaFileId,
-                durationMs = entry.durationMs,
-            )
-        }.toMutableList(),
-        currentEntryId = snapshot.currentEntryId,
-        playbackStrategy = snapshot.playbackStrategy,
-        stopStrategy = snapshot.stopStrategy,
-        shuffleEntryIds = snapshot.shuffleEntryIds.toMutableList(),
-        nextEntryId = snapshot.nextEntryId,
-        version = version,
-        updatedAtMs = updatedAtMs,
-    )
+    private fun readIntArray(array: java.sql.Array?): MutableList<Int> {
+        val values = array?.array as? Array<*> ?: return mutableListOf()
+        return values.map { (it as Number).toInt() }.toMutableList()
+    }
 }

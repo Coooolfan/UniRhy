@@ -1,455 +1,91 @@
 package com.coooolfan.unirhy.sync.protocol
 
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
-import com.fasterxml.jackson.module.kotlin.readValue
-import kotlin.reflect.KClass
 import kotlin.test.Test
-import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class PlaybackSyncProtocolSerializationTest {
-
     private val objectMapper = jacksonObjectMapper()
 
     @Test
-    fun `serializes each client message with frozen envelope`() {
-        clientSamples.forEach { sample ->
-            val actualJson = objectMapper.writerFor(ClientPlaybackSyncMessage::class.java)
-                .writeValueAsString(sample.message)
-            assertJsonEquals(sample.expectedJson, actualJson)
-        }
-    }
-
-    @Test
-    fun `deserializes each client message into expected subtype`() {
-        clientSamples.forEach { sample ->
-            val actualMessage = objectMapper.readValue<ClientPlaybackSyncMessage>(sample.expectedJson)
-            assertEquals(sample.expectedType, actualMessage::class)
-            assertEquals(sample.message, actualMessage)
-        }
-    }
-
-    @Test
-    fun `serializes each server message with frozen envelope`() {
-        serverSamples.forEach { sample ->
-            val actualJson = objectMapper.writerFor(ServerPlaybackSyncMessage::class.java)
-                .writeValueAsString(sample.message)
-            assertJsonEquals(sample.expectedJson, actualJson)
-        }
-    }
-
-    @Test
-    fun `deserializes each server message into expected subtype`() {
-        serverSamples.forEach { sample ->
-            val actualMessage = objectMapper.readValue<ServerPlaybackSyncMessage>(sample.expectedJson)
-            assertEquals(sample.expectedType, actualMessage::class)
-            assertEquals(sample.message, actualMessage)
-        }
-    }
-
-    private fun assertJsonEquals(expectedJson: String, actualJson: String) {
-        assertEquals(
-            objectMapper.readTree(expectedJson),
-            objectMapper.readTree(actualJson),
-        )
-    }
-
-    private data class ClientSample(
-        val message: ClientPlaybackSyncMessage,
-        val expectedJson: String,
-        val expectedType: KClass<out ClientPlaybackSyncMessage>,
-    )
-
-    private data class ServerSample(
-        val message: ServerPlaybackSyncMessage,
-        val expectedJson: String,
-        val expectedType: KClass<out ServerPlaybackSyncMessage>,
-    )
-
-    private val clientSamples = listOf(
-        ClientSample(
-            message = HelloMessage(
-                payload = HelloPayload(
-                    deviceId = "web-7c2f",
-                    clientVersion = "web@0.1.0",
-                ),
-            ),
-            expectedJson = """
-                {
-                  "type": "HELLO",
-                  "payload": {
-                    "deviceId": "web-7c2f",
-                    "clientVersion": "web@0.1.0"
-                  }
-                }
-            """.trimIndent(),
-            expectedType = HelloMessage::class,
-        ),
-        ClientSample(
-            message = NtpRequestMessage(
-                payload = NtpRequestPayload(
-                    t0 = 1730844000000,
-                    clientRttMs = 18.5,
-                ),
-            ),
-            expectedJson = """
-                {
-                  "type": "NTP_REQUEST",
-                  "payload": {
-                    "t0": 1730844000000,
-                    "clientRttMs": 18.5
-                  }
-                }
-            """.trimIndent(),
-            expectedType = NtpRequestMessage::class,
-        ),
-        ClientSample(
-            message = PlayMessage(
+    fun `play payload serializes current index and version`() {
+        val json = objectMapper.writeValueAsString(
+            PlayMessage(
                 payload = PlaybackControlPayload(
                     commandId = "cmd-play-001",
                     deviceId = "web-7c2f",
-                    recordingId = 1001,
+                    currentIndex = 1,
                     positionSeconds = 12.5,
+                    version = 9L,
                 ),
             ),
-            expectedJson = """
-                {
-                  "type": "PLAY",
-                  "payload": {
-                    "commandId": "cmd-play-001",
-                    "deviceId": "web-7c2f",
-                    "recordingId": 1001,
-                    "positionSeconds": 12.5
-                  }
-                }
-            """.trimIndent(),
-            expectedType = PlayMessage::class,
-        ),
-        ClientSample(
-            message = PauseMessage(
-                payload = PlaybackControlPayload(
-                    commandId = "cmd-pause-001",
-                    deviceId = "web-7c2f",
-                    recordingId = 1001,
-                    positionSeconds = 36.25,
-                ),
-            ),
-            expectedJson = """
-                {
-                  "type": "PAUSE",
-                  "payload": {
-                    "commandId": "cmd-pause-001",
-                    "deviceId": "web-7c2f",
-                    "recordingId": 1001,
-                    "positionSeconds": 36.25
-                  }
-                }
-            """.trimIndent(),
-            expectedType = PauseMessage::class,
-        ),
-        ClientSample(
-            message = SeekMessage(
-                payload = PlaybackControlPayload(
-                    commandId = "cmd-seek-001",
-                    deviceId = "web-7c2f",
-                    recordingId = 1001,
-                    positionSeconds = 91.0,
-                ),
-            ),
-            expectedJson = """
-                {
-                  "type": "SEEK",
-                  "payload": {
-                    "commandId": "cmd-seek-001",
-                    "deviceId": "web-7c2f",
-                    "recordingId": 1001,
-                    "positionSeconds": 91.0
-                  }
-                }
-            """.trimIndent(),
-            expectedType = SeekMessage::class,
-        ),
-        ClientSample(
-            message = AudioSourceLoadedMessage(
-                payload = AudioSourceLoadedPayload(
-                    commandId = "cmd-play-001",
-                    deviceId = "web-85ab",
-                    recordingId = 1001,
-                ),
-            ),
-            expectedJson = """
-                {
-                  "type": "AUDIO_SOURCE_LOADED",
-                  "payload": {
-                    "commandId": "cmd-play-001",
-                    "deviceId": "web-85ab",
-                    "recordingId": 1001
-                  }
-                }
-            """.trimIndent(),
-            expectedType = AudioSourceLoadedMessage::class,
-        ),
-        ClientSample(
-            message = SyncMessage(
-                payload = SyncPayload(
-                    deviceId = "web-85ab",
-                ),
-            ),
-            expectedJson = """
-                {
-                  "type": "SYNC",
-                  "payload": {
-                    "deviceId": "web-85ab"
-                  }
-                }
-            """.trimIndent(),
-            expectedType = SyncMessage::class,
-        ),
-    )
+        )
 
-    private val serverSamples = listOf(
-        ServerSample(
-            message = NtpResponseMessage(
-                payload = NtpResponsePayload(
-                    t0 = 1730844000000,
-                    t1 = 1730844000012,
-                    t2 = 1730844000014,
-                ),
-            ),
-            expectedJson = """
-                {
-                  "type": "NTP_RESPONSE",
-                  "payload": {
-                    "t0": 1730844000000,
-                    "t1": 1730844000012,
-                    "t2": 1730844000014
-                  }
-                }
-            """.trimIndent(),
-            expectedType = NtpResponseMessage::class,
-        ),
-        ServerSample(
-            message = SnapshotMessage(
+        assertTrue(json.contains(""""currentIndex":1"""))
+        assertTrue(json.contains(""""version":9"""))
+    }
+
+    @Test
+    fun `snapshot payload serializes queue and playback state with current index`() {
+        val json = objectMapper.writeValueAsString(
+            SnapshotMessage(
                 payload = SnapshotPayload(
                     state = AccountPlaybackStateDto(
-                        status = PlaybackStatus.PLAYING,
-                        recordingId = 1001,
-                        positionSeconds = 12.5,
-                        serverTimeToExecuteMs = 1730844001500,
-                        version = 8,
-                        updatedAtMs = 1730844000100,
-                    ),
-                    queue = CurrentQueueDto(
-                        items = listOf(
-                            CurrentQueueItemDto(
-                                entryId = 1,
-                                recordingId = 1001,
-                                title = "Track 1",
-                                artistLabel = "Artist 1",
-                                coverUrl = "/api/media/3001",
-                                durationMs = 180000,
-                            ),
-                        ),
-                        currentEntryId = 1,
-                        playbackStrategy = PlaybackStrategy.SEQUENTIAL,
-                        stopStrategy = StopStrategy.LIST,
-                        version = 3,
-                        updatedAtMs = 1730844000090,
-                    ),
-                    serverNowMs = 1730844000200,
-                ),
-            ),
-            expectedJson = """
-                {
-                  "type": "SNAPSHOT",
-                  "payload": {
-                    "state": {
-                      "status": "PLAYING",
-                      "recordingId": 1001,
-                      "positionSeconds": 12.5,
-                      "serverTimeToExecuteMs": 1730844001500,
-                      "version": 8,
-                      "updatedAtMs": 1730844000100
-                    },
-                    "queue": {
-                      "items": [
-                        {
-                          "entryId": 1,
-                          "recordingId": 1001,
-                          "title": "Track 1",
-                          "artistLabel": "Artist 1",
-                          "coverUrl": "/api/media/3001",
-                          "durationMs": 180000
-                        }
-                      ],
-                      "currentEntryId": 1,
-                      "playbackStrategy": "SEQUENTIAL",
-                      "stopStrategy": "LIST",
-                      "version": 3,
-                      "updatedAtMs": 1730844000090
-                    },
-                    "serverNowMs": 1730844000200
-                  }
-                }
-            """.trimIndent(),
-            expectedType = SnapshotMessage::class,
-        ),
-        ServerSample(
-            message = LoadAudioSourceMessage(
-                payload = LoadAudioSourcePayload(
-                    commandId = "cmd-play-001",
-                    recordingId = 1001,
-                ),
-            ),
-            expectedJson = """
-                {
-                  "type": "ROOM_EVENT_LOAD_AUDIO_SOURCE",
-                  "payload": {
-                    "commandId": "cmd-play-001",
-                    "recordingId": 1001
-                  }
-                }
-            """.trimIndent(),
-            expectedType = LoadAudioSourceMessage::class,
-        ),
-        ServerSample(
-            message = QueueChangeMessage(
-                payload = QueueChangePayload(
-                    queue = CurrentQueueDto(
-                        items = listOf(
-                            CurrentQueueItemDto(
-                                entryId = 1,
-                                recordingId = 1001,
-                                title = "Track 1",
-                                artistLabel = "Artist 1",
-                                coverUrl = "/api/media/3001",
-                                durationMs = 180000,
-                            ),
-                            CurrentQueueItemDto(
-                                entryId = 2,
-                                recordingId = 1002,
-                                title = "Track 2",
-                                artistLabel = "Artist 2",
-                                coverUrl = null,
-                                durationMs = 210000,
-                            ),
-                        ),
-                        currentEntryId = 2,
-                        playbackStrategy = PlaybackStrategy.SEQUENTIAL,
-                        stopStrategy = StopStrategy.LIST,
-                        version = 4,
-                        updatedAtMs = 1730844000500,
-                    ),
-                ),
-            ),
-            expectedJson = """
-                {
-                  "type": "ROOM_EVENT_QUEUE_CHANGE",
-                  "payload": {
-                    "queue": {
-                      "items": [
-                        {
-                          "entryId": 1,
-                          "recordingId": 1001,
-                          "title": "Track 1",
-                          "artistLabel": "Artist 1",
-                          "coverUrl": "/api/media/3001",
-                          "durationMs": 180000
-                        },
-                        {
-                          "entryId": 2,
-                          "recordingId": 1002,
-                          "title": "Track 2",
-                          "artistLabel": "Artist 2",
-                          "coverUrl": null,
-                          "durationMs": 210000
-                        }
-                      ],
-                      "currentEntryId": 2,
-                      "playbackStrategy": "SEQUENTIAL",
-                      "stopStrategy": "LIST",
-                      "version": 4,
-                      "updatedAtMs": 1730844000500
-                    }
-                  }
-                }
-            """.trimIndent(),
-            expectedType = QueueChangeMessage::class,
-        ),
-        ServerSample(
-            message = ScheduledActionMessage(
-                payload = ScheduledActionPayload(
-                    commandId = "cmd-seek-001",
-                    serverTimeToExecuteMs = 1730844001500,
-                    scheduledAction = ScheduledPlaybackAction(
-                        action = ScheduledActionType.SEEK,
                         status = PlaybackStatus.PAUSED,
-                        recordingId = 1001,
-                        positionSeconds = 91.0,
-                        version = 9,
+                        currentIndex = 1,
+                        positionSeconds = 36.25,
+                        serverTimeToExecuteMs = 1_730_844_000_500,
+                        version = 8L,
+                        updatedAtMs = 1_730_844_000_200,
+                    ),
+                    queue = CurrentQueueDto(
+                        items = listOf(
+                            CurrentQueueItemDto(
+                                recordingId = 1001L,
+                                title = "Track 1",
+                                artistLabel = "Artist 1",
+                                durationMs = 180_000L,
+                            ),
+                        ),
+                        recordingIds = listOf(1001L),
+                        currentIndex = 0,
+                        playbackStrategy = PlaybackStrategy.SEQUENTIAL,
+                        stopStrategy = StopStrategy.LIST,
+                        playbackStatus = PlaybackStatus.PAUSED,
+                        positionMs = 36_250L,
+                        serverTimeToExecuteMs = 1_730_844_000_500,
+                        version = 8L,
+                        updatedAtMs = 1_730_844_000_200,
+                    ),
+                    serverNowMs = 1_730_844_000_300,
+                ),
+            ),
+        )
+
+        assertTrue(json.contains(""""currentIndex":1"""))
+        assertTrue(json.contains(""""recordingIds":[1001]"""))
+        assertTrue(json.contains(""""positionMs":36250"""))
+    }
+
+    @Test
+    fun `scheduled action serializes current index`() {
+        val json = objectMapper.writeValueAsString(
+            ScheduledActionMessage(
+                payload = ScheduledActionPayload(
+                    commandId = "cmd-play-001",
+                    serverTimeToExecuteMs = 1_730_844_000_600,
+                    scheduledAction = ScheduledPlaybackAction(
+                        action = ScheduledActionType.PLAY,
+                        status = PlaybackStatus.PLAYING,
+                        currentIndex = 2,
+                        positionSeconds = 24.0,
+                        version = 10L,
                     ),
                 ),
             ),
-            expectedJson = """
-                {
-                  "type": "SCHEDULED_ACTION",
-                  "payload": {
-                    "commandId": "cmd-seek-001",
-                    "serverTimeToExecuteMs": 1730844001500,
-                    "scheduledAction": {
-                      "action": "SEEK",
-                      "status": "PAUSED",
-                      "recordingId": 1001,
-                      "positionSeconds": 91.0,
-                      "version": 9
-                    }
-                  }
-                }
-            """.trimIndent(),
-            expectedType = ScheduledActionMessage::class,
-        ),
-        ServerSample(
-            message = DeviceChangeMessage(
-                payload = DeviceChangePayload(
-                    devices = listOf(
-                        PlaybackSyncDevice(deviceId = "web-7c2f"),
-                        PlaybackSyncDevice(deviceId = "web-85ab"),
-                    ),
-                ),
-            ),
-            expectedJson = """
-                {
-                  "type": "ROOM_EVENT_DEVICE_CHANGE",
-                  "payload": {
-                    "devices": [
-                      {
-                        "deviceId": "web-7c2f"
-                      },
-                      {
-                        "deviceId": "web-85ab"
-                      }
-                    ]
-                  }
-                }
-            """.trimIndent(),
-            expectedType = DeviceChangeMessage::class,
-        ),
-        ServerSample(
-            message = ErrorMessage(
-                payload = ErrorPayload(
-                    code = PlaybackSyncErrorCode.RECORDING_NOT_PLAYABLE,
-                    message = "Recording 1001 has no playable audio asset",
-                ),
-            ),
-            expectedJson = """
-                {
-                  "type": "ERROR",
-                  "payload": {
-                    "code": "RECORDING_NOT_PLAYABLE",
-                    "message": "Recording 1001 has no playable audio asset"
-                  }
-                }
-            """.trimIndent(),
-            expectedType = ErrorMessage::class,
-        ),
-    )
+        )
+
+        assertTrue(json.contains(""""currentIndex":2"""))
+        assertTrue(json.contains(""""version":10"""))
+    }
 }

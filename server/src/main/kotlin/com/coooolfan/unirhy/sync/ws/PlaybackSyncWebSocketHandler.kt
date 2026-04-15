@@ -6,7 +6,9 @@ import com.coooolfan.unirhy.sync.protocol.*
 import com.coooolfan.unirhy.sync.service.*
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.springframework.beans.factory.annotation.Qualifier
+import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Component
+import org.springframework.web.server.ResponseStatusException
 import org.springframework.web.socket.CloseStatus
 import org.springframework.web.socket.TextMessage
 import org.springframework.web.socket.WebSocketSession
@@ -103,6 +105,21 @@ class PlaybackSyncWebSocketHandler(
                 message = ex.message,
                 reason = ex.reason,
             )
+        } catch (ex: ResponseStatusException) {
+            val (code, reason) = if (
+                ex.statusCode == HttpStatus.CONFLICT &&
+                ex.reason == CurrentQueueService.VERSION_CONFLICT_REASON
+            ) {
+                PlaybackSyncErrorCode.VERSION_CONFLICT to PlaybackSyncErrorReason.VERSION_CONFLICT
+            } else {
+                PlaybackSyncErrorCode.INVALID_MESSAGE to PlaybackSyncErrorReason.INVALID_MESSAGE
+            }
+            sendProtocolError(
+                context = context,
+                code = code,
+                message = ex.reason ?: "Invalid playback sync message",
+                reason = reason,
+            )
         } catch (_: Exception) {
             sendProtocolError(
                 context = context,
@@ -161,7 +178,6 @@ class PlaybackSyncWebSocketHandler(
         cancelPendingTimeout(sessionId)
         val context = deviceRuntimeService.registerConnection(
             accountId = accountId,
-            tokenValue = token,
             sessionId = sessionId,
             session = decoratedSession,
         )
@@ -278,18 +294,23 @@ class PlaybackSyncWebSocketHandler(
         val deviceId = requireValidControlPayload(
             context = context,
             payload = payload,
-            requireRecordingContext = true,
             nowMs = nowMs,
         )
-        val recordingId = requireNotNull(payload.recordingId)
-        val queueChange = currentQueueService.syncTrackWithPlayback(
+        val queueChange = currentQueueService.setCurrentIndex(
             accountId = context.accountId,
-            recording = currentQueueService.resolvePlayableRecordings(listOf(recordingId)).single(),
+            currentIndex = payload.currentIndex,
+            expectedVersion = payload.version,
             nowMs = nowMs,
         )
-        if (queueChange != null) {
+        if (queueChange.changed) {
             messageSender.broadcastQueueChange(context.accountId, queueChange.queue)
         }
+        val recordingId = queueChange.currentRecordingId
+            ?: throw PlaybackSyncProtocolException(
+                code = PlaybackSyncErrorCode.INVALID_MESSAGE,
+                message = "currentIndex does not resolve to a queue item",
+                reason = PlaybackSyncErrorReason.INVALID_MESSAGE,
+            )
 
         logControlRequest(
             event = PlaybackSyncLogEvents.PLAY_REQUEST,
@@ -301,7 +322,7 @@ class PlaybackSyncWebSocketHandler(
             PlaybackSyncLogEvents.PENDING_PLAY_CREATED,
             *context.toBaseLogFields(),
             PlaybackSyncLogFields.COMMAND_ID to payload.commandId,
-            PlaybackSyncLogFields.RECORDING_ID to payload.recordingId,
+            PlaybackSyncLogFields.RECORDING_ID to recordingId,
             PlaybackSyncLogFields.POSITION_SECONDS to payload.positionSeconds,
             PlaybackSyncLogFields.RESULT to "accepted",
         )
@@ -309,6 +330,7 @@ class PlaybackSyncWebSocketHandler(
             accountId = context.accountId,
             commandId = payload.commandId,
             initiatorDeviceId = deviceId,
+            currentIndex = payload.currentIndex,
             recordingId = recordingId,
             positionSeconds = payload.positionSeconds,
             nowMs = nowMs,
@@ -324,7 +346,6 @@ class PlaybackSyncWebSocketHandler(
         requireValidControlPayload(
             context = context,
             payload = payload,
-            requireRecordingContext = false,
             nowMs = nowMs,
         )
 
@@ -339,10 +360,11 @@ class PlaybackSyncWebSocketHandler(
         val scheduledAction = playbackSessionService.schedulePause(
             accountId = context.accountId,
             commandId = payload.commandId,
-            recordingId = payload.recordingId,
+            currentIndex = payload.currentIndex.takeIf { currentQueueService.getCurrentRecordingId(context.accountId) != null },
             positionSeconds = payload.positionSeconds,
             nowMs = nowMs,
             executeAtMs = playbackSchedulerService.calculateExecuteAtMs(context.accountId, nowMs),
+            expectedVersion = payload.version,
         )
         scheduledActionDispatcher.broadcastAndLog(context.accountId, context.deviceId, scheduledAction, nowMs)
         autoAdvanceService.syncFromScheduledAction(context.accountId, scheduledAction, nowMs)
@@ -356,11 +378,8 @@ class PlaybackSyncWebSocketHandler(
         requireValidControlPayload(
             context = context,
             payload = payload,
-            requireRecordingContext = true,
             nowMs = nowMs,
         )
-
-        val recordingId = requireNotNull(payload.recordingId)
 
         sessionRemovalCoordinator.abandonPendingPlay(context.accountId)
 
@@ -373,10 +392,11 @@ class PlaybackSyncWebSocketHandler(
         val scheduledAction = playbackSessionService.scheduleSeek(
             accountId = context.accountId,
             commandId = payload.commandId,
-            recordingId = recordingId,
+            currentIndex = payload.currentIndex,
             positionSeconds = payload.positionSeconds,
             nowMs = nowMs,
             executeAtMs = playbackSchedulerService.calculateExecuteAtMs(context.accountId, nowMs),
+            expectedVersion = payload.version,
         )
         scheduledActionDispatcher.broadcastAndLog(context.accountId, context.deviceId, scheduledAction, nowMs)
         autoAdvanceService.syncFromScheduledAction(context.accountId, scheduledAction, nowMs)
@@ -395,7 +415,7 @@ class PlaybackSyncWebSocketHandler(
             accountId = context.accountId,
             commandId = payload.commandId,
             deviceId = payload.deviceId,
-            recordingId = payload.recordingId,
+            currentIndex = payload.currentIndex,
         ) ?: throw PlaybackSyncProtocolException(
             code = PlaybackSyncErrorCode.INVALID_MESSAGE,
             message = "No matching pending play found for AUDIO_SOURCE_LOADED",
@@ -456,13 +476,6 @@ class PlaybackSyncWebSocketHandler(
         )
     }
 
-    internal fun handlePendingPlayTimeout(
-        accountId: Long,
-        commandId: String,
-    ) {
-        playCoordinator.handlePendingPlayTimeout(accountId, commandId)
-    }
-
     private fun handleReplacedConnection(replacedContext: PlaybackConnectionContext) {
         logWriter.logConnectionClosed(replacedContext, "replaced_by_new_connection")
         replacedContext.session.close(REPLACED_BY_NEW_CONNECTION_STATUS)
@@ -471,19 +484,17 @@ class PlaybackSyncWebSocketHandler(
     private fun requireValidControlPayload(
         context: PlaybackConnectionContext,
         payload: PlaybackControlPayload,
-        requireRecordingContext: Boolean,
         nowMs: Long,
     ): String {
         requireMatchingDevice(context, payload.deviceId)
         requireNonBlank(payload.commandId)
         requireValidPosition(payload.positionSeconds)
         deviceRuntimeService.touchDevice(context.accountId, payload.deviceId, nowMs)
-
-        if (requireRecordingContext && payload.recordingId == null) {
+        if (payload.currentIndex < 0) {
             throw PlaybackSyncProtocolException(
                 code = PlaybackSyncErrorCode.INVALID_MESSAGE,
-                message = "recordingId is required",
-                reason = PlaybackSyncErrorReason.MEDIA_CONTEXT_REQUIRED,
+                message = "currentIndex must be non-negative",
+                reason = PlaybackSyncErrorReason.INVALID_MESSAGE,
             )
         }
         return payload.deviceId
@@ -571,7 +582,8 @@ class PlaybackSyncWebSocketHandler(
             event,
             *context.toBaseLogFields(),
             PlaybackSyncLogFields.COMMAND_ID to payload.commandId,
-            PlaybackSyncLogFields.RECORDING_ID to payload.recordingId,
+            PlaybackSyncLogFields.RECORDING_ID to currentQueueService.getCurrentRecordingId(context.accountId),
+            PlaybackSyncLogFields.VERSION to payload.version,
             PlaybackSyncLogFields.POSITION_SECONDS to payload.positionSeconds,
             PlaybackSyncLogFields.RESULT to "accepted",
         )

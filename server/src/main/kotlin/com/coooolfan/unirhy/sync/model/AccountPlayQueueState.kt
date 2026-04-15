@@ -1,16 +1,19 @@
 package com.coooolfan.unirhy.sync.model
 
+import com.coooolfan.unirhy.sync.protocol.PlaybackStatus
 import com.coooolfan.unirhy.sync.protocol.PlaybackStrategy
 import com.coooolfan.unirhy.sync.protocol.StopStrategy
 
-data class AccountCurrentQueueState(
+data class AccountPlayQueueState(
     val accountId: Long,
-    val items: MutableList<CurrentQueueEntry>,
-    var currentEntryId: Long? = null,
+    val recordingIds: MutableList<Long>,
+    var currentIndex: Int = 0,
+    val shuffleIndices: MutableList<Int> = mutableListOf(),
     var playbackStrategy: PlaybackStrategy = PlaybackStrategy.SEQUENTIAL,
     var stopStrategy: StopStrategy = StopStrategy.LIST,
-    val shuffleEntryIds: MutableList<Long> = mutableListOf(),
-    var nextEntryId: Long = 1L,
+    var playbackStatus: PlaybackStatus = PlaybackStatus.PAUSED,
+    var positionMs: Long = 0L,
+    var serverTimeToExecuteMs: Long = 0L,
     var version: Long = 0L,
     var updatedAtMs: Long,
 ) {
@@ -18,12 +21,9 @@ data class AccountCurrentQueueState(
         fun initial(
             accountId: Long,
             nowMs: Long,
-        ): AccountCurrentQueueState = AccountCurrentQueueState(
+        ): AccountPlayQueueState = AccountPlayQueueState(
             accountId = accountId,
-            items = mutableListOf(),
-            currentEntryId = null,
-            nextEntryId = 1L,
-            version = 0L,
+            recordingIds = mutableListOf(),
             updatedAtMs = nowMs,
         )
     }

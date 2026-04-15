@@ -17,14 +17,12 @@ class DeviceRuntimeService(
 
     fun registerConnection(
         accountId: Long,
-        tokenValue: String,
         sessionId: String,
         session: ConcurrentWebSocketSessionDecorator,
     ): PlaybackConnectionContext {
         return lockManager.withAccountLock(accountId) {
             val context = PlaybackConnectionContext(
                 accountId = accountId,
-                tokenValue = tokenValue,
                 sessionId = sessionId,
                 session = session,
             )
@@ -103,10 +101,6 @@ class DeviceRuntimeService(
         }
     }
 
-    fun listActiveRuntimeStates(accountId: Long): List<DeviceRuntimeState> {
-        return getActiveRuntimeSnapshot(accountId).runtimeStates
-    }
-
     fun recordNtpResponse(
         accountId: Long,
         deviceId: String,
@@ -165,8 +159,9 @@ class DeviceRuntimeService(
                     sessionIds.mapNotNull { sessionId ->
                         val context = connectionContextsBySessionId[sessionId] ?: return@mapNotNull null
                         val deviceId = context.deviceId ?: return@mapNotNull null
-                        val runtimeState = runtimeStateByDeviceKey[PlaybackDeviceKey(accountId = accountId, deviceId = deviceId)]
-                            ?: return@mapNotNull null
+                        val runtimeState =
+                            runtimeStateByDeviceKey[PlaybackDeviceKey(accountId = accountId, deviceId = deviceId)]
+                                ?: return@mapNotNull null
                         if (runtimeState.lastNtpResponseAtMs == 0L) {
                             return@mapNotNull null
                         }
@@ -184,8 +179,6 @@ class DeviceRuntimeService(
                 }
             }
     }
-
-    fun hasConnection(sessionId: String): Boolean = connectionContextsBySessionId.containsKey(sessionId)
 
     private fun listDeviceIdsLocked(accountId: Long): List<String> {
         return sessionIdsByAccountId[accountId]
@@ -238,7 +231,6 @@ class DeviceRuntimeService(
 
 class PlaybackConnectionContext(
     val accountId: Long,
-    val tokenValue: String,
     val sessionId: String,
     val session: ConcurrentWebSocketSessionDecorator,
     var deviceId: String? = null,

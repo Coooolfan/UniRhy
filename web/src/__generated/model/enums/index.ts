@@ -2,6 +2,8 @@ export type {CodecType} from './CodecType';
 export {CodecType_CONSTANTS} from './CodecType';
 export type {FileProviderType} from './FileProviderType';
 export {FileProviderType_CONSTANTS} from './FileProviderType';
+export type {PlaybackStatus} from './PlaybackStatus';
+export {PlaybackStatus_CONSTANTS} from './PlaybackStatus';
 export type {PlaybackStrategy} from './PlaybackStrategy';
 export {PlaybackStrategy_CONSTANTS} from './PlaybackStrategy';
 export type {StopStrategy} from './StopStrategy';

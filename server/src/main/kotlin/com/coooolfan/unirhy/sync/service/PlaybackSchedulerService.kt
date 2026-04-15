@@ -65,7 +65,6 @@ class PlaybackSchedulerService(
 
     fun schedulePendingPlayTimeout(
         accountId: Long,
-        commandId: String,
         task: () -> Unit,
     ) {
         cancelPendingPlayTimeout(accountId)

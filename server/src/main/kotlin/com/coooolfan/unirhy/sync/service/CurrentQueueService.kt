@@ -4,10 +4,12 @@ import com.coooolfan.unirhy.model.Recording
 import com.coooolfan.unirhy.model.by
 import com.coooolfan.unirhy.model.id
 import com.coooolfan.unirhy.service.MediaUrlSigner
-import com.coooolfan.unirhy.sync.model.AccountCurrentQueueState
+import com.coooolfan.unirhy.sync.model.AccountPlayQueueState
+import com.coooolfan.unirhy.sync.model.AccountPlaybackState
 import com.coooolfan.unirhy.sync.model.CurrentQueueEntry
 import com.coooolfan.unirhy.sync.protocol.CurrentQueueDto
 import com.coooolfan.unirhy.sync.protocol.CurrentQueueItemDto
+import com.coooolfan.unirhy.sync.protocol.PlaybackStatus
 import com.coooolfan.unirhy.sync.protocol.PlaybackStrategy
 import com.coooolfan.unirhy.sync.protocol.StopStrategy
 import org.babyfish.jimmer.sql.kt.KSqlClient
@@ -24,9 +26,12 @@ import kotlin.random.Random
 
 data class CurrentQueueChangeResult(
     val queue: CurrentQueueDto,
-    val previousCurrentEntry: CurrentQueueEntry?,
-    val currentEntry: CurrentQueueEntry?,
-    val removedEntry: CurrentQueueEntry? = null,
+    val previousCurrentIndex: Int?,
+    val currentIndex: Int?,
+    val previousRecordingId: Long?,
+    val currentRecordingId: Long?,
+    val removedIndex: Int? = null,
+    val removedRecordingId: Long? = null,
     val changed: Boolean = true,
 )
 
@@ -47,7 +52,14 @@ class CurrentQueueService(
     private val urlSigner: MediaUrlSigner,
     private val stateStore: CurrentQueueStateStore,
 ) {
-    private val states = ConcurrentHashMap<Long, AccountCurrentQueueState>()
+    private val states = ConcurrentHashMap<Long, AccountPlayQueueState>()
+
+    private data class MutationContext(
+        val currentState: AccountPlayQueueState,
+        val nextState: AccountPlayQueueState,
+        val previousCurrentIndex: Int?,
+        val previousRecordingId: Long?,
+    )
 
     fun getQueue(accountId: Long): CurrentQueueDto {
         return lockManager.withAccountLock(accountId) {
@@ -55,130 +67,110 @@ class CurrentQueueService(
         }
     }
 
+    fun getPlaybackState(accountId: Long): AccountPlaybackState {
+        return lockManager.withAccountLock(accountId) {
+            getOrLoadStateLocked(accountId).toPlaybackState()
+        }
+    }
+
     fun getCurrentEntry(accountId: Long): CurrentQueueEntry? {
         return lockManager.withAccountLock(accountId) {
-            currentEntryOf(getOrLoadStateLocked(accountId))
+            currentRecordingIdOf(getOrLoadStateLocked(accountId))?.let(::resolveCurrentEntry)
+        }
+    }
+
+    fun getCurrentRecordingId(accountId: Long): Long? {
+        return lockManager.withAccountLock(accountId) {
+            currentRecordingIdOf(getOrLoadStateLocked(accountId))
         }
     }
 
     fun replaceQueue(
         accountId: Long,
-        recordings: List<ResolvedQueueRecording>,
+        recordingIds: List<Long>,
         currentIndex: Int,
+        expectedVersion: Long,
         nowMs: Long = timeProvider.nowMs(),
     ): CurrentQueueChangeResult {
-        if (recordings.isEmpty()) {
-            if (currentIndex != 0) {
-                throw ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "currentIndex must be 0 for an empty queue",
-                )
-            }
-            return clearQueue(accountId, nowMs)
+        if (recordingIds.isEmpty()) {
+            requireEmptyQueueIndex(currentIndex)
+            return clearQueue(accountId, expectedVersion, nowMs)
         }
-        if (currentIndex !in recordings.indices) {
-            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "currentIndex out of range")
-        }
+        requireValidCurrentIndex(recordingIds, currentIndex)
 
-        return lockManager.withAccountLock(accountId) {
-            val currentState = getOrLoadStateLocked(accountId)
-            val previousCurrent = currentEntryOf(currentState)
-            val state = currentState.deepCopy()
-            state.items.clear()
-            recordings.forEach { recording ->
-                state.items += recording.toQueueEntry(state.nextEntryId++)
+        return withMutationContext(accountId, expectedVersion) { context ->
+            val nextState = context.nextState
+            replaceQueueContents(nextState, recordingIds, currentIndex)
+            if (recordingIds.isEmpty()) {
+                forceEmptyStateLocked(nextState)
+            } else {
+                resetStrategiesLocked(nextState)
             }
-            state.currentEntryId = state.items[currentIndex].entryId
-            resetStrategiesLocked(state)
-            touchState(state, nowMs)
-            persistAndCacheState(state)
-            buildChangeResult(state, previousCurrent, removedEntry = null)
+            buildPersistedChangeResult(context, nowMs)
         }
     }
 
     fun appendToQueue(
         accountId: Long,
-        recordings: List<ResolvedQueueRecording>,
+        recordingIds: List<Long>,
+        expectedVersion: Long,
         nowMs: Long = timeProvider.nowMs(),
     ): CurrentQueueChangeResult {
-        if (recordings.isEmpty()) {
+        if (recordingIds.isEmpty()) {
             throw ResponseStatusException(HttpStatus.BAD_REQUEST, "recordingIds must not be empty")
         }
 
-        return lockManager.withAccountLock(accountId) {
-            val currentState = getOrLoadStateLocked(accountId)
-            val previousCurrent = currentEntryOf(currentState)
-            val state = currentState.deepCopy()
-            recordings.forEach { recording ->
-                state.items += recording.toQueueEntry(state.nextEntryId++)
+        return withMutationContext(accountId, expectedVersion) { context ->
+            val nextState = context.nextState
+            val wasEmpty = nextState.recordingIds.isEmpty()
+            nextState.recordingIds += recordingIds
+            if (wasEmpty) {
+                nextState.currentIndex = 0
             }
-            if (state.currentEntryId == null) {
-                state.currentEntryId = state.items.firstOrNull()?.entryId
-            }
-            rebuildShuffleOrderLocked(state)
-            touchState(state, nowMs)
-            persistAndCacheState(state)
-            buildChangeResult(state, previousCurrent, removedEntry = null)
+            rebuildShuffleOrderLocked(nextState)
+            buildPersistedChangeResult(context, nowMs)
         }
     }
 
     fun reorderQueue(
         accountId: Long,
-        entryIds: List<Long>,
+        recordingIds: List<Long>,
+        currentIndex: Int,
+        expectedVersion: Long,
         nowMs: Long = timeProvider.nowMs(),
     ): CurrentQueueChangeResult {
-        return lockManager.withAccountLock(accountId) {
-            val currentState = getOrLoadStateLocked(accountId)
-            if (entryIds.size != currentState.items.size) {
-                throw ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "entryIds size does not match queue size",
-                )
-            }
+        if (recordingIds.isEmpty()) {
+            requireEmptyQueueIndex(currentIndex)
+            return clearQueue(accountId, expectedVersion, nowMs)
+        }
+        requireValidCurrentIndex(recordingIds, currentIndex)
 
-            val itemByEntryId = currentState.items.associateBy(CurrentQueueEntry::entryId)
-            val reorderedItems = entryIds.map { entryId ->
-                itemByEntryId[entryId]
-                    ?: throw ResponseStatusException(
-                        HttpStatus.BAD_REQUEST,
-                        "Queue entry $entryId not found",
-                    )
-            }
-            if (itemByEntryId.size != entryIds.toSet().size) {
-                throw ResponseStatusException(HttpStatus.BAD_REQUEST, "entryIds must be unique")
-            }
-
-            val previousCurrent = currentEntryOf(currentState)
-            val state = currentState.deepCopy()
-            state.items.clear()
-            state.items += reorderedItems
-            rebuildShuffleOrderLocked(state)
-            touchState(state, nowMs)
-            persistAndCacheState(state)
-            buildChangeResult(state, previousCurrent, removedEntry = null)
+        return withMutationContext(accountId, expectedVersion) { context ->
+            val nextState = context.nextState
+            replaceQueueContents(nextState, recordingIds, currentIndex)
+            rebuildShuffleOrderLocked(nextState, anchorIndex = currentIndex)
+            buildPersistedChangeResult(context, nowMs)
         }
     }
 
-    fun setCurrentEntry(
+    fun setCurrentIndex(
         accountId: Long,
-        entryId: Long,
+        currentIndex: Int,
+        expectedVersion: Long,
         nowMs: Long = timeProvider.nowMs(),
     ): CurrentQueueChangeResult {
-        return lockManager.withAccountLock(accountId) {
-            val currentState = getOrLoadStateLocked(accountId)
-            val previousCurrent = currentEntryOf(currentState)
-            val state = currentState.deepCopy()
-            val nextCurrent = state.items.firstOrNull { it.entryId == entryId }
-                ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Queue entry not found")
-            if (previousCurrent?.entryId == nextCurrent.entryId) {
-                return@withAccountLock buildNoopChangeResult(currentState, previousCurrent)
+        return withMutationContext(accountId, expectedVersion) { context ->
+            val currentState = context.currentState
+            requireValidCurrentIndex(currentState.recordingIds, currentIndex)
+            if (currentState.recordingIds.isNotEmpty() && currentState.currentIndex == currentIndex) {
+                return@withMutationContext buildNoopChangeResult(currentState)
             }
 
-            state.currentEntryId = nextCurrent.entryId
-            rebuildShuffleOrderLocked(state, anchorEntryId = nextCurrent.entryId)
-            touchState(state, nowMs)
-            persistAndCacheState(state)
-            buildChangeResult(state, previousCurrent, removedEntry = null)
+            val nextState = context.nextState
+            nextState.currentIndex = currentIndex
+            clearPlaybackProgress(nextState)
+            rebuildShuffleOrderLocked(nextState, anchorIndex = currentIndex)
+            buildPersistedChangeResult(context, nowMs)
         }
     }
 
@@ -186,393 +178,577 @@ class CurrentQueueService(
         accountId: Long,
         playbackStrategy: PlaybackStrategy,
         stopStrategy: StopStrategy,
+        expectedVersion: Long,
         nowMs: Long = timeProvider.nowMs(),
     ): CurrentQueueChangeResult {
-        return lockManager.withAccountLock(accountId) {
-            val currentState = getOrLoadStateLocked(accountId)
-            val previousCurrent = currentEntryOf(currentState)
-            val changed =
-                currentState.playbackStrategy != playbackStrategy || currentState.stopStrategy != stopStrategy
-            if (!changed) {
-                return@withAccountLock buildNoopChangeResult(currentState, previousCurrent)
+        return withMutationContext(accountId, expectedVersion) { context ->
+            val currentState = context.currentState
+            if (
+                currentState.playbackStrategy == playbackStrategy &&
+                currentState.stopStrategy == stopStrategy
+            ) {
+                return@withMutationContext buildNoopChangeResult(currentState)
             }
 
-            val state = currentState.deepCopy()
-            state.playbackStrategy = playbackStrategy
-            state.stopStrategy = stopStrategy
-            rebuildShuffleOrderLocked(state)
-            touchState(state, nowMs)
-            persistAndCacheState(state)
-            buildChangeResult(state, previousCurrent, removedEntry = null)
+            val nextState = context.nextState
+            nextState.playbackStrategy = playbackStrategy
+            nextState.stopStrategy = stopStrategy
+            rebuildShuffleOrderLocked(nextState)
+            buildPersistedChangeResult(context, nowMs)
         }
     }
 
     fun navigateToNext(
         accountId: Long,
+        expectedVersion: Long? = null,
         nowMs: Long = timeProvider.nowMs(),
     ): CurrentQueueChangeResult {
-        return lockManager.withAccountLock(accountId) {
-            val currentState = getOrLoadStateLocked(accountId)
-            val previousCurrent = currentEntryOf(currentState)
-            val state = currentState.deepCopy()
-            if (state.items.isEmpty() || previousCurrent == null) {
-                return@withAccountLock buildNoopChangeResult(currentState, previousCurrent)
+        return withMutationContext(accountId, expectedVersion) { context ->
+            val currentState = context.currentState
+            if (currentState.recordingIds.isEmpty()) {
+                return@withMutationContext buildNoopChangeResult(currentState)
             }
 
-            val changed = when (state.playbackStrategy) {
-                PlaybackStrategy.SEQUENTIAL -> moveSequentialLocked(state, previousCurrent, 1)
-                PlaybackStrategy.SHUFFLE -> moveShuffleLocked(state, previousCurrent, 1)
-                PlaybackStrategy.RADIO -> moveRadioNextLocked(state, previousCurrent)
+            val nextState = context.nextState
+            val changed = when (nextState.playbackStrategy) {
+                PlaybackStrategy.SEQUENTIAL -> moveSequentialLocked(nextState, 1)
+                PlaybackStrategy.SHUFFLE -> moveShuffleLocked(nextState, 1)
+                PlaybackStrategy.RADIO -> moveRadioNextLocked(nextState)
             }
             if (!changed) {
-                return@withAccountLock buildNoopChangeResult(currentState, previousCurrent)
+                return@withMutationContext buildNoopChangeResult(currentState)
             }
 
-            touchState(state, nowMs)
-            persistAndCacheState(state)
-            buildChangeResult(state, previousCurrent, removedEntry = null)
+            clearPlaybackProgress(nextState)
+            buildPersistedChangeResult(context, nowMs)
         }
     }
 
     fun navigateToPrevious(
         accountId: Long,
+        expectedVersion: Long? = null,
         nowMs: Long = timeProvider.nowMs(),
     ): CurrentQueueChangeResult {
-        return lockManager.withAccountLock(accountId) {
-            val currentState = getOrLoadStateLocked(accountId)
-            val previousCurrent = currentEntryOf(currentState)
-            val state = currentState.deepCopy()
-            if (state.items.isEmpty() || previousCurrent == null) {
-                return@withAccountLock buildNoopChangeResult(currentState, previousCurrent)
+        return withMutationContext(accountId, expectedVersion) { context ->
+            val currentState = context.currentState
+            if (currentState.recordingIds.isEmpty()) {
+                return@withMutationContext buildNoopChangeResult(currentState)
             }
 
-            val changed = when (state.playbackStrategy) {
-                PlaybackStrategy.SEQUENTIAL -> moveSequentialLocked(state, previousCurrent, -1)
-                PlaybackStrategy.SHUFFLE -> moveShuffleLocked(state, previousCurrent, -1)
-                PlaybackStrategy.RADIO -> moveSequentialLocked(state, previousCurrent, -1)
+            val nextState = context.nextState
+            val changed = when (nextState.playbackStrategy) {
+                PlaybackStrategy.SEQUENTIAL -> moveSequentialLocked(nextState, -1)
+                PlaybackStrategy.SHUFFLE -> moveShuffleLocked(nextState, -1)
+                PlaybackStrategy.RADIO -> moveSequentialLocked(nextState, -1)
             }
             if (!changed) {
-                return@withAccountLock buildNoopChangeResult(currentState, previousCurrent)
+                return@withMutationContext buildNoopChangeResult(currentState)
             }
 
-            touchState(state, nowMs)
-            persistAndCacheState(state)
-            buildChangeResult(state, previousCurrent, removedEntry = null)
+            clearPlaybackProgress(nextState)
+            buildPersistedChangeResult(context, nowMs)
         }
     }
 
-    fun removeEntry(
+    fun removeAt(
         accountId: Long,
-        entryId: Long,
+        index: Int,
+        expectedVersion: Long,
         nowMs: Long = timeProvider.nowMs(),
     ): CurrentQueueChangeResult {
-        return lockManager.withAccountLock(accountId) {
-            val currentState = getOrLoadStateLocked(accountId)
-            val state = currentState.deepCopy()
-            val removeIndex = state.items.indexOfFirst { it.entryId == entryId }
-            if (removeIndex < 0) {
-                throw ResponseStatusException(HttpStatus.NOT_FOUND, "Queue entry not found")
+        return withMutationContext(accountId, expectedVersion) { context ->
+            val currentState = context.currentState
+            if (index !in currentState.recordingIds.indices) {
+                throw ResponseStatusException(HttpStatus.NOT_FOUND, "Queue index not found")
             }
 
-            val previousCurrent = currentEntryOf(currentState)
-            val removedEntry = state.items.removeAt(removeIndex)
+            val nextState = context.nextState
+            val removedRecordingId = nextState.recordingIds.removeAt(index)
 
             when {
-                state.items.isEmpty() -> {
-                    state.currentEntryId = null
-                    resetStrategiesLocked(state)
+                nextState.recordingIds.isEmpty() -> forceEmptyStateLocked(nextState)
+                index < currentState.currentIndex -> nextState.currentIndex -= 1
+                index == currentState.currentIndex -> {
+                    nextState.currentIndex = minOf(index, nextState.recordingIds.lastIndex)
+                    clearPlaybackProgress(nextState)
                 }
-
-                previousCurrent?.entryId == removedEntry.entryId -> {
-                    val nextIndex = if (removeIndex >= state.items.size) removeIndex - 1 else removeIndex
-                    state.currentEntryId = state.items[nextIndex].entryId
-                    rebuildShuffleOrderLocked(state)
-                }
-
-                else -> rebuildShuffleOrderLocked(state)
             }
 
-            touchState(state, nowMs)
-            persistAndCacheState(state)
-            buildChangeResult(state, previousCurrent, removedEntry)
+            rebuildShuffleOrderLocked(nextState, anchorIndex = currentIndexOrNull(nextState))
+            buildPersistedChangeResult(context, nowMs, index, removedRecordingId)
         }
     }
 
     fun clearQueue(
         accountId: Long,
+        expectedVersion: Long,
         nowMs: Long = timeProvider.nowMs(),
     ): CurrentQueueChangeResult {
-        return lockManager.withAccountLock(accountId) {
-            val currentState = getOrLoadStateLocked(accountId)
-            val previousCurrent = currentEntryOf(currentState)
-            val state = currentState.deepCopy()
-            state.items.clear()
-            state.currentEntryId = null
-            resetStrategiesLocked(state)
-            touchState(state, nowMs)
-            persistAndCacheState(state)
-            buildChangeResult(state, previousCurrent, previousCurrent)
+        return withMutationContext(accountId, expectedVersion) { context ->
+            val nextState = context.nextState
+            forceEmptyStateLocked(nextState)
+            buildPersistedChangeResult(
+                context,
+                nowMs,
+                context.previousCurrentIndex,
+                context.previousRecordingId,
+            )
         }
     }
 
-    fun syncTrackWithPlayback(
+    fun beginPlayback(
         accountId: Long,
-        recording: ResolvedQueueRecording,
+        currentIndex: Int,
+        positionMs: Long,
+        executeAtMs: Long,
+        expectedVersion: Long,
         nowMs: Long = timeProvider.nowMs(),
-    ): CurrentQueueChangeResult? {
-        return lockManager.withAccountLock(accountId) {
-            val currentState = getOrLoadStateLocked(accountId)
-            val previousCurrent = currentEntryOf(currentState)
-            val state = currentState.deepCopy()
-            val matchingEntry = state.items.firstOrNull { it.recordingId == recording.recordingId }
+    ): AccountPlaybackState {
+        return withMutationContext(accountId, expectedVersion) { context ->
+            requirePlayableIndex(context.currentState, currentIndex)
 
-            when {
-                matchingEntry == null -> {
-                    state.items.clear()
-                    state.items += recording.toQueueEntry(state.nextEntryId++)
-                    state.currentEntryId = state.items.single().entryId
-                    resetStrategiesLocked(state)
-                }
-
-                previousCurrent?.entryId == matchingEntry.entryId -> return@withAccountLock null
-
-                else -> {
-                    state.currentEntryId = matchingEntry.entryId
-                    rebuildShuffleOrderLocked(state, anchorEntryId = matchingEntry.entryId)
-                }
-            }
-
-            touchState(state, nowMs)
-            persistAndCacheState(state)
-            buildChangeResult(state, previousCurrent, removedEntry = null)
+            val nextState = context.nextState
+            nextState.currentIndex = currentIndex
+            nextState.playbackStatus = PlaybackStatus.PLAYING
+            nextState.positionMs = positionMs
+            nextState.serverTimeToExecuteMs = executeAtMs
+            buildPersistedPlaybackState(context, nowMs)
         }
     }
 
-    fun resolvePlayableRecordings(recordingIds: List<Long>): List<ResolvedQueueRecording> {
+    fun pausePlayback(
+        accountId: Long,
+        currentIndex: Int?,
+        positionMs: Long,
+        executeAtMs: Long,
+        expectedVersion: Long? = null,
+        nowMs: Long = timeProvider.nowMs(),
+    ): AccountPlaybackState {
+        return withMutationContext(accountId, expectedVersion) { context ->
+            val nextState = context.nextState
+            if (currentIndex == null || nextState.recordingIds.isEmpty()) {
+                forceEmptyStateLocked(nextState)
+            } else {
+                requirePlayableIndex(nextState, currentIndex)
+                nextState.currentIndex = currentIndex
+                nextState.playbackStatus = PlaybackStatus.PAUSED
+                nextState.positionMs = positionMs
+                nextState.serverTimeToExecuteMs = executeAtMs
+            }
+            buildPersistedPlaybackState(context, nowMs)
+        }
+    }
+
+    fun seekPlayback(
+        accountId: Long,
+        currentIndex: Int,
+        positionMs: Long,
+        executeAtMs: Long,
+        expectedVersion: Long,
+        nowMs: Long = timeProvider.nowMs(),
+    ): AccountPlaybackState {
+        return withMutationContext(accountId, expectedVersion) { context ->
+            requirePlayableIndex(context.currentState, currentIndex)
+
+            val nextState = context.nextState
+            nextState.currentIndex = currentIndex
+            nextState.positionMs = positionMs
+            nextState.serverTimeToExecuteMs = executeAtMs
+            buildPersistedPlaybackState(context, nowMs)
+        }
+    }
+
+    fun buildSyncPlaybackState(
+        accountId: Long,
+        executeAtMs: Long,
+        nowMs: Long,
+    ): AccountPlaybackState {
+        return lockManager.withAccountLock(accountId) {
+            val state = getOrLoadStateLocked(accountId)
+            val positionMs = if (state.playbackStatus == PlaybackStatus.PLAYING) {
+                recoverPositionMs(state, nowMs)
+            } else {
+                state.positionMs
+            }
+            state.toPlaybackState(
+                positionMs = positionMs,
+                serverTimeToExecuteMs = executeAtMs,
+            )
+        }
+    }
+
+    fun getQueueVersion(accountId: Long): Long {
+        return lockManager.withAccountLock(accountId) {
+            getOrLoadStateLocked(accountId).version
+        }
+    }
+
+    private fun requirePlayableIndex(
+        state: AccountPlayQueueState,
+        currentIndex: Int,
+    ) {
+        requireValidCurrentIndex(state.recordingIds, currentIndex)
+    }
+
+    private fun requireEmptyQueueIndex(currentIndex: Int) {
+        if (currentIndex != 0) {
+            throw ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "currentIndex must be 0 for an empty queue",
+            )
+        }
+    }
+
+    private fun requireValidCurrentIndex(
+        recordingIds: List<Long>,
+        currentIndex: Int,
+    ) {
+        if (recordingIds.isEmpty() || currentIndex !in recordingIds.indices) {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "currentIndex out of range")
+        }
+    }
+
+    private fun currentIndexOrNull(state: AccountPlayQueueState): Int? {
+        return state.currentIndex.takeIf { state.recordingIds.isNotEmpty() }
+    }
+
+    private fun currentRecordingIdOf(state: AccountPlayQueueState): Long? {
+        val index = currentIndexOrNull(state) ?: return null
+        return state.recordingIds[index]
+    }
+
+    private fun replaceQueueContents(
+        state: AccountPlayQueueState,
+        recordingIds: List<Long>,
+        currentIndex: Int,
+    ) {
+        state.recordingIds.clear()
+        state.recordingIds += recordingIds
+        state.currentIndex = currentIndex
+        clearPlaybackProgress(state)
+    }
+
+    private fun clearPlaybackProgress(state: AccountPlayQueueState) {
+        state.positionMs = 0L
+        state.serverTimeToExecuteMs = 0L
+    }
+
+    private fun moveSequentialLocked(
+        state: AccountPlayQueueState,
+        step: Int,
+    ): Boolean {
+        val nextIndex = state.currentIndex + step
+        if (nextIndex !in state.recordingIds.indices) {
+            return false
+        }
+        state.currentIndex = nextIndex
+        return true
+    }
+
+    private fun moveShuffleLocked(
+        state: AccountPlayQueueState,
+        step: Int,
+    ): Boolean {
+        rebuildShuffleOrderLocked(state)
+        val currentPosition = state.shuffleIndices.indexOf(state.currentIndex)
+        if (currentPosition < 0) {
+            return false
+        }
+        val nextPosition = currentPosition + step
+        if (nextPosition !in state.shuffleIndices.indices) {
+            return false
+        }
+        state.currentIndex = state.shuffleIndices[nextPosition]
+        return true
+    }
+
+    private fun moveRadioNextLocked(state: AccountPlayQueueState): Boolean {
+        val realizedNextIndex = state.currentIndex + 1
+        if (realizedNextIndex in state.recordingIds.indices) {
+            state.currentIndex = realizedNextIndex
+            return true
+        }
+
+        val currentRecordingId = currentRecordingIdOf(state) ?: return false
+        val recentWindowSize = minOf(RADIO_RECENT_WINDOW_MAX, recordingCatalog.countWorks())
+        val recentWorkIds = try {
+            resolveEntriesOrThrow(
+                state.recordingIds.takeLast(recentWindowSize),
+            ).map(CurrentQueueEntry::workId).toSet()
+        } catch (_: ResponseStatusException) {
+            return false
+        }
+
+        val similarRecordingId = recordingCatalog.findFirstSimilarRecordingId(
+            recordingId = currentRecordingId,
+            excludedWorkIds = recentWorkIds,
+        ) ?: return false
+
+        state.recordingIds += similarRecordingId
+        state.currentIndex = state.recordingIds.lastIndex
+        return true
+    }
+
+    private fun resetStrategiesLocked(state: AccountPlayQueueState) {
+        state.playbackStrategy = PlaybackStrategy.SEQUENTIAL
+        state.stopStrategy = StopStrategy.LIST
+        state.shuffleIndices.clear()
+    }
+
+    private fun forceEmptyStateLocked(state: AccountPlayQueueState) {
+        state.recordingIds.clear()
+        state.currentIndex = 0
+        state.shuffleIndices.clear()
+        state.playbackStrategy = PlaybackStrategy.SEQUENTIAL
+        state.stopStrategy = StopStrategy.LIST
+        state.playbackStatus = PlaybackStatus.PAUSED
+        state.positionMs = 0L
+        state.serverTimeToExecuteMs = 0L
+    }
+
+    private fun rebuildShuffleOrderLocked(
+        state: AccountPlayQueueState,
+        anchorIndex: Int? = currentIndexOrNull(state),
+    ) {
+        if (state.playbackStrategy != PlaybackStrategy.SHUFFLE) {
+            state.shuffleIndices.clear()
+            return
+        }
+
+        val indices = state.recordingIds.indices.toList()
+        val anchor = anchorIndex?.takeIf { it in indices } ?: indices.firstOrNull() ?: run {
+            state.shuffleIndices.clear()
+            return
+        }
+
+        val existingOrdered = state.shuffleIndices
+            .filter { it in indices }
+            .distinct()
+        if (existingOrdered.size == indices.size && anchor in existingOrdered) {
+            state.shuffleIndices.clear()
+            state.shuffleIndices += existingOrdered
+            return
+        }
+
+        val missingIndices = indices
+            .filterNot(existingOrdered::contains)
+            .filterNot { it == anchor }
+            .shuffled(Random.Default)
+        val mergedIndices = (existingOrdered + missingIndices)
+            .filterNot { it == anchor }
+
+        state.shuffleIndices.clear()
+        state.shuffleIndices += anchor
+        state.shuffleIndices += mergedIndices
+    }
+
+    private fun resolveEntriesOrThrow(recordingIds: List<Long>): List<CurrentQueueEntry> {
         if (recordingIds.isEmpty()) {
             return emptyList()
         }
 
         val existingRecordingIds = recordingCatalog.getExistingRecordingIds(recordingIds.toSet())
-        val resolvedByRecordingId =
-            recordingCatalog.loadResolvedRecordings(recordingIds.toSet()).associateBy(
-                ResolvedQueueRecording::recordingId,
-            )
+        val resolvedByRecordingId = recordingCatalog.loadResolvedRecordings(recordingIds.toSet())
+            .associateBy(ResolvedQueueRecording::recordingId)
         return recordingIds.map { recordingId ->
             when (recordingId) {
-                !in existingRecordingIds -> {
-                    throw ResponseStatusException(
-                        HttpStatus.NOT_FOUND,
-                        "Recording $recordingId not found",
-                    )
-                }
+                !in existingRecordingIds -> throw ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Recording $recordingId not found",
+                )
 
-                !in resolvedByRecordingId -> {
-                    throw ResponseStatusException(
-                        HttpStatus.BAD_REQUEST,
-                        "Recording $recordingId is not playable",
-                    )
-                }
+                !in resolvedByRecordingId -> throw ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Recording $recordingId is not playable",
+                )
 
-                else -> resolvedByRecordingId.getValue(recordingId)
+                else -> resolvedByRecordingId.getValue(recordingId).toCurrentQueueEntry()
             }
         }
     }
 
-    private fun currentEntryOf(state: AccountCurrentQueueState): CurrentQueueEntry? {
-        val currentId = state.currentEntryId ?: return null
-        return state.items.firstOrNull { it.entryId == currentId }
+    private fun resolveCurrentEntry(recordingId: Long): CurrentQueueEntry {
+        return resolveEntriesOrThrow(listOf(recordingId)).single()
     }
 
-    private fun moveSequentialLocked(
-        state: AccountCurrentQueueState,
-        currentEntry: CurrentQueueEntry,
-        step: Int,
-    ): Boolean {
-        val currentIndex = state.items.indexOfFirst { it.entryId == currentEntry.entryId }
-        if (currentIndex < 0) {
-            return false
-        }
-        val nextIndex = currentIndex + step
-        if (nextIndex !in state.items.indices) {
-            return false
-        }
-        state.currentEntryId = state.items[nextIndex].entryId
-        return true
-    }
-
-    private fun moveShuffleLocked(
-        state: AccountCurrentQueueState,
-        currentEntry: CurrentQueueEntry,
-        step: Int,
-    ): Boolean {
-        rebuildShuffleOrderLocked(state)
-        val currentIndex = state.shuffleEntryIds.indexOf(currentEntry.entryId)
-        if (currentIndex < 0) {
-            return false
-        }
-        val nextIndex = currentIndex + step
-        if (nextIndex !in state.shuffleEntryIds.indices) {
-            return false
-        }
-        state.currentEntryId = state.shuffleEntryIds[nextIndex]
-        return true
-    }
-
-    private fun moveRadioNextLocked(
-        state: AccountCurrentQueueState,
-        currentEntry: CurrentQueueEntry,
-    ): Boolean {
-        val currentIndex = state.items.indexOfFirst { it.entryId == currentEntry.entryId }
-        if (currentIndex < 0) {
-            return false
-        }
-
-        val realizedNextIndex = currentIndex + 1
-        if (realizedNextIndex in state.items.indices) {
-            state.currentEntryId = state.items[realizedNextIndex].entryId
-            return true
-        }
-
-        val recentWindowSize = minOf(RADIO_RECENT_WINDOW_MAX, recordingCatalog.countWorks())
-        val recentWorkIds = state.items
-            .takeLast(recentWindowSize)
-            .map(CurrentQueueEntry::workId)
-            .toSet()
-
-        val similarRecordingId = recordingCatalog.findFirstSimilarRecordingId(
-            recordingId = currentEntry.recordingId,
-            excludedWorkIds = recentWorkIds,
-        )
-            ?: return false
-        val nextRecording = try {
-            resolvePlayableRecordings(listOf(similarRecordingId)).single()
-        } catch (_: ResponseStatusException) {
-            return false
-        }
-
-        state.items += nextRecording.toQueueEntry(state.nextEntryId++)
-        state.currentEntryId = state.items.last().entryId
-        return true
-    }
-
-    private fun resetStrategiesLocked(state: AccountCurrentQueueState) {
-        state.playbackStrategy = PlaybackStrategy.SEQUENTIAL
-        state.stopStrategy = StopStrategy.LIST
-        state.shuffleEntryIds.clear()
-    }
-
-    private fun rebuildShuffleOrderLocked(
-        state: AccountCurrentQueueState,
-        anchorEntryId: Long? = state.currentEntryId,
-    ) {
-        if (state.playbackStrategy != PlaybackStrategy.SHUFFLE) {
-            state.shuffleEntryIds.clear()
-            return
-        }
-
-        val entryIds = state.items.map(CurrentQueueEntry::entryId)
-        val anchor = anchorEntryId?.takeIf { entryId -> entryIds.any { it == entryId } }
-            ?: state.items.firstOrNull()?.entryId
-            ?: run {
-                state.shuffleEntryIds.clear()
-                return
-            }
-
-        val existingOrderedEntryIds = state.shuffleEntryIds
-            .filter { entryId -> entryIds.any { it == entryId } }
-            .distinct()
-        if (existingOrderedEntryIds.size == entryIds.size && existingOrderedEntryIds.contains(anchor)) {
-            state.shuffleEntryIds.clear()
-            state.shuffleEntryIds += existingOrderedEntryIds
-            return
-        }
-
-        val missingEntryIds = entryIds
-            .filterNot(existingOrderedEntryIds::contains)
-            .filterNot { it == anchor }
-            .shuffled(Random.Default)
-        val mergedEntryIds = (existingOrderedEntryIds + missingEntryIds)
-            .filterNot { it == anchor }
-
-        state.shuffleEntryIds.clear()
-        state.shuffleEntryIds += anchor
-        state.shuffleEntryIds += mergedEntryIds
-    }
-
-    private fun getOrLoadStateLocked(accountId: Long): AccountCurrentQueueState {
+    private fun getOrLoadStateLocked(accountId: Long): AccountPlayQueueState {
         states[accountId]?.let { return it }
-        val loaded = stateStore.load(accountId)
-            ?: AccountCurrentQueueState.initial(accountId = accountId, nowMs = timeProvider.nowMs())
+        val loaded = stateStore.load(accountId)?.toRecoveredState()
+            ?: AccountPlayQueueState.initial(accountId, timeProvider.nowMs())
         states[accountId] = loaded
         return loaded
     }
 
-    private fun persistAndCacheState(state: AccountCurrentQueueState) {
-        stateStore.upsert(state)
+    private inline fun <T> withMutationContext(
+        accountId: Long,
+        expectedVersion: Long? = null,
+        crossinline block: (MutationContext) -> T,
+    ): T {
+        return lockManager.withAccountLock(accountId) {
+            val currentState = getOrLoadStateLocked(accountId)
+            if (expectedVersion != null) {
+                requireExpectedVersion(currentState, expectedVersion)
+            }
+            val context = MutationContext(
+                currentState = currentState,
+                nextState = currentState.deepCopy(),
+                previousCurrentIndex = currentIndexOrNull(currentState),
+                previousRecordingId = currentRecordingIdOf(currentState),
+            )
+            block(context)
+        }
+    }
+
+    private fun persistAndCacheState(
+        previousVersion: Long,
+        state: AccountPlayQueueState,
+    ) {
+        if (!stateStore.save(previousVersion, state)) {
+            throw ResponseStatusException(HttpStatus.CONFLICT, VERSION_CONFLICT_REASON)
+        }
         states[state.accountId] = state
     }
 
     private fun touchState(
-        state: AccountCurrentQueueState,
+        state: AccountPlayQueueState,
         nowMs: Long,
     ) {
         state.version += 1
         state.updatedAtMs = nowMs
     }
 
-    private fun buildNoopChangeResult(
-        state: AccountCurrentQueueState,
-        previousCurrent: CurrentQueueEntry?,
+    private fun persistMutation(
+        context: MutationContext,
+        nowMs: Long,
+    ): AccountPlayQueueState {
+        touchState(context.nextState, nowMs)
+        persistAndCacheState(context.currentState.version, context.nextState)
+        return context.nextState
+    }
+
+    private fun buildPersistedChangeResult(
+        context: MutationContext,
+        nowMs: Long,
+        removedIndex: Int? = null,
+        removedRecordingId: Long? = null,
     ): CurrentQueueChangeResult {
+        val nextState = persistMutation(context, nowMs)
+        return buildChangeResult(
+            nextState,
+            context.previousCurrentIndex,
+            context.previousRecordingId,
+            removedIndex,
+            removedRecordingId,
+        )
+    }
+
+    private fun buildPersistedPlaybackState(
+        context: MutationContext,
+        nowMs: Long,
+    ): AccountPlaybackState {
+        return persistMutation(context, nowMs).toPlaybackState()
+    }
+
+    private fun buildNoopChangeResult(state: AccountPlayQueueState): CurrentQueueChangeResult {
         return CurrentQueueChangeResult(
             queue = buildQueueDto(state),
-            previousCurrentEntry = previousCurrent,
-            currentEntry = currentEntryOf(state),
-            removedEntry = null,
+            previousCurrentIndex = currentIndexOrNull(state),
+            currentIndex = currentIndexOrNull(state),
+            previousRecordingId = currentRecordingIdOf(state),
+            currentRecordingId = currentRecordingIdOf(state),
             changed = false,
         )
     }
 
     private fun buildChangeResult(
-        state: AccountCurrentQueueState,
-        previousCurrent: CurrentQueueEntry?,
-        removedEntry: CurrentQueueEntry?,
+        state: AccountPlayQueueState,
+        previousCurrentIndex: Int?,
+        previousRecordingId: Long?,
+        removedIndex: Int?,
+        removedRecordingId: Long?,
     ): CurrentQueueChangeResult {
         return CurrentQueueChangeResult(
             queue = buildQueueDto(state),
-            previousCurrentEntry = previousCurrent,
-            currentEntry = currentEntryOf(state),
-            removedEntry = removedEntry,
+            previousCurrentIndex = previousCurrentIndex,
+            currentIndex = currentIndexOrNull(state),
+            previousRecordingId = previousRecordingId,
+            currentRecordingId = currentRecordingIdOf(state),
+            removedIndex = removedIndex,
+            removedRecordingId = removedRecordingId,
             changed = true,
         )
     }
 
-    private fun buildQueueDto(state: AccountCurrentQueueState): CurrentQueueDto {
+    private fun buildQueueDto(state: AccountPlayQueueState): CurrentQueueDto {
+        val items = resolveEntriesOrThrow(state.recordingIds).map(::toQueueItemDto)
         return CurrentQueueDto(
-            items = state.items.map(::toQueueItemDto),
-            currentEntryId = state.currentEntryId,
+            items = items,
+            recordingIds = state.recordingIds.toList(),
+            currentIndex = state.currentIndex,
             playbackStrategy = state.playbackStrategy,
             stopStrategy = state.stopStrategy,
+            playbackStatus = state.playbackStatus,
+            positionMs = state.positionMs,
+            serverTimeToExecuteMs = state.serverTimeToExecuteMs,
             version = state.version,
             updatedAtMs = state.updatedAtMs,
         )
     }
 
-    private fun toQueueItemDto(entry: CurrentQueueEntry): CurrentQueueItemDto {
-        return CurrentQueueItemDto(
-            entryId = entry.entryId,
-            recordingId = entry.recordingId,
-            title = entry.title,
-            artistLabel = entry.artistLabel,
-            coverUrl = entry.coverMediaFileId?.let(urlSigner::generatePresignedPath),
-            durationMs = entry.durationMs,
+    private fun recoverPositionMs(
+        state: AccountPlayQueueState,
+        nowMs: Long,
+    ): Long {
+        if (state.playbackStatus != PlaybackStatus.PLAYING) {
+            return state.positionMs
+        }
+        return state.positionMs + (nowMs - state.serverTimeToExecuteMs).coerceAtLeast(0L)
+    }
+
+    private fun requireExpectedVersion(
+        state: AccountPlayQueueState,
+        expectedVersion: Long,
+    ): AccountPlayQueueState {
+        if (state.version != expectedVersion) {
+            throw ResponseStatusException(HttpStatus.CONFLICT, VERSION_CONFLICT_REASON)
+        }
+        return state
+    }
+
+    private fun AccountPlayQueueState.toPlaybackState(
+        positionMs: Long = this.positionMs,
+        serverTimeToExecuteMs: Long = this.serverTimeToExecuteMs,
+    ): AccountPlaybackState {
+        return AccountPlaybackState(
+            accountId = accountId,
+            status = playbackStatus,
+            currentIndex = currentIndexOrNull(this),
+            positionSeconds = positionMs / 1_000.0,
+            serverTimeToExecuteMs = serverTimeToExecuteMs,
+            version = version,
+            updatedAtMs = updatedAtMs,
         )
     }
 
-    private fun ResolvedQueueRecording.toQueueEntry(entryId: Long): CurrentQueueEntry {
+    private fun AccountPlayQueueState.toRecoveredState(): AccountPlayQueueState {
+        if (playbackStatus != PlaybackStatus.PLAYING) {
+            return this
+        }
+        return copy(
+            playbackStatus = PlaybackStatus.PAUSED,
+            serverTimeToExecuteMs = 0L,
+        )
+    }
+
+    private fun AccountPlayQueueState.deepCopy(): AccountPlayQueueState {
+        return copy(
+            recordingIds = recordingIds.toMutableList(),
+            shuffleIndices = shuffleIndices.toMutableList(),
+        )
+    }
+
+    private fun ResolvedQueueRecording.toCurrentQueueEntry(): CurrentQueueEntry {
         return CurrentQueueEntry(
-            entryId = entryId,
             recordingId = recordingId,
             workId = workId,
             title = title,
@@ -582,14 +758,19 @@ class CurrentQueueService(
         )
     }
 
-    private fun AccountCurrentQueueState.deepCopy(): AccountCurrentQueueState {
-        return copy(
-            items = items.map { it.copy() }.toMutableList(),
-            shuffleEntryIds = shuffleEntryIds.toMutableList(),
+    private fun toQueueItemDto(entry: CurrentQueueEntry): CurrentQueueItemDto {
+        return CurrentQueueItemDto(
+            recordingId = entry.recordingId,
+            title = entry.title,
+            artistLabel = entry.artistLabel,
+            coverUrl = entry.coverMediaFileId?.let(urlSigner::generatePresignedPath),
+            durationMs = entry.durationMs,
         )
     }
 
-    private companion object {
+    companion object {
+        const val VERSION_CONFLICT_REASON: String = "Queue version conflict"
+
         private const val RADIO_RECENT_WINDOW_MAX = 16
     }
 }
@@ -643,7 +824,6 @@ class JimmerCurrentQueueRecordingCatalog(
         }.execute()
 
         return recordings.map { recording ->
-
             ResolvedQueueRecording(
                 recordingId = recording.id,
                 workId = recording.work.id,

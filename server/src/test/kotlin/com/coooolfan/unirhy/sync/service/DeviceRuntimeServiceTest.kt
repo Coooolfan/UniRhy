@@ -117,7 +117,6 @@ class DeviceRuntimeServiceTest {
     ) {
         service.registerConnection(
             accountId = accountId,
-            tokenValue = "token-$sessionId",
             sessionId = sessionId,
             session = ConcurrentWebSocketSessionDecorator(
                 TestWebSocketSession(sessionId = sessionId, accountId = accountId),

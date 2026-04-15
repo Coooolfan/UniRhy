@@ -5,7 +5,7 @@ import com.coooolfan.unirhy.sync.protocol.PlaybackStatus
 data class AccountPlaybackState(
     val accountId: Long,
     val status: PlaybackStatus,
-    val recordingId: Long? = null,
+    val currentIndex: Int? = null,
     val positionSeconds: Double,
     val serverTimeToExecuteMs: Long,
     val version: Long,
@@ -18,7 +18,7 @@ data class AccountPlaybackState(
         ): AccountPlaybackState = AccountPlaybackState(
             accountId = accountId,
             status = PlaybackStatus.PAUSED,
-            recordingId = null,
+            currentIndex = null,
             positionSeconds = 0.0,
             serverTimeToExecuteMs = 0L,
             version = 0L,

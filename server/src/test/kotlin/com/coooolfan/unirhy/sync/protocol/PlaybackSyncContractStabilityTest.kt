@@ -11,6 +11,7 @@ class PlaybackSyncContractStabilityTest {
             listOf(
                 "INVALID_MESSAGE",
                 "UNSUPPORTED_MESSAGE",
+                "VERSION_CONFLICT",
                 "RECORDING_NOT_FOUND",
                 "MEDIA_FILE_NOT_FOUND",
                 "RECORDING_NOT_PLAYABLE",

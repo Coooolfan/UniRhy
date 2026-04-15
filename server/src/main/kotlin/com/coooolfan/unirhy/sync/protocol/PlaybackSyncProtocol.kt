@@ -37,6 +37,7 @@ enum class ScheduledActionType {
 enum class PlaybackSyncErrorCode {
     INVALID_MESSAGE,
     UNSUPPORTED_MESSAGE,
+    VERSION_CONFLICT,
     RECORDING_NOT_FOUND,
     MEDIA_FILE_NOT_FOUND,
     RECORDING_NOT_PLAYABLE,
@@ -59,13 +60,15 @@ data class NtpRequestPayload(
 data class PlaybackControlPayload(
     val commandId: String,
     val deviceId: String,
-    val recordingId: Long? = null,
+    val currentIndex: Int,
     val positionSeconds: Double,
+    val version: Long,
 )
 
 data class AudioSourceLoadedPayload(
     val commandId: String,
     val deviceId: String,
+    val currentIndex: Int,
     val recordingId: Long,
 )
 
@@ -81,7 +84,7 @@ data class NtpResponsePayload(
 
 data class AccountPlaybackStateDto(
     val status: PlaybackStatus,
-    val recordingId: Long? = null,
+    val currentIndex: Int? = null,
     val positionSeconds: Double,
     val serverTimeToExecuteMs: Long,
     val version: Long,
@@ -96,13 +99,14 @@ data class SnapshotPayload(
 
 data class LoadAudioSourcePayload(
     val commandId: String,
+    val currentIndex: Int,
     val recordingId: Long,
 )
 
 data class ScheduledPlaybackAction(
     val action: ScheduledActionType,
     val status: PlaybackStatus,
-    val recordingId: Long? = null,
+    val currentIndex: Int? = null,
     val positionSeconds: Double,
     val version: Long,
 )

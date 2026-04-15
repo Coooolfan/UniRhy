@@ -74,13 +74,11 @@ export const useAudioTrackCatalog = (options: UseAudioTrackCatalogOptions) => {
             cacheTrack(createTrackFromQueueItem(item))
         })
 
-        const currentEntryId = options.currentQueue.value.currentEntryId
-        if (currentEntryId === undefined) {
-            return
-        }
-
         const nextCurrentItem =
-            options.currentQueue.value.items.find((item) => item.entryId === currentEntryId) ?? null
+            options.currentQueue.value.currentIndex >= 0
+                ? (options.currentQueue.value.items[options.currentQueue.value.currentIndex] ??
+                  null)
+                : null
         if (!nextCurrentItem) {
             return
         }
@@ -98,11 +96,11 @@ export const useAudioTrackCatalog = (options: UseAudioTrackCatalogOptions) => {
     }
 
     const queueRecordingIdsEqual = (recordingIds: number[]) => {
-        if (recordingIds.length !== options.currentQueue.value.items.length) {
+        if (recordingIds.length !== options.currentQueue.value.recordingIds.length) {
             return false
         }
-        return options.currentQueue.value.items.every(
-            (item, index) => item.recordingId === recordingIds[index],
+        return options.currentQueue.value.recordingIds.every(
+            (currentRecordingId, index) => currentRecordingId === recordingIds[index],
         )
     }
 

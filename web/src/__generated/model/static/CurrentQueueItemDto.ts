@@ -1,5 +1,4 @@
 export interface CurrentQueueItemDto {
-    readonly entryId: number;
     readonly recordingId: number;
     readonly title: string;
     readonly artistLabel: string;

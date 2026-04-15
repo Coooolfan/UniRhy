@@ -21,6 +21,7 @@ export type StopStrategy = 'TRACK' | 'LIST'
 export type PlaybackSyncErrorCode =
     | 'INVALID_MESSAGE'
     | 'UNSUPPORTED_MESSAGE'
+    | 'VERSION_CONFLICT'
     | 'RECORDING_NOT_FOUND'
     | 'MEDIA_FILE_NOT_FOUND'
     | 'RECORDING_NOT_PLAYABLE'
@@ -29,7 +30,7 @@ export type PlaybackSyncErrorCode =
 
 export type PlaybackSyncStatePayload = {
     status: PlaybackStatus
-    recordingId: number | null
+    currentIndex: number | null
     positionSeconds: number
     serverTimeToExecuteMs: number
     version: number
@@ -50,13 +51,15 @@ export type NtpRequestPayload = {
 export type PlaybackControlPayload = {
     commandId: string
     deviceId: string
-    recordingId?: number | null
+    currentIndex: number
     positionSeconds: number
+    version: number
 }
 
 export type AudioSourceLoadedPayload = {
     commandId: string
     deviceId: string
+    currentIndex: number
     recordingId: number
 }
 
@@ -77,7 +80,6 @@ export type SnapshotPayload = {
 }
 
 export type CurrentQueueItemDto = {
-    entryId: number
     recordingId: number
     title: string
     artistLabel: string
@@ -87,9 +89,13 @@ export type CurrentQueueItemDto = {
 
 export type CurrentQueueDto = {
     items: readonly CurrentQueueItemDto[]
-    currentEntryId?: number
+    recordingIds: readonly number[]
+    currentIndex: number
     playbackStrategy: PlaybackStrategy
     stopStrategy: StopStrategy
+    playbackStatus: PlaybackStatus
+    positionMs: number
+    serverTimeToExecuteMs: number
     version: number
     updatedAtMs: number
 }
@@ -100,13 +106,14 @@ export type QueueChangePayload = {
 
 export type LoadAudioSourcePayload = {
     commandId: string
+    currentIndex: number
     recordingId: number
 }
 
 export type ScheduledPlaybackAction = {
     action: ScheduledActionType
     status: PlaybackStatus
-    recordingId: number | null
+    currentIndex: number | null
     positionSeconds: number
     version: number
 }
