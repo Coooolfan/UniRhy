@@ -3,12 +3,15 @@ import { onMounted, onUnmounted, watch } from 'vue'
 import { RouterView, useRoute } from 'vue-router'
 import NoiseTexture from '@/components/NoiseTexture.vue'
 import DashboardSidebar from '@/components/dashboard/DashboardSidebar.vue'
+import { useMediaSession } from '@/composables/useMediaSession'
 import { provideDashboardLayout } from '@/composables/useDashboardLayout'
 import { useAudioStore } from '@/stores/audio'
 
 const audioStore = useAudioStore()
 const route = useRoute()
 const dashboardLayout = provideDashboardLayout()
+
+useMediaSession(audioStore)
 
 onMounted(() => {
     audioStore.connectPlaybackSync()

@@ -69,6 +69,10 @@ const playbackSyncDebugSnapshot = reactive({
         recordingId: 9,
         mediaFileId: 2_009,
         duration: 25,
+        sampleRate: 48_000,
+        numberOfChannels: 2,
+        fileSizeBytes: 400_000,
+        contentType: 'audio/mpeg',
     },
     activeLoad: null,
     lastLocalExecution: {
@@ -197,16 +201,56 @@ describe('PlaybackSyncDebugView', () => {
         expect(wrapper.get('[data-test="debug-clock-sync-uncertainty"]').text()).toContain('9.0ms')
         expect(wrapper.get('[data-test="debug-panel-events"]').text()).toContain('SCHEDULED_ACTION')
         expect(wrapper.get('[data-test="debug-local-execution"]').text()).toContain('250ms')
+        expect(wrapper.get('[data-test="debug-local-execution"]').text()).toContain('最近动作')
+        expect(wrapper.get('[data-test="debug-local-execution"]').text()).toContain('播放')
+        expect(wrapper.get('[data-test="debug-local-execution"]').text()).toContain(
+            'web-test, web-pad',
+        )
+        expect(wrapper.get('[data-test="debug-local-execution"]').text()).toContain('MP3')
+        expect(wrapper.get('[data-test="debug-local-execution"]').text()).toContain('128 kbps')
+        expect(wrapper.get('[data-test="debug-local-execution"]').text()).toContain('48000 Hz')
+        expect(wrapper.get('[data-test="debug-local-execution"]').text()).toContain('2（立体声）')
+        expect(wrapper.get('[data-test="debug-local-execution"]').text()).toContain('391 KB')
+        expect(wrapper.text()).toContain('13.00s/25.00s')
     })
 
     it('updates relative age labels on the one-second tick', async () => {
         const wrapper = mount(PlaybackSyncDebugView)
 
-        expect(wrapper.get('[data-test="debug-last-response-age"]').text()).toContain('1s ago')
+        expect(wrapper.get('[data-test="debug-last-response-age"]').text()).toContain('1秒前')
 
         vi.advanceTimersByTime(1_000)
         await wrapper.vm.$nextTick()
 
-        expect(wrapper.get('[data-test="debug-last-response-age"]').text()).toContain('2s ago')
+        expect(wrapper.get('[data-test="debug-last-response-age"]').text()).toContain('2秒前')
+    })
+
+    it('hides stale protocol errors when sync is currently healthy', () => {
+        ;(playbackSyncDebugSnapshot as { error: string | null }).error =
+            'No matching pending play found for AUDIO_SOURCE_LOADED'
+        ;(
+            playbackSyncDebugSnapshot.clientDiagnostics as {
+                lastError: {
+                    atMs: number
+                    code: string | null
+                    message: string
+                    rawType: string | null
+                    rawMessage: string | null
+                } | null
+            }
+        ).lastError = {
+            atMs: Date.now() - 5_000,
+            code: 'INVALID_MESSAGE',
+            message: 'No matching pending play found for AUDIO_SOURCE_LOADED',
+            rawType: 'ERROR',
+            rawMessage: '{"type":"ERROR"}',
+        }
+
+        const wrapper = mount(PlaybackSyncDebugView)
+        const panelText = wrapper.get('[data-test="debug-local-execution"]').text()
+
+        expect(panelText).toContain('web-test, web-pad')
+        expect(panelText).not.toContain('当前错误')
+        expect(panelText).not.toContain('No matching pending play found for AUDIO_SOURCE_LOADED')
     })
 })
