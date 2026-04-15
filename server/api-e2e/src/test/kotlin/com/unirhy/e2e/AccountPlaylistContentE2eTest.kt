@@ -613,6 +613,8 @@ class AccountPlaylistContentE2eTest {
             ),
         )
         E2eAssert.status(loginResponse, 200, "[accounts] account login should succeed")
+        val token = E2eJson.mapper.readTree(loginResponse.body()).path("token").asText()
+        api.setAuthToken(token)
         return api
     }
 
@@ -762,19 +764,20 @@ class AccountPlaylistContentE2eTest {
     private fun prepareScanFixture(scanWorkspace: Path): FixtureInfo {
         val suffix = suffix()
         val albumTitle = "e2e-playlist-album-$suffix"
-        val metadata = AudioFixtureMetadata(
-            title = "e2e-playlist-track",
-            artist = "e2e-playlist-artist",
-            album = albumTitle,
-            comment = "e2e-playlist-fixture",
-        )
-        SyntheticAudioFixture.generateBatch(
-            scanWorkspace = scanWorkspace,
-            dirName = "account-playlist-content-$suffix",
-            count = SCAN_FIXTURE_FILE_COUNT,
-            extension = "mp3",
-            metadata = metadata,
-        )
+        val fixtureRoot = scanWorkspace.resolve("account-playlist-content-$suffix")
+        java.nio.file.Files.createDirectories(fixtureRoot)
+        repeat(SCAN_FIXTURE_FILE_COUNT) { index ->
+            SyntheticAudioFixture.generateOne(
+                outputDir = fixtureRoot,
+                fileName = "fixture-${index.toString().padStart(4, '0')}.mp3",
+                metadata = AudioFixtureMetadata(
+                    title = "e2e-playlist-track-$index-$suffix",
+                    artist = "e2e-playlist-artist",
+                    album = albumTitle,
+                    comment = "e2e-playlist-fixture-$suffix",
+                ),
+            )
+        }
         return FixtureInfo(albumTitle = albumTitle)
     }
 

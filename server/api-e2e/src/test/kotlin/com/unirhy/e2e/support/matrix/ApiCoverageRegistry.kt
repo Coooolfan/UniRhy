@@ -33,6 +33,10 @@ object ApiCoverageRegistry {
         "com.unirhy.e2e.AccountPlaylistContentE2eTest#playlists should support owner scoped crud and recording association"
     private const val CONTENT_SEARCH_UPDATE_MERGE_CASE =
         "com.unirhy.e2e.AccountPlaylistContentE2eTest#content endpoints should support search update recording update and merge flow"
+    private const val PLAYBACK_QUEUE_AUTH_REQUIRED_CASE =
+        "com.unirhy.e2e.PlaybackQueueE2eTest#all playback queue endpoints should reject unauthenticated access"
+    private const val PLAYBACK_QUEUE_FLOW_CASE =
+        "com.unirhy.e2e.PlaybackQueueE2eTest#playback queue should support full mutation flow and stable conflict branches"
 
     val coverageByKey: Map<ApiEndpointKey, CoverageMark> = listOf(
         full(
@@ -76,6 +80,66 @@ object ApiCoverageRegistry {
             "/api/playlists",
             testRef = PLAYLIST_OWNER_SCOPE_CASE,
             note = "auth: $ACCOUNT_PLAYLIST_CONTENT_AUTH_REQUIRED_CASE",
+        ),
+        full(
+            "GET",
+            "/api/playback/current-queue",
+            testRef = PLAYBACK_QUEUE_FLOW_CASE,
+            note = "auth: $PLAYBACK_QUEUE_AUTH_REQUIRED_CASE",
+        ),
+        full(
+            "PUT",
+            "/api/playback/current-queue",
+            testRef = PLAYBACK_QUEUE_FLOW_CASE,
+            note = "auth: $PLAYBACK_QUEUE_AUTH_REQUIRED_CASE; conflict: stale version and unknown recording return 409",
+        ),
+        full(
+            "POST",
+            "/api/playback/current-queue/items",
+            testRef = PLAYBACK_QUEUE_FLOW_CASE,
+            note = "auth: $PLAYBACK_QUEUE_AUTH_REQUIRED_CASE; conflict: stale version returns 409",
+        ),
+        full(
+            "PUT",
+            "/api/playback/current-queue/order",
+            testRef = PLAYBACK_QUEUE_FLOW_CASE,
+            note = "auth: $PLAYBACK_QUEUE_AUTH_REQUIRED_CASE",
+        ),
+        full(
+            "PUT",
+            "/api/playback/current-queue/current",
+            testRef = PLAYBACK_QUEUE_FLOW_CASE,
+            note = "auth: $PLAYBACK_QUEUE_AUTH_REQUIRED_CASE",
+        ),
+        full(
+            "PUT",
+            "/api/playback/current-queue/strategy",
+            testRef = PLAYBACK_QUEUE_FLOW_CASE,
+            note = "auth: $PLAYBACK_QUEUE_AUTH_REQUIRED_CASE",
+        ),
+        full(
+            "POST",
+            "/api/playback/current-queue/actions/next",
+            testRef = PLAYBACK_QUEUE_FLOW_CASE,
+            note = "auth: $PLAYBACK_QUEUE_AUTH_REQUIRED_CASE",
+        ),
+        full(
+            "POST",
+            "/api/playback/current-queue/actions/previous",
+            testRef = PLAYBACK_QUEUE_FLOW_CASE,
+            note = "auth: $PLAYBACK_QUEUE_AUTH_REQUIRED_CASE",
+        ),
+        full(
+            "POST",
+            "/api/playback/current-queue/actions/remove",
+            testRef = PLAYBACK_QUEUE_FLOW_CASE,
+            note = "auth: $PLAYBACK_QUEUE_AUTH_REQUIRED_CASE",
+        ),
+        full(
+            "POST",
+            "/api/playback/current-queue/actions/clear",
+            testRef = PLAYBACK_QUEUE_FLOW_CASE,
+            note = "auth: $PLAYBACK_QUEUE_AUTH_REQUIRED_CASE",
         ),
         full(
             "POST",

@@ -21,6 +21,10 @@ class E2eHttpClient(private val baseUrl: String) {
         this.authToken = token
     }
 
+    fun authToken(): String? {
+        return authToken
+    }
+
     fun get(path: String, headers: Map<String, String> = emptyMap()): HttpResponse<String> {
         return requestText(
             E2eRequest(

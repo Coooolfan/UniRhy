@@ -10,19 +10,4 @@ data class AccountPlaybackState(
     val serverTimeToExecuteMs: Long,
     val version: Long,
     val updatedAtMs: Long,
-) {
-    companion object {
-        fun initial(
-            accountId: Long,
-            nowMs: Long,
-        ): AccountPlaybackState = AccountPlaybackState(
-            accountId = accountId,
-            status = PlaybackStatus.PAUSED,
-            currentIndex = null,
-            positionSeconds = 0.0,
-            serverTimeToExecuteMs = 0L,
-            version = 0L,
-            updatedAtMs = nowMs,
-        )
-    }
-}
+)

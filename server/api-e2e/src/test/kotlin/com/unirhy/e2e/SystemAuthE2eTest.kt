@@ -70,10 +70,7 @@ class SystemAuthE2eTest {
         )
 
         val logoutResponse = state.api.delete("/api/tokens/current")
-        assertAuthenticationFailed(
-            logoutResponse,
-            "[auth] logout should require login",
-        )
+        E2eAssert.status(logoutResponse, 204, "[auth] logout without login should stay idempotent")
     }
 
     @Test
@@ -115,6 +112,7 @@ class SystemAuthE2eTest {
 
         val logoutResponse = state.api.delete("/api/tokens/current")
         E2eAssert.status(logoutResponse, 204, "[flow] logout should succeed")
+        state.api.setAuthToken(null)
 
         val getAfterLogoutResponse = state.api.get("/api/system/config")
         assertAuthenticationFailed(
