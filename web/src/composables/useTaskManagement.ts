@@ -24,6 +24,7 @@ export const TASK_TYPE_LABEL_MAP: Record<TaskType, string> = {
 export const useTaskManagement = () => {
     const taskCounts = ref<ReadonlyArray<AsyncTaskLogCountRow>>([])
     const providerOptions = ref<TaskProviderOption[]>([])
+    const hasLoadedProviders = ref(false)
 
     const isLoadingTaskCounts = ref(false)
     const isLoadingProviders = ref(false)
@@ -67,7 +68,14 @@ export const useTaskManagement = () => {
         }
     }
 
-    const fetchProviders = async () => {
+    const fetchProviders = async (force = false) => {
+        if (isLoadingProviders.value) {
+            return
+        }
+        if (!force && hasLoadedProviders.value) {
+            return
+        }
+
         isLoadingProviders.value = true
         try {
             const [fsNodes, ossNodes, systemConfig] = await Promise.all([
@@ -99,6 +107,7 @@ export const useTaskManagement = () => {
             })
 
             providerOptions.value = options
+            hasLoadedProviders.value = true
         } catch (error) {
             console.error('Failed to fetch providers', error)
             // Non-critical, just empty list
@@ -124,7 +133,7 @@ export const useTaskManagement = () => {
         )
 
     const init = () => {
-        void Promise.all([fetchTaskCounts(), fetchProviders()])
+        void fetchTaskCounts()
     }
 
     const clearSubmitError = () => {

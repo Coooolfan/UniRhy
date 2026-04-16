@@ -18,6 +18,9 @@ vi.mock('@/ApiInstance', async (importOriginal) => {
             ossStorageController: {
                 list: vi.fn(),
             },
+            systemConfigController: {
+                get: vi.fn(),
+            },
         },
     }
 })
@@ -30,6 +33,7 @@ const executeScanTaskMock = vi.mocked(api.taskController.executeScanTask)
 const executeTranscodeTaskMock = vi.mocked(api.taskController.executeTranscodeTask)
 const listFileSystemStorageMock = vi.mocked(api.fileSystemStorageController.list)
 const listOssStorageMock = vi.mocked(api.ossStorageController.list)
+const getSystemConfigMock = vi.mocked(api.systemConfigController.get)
 
 const TaskSubmissionModalStub = defineComponent({
     name: 'TaskSubmissionModal',
@@ -58,6 +62,7 @@ describe('TasksView', () => {
         executeTranscodeTaskMock.mockReset()
         listFileSystemStorageMock.mockReset()
         listOssStorageMock.mockReset()
+        getSystemConfigMock.mockReset()
         vi.useRealTimers()
     })
 
@@ -72,9 +77,6 @@ describe('TasksView', () => {
             { taskType: 'TRANSCODE', status: 'COMPLETED', count: 7 },
             { taskType: 'TRANSCODE', status: 'FAILED', count: 0 },
         ])
-        listFileSystemStorageMock.mockResolvedValueOnce([])
-        listOssStorageMock.mockResolvedValueOnce([])
-
         const wrapper = mount(TasksView, {
             global: {
                 stubs: {
@@ -87,6 +89,9 @@ describe('TasksView', () => {
         await flushView()
 
         expect(listTaskLogsMock).toHaveBeenCalledTimes(1)
+        expect(listFileSystemStorageMock).not.toHaveBeenCalled()
+        expect(listOssStorageMock).not.toHaveBeenCalled()
+        expect(getSystemConfigMock).not.toHaveBeenCalled()
         expect(wrapper.text()).toContain('6 个任务待处理或执行中')
         expect(wrapper.text()).toContain('元数据解析')
         expect(wrapper.text()).toContain('媒体转码')
@@ -102,6 +107,11 @@ describe('TasksView', () => {
         executeScanTaskMock.mockResolvedValue(undefined)
         listFileSystemStorageMock.mockResolvedValue([])
         listOssStorageMock.mockResolvedValue([])
+        getSystemConfigMock.mockResolvedValue({
+            id: 0,
+            fsProviderId: 1,
+            ossProviderId: undefined,
+        })
 
         const wrapper = mount(TasksView, {
             global: {
@@ -117,9 +127,16 @@ describe('TasksView', () => {
         const actionButton = wrapper.get('[data-test="open-task-button"]')
         expect(actionButton.text()).toContain('发起新任务')
         expect(actionButton.attributes()).not.toHaveProperty('disabled')
+        expect(listFileSystemStorageMock).not.toHaveBeenCalled()
+        expect(listOssStorageMock).not.toHaveBeenCalled()
+        expect(getSystemConfigMock).not.toHaveBeenCalled()
 
         await actionButton.trigger('click')
         await flushView()
+
+        expect(listFileSystemStorageMock).toHaveBeenCalledTimes(1)
+        expect(listOssStorageMock).toHaveBeenCalledTimes(1)
+        expect(getSystemConfigMock).toHaveBeenCalledTimes(1)
 
         await wrapper.get('[data-test="submit-metadata-parse"]').trigger('click')
         await flushView()
@@ -143,8 +160,6 @@ describe('TasksView', () => {
         listTaskLogsMock
             .mockResolvedValueOnce([{ taskType: 'METADATA_PARSE', status: 'PENDING', count: 1 }])
             .mockResolvedValueOnce([])
-        listFileSystemStorageMock.mockResolvedValue([])
-        listOssStorageMock.mockResolvedValue([])
 
         mount(TasksView, {
             global: {
@@ -171,6 +186,11 @@ describe('TasksView', () => {
         listTaskLogsMock.mockResolvedValue([])
         listFileSystemStorageMock.mockResolvedValue([])
         listOssStorageMock.mockResolvedValue([])
+        getSystemConfigMock.mockResolvedValue({
+            id: 0,
+            fsProviderId: 1,
+            ossProviderId: undefined,
+        })
 
         const wrapper = mount(TasksView, {
             global: {
@@ -190,5 +210,41 @@ describe('TasksView', () => {
         await flushView()
 
         expect(listTaskLogsMock).toHaveBeenCalledTimes(2)
+        expect(listFileSystemStorageMock).toHaveBeenCalledTimes(1)
+        expect(listOssStorageMock).toHaveBeenCalledTimes(1)
+        expect(getSystemConfigMock).toHaveBeenCalledTimes(1)
+    })
+
+    it('reuses provider data when reopening the task modal', async () => {
+        listTaskLogsMock.mockResolvedValue([])
+        listFileSystemStorageMock.mockResolvedValue([])
+        listOssStorageMock.mockResolvedValue([])
+        getSystemConfigMock.mockResolvedValue({
+            id: 0,
+            fsProviderId: 1,
+            ossProviderId: undefined,
+        })
+
+        const wrapper = mount(TasksView, {
+            global: {
+                stubs: {
+                    DashboardTopBar: true,
+                    TaskSubmissionModal: TaskSubmissionModalStub,
+                },
+            },
+        })
+
+        await flushView()
+
+        await wrapper.get('[data-test="open-task-button"]').trigger('click')
+        await flushView()
+        await wrapper.get('[data-test="close-task-modal"]').trigger('click')
+        await flushView()
+        await wrapper.get('[data-test="open-task-button"]').trigger('click')
+        await flushView()
+
+        expect(listFileSystemStorageMock).toHaveBeenCalledTimes(1)
+        expect(listOssStorageMock).toHaveBeenCalledTimes(1)
+        expect(getSystemConfigMock).toHaveBeenCalledTimes(1)
     })
 })

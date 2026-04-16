@@ -241,6 +241,7 @@
 import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { api, normalizeApiError } from '@/ApiInstance'
+import { setInitializationStatus } from '@/services/systemInitialization'
 import { User, Mail, Key, HardDrive, Database, ArrowRight } from 'lucide-vue-next'
 
 const router = useRouter()
@@ -266,6 +267,7 @@ const handleInit = async () => {
                 storageProviderPath: form.storageProviderPath,
             },
         })
+        setInitializationStatus({ initialized: true })
         router.push('/login')
     } catch (error) {
         const normalizedError = normalizeApiError(error)

@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { api, getAuthToken } from '@/ApiInstance'
+import { getAuthToken } from '@/ApiInstance'
+import { getInitializationStatus } from '@/services/systemInitialization'
 
 const hasPersistedAuthToken = () => {
     const token = getAuthToken()
@@ -82,7 +83,7 @@ const router = createRouter({
 
 router.beforeEach(async (to) => {
     try {
-        const status = await api.systemConfigController.isInitialized()
+        const status = await getInitializationStatus()
         if (!status.initialized) {
             if (to.path !== '/init') {
                 return '/init'

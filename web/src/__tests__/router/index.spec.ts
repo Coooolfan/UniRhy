@@ -64,4 +64,15 @@ describe('router auth persistence', () => {
 
         expect(router.currentRoute.value.fullPath).toBe('/init')
     })
+
+    it('checks initialization status only once across route changes', async () => {
+        getAuthTokenMock.mockReturnValue('persisted-token')
+        const router = await loadRouter()
+
+        await router.push('/')
+        await router.push('/dashboard/albums')
+        await router.push('/dashboard/settings')
+
+        expect(isInitializedMock).toHaveBeenCalledTimes(1)
+    })
 })
