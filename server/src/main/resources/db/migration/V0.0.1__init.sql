@@ -171,9 +171,11 @@ CREATE TABLE public.album
 -- 专辑与录音的关联表（多对多）
 CREATE TABLE public.album_recording_mapping
 (
+    id           BIGSERIAL PRIMARY KEY,
     album_id     BIGINT NOT NULL REFERENCES public.album (id) ON DELETE CASCADE,
     recording_id BIGINT NOT NULL REFERENCES public.recording (id) ON DELETE RESTRICT,
-    PRIMARY KEY (album_id, recording_id) -- 联合主键防止重复添加
+    sort_order   INT    NOT NULL DEFAULT 0,
+    CONSTRAINT album_recording_mapping_uniq UNIQUE (album_id, recording_id)
 );
 
 -- ==========================================================
@@ -194,9 +196,11 @@ CREATE INDEX playlist_owner_id_idx ON public.playlist (owner_id);
 -- 歌单与录音的关联表（多对多）
 CREATE TABLE public.playlist_recording_mapping
 (
+    id           BIGSERIAL PRIMARY KEY,
     playlist_id  BIGINT NOT NULL REFERENCES public.playlist (id) ON DELETE CASCADE,
     recording_id BIGINT NOT NULL REFERENCES public.recording (id) ON DELETE RESTRICT,
-    PRIMARY KEY (playlist_id, recording_id) -- 联合主键防止重复添加
+    sort_order   INT    NOT NULL DEFAULT 0,
+    CONSTRAINT playlist_recording_mapping_uniq UNIQUE (playlist_id, recording_id)
 );
 
 -- ==========================================================

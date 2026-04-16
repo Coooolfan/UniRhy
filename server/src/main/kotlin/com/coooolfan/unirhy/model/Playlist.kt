@@ -4,8 +4,10 @@ import org.babyfish.jimmer.sql.Entity
 import org.babyfish.jimmer.sql.GeneratedValue
 import org.babyfish.jimmer.sql.GenerationType
 import org.babyfish.jimmer.sql.Id
-import org.babyfish.jimmer.sql.ManyToMany
+import org.babyfish.jimmer.sql.ManyToManyView
 import org.babyfish.jimmer.sql.ManyToOne
+import org.babyfish.jimmer.sql.OneToMany
+import org.babyfish.jimmer.sql.OrderedProp
 
 @Entity
 interface Playlist {
@@ -16,7 +18,13 @@ interface Playlist {
     @ManyToOne
     val owner: Account
 
-    @ManyToMany
+    @OneToMany(
+        mappedBy = "playlist",
+        orderedProps = [OrderedProp("sortOrder")]
+    )
+    val playlistRecordings: List<PlaylistRecording>
+
+    @ManyToManyView(prop = "playlistRecordings", deeperProp = "recording")
     val recordings: List<Recording>
 
     val name: String

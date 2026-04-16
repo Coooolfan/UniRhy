@@ -1,15 +1,10 @@
 package com.coooolfan.unirhy.service
 
-import com.coooolfan.unirhy.model.Album
-import com.coooolfan.unirhy.model.id
-import com.coooolfan.unirhy.model.title
+import com.coooolfan.unirhy.model.*
 import org.babyfish.jimmer.Page
 import org.babyfish.jimmer.sql.fetcher.Fetcher
 import org.babyfish.jimmer.sql.kt.KSqlClient
-import org.babyfish.jimmer.sql.kt.ast.expression.eq
-import org.babyfish.jimmer.sql.kt.ast.expression.ilike
-import org.babyfish.jimmer.sql.kt.ast.expression.ne
-import org.babyfish.jimmer.sql.kt.ast.table.sourceId
+import org.babyfish.jimmer.sql.kt.ast.expression.*
 import org.springframework.stereotype.Service
 
 @Service
@@ -21,14 +16,18 @@ class AlbumService(private val sql: KSqlClient) {
         filterSingle: Boolean = false
     ): Page<Album> {
         return sql.createQuery(Album::class) {
-
-            if (filterSingle)
+            if (filterSingle) {
                 where(
-                    subQueries.forList(Album::recordings) {
-                        where(table.sourceId eq parentTable.id)
-                        selectCount()
-                    } ne 1L
+                    exists(
+                        subQuery(AlbumRecording::class) {
+                            where(table.albumId eq parentTable.id)
+                            groupBy(table.albumId)
+                            having(count(table.id) ne 1L)
+                            select(table.albumId)
+                        }
+                    )
                 )
+            }
 
             orderBy(table.id)
             select(table.fetch(fetcher))

@@ -129,7 +129,8 @@ class ScanTaskService(
             setAssociatedMode(Album::cover, AssociatedSaveMode.APPEND_IF_ABSENT)
             setAssociatedMode(Recording::cover, AssociatedSaveMode.APPEND_IF_ABSENT)
             setAssociatedMode(Recording::artists, AssociatedSaveMode.APPEND_IF_ABSENT)
-            setAssociatedMode(Recording::albums, AssociatedSaveMode.APPEND_IF_ABSENT)
+            setAssociatedMode(Recording::albumRecordings, AssociatedSaveMode.APPEND_IF_ABSENT)
+            setAssociatedMode(AlbumRecording::album, AssociatedSaveMode.APPEND_IF_ABSENT)
         }
         return "SUCCESS"
     }
@@ -195,12 +196,15 @@ private fun buildWorkFromAudioFile(
                 comment = "load from local file: $objectKey"
                 avatar = null
             }
-            albums().addBy {
-                title = tag?.getFirst(FieldKey.ALBUM).orEmpty()
-                kind = "CD"
-                releaseDate = null
-                comment = "load from local file: $objectKey"
-                cover = audioCover
+            albumRecordings().addBy {
+                sortOrder = 0
+                album().apply {
+                    title = tag?.getFirst(FieldKey.ALBUM).orEmpty()
+                    kind = "CD"
+                    releaseDate = null
+                    comment = "load from local file: $objectKey"
+                    cover = audioCover
+                }
             }
             assets().addBy {
                 comment = "load from local file: $objectKey"

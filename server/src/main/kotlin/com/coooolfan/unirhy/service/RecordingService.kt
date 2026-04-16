@@ -60,11 +60,20 @@ class RecordingService(
 
         jdbc.update(
             """
-                INSERT INTO public.album_recording_mapping (album_id, recording_id)
-                SELECT DISTINCT arm.album_id, :targetId
-                FROM public.album_recording_mapping arm
-                WHERE arm.recording_id IN (:needMergeIds)
-                ON CONFLICT (album_id, recording_id) DO NOTHING
+                INSERT INTO public.album_recording_mapping (album_id, recording_id, sort_order)
+                SELECT src.album_id,
+                       :targetId,
+                       COALESCE((
+                           SELECT MAX(sort_order) + 1
+                           FROM public.album_recording_mapping
+                           WHERE album_id = src.album_id
+                       ), 0)
+                FROM (
+                    SELECT DISTINCT album_id
+                    FROM public.album_recording_mapping
+                    WHERE recording_id IN (:needMergeIds)
+                ) AS src
+                ON CONFLICT ON CONSTRAINT album_recording_mapping_uniq DO NOTHING
                 """.trimIndent(),
             params
         )
@@ -79,11 +88,20 @@ class RecordingService(
 
         jdbc.update(
             """
-                INSERT INTO public.playlist_recording_mapping (playlist_id, recording_id)
-                SELECT DISTINCT prm.playlist_id, :targetId
-                FROM public.playlist_recording_mapping prm
-                WHERE prm.recording_id IN (:needMergeIds)
-                ON CONFLICT (playlist_id, recording_id) DO NOTHING
+                INSERT INTO public.playlist_recording_mapping (playlist_id, recording_id, sort_order)
+                SELECT src.playlist_id,
+                       :targetId,
+                       COALESCE((
+                           SELECT MAX(sort_order) + 1
+                           FROM public.playlist_recording_mapping
+                           WHERE playlist_id = src.playlist_id
+                       ), 0)
+                FROM (
+                    SELECT DISTINCT playlist_id
+                    FROM public.playlist_recording_mapping
+                    WHERE recording_id IN (:needMergeIds)
+                ) AS src
+                ON CONFLICT ON CONSTRAINT playlist_recording_mapping_uniq DO NOTHING
                 """.trimIndent(),
             params
         )

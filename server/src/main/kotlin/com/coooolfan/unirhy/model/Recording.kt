@@ -34,6 +34,15 @@ interface Recording {
     @OneToMany(mappedBy = "recording")
     val assets: List<Asset>
 
-    @ManyToMany(mappedBy = "recordings")
+    @OneToMany(mappedBy = "recording")
+    val albumRecordings: List<AlbumRecording>
+
+    @ManyToManyView(prop = "albumRecordings", deeperProp = "album")
     val albums: List<Album>
+
+    @OneToMany(mappedBy = "recording")
+    val playlistRecordings: List<PlaylistRecording>
+
+    @ManyToManyView(prop = "playlistRecordings", deeperProp = "playlist")
+    val playlists: List<Playlist>
 }
