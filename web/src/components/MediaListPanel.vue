@@ -1,4 +1,7 @@
 <script setup lang="ts" generic="T extends { id: number }">
+import { ref } from 'vue'
+import type { ReorderPosition } from '@/utils/recordingOrder'
+
 const props = withDefaults(
     defineProps<{
         title: string
@@ -7,10 +10,14 @@ const props = withDefaults(
         playingId: number | null
         enableMultiSelect?: boolean
         selectedIds?: Set<number>
+        enableReorder?: boolean
+        reorderDisabled?: boolean
     }>(),
     {
         enableMultiSelect: false,
         selectedIds: () => new Set(),
+        enableReorder: false,
+        reorderDisabled: false,
     },
 )
 
@@ -20,6 +27,14 @@ const emit = defineEmits<{
     (e: 'item-keydown', event: KeyboardEvent, item: T): void
     (e: 'item-edit', item: T): void
     (e: 'item-toggle-select', item: T, event?: MouseEvent): void
+    (
+        e: 'item-reorder',
+        payload: {
+            draggedId: number
+            targetId: number
+            position: ReorderPosition
+        },
+    ): void
 }>()
 
 defineSlots<{
@@ -34,6 +49,76 @@ const isItemPlaying = (itemId: number) => {
 
 const isItemSelected = (itemId: number) => {
     return props.selectedIds?.has(itemId) ?? false
+}
+
+const draggedItemId = ref<number | null>(null)
+const dropTargetId = ref<number | null>(null)
+const dropPosition = ref<ReorderPosition>('before')
+
+const resetDragState = () => {
+    draggedItemId.value = null
+    dropTargetId.value = null
+    dropPosition.value = 'before'
+}
+
+const handleDragStart = (itemId: number, event: DragEvent) => {
+    if (!props.enableReorder || props.reorderDisabled) {
+        return
+    }
+
+    draggedItemId.value = itemId
+    if (event.dataTransfer) {
+        event.dataTransfer.effectAllowed = 'move'
+        event.dataTransfer.setData('text/plain', String(itemId))
+        const currentTarget = event.currentTarget
+        if (currentTarget instanceof HTMLElement) {
+            const row = currentTarget.closest<HTMLElement>('[data-testid="media-list-row"]')
+            if (row) {
+                event.dataTransfer.setDragImage(row, 24, row.clientHeight / 2)
+            }
+        }
+    }
+}
+
+const updateDropState = (itemId: number, event: DragEvent) => {
+    if (!props.enableReorder || props.reorderDisabled || draggedItemId.value === null) {
+        return
+    }
+    if (draggedItemId.value === itemId) {
+        return
+    }
+
+    event.preventDefault()
+    const currentTarget = event.currentTarget
+    if (!(currentTarget instanceof HTMLElement)) {
+        return
+    }
+
+    const rect = currentTarget.getBoundingClientRect()
+    dropTargetId.value = itemId
+    dropPosition.value = event.clientY - rect.top > rect.height / 2 ? 'after' : 'before'
+
+    if (event.dataTransfer) {
+        event.dataTransfer.dropEffect = 'move'
+    }
+}
+
+const handleDrop = (itemId: number, event: DragEvent) => {
+    if (!props.enableReorder || props.reorderDisabled || draggedItemId.value === null) {
+        return
+    }
+
+    event.preventDefault()
+
+    if (draggedItemId.value !== itemId) {
+        emit('item-reorder', {
+            draggedId: draggedItemId.value,
+            targetId: itemId,
+            position: dropPosition.value,
+        })
+    }
+
+    resetDragState()
 }
 </script>
 
@@ -74,14 +159,41 @@ const isItemSelected = (itemId: number) => {
                 @click="emit('item-click', item)"
                 @dblclick="emit('item-double-click', item)"
                 @keydown="(event) => emit('item-keydown', event, item)"
+                @dragover="updateDropState(item.id, $event)"
+                @drop="handleDrop(item.id, $event)"
                 tabindex="0"
                 role="button"
+                data-testid="media-list-row"
+                :data-item-id="item.id"
                 class="group relative flex items-start gap-4 overflow-visible rounded-sm border-b border-transparent px-3 py-4 transition-all duration-200 hover:bg-[#F2EFE9] sm:px-4 md:items-center md:gap-6"
                 :class="{
                     'bg-[#F2EFE9]': enableMultiSelect && isItemSelected(item.id),
-                    'cursor-pointer': true,
+                    'cursor-move': enableReorder && !reorderDisabled,
+                    'cursor-pointer': !enableReorder || reorderDisabled,
+                    'bg-[#F7F2EA]':
+                        enableReorder && dropTargetId === item.id && draggedItemId !== item.id,
+                    'opacity-75': draggedItemId === item.id,
                 }"
             >
+                <div
+                    v-if="
+                        enableReorder &&
+                        dropTargetId === item.id &&
+                        draggedItemId !== item.id &&
+                        dropPosition === 'before'
+                    "
+                    class="pointer-events-none absolute left-6 right-6 top-0 h-1 -translate-y-1/2 rounded-full bg-[#C17D46]/70"
+                ></div>
+                <div
+                    v-if="
+                        enableReorder &&
+                        dropTargetId === item.id &&
+                        draggedItemId !== item.id &&
+                        dropPosition === 'after'
+                    "
+                    class="pointer-events-none absolute bottom-0 left-6 right-6 h-1 translate-y-1/2 rounded-full bg-[#C17D46]/70"
+                ></div>
+
                 <input
                     v-if="enableMultiSelect"
                     type="checkbox"
@@ -107,8 +219,15 @@ const isItemSelected = (itemId: number) => {
                 </div>
 
                 <div
-                    class="relative z-10 w-5 shrink-0 select-none text-center font-serif text-base text-[#DCD6CC] group-hover:text-[#8C857B] sm:w-6 sm:text-lg"
-                    :class="{ 'cursor-pointer': enableMultiSelect }"
+                    data-testid="media-list-drag-handle"
+                    class="relative z-10 flex w-5 shrink-0 flex-col items-center justify-center select-none text-center font-serif text-base text-[#DCD6CC] group-hover:text-[#8C857B] sm:w-6 sm:text-lg"
+                    :draggable="enableReorder && !reorderDisabled"
+                    :class="{
+                        'cursor-pointer': enableMultiSelect,
+                        'cursor-move': enableReorder && !reorderDisabled,
+                    }"
+                    @dragstart="handleDragStart(item.id, $event)"
+                    @dragend="resetDragState"
                     @click.stop="
                         enableMultiSelect
                             ? emit('item-toggle-select', item, $event)

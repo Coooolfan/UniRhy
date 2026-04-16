@@ -25,6 +25,7 @@ vi.mock('@/ApiInstance', async (importOriginal) => {
 })
 
 import { api } from '@/ApiInstance'
+import { buildRecordingOrderStorageKey } from '@/utils/recordingOrder'
 import AlbumDetailView from '@/views/AlbumDetailView.vue'
 
 const getAlbumMock = vi.mocked(api.albumController.getAlbum)
@@ -36,6 +37,12 @@ const flushView = async () => {
     await Promise.resolve()
     await nextTick()
 }
+
+const createDragTransfer = () => ({
+    effectAllowed: '',
+    dropEffect: '',
+    setData: vi.fn(),
+})
 
 const buildAlbumResponse = () => ({
     id: 1,
@@ -53,8 +60,22 @@ const buildAlbumResponse = () => ({
             comment: 'Track Comment',
             durationMs: 240000,
             defaultInWork: false,
+            lyrics: '',
             assets: [],
             artists: [{ id: 101, displayName: 'Artist A', alias: [], comment: '' }],
+            cover: undefined,
+        },
+        {
+            id: 12,
+            kind: 'Live',
+            label: 'Label B',
+            title: 'Track Two',
+            comment: 'Track Comment B',
+            durationMs: 180000,
+            defaultInWork: false,
+            lyrics: '',
+            assets: [],
+            artists: [{ id: 102, displayName: 'Artist B', alias: [], comment: '' }],
             cover: undefined,
         },
     ],
@@ -63,6 +84,7 @@ const buildAlbumResponse = () => ({
 describe('AlbumDetailView', () => {
     beforeEach(() => {
         setActivePinia(createPinia())
+        window.localStorage.clear()
         getAlbumMock.mockReset()
         updateRecordingMock.mockReset()
     })
@@ -150,5 +172,44 @@ describe('AlbumDetailView', () => {
                 kind: 'Studio',
             },
         })
+    })
+
+    it('reorders recordings and persists order locally', async () => {
+        getAlbumMock.mockResolvedValueOnce(buildAlbumResponse())
+
+        const wrapper = mount(AlbumDetailView, {
+            global: {
+                stubs: {
+                    teleport: true,
+                    transition: false,
+                    DashboardTopBar: true,
+                },
+            },
+        })
+
+        await flushView()
+
+        const rows = wrapper.findAll('[data-testid="media-list-row"]')
+        const firstRow = rows[0]
+        const secondRow = rows[1]
+        const dragHandles = wrapper.findAll('[data-testid="media-list-drag-handle"]')
+        const secondHandle = dragHandles[1]
+        if (!firstRow || !secondRow || !secondHandle) {
+            throw new Error('Missing media list rows in test setup')
+        }
+
+        const dataTransfer = createDragTransfer()
+        await secondHandle.trigger('dragstart', { dataTransfer })
+        await firstRow.trigger('dragover', { clientY: 0, dataTransfer })
+        await firstRow.trigger('drop', { clientY: 0, dataTransfer })
+        await nextTick()
+
+        const itemIds = wrapper
+            .findAll('[data-testid="media-list-row"]')
+            .map((row) => Number(row.attributes('data-item-id')))
+        expect(itemIds).toEqual([12, 11])
+        expect(window.localStorage.getItem(buildRecordingOrderStorageKey('album', 1))).toBe(
+            '[12,11]',
+        )
     })
 })
