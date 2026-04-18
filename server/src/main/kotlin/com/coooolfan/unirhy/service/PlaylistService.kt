@@ -136,6 +136,7 @@ class PlaylistService(private val sql: KSqlClient) {
 
         val currentIds = sql.createQuery(PlaylistRecording::class) {
             where(table.playlistId eq playlistId)
+            where(table.playlist.ownerId eq StpUtil.getLoginIdAsLong())
             select(table.recordingId)
         }.execute()
 

@@ -950,8 +950,15 @@ class AccountPlaylistContentE2eTest {
             email = "playlist-reorder-owner-$suffix@example.invalid",
             password = "playlist-reorder-owner-$suffix-password",
         )
+        val visitor = createAccountByAdmin(
+            state = state,
+            name = "playlist-reorder-visitor-$suffix",
+            email = "playlist-reorder-visitor-$suffix@example.invalid",
+            password = "playlist-reorder-visitor-$suffix-password",
+        )
 
         val ownerApi = loginAsAccount(owner.email, owner.password)
+        val visitorApi = loginAsAccount(visitor.email, visitor.password)
 
         val createPlaylistResponse = ownerApi.post(
             path = "/api/playlists",
@@ -1023,6 +1030,31 @@ class AccountPlaylistContentE2eTest {
             ),
             204,
             "[playlist-reorder] same-order reorder should stay idempotent",
+        )
+
+        E2eAssert.status(
+            visitorApi.put(
+                path = "/api/playlists/$playlistId/recordings/reorder",
+                json = mapOf(
+                    "recordingIds" to listOf(
+                        playlistOrderData.firstRecordingId,
+                        playlistOrderData.secondRecordingId,
+                    ),
+                ),
+            ),
+            400,
+            "[playlist-reorder] non-owner reorder should fail",
+        )
+
+        val detailAfterVisitorAttempt = ownerApi.get("/api/playlists/$playlistId")
+        E2eAssert.status(detailAfterVisitorAttempt, 200, "[playlist-reorder] detail after visitor attempt should succeed")
+        assertRecordingOrder(
+            responseBody = detailAfterVisitorAttempt.body(),
+            expectedRecordingIds = listOf(
+                playlistOrderData.secondRecordingId,
+                playlistOrderData.firstRecordingId,
+            ),
+            step = "[playlist-reorder] visitor attempt should not change order",
         )
 
         E2eAssert.status(
