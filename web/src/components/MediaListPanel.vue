@@ -168,8 +168,7 @@ const handleDrop = (itemId: number, event: DragEvent) => {
                 class="group relative flex items-start gap-4 overflow-visible rounded-sm border-b border-transparent px-3 py-4 transition-all duration-200 hover:bg-[#F2EFE9] sm:px-4 md:items-center md:gap-6"
                 :class="{
                     'bg-[#F2EFE9]': enableMultiSelect && isItemSelected(item.id),
-                    'cursor-move': enableReorder && !reorderDisabled,
-                    'cursor-pointer': !enableReorder || reorderDisabled,
+                    'cursor-pointer': true,
                     'bg-[#F7F2EA]':
                         enableReorder && dropTargetId === item.id && draggedItemId !== item.id,
                     'opacity-75': draggedItemId === item.id,
