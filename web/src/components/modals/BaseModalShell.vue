@@ -122,15 +122,7 @@ onUnmounted(() => {
 
 <template>
     <Teleport to="body">
-        <Transition
-            appear
-            enter-active-class="transition duration-300 ease-out"
-            enter-from-class="opacity-0 translate-y-4"
-            enter-to-class="opacity-100 translate-y-0"
-            leave-active-class="transition duration-200 ease-in"
-            leave-from-class="opacity-100 translate-y-0"
-            leave-to-class="opacity-0 translate-y-4"
-        >
+        <Transition appear name="app-modal">
             <div
                 data-testid="app-modal-root"
                 class="fixed inset-0"
@@ -146,7 +138,7 @@ onUnmounted(() => {
 
                 <div class="absolute inset-0 flex items-center justify-center p-4 sm:p-6">
                     <div
-                        class="relative max-w-full pointer-events-auto transition-[width,height] duration-300 ease-out"
+                        class="app-modal-panel relative max-w-full pointer-events-auto transition-[width,height] duration-300 ease-out"
                         :style="panelFrameStyle"
                     >
                         <div
@@ -200,3 +192,38 @@ onUnmounted(() => {
         </Transition>
     </Teleport>
 </template>
+
+<style scoped>
+.app-modal-enter-active,
+.app-modal-leave-active {
+    transition: opacity 300ms ease;
+}
+
+.app-modal-leave-active {
+    transition-duration: 200ms;
+}
+
+.app-modal-enter-from,
+.app-modal-leave-to {
+    opacity: 0;
+}
+
+.app-modal-enter-active .app-modal-panel,
+.app-modal-leave-active .app-modal-panel {
+    transition:
+        transform 300ms ease,
+        opacity 300ms ease,
+        width 300ms ease-out,
+        height 300ms ease-out;
+}
+
+.app-modal-leave-active .app-modal-panel {
+    transition-duration: 200ms;
+}
+
+.app-modal-enter-from .app-modal-panel,
+.app-modal-leave-to .app-modal-panel {
+    opacity: 0;
+    transform: translateY(1rem);
+}
+</style>
