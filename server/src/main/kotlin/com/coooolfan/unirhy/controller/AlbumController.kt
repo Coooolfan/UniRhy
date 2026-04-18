@@ -3,6 +3,7 @@ package com.coooolfan.unirhy.controller
 import cn.dev33.satoken.annotation.SaCheckLogin
 import com.coooolfan.unirhy.model.Album
 import com.coooolfan.unirhy.model.by
+import com.coooolfan.unirhy.model.dto.RecordingReorderReq
 import com.coooolfan.unirhy.service.AlbumService
 import org.babyfish.jimmer.Page
 import org.babyfish.jimmer.client.FetchBy
@@ -74,6 +75,27 @@ class AlbumController(private val service: AlbumService) {
         @RequestParam(required = true) name: String,
     ): List<@FetchBy("DEFAULT_ALBUM_FETCHER") Album> {
         return service.getAlbumByName(name, DEFAULT_ALBUM_FETCHER)
+    }
+
+    /**
+     * 调整专辑内录音顺序
+     *
+     * 请求体需提供当前专辑中全部录音的 id 列表，按期望顺序排列。
+     * 服务端严格校验集合一致性后，按下标重写映射表的 sortOrder。
+     *
+     * @param id 专辑 ID
+     * @param input 新顺序下的录音 id 列表
+     *
+     * @api PUT /api/albums/{id}/recordings/reorder
+     * @permission 需要登录认证
+     */
+    @PutMapping("/{id}/recordings/reorder")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    fun reorderAlbumRecordings(
+        @PathVariable id: Long,
+        @RequestBody input: RecordingReorderReq,
+    ) {
+        service.reorderAlbumRecordings(id, input.recordingIds)
     }
 
     companion object {

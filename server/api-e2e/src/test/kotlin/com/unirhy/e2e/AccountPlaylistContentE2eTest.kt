@@ -818,6 +818,261 @@ class AccountPlaylistContentE2eTest {
         E2eAssert.status(missingRecordingResponse, 404, "[content] missing recording detail should return 404")
     }
 
+    @Test
+    @Order(8)
+    fun `album reorder should update sort order and validate input`() {
+        val state = bootstrapAdminSession(baseUrl())
+        val unrelatedRecordingId = ensurePreparedData(state).recordingId
+        val workId = fetchRecordingWorkId(
+            state = state,
+            recordingId = unrelatedRecordingId,
+            step = "[album-reorder] reference work id",
+        )
+        val suffix = suffix()
+
+        val albumId = insertAlbum(
+            title = "album-reorder-$suffix",
+            comment = "album-reorder-comment-$suffix",
+        )
+        val firstRecordingId = insertRecording(
+            workId = workId,
+            title = "album-reorder-first-$suffix",
+            comment = "album-reorder-first-comment-$suffix",
+        )
+        val secondRecordingId = insertRecording(
+            workId = workId,
+            title = "album-reorder-second-$suffix",
+            comment = "album-reorder-second-comment-$suffix",
+        )
+        val thirdRecordingId = insertRecording(
+            workId = workId,
+            title = "album-reorder-third-$suffix",
+            comment = "album-reorder-third-comment-$suffix",
+        )
+        insertAlbumRecording(albumId = albumId, recordingId = firstRecordingId, sortOrder = 0)
+        insertAlbumRecording(albumId = albumId, recordingId = secondRecordingId, sortOrder = 1)
+        insertAlbumRecording(albumId = albumId, recordingId = thirdRecordingId, sortOrder = 2)
+
+        val initialDetail = state.api.get("/api/albums/$albumId")
+        E2eAssert.status(initialDetail, 200, "[album-reorder] initial detail should succeed")
+        assertRecordingOrder(
+            responseBody = initialDetail.body(),
+            expectedRecordingIds = listOf(firstRecordingId, secondRecordingId, thirdRecordingId),
+            step = "[album-reorder] initial order should match fixtures",
+        )
+
+        val reorderResponse = state.api.put(
+            path = "/api/albums/$albumId/recordings/reorder",
+            json = mapOf(
+                "recordingIds" to listOf(thirdRecordingId, firstRecordingId, secondRecordingId),
+            ),
+        )
+        E2eAssert.status(reorderResponse, 204, "[album-reorder] reorder should succeed")
+
+        val afterReorderDetail = state.api.get("/api/albums/$albumId")
+        E2eAssert.status(afterReorderDetail, 200, "[album-reorder] detail after reorder should succeed")
+        assertRecordingOrder(
+            responseBody = afterReorderDetail.body(),
+            expectedRecordingIds = listOf(thirdRecordingId, firstRecordingId, secondRecordingId),
+            step = "[album-reorder] recordings should be returned in the new order",
+        )
+
+        E2eAssert.status(
+            state.api.put(
+                path = "/api/albums/$albumId/recordings/reorder",
+                json = mapOf(
+                    "recordingIds" to listOf(thirdRecordingId, firstRecordingId, secondRecordingId),
+                ),
+            ),
+            204,
+            "[album-reorder] reorder with same order should stay idempotent",
+        )
+
+        E2eAssert.status(
+            state.api.put(
+                path = "/api/albums/${Long.MAX_VALUE}/recordings/reorder",
+                json = mapOf("recordingIds" to listOf(firstRecordingId)),
+            ),
+            404,
+            "[album-reorder] nonexistent album should return not found",
+        )
+
+        E2eAssert.status(
+            state.api.put(
+                path = "/api/albums/$albumId/recordings/reorder",
+                json = mapOf(
+                    "recordingIds" to listOf(firstRecordingId, firstRecordingId, secondRecordingId),
+                ),
+            ),
+            400,
+            "[album-reorder] duplicate recording ids should fail",
+        )
+
+        E2eAssert.status(
+            state.api.put(
+                path = "/api/albums/$albumId/recordings/reorder",
+                json = mapOf(
+                    "recordingIds" to listOf(firstRecordingId, secondRecordingId),
+                ),
+            ),
+            400,
+            "[album-reorder] missing recording id should fail",
+        )
+
+        E2eAssert.status(
+            state.api.put(
+                path = "/api/albums/$albumId/recordings/reorder",
+                json = mapOf(
+                    "recordingIds" to listOf(
+                        firstRecordingId,
+                        secondRecordingId,
+                        thirdRecordingId,
+                        unrelatedRecordingId,
+                    ),
+                ),
+            ),
+            400,
+            "[album-reorder] extra recording id should fail",
+        )
+    }
+
+    @Test
+    @Order(9)
+    fun `playlist reorder should update sort order and validate input`() {
+        val state = bootstrapAdminSession(baseUrl())
+        val playlistOrderData = preparePlaylistOrderData(state)
+        val unrelatedRecordingId = ensurePreparedData(state).recordingId
+        val suffix = suffix()
+
+        val owner = createAccountByAdmin(
+            state = state,
+            name = "playlist-reorder-owner-$suffix",
+            email = "playlist-reorder-owner-$suffix@example.invalid",
+            password = "playlist-reorder-owner-$suffix-password",
+        )
+
+        val ownerApi = loginAsAccount(owner.email, owner.password)
+
+        val createPlaylistResponse = ownerApi.post(
+            path = "/api/playlists",
+            json = mapOf(
+                "name" to "playlist-reorder-$suffix",
+                "comment" to "playlist-reorder-comment-$suffix",
+            ),
+        )
+        E2eAssert.status(createPlaylistResponse, 201, "[playlist-reorder] create should succeed")
+        val playlistId = readIdFromObject(
+            responseBody = createPlaylistResponse.body(),
+            pointer = "/id",
+            step = "[playlist-reorder] created playlist should contain id",
+        )
+
+        E2eAssert.status(
+            ownerApi.put("/api/playlists/$playlistId/recordings/${playlistOrderData.firstRecordingId}"),
+            204,
+            "[playlist-reorder] add first recording should succeed",
+        )
+        E2eAssert.status(
+            ownerApi.put("/api/playlists/$playlistId/recordings/${playlistOrderData.secondRecordingId}"),
+            204,
+            "[playlist-reorder] add second recording should succeed",
+        )
+
+        val initialDetail = ownerApi.get("/api/playlists/$playlistId")
+        E2eAssert.status(initialDetail, 200, "[playlist-reorder] initial detail should succeed")
+        assertRecordingOrder(
+            responseBody = initialDetail.body(),
+            expectedRecordingIds = listOf(
+                playlistOrderData.firstRecordingId,
+                playlistOrderData.secondRecordingId,
+            ),
+            step = "[playlist-reorder] initial insertion order",
+        )
+
+        val reorderResponse = ownerApi.put(
+            path = "/api/playlists/$playlistId/recordings/reorder",
+            json = mapOf(
+                "recordingIds" to listOf(
+                    playlistOrderData.secondRecordingId,
+                    playlistOrderData.firstRecordingId,
+                ),
+            ),
+        )
+        E2eAssert.status(reorderResponse, 204, "[playlist-reorder] reorder should succeed")
+
+        val afterReorderDetail = ownerApi.get("/api/playlists/$playlistId")
+        E2eAssert.status(afterReorderDetail, 200, "[playlist-reorder] detail after reorder should succeed")
+        assertRecordingOrder(
+            responseBody = afterReorderDetail.body(),
+            expectedRecordingIds = listOf(
+                playlistOrderData.secondRecordingId,
+                playlistOrderData.firstRecordingId,
+            ),
+            step = "[playlist-reorder] recordings should follow new order",
+        )
+
+        E2eAssert.status(
+            ownerApi.put(
+                path = "/api/playlists/$playlistId/recordings/reorder",
+                json = mapOf(
+                    "recordingIds" to listOf(
+                        playlistOrderData.secondRecordingId,
+                        playlistOrderData.firstRecordingId,
+                    ),
+                ),
+            ),
+            204,
+            "[playlist-reorder] same-order reorder should stay idempotent",
+        )
+
+        E2eAssert.status(
+            ownerApi.put(
+                path = "/api/playlists/${Long.MAX_VALUE}/recordings/reorder",
+                json = mapOf("recordingIds" to listOf(playlistOrderData.firstRecordingId)),
+            ),
+            400,
+            "[playlist-reorder] nonexistent playlist should fail",
+        )
+
+        E2eAssert.status(
+            ownerApi.put(
+                path = "/api/playlists/$playlistId/recordings/reorder",
+                json = mapOf(
+                    "recordingIds" to listOf(
+                        playlistOrderData.firstRecordingId,
+                        playlistOrderData.firstRecordingId,
+                    ),
+                ),
+            ),
+            400,
+            "[playlist-reorder] duplicate recording ids should fail",
+        )
+
+        E2eAssert.status(
+            ownerApi.put(
+                path = "/api/playlists/$playlistId/recordings/reorder",
+                json = mapOf("recordingIds" to listOf(playlistOrderData.firstRecordingId)),
+            ),
+            400,
+            "[playlist-reorder] missing recording id should fail",
+        )
+
+        E2eAssert.status(
+            ownerApi.put(
+                path = "/api/playlists/$playlistId/recordings/reorder",
+                json = mapOf(
+                    "recordingIds" to listOf(
+                        playlistOrderData.firstRecordingId,
+                        playlistOrderData.secondRecordingId,
+                        unrelatedRecordingId,
+                    ),
+                ),
+            ),
+            400,
+            "[playlist-reorder] extra recording id should fail",
+        )
+    }
+
     private fun createAccountByAdmin(
         state: E2eAdminSession,
         name: String,

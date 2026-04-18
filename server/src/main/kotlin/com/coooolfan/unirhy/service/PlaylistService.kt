@@ -127,4 +127,38 @@ class PlaylistService(private val sql: KSqlClient) {
         }.execute()
     }
 
+    @Transactional
+    fun reorderPlaylistRecordings(playlistId: Long, recordingIds: List<Long>) {
+        val requestedSet = recordingIds.toSet()
+        if (requestedSet.size != recordingIds.size) {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "recordingIds contain duplicates")
+        }
+
+        val currentIds = sql.createQuery(PlaylistRecording::class) {
+            where(table.playlistId eq playlistId)
+            select(table.recordingId)
+        }.execute()
+
+        if (requestedSet != currentIds.toSet()) {
+            throw ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "Playlist not found or recordingIds do not match playlist recordings",
+            )
+        }
+
+        val sortedRecordings = ArrayList<PlaylistRecording>(recordingIds.size)
+
+        recordingIds.forEachIndexed { index, recordingId ->
+            sortedRecordings.add(
+                PlaylistRecording {
+                    this.playlistId = playlistId
+                    this.recordingId = recordingId
+                    this.sortOrder = index
+                }
+            )
+        }
+
+        sql.saveEntities(sortedRecordings, SaveMode.UPDATE_ONLY)
+    }
+
 }

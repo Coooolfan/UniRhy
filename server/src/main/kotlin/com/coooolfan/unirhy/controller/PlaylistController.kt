@@ -5,6 +5,7 @@ import com.coooolfan.unirhy.model.Playlist
 import com.coooolfan.unirhy.model.by
 import com.coooolfan.unirhy.model.dto.PlaylistCreate
 import com.coooolfan.unirhy.model.dto.PlaylistUpdate
+import com.coooolfan.unirhy.model.dto.RecordingReorderReq
 import com.coooolfan.unirhy.service.PlaylistService
 import org.babyfish.jimmer.client.FetchBy
 import org.babyfish.jimmer.sql.kt.fetcher.newFetcher
@@ -158,6 +159,27 @@ class PlaylistController(private val service: PlaylistService) {
         @PathVariable recordingId: Long,
     ) {
         service.removeRecordingFromPlaylist(id, recordingId)
+    }
+
+    /**
+     * 调整播放列表内录音顺序
+     *
+     * 请求体需提供当前播放列表中全部录音的 id 列表，按期望顺序排列。
+     * 需要当前登录用户为该播放列表拥有者，否则 404。
+     *
+     * @param id 播放列表 ID
+     * @param input 新顺序下的录音 id 列表
+     *
+     * @api PUT /api/playlists/{id}/recordings/reorder
+     * @permission 需要登录认证
+     */
+    @PutMapping("/{id}/recordings/reorder")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    fun reorderPlaylistRecordings(
+        @PathVariable id: Long,
+        @RequestBody input: RecordingReorderReq,
+    ) {
+        service.reorderPlaylistRecordings(id, input.recordingIds)
     }
 
     companion object {

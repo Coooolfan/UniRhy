@@ -2,10 +2,14 @@ package com.coooolfan.unirhy.service
 
 import com.coooolfan.unirhy.model.*
 import org.babyfish.jimmer.Page
+import org.babyfish.jimmer.sql.ast.mutation.SaveMode
 import org.babyfish.jimmer.sql.fetcher.Fetcher
 import org.babyfish.jimmer.sql.kt.KSqlClient
 import org.babyfish.jimmer.sql.kt.ast.expression.*
+import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
+import org.springframework.web.server.ResponseStatusException
 
 @Service
 class AlbumService(private val sql: KSqlClient) {
@@ -44,5 +48,42 @@ class AlbumService(private val sql: KSqlClient) {
             select(table.fetch(fetcher))
         }.execute()
 
+    }
+
+    @Transactional
+    fun reorderAlbumRecordings(albumId: Long, recordingIds: List<Long>) {
+        val requestedSet = recordingIds.toSet()
+        if (requestedSet.size != recordingIds.size) {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "recordingIds contain duplicates")
+        }
+
+        val currentIds = sql.createQuery(AlbumRecording::class) {
+            where(table.albumId eq albumId)
+            select(table.recordingId)
+        }.execute()
+
+        if (currentIds.isEmpty())
+            throw ResponseStatusException(HttpStatus.NOT_FOUND, "Album not found")
+
+        if (requestedSet != currentIds.toSet()) {
+            throw ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "recordingIds do not match album recordings",
+            )
+        }
+
+        val sortedRecordings = ArrayList<AlbumRecording>(recordingIds.size)
+
+        recordingIds.forEachIndexed { index, recordingId ->
+            sortedRecordings.add(
+                AlbumRecording {
+                    this.albumId = albumId
+                    this.recordingId = recordingId
+                    this.sortOrder = index
+                }
+            )
+        }
+
+        sql.saveEntities(sortedRecordings, SaveMode.UPDATE_ONLY)
     }
 }
