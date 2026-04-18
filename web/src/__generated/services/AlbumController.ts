@@ -1,6 +1,6 @@
 import type {Executor} from '../';
 import type {AlbumDto} from '../model/dto/';
-import type {Page} from '../model/static/';
+import type {Page, RecordingReorderReq} from '../model/static/';
 
 /**
  * 专辑管理接口
@@ -82,6 +82,26 @@ export class AlbumController {
         }
         return (await this.executor({uri: _uri, method: 'GET'})) as Promise<Page<AlbumDto['AlbumController/DEFAULT_ALBUM_FETCHER']>>;
     }
+    
+    /**
+     * 调整专辑内录音顺序
+     * 
+     * 请求体需提供当前专辑中全部录音的 id 列表，按期望顺序排列。
+     * 服务端严格校验集合一致性后，按下标重写映射表的 sortOrder。
+     * 
+     * @parameter {AlbumControllerOptions['reorderAlbumRecordings']} options
+     * - id 专辑 ID
+     * - input 新顺序下的录音 id 列表
+     * 
+     */
+    readonly reorderAlbumRecordings: (options: AlbumControllerOptions['reorderAlbumRecordings']) => Promise<
+        void
+    > = async(options) => {
+        let _uri = '/api/albums/';
+        _uri += encodeURIComponent(options.id);
+        _uri += '/recordings/reorder';
+        return (await this.executor({uri: _uri, method: 'PUT', body: options.body})) as Promise<void>;
+    }
 }
 
 export type AlbumControllerOptions = {
@@ -100,5 +120,16 @@ export type AlbumControllerOptions = {
          * 专辑名称
          */
         readonly name: string
+    }, 
+    'reorderAlbumRecordings': {
+        /**
+         * 专辑 ID
+         */
+        readonly id: number, 
+        /**
+         * 新顺序下的录音 id 列表
+         * 
+         */
+        readonly body: RecordingReorderReq
     }
 }

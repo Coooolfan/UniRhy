@@ -23,15 +23,6 @@ import {
 } from '@/composables/recordingMedia'
 import { useRecordingMergeState } from '@/composables/useRecordingMergeState'
 import { useRecordingPlayback } from '@/composables/useRecordingPlayback'
-import {
-    applyStoredItemOrder,
-    buildRecordingOrderStorageKey,
-    hasSameItemOrder,
-    loadStoredItemOrder,
-    moveItemById,
-    saveStoredItemOrder,
-    type ReorderPayload,
-} from '@/utils/recordingOrder'
 
 const route = useRoute()
 const modal = useModal()
@@ -71,7 +62,6 @@ const recordings = ref<Recording[]>([])
 const mergeStateActions: { resetState: () => void } = {
     resetState: () => undefined,
 }
-const buildStorageKey = (workId: number) => buildRecordingOrderStorageKey('work', workId)
 
 async function fetchWork(id: number) {
     try {
@@ -104,16 +94,7 @@ async function fetchWork(id: number) {
                 }),
             },
         )
-        const storageKey = buildStorageKey(id)
-        const orderedRecordings = applyStoredItemOrder(
-            normalizedRecordings,
-            loadStoredItemOrder(storageKey),
-        )
-        recordings.value = orderedRecordings
-        saveStoredItemOrder(
-            storageKey,
-            orderedRecordings.map((recording) => recording.id),
-        )
+        recordings.value = normalizedRecordings
 
         currentRecordingId.value = pickInitialRecordingId(recordings.value, 'default-first')
 
@@ -330,24 +311,6 @@ const openRecordingMergeModal = async () => {
     })
 }
 
-const handleRecordingReorder = (payload: ReorderPayload) => {
-    const workId = Number(route.params.id)
-    if (Number.isNaN(workId)) {
-        return
-    }
-
-    const nextRecordings = moveItemById(recordings.value, payload)
-    if (hasSameItemOrder(recordings.value, nextRecordings)) {
-        return
-    }
-
-    recordings.value = nextRecordings
-    saveStoredItemOrder(
-        buildStorageKey(workId),
-        nextRecordings.map((recording) => recording.id),
-    )
-}
-
 onMounted(() => {
     const id = Number(route.params.id)
     if (!Number.isNaN(id)) {
@@ -391,17 +354,12 @@ watch(
                 :items="recordings"
                 :playing-id="playingId"
                 enable-multi-select
-                enable-reorder
                 :selected-ids="selectedRecordingIds"
                 @item-double-click="onRecordingDoubleClick"
                 @item-toggle-select="toggleRecordingSelection"
                 @item-keydown="onRecordingKeydown"
-                @item-reorder="handleRecordingReorder"
             >
                 <template #actions>
-                    <span class="text-[11px] uppercase tracking-[0.24em] text-[#B0AAA0]">
-                        拖拽排序 · 当前设备
-                    </span>
                     <button
                         v-if="hasEnoughSelectedRecordings"
                         type="button"

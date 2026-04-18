@@ -1,6 +1,6 @@
 import type {Executor} from '../';
 import type {PlaylistDto} from '../model/dto/';
-import type {PlaylistCreate, PlaylistUpdate} from '../model/static/';
+import type {PlaylistCreate, PlaylistUpdate, RecordingReorderReq} from '../model/static/';
 
 export class PlaylistController {
     
@@ -121,6 +121,26 @@ export class PlaylistController {
     }
     
     /**
+     * 调整播放列表内录音顺序
+     * 
+     * 请求体需提供当前播放列表中全部录音的 id 列表，按期望顺序排列。
+     * 需要当前登录用户为该播放列表拥有者，否则 404。
+     * 
+     * @parameter {PlaylistControllerOptions['reorderPlaylistRecordings']} options
+     * - id 播放列表 ID
+     * - input 新顺序下的录音 id 列表
+     * 
+     */
+    readonly reorderPlaylistRecordings: (options: PlaylistControllerOptions['reorderPlaylistRecordings']) => Promise<
+        void
+    > = async(options) => {
+        let _uri = '/api/playlists/';
+        _uri += encodeURIComponent(options.id);
+        _uri += '/recordings/reorder';
+        return (await this.executor({uri: _uri, method: 'PUT', body: options.body})) as Promise<void>;
+    }
+    
+    /**
      * 更新播放列表
      * 
      * 此接口用于更新指定 ID 的播放列表信息
@@ -193,5 +213,16 @@ export type PlaylistControllerOptions = {
          * 
          */
         readonly recordingId: number
+    }, 
+    'reorderPlaylistRecordings': {
+        /**
+         * 播放列表 ID
+         */
+        readonly id: number, 
+        /**
+         * 新顺序下的录音 id 列表
+         * 
+         */
+        readonly body: RecordingReorderReq
     }
 }

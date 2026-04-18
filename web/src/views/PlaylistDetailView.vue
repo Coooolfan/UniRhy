@@ -205,28 +205,17 @@ const handleRecordingReorder = async (payload: ReorderPayload) => {
     reorderRecordingError.value = ''
 
     try {
-        for (const recording of previousRecordings) {
-            await api.playlistController.removeRecordingFromPlaylist({
-                id: playlistId,
-                recordingId: recording.id,
-            })
-        }
-
-        for (const recording of nextRecordings) {
-            await api.playlistController.addRecordingToPlaylist({
-                id: playlistId,
-                recordingId: recording.id,
-            })
-        }
+        await api.playlistController.reorderPlaylistRecordings({
+            id: playlistId,
+            body: {
+                recordingIds: nextRecordings.map((recording) => recording.id),
+            },
+        })
     } catch (error) {
-        try {
-            await fetchPlaylist(playlistId)
-        } catch {
-            recordings.value = previousRecordings
-            playlistData.value = {
-                ...playlistData.value,
-                cover: previousRecordings[0]?.cover || '',
-            }
+        recordings.value = previousRecordings
+        playlistData.value = {
+            ...playlistData.value,
+            cover: previousRecordings[0]?.cover || '',
         }
         const normalized = normalizeApiError(error)
         reorderRecordingError.value = normalized.message ?? '调整曲目顺序失败'
@@ -334,7 +323,7 @@ watch(
             >
                 <template #actions>
                     <span class="text-[11px] uppercase tracking-[0.24em] text-[#B0AAA0]">
-                        {{ isReorderingRecordings ? '正在保存顺序' : '拖拽排序' }}
+                        {{ isReorderingRecordings ? '正在保存顺序' : '' }}
                     </span>
                 </template>
                 <template #empty> 前往 Work 或者 Album 详情页添加曲目到您的歌单 </template>

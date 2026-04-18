@@ -21,21 +21,15 @@ import {
     type RecordingAsset,
 } from '@/composables/recordingMedia'
 import { useRecordingPlayback } from '@/composables/useRecordingPlayback'
-import {
-    applyStoredItemOrder,
-    buildRecordingOrderStorageKey,
-    hasSameItemOrder,
-    loadStoredItemOrder,
-    moveItemById,
-    saveStoredItemOrder,
-    type ReorderPayload,
-} from '@/utils/recordingOrder'
+import { hasSameItemOrder, moveItemById, type ReorderPayload } from '@/utils/recordingOrder'
 
 const route = useRoute()
 const modal = useModal()
 const currentRecordingId = ref<number | null>(null)
 const isLoading = ref(true)
 const isCdVisible = ref(false)
+const isReorderingRecordings = ref(false)
+const reorderRecordingError = ref('')
 
 type AlbumData = {
     title: string
@@ -72,7 +66,6 @@ const albumData = ref<AlbumData>({
 })
 
 const recordings = ref<Recording[]>([])
-const buildStorageKey = (albumId: number) => buildRecordingOrderStorageKey('album', albumId)
 
 const {
     audioStore,
@@ -93,6 +86,7 @@ const fetchAlbum = async (id: number) => {
     try {
         isLoading.value = true
         isCdVisible.value = false
+        reorderRecordingError.value = ''
 
         const data = await api.albumController.getAlbum({ id })
 
@@ -110,7 +104,7 @@ const fetchAlbum = async (id: number) => {
             cover: resolveCover(data.cover),
         }
 
-        const normalizedRecordings = normalizeRecordings(
+        recordings.value = normalizeRecordings(
             (data.recordings || []) as readonly AlbumRecordingDto[],
             {
                 fallbackArtist: artistName,
@@ -125,16 +119,6 @@ const fetchAlbum = async (id: number) => {
                     isDefault: recording.defaultInWork,
                 }),
             },
-        )
-        const storageKey = buildStorageKey(id)
-        const orderedRecordings = applyStoredItemOrder(
-            normalizedRecordings,
-            loadStoredItemOrder(storageKey),
-        )
-        recordings.value = orderedRecordings
-        saveStoredItemOrder(
-            storageKey,
-            orderedRecordings.map((recording) => recording.id),
         )
         currentRecordingId.value = pickInitialRecordingId(recordings.value, 'first-playable')
     } catch (error) {
@@ -168,22 +152,36 @@ const buildRecordingLabel = (recording: Recording) => {
     return `${recording.label} · ${duration}`
 }
 
-const handleRecordingReorder = (payload: ReorderPayload) => {
+const handleRecordingReorder = async (payload: ReorderPayload) => {
     const albumId = Number(route.params.id)
-    if (Number.isNaN(albumId)) {
+    if (Number.isNaN(albumId) || isReorderingRecordings.value) {
         return
     }
 
-    const nextRecordings = moveItemById(recordings.value, payload)
-    if (hasSameItemOrder(recordings.value, nextRecordings)) {
+    const previousRecordings = [...recordings.value]
+    const nextRecordings = moveItemById(previousRecordings, payload)
+    if (hasSameItemOrder(previousRecordings, nextRecordings)) {
         return
     }
 
     recordings.value = nextRecordings
-    saveStoredItemOrder(
-        buildStorageKey(albumId),
-        nextRecordings.map((recording) => recording.id),
-    )
+    isReorderingRecordings.value = true
+    reorderRecordingError.value = ''
+
+    try {
+        await api.albumController.reorderAlbumRecordings({
+            id: albumId,
+            body: {
+                recordingIds: nextRecordings.map((recording) => recording.id),
+            },
+        })
+    } catch (error) {
+        recordings.value = previousRecordings
+        const normalized = normalizeApiError(error)
+        reorderRecordingError.value = normalized.message ?? '调整曲目顺序失败'
+    } finally {
+        isReorderingRecordings.value = false
+    }
 }
 
 const openEditRecordingModal = async (recording: Recording) => {
@@ -269,13 +267,14 @@ watch(
                 :items="recordings"
                 :playing-id="playingId"
                 enable-reorder
+                :reorder-disabled="isReorderingRecordings"
                 @item-double-click="onRecordingDoubleClick"
                 @item-keydown="onRecordingKeydown"
                 @item-reorder="handleRecordingReorder"
             >
                 <template #actions>
                     <span class="text-[11px] uppercase tracking-[0.24em] text-[#B0AAA0]">
-                        拖拽排序 · 当前设备
+                        {{ isReorderingRecordings ? '正在保存顺序' : '' }}
                     </span>
                 </template>
                 <template #item="{ item }">
@@ -293,6 +292,10 @@ watch(
                     />
                 </template>
             </MediaListPanel>
+
+            <p v-if="reorderRecordingError" class="mt-4 text-sm text-[#B95D5D]">
+                {{ reorderRecordingError }}
+            </p>
         </div>
     </div>
 </template>

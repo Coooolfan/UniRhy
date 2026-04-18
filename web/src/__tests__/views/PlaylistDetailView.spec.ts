@@ -23,6 +23,7 @@ vi.mock('@/ApiInstance', async (importOriginal) => {
                 deletePlaylist: vi.fn(),
                 removeRecordingFromPlaylist: vi.fn(),
                 addRecordingToPlaylist: vi.fn(),
+                reorderPlaylistRecordings: vi.fn(),
             },
         },
     }
@@ -32,10 +33,7 @@ import { api } from '@/ApiInstance'
 import PlaylistDetailView from '@/views/PlaylistDetailView.vue'
 
 const getPlaylistMock = vi.mocked(api.playlistController.getPlaylist)
-const removeRecordingFromPlaylistMock = vi.mocked(
-    api.playlistController.removeRecordingFromPlaylist,
-)
-const addRecordingToPlaylistMock = vi.mocked(api.playlistController.addRecordingToPlaylist)
+const reorderPlaylistRecordingsMock = vi.mocked(api.playlistController.reorderPlaylistRecordings)
 
 const flushView = async () => {
     await Promise.resolve()
@@ -90,14 +88,12 @@ describe('PlaylistDetailView', () => {
     beforeEach(() => {
         setActivePinia(createPinia())
         getPlaylistMock.mockReset()
-        removeRecordingFromPlaylistMock.mockReset()
-        addRecordingToPlaylistMock.mockReset()
+        reorderPlaylistRecordingsMock.mockReset()
     })
 
-    it('reorders recordings and persists playlist order through playlist APIs', async () => {
+    it('reorders recordings via reorderPlaylistRecordings API', async () => {
         getPlaylistMock.mockResolvedValueOnce(buildPlaylistResponse())
-        removeRecordingFromPlaylistMock.mockResolvedValue(undefined)
-        addRecordingToPlaylistMock.mockResolvedValue(undefined)
+        reorderPlaylistRecordingsMock.mockResolvedValue(undefined)
 
         const wrapper = mount(PlaylistDetailView, {
             global: {
@@ -130,13 +126,10 @@ describe('PlaylistDetailView', () => {
             .map((row) => Number(row.attributes('data-item-id')))
         expect(itemIds).toEqual([32, 31])
 
-        expect(removeRecordingFromPlaylistMock.mock.calls).toEqual([
-            [{ id: 5, recordingId: 31 }],
-            [{ id: 5, recordingId: 32 }],
-        ])
-        expect(addRecordingToPlaylistMock.mock.calls).toEqual([
-            [{ id: 5, recordingId: 32 }],
-            [{ id: 5, recordingId: 31 }],
-        ])
+        expect(reorderPlaylistRecordingsMock).toHaveBeenCalledTimes(1)
+        expect(reorderPlaylistRecordingsMock).toHaveBeenCalledWith({
+            id: 5,
+            body: { recordingIds: [32, 31] },
+        })
     })
 })

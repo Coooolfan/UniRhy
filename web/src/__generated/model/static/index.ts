@@ -18,6 +18,7 @@ export type {Page} from './Page';
 export type {PlaylistCreate} from './PlaylistCreate';
 export type {PlaylistUpdate} from './PlaylistUpdate';
 export type {RecordingMergeReq} from './RecordingMergeReq';
+export type {RecordingReorderReq} from './RecordingReorderReq';
 export type {RecordingUpdate} from './RecordingUpdate';
 export type {ScanTaskRequest} from './ScanTaskRequest';
 export type {SystemConfigUpdate} from './SystemConfigUpdate';

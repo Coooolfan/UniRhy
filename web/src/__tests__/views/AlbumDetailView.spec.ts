@@ -17,6 +17,7 @@ vi.mock('@/ApiInstance', async (importOriginal) => {
         api: {
             albumController: {
                 getAlbum: vi.fn(),
+                reorderAlbumRecordings: vi.fn(),
             },
             recordingController: {
                 updateRecording: vi.fn(),
@@ -26,10 +27,10 @@ vi.mock('@/ApiInstance', async (importOriginal) => {
 })
 
 import { api } from '@/ApiInstance'
-import { buildRecordingOrderStorageKey } from '@/utils/recordingOrder'
 import AlbumDetailView from '@/views/AlbumDetailView.vue'
 
 const getAlbumMock = vi.mocked(api.albumController.getAlbum)
+const reorderAlbumRecordingsMock = vi.mocked(api.albumController.reorderAlbumRecordings)
 const updateRecordingMock = vi.mocked(api.recordingController.updateRecording)
 
 const flushView = async () => {
@@ -112,6 +113,7 @@ describe('AlbumDetailView', () => {
         setActivePinia(createPinia())
         window.localStorage.clear()
         getAlbumMock.mockReset()
+        reorderAlbumRecordingsMock.mockReset()
         updateRecordingMock.mockReset()
     })
 
@@ -176,8 +178,9 @@ describe('AlbumDetailView', () => {
         })
     })
 
-    it('reorders recordings and persists order locally', async () => {
+    it('reorders recordings via reorderAlbumRecordings API', async () => {
         getAlbumMock.mockResolvedValueOnce(buildAlbumResponse())
+        reorderAlbumRecordingsMock.mockResolvedValue(undefined)
 
         const wrapper = mountWithModalHost()
 
@@ -196,14 +199,17 @@ describe('AlbumDetailView', () => {
         await secondHandle.trigger('dragstart', { dataTransfer })
         await firstRow.trigger('dragover', { clientY: 0, dataTransfer })
         await firstRow.trigger('drop', { clientY: 0, dataTransfer })
-        await nextTick()
+        await flushView()
 
         const itemIds = wrapper
             .findAll('[data-testid="media-list-row"]')
             .map((row) => Number(row.attributes('data-item-id')))
         expect(itemIds).toEqual([12, 11])
-        expect(window.localStorage.getItem(buildRecordingOrderStorageKey('album', 1))).toBe(
-            '[12,11]',
-        )
+
+        expect(reorderAlbumRecordingsMock).toHaveBeenCalledTimes(1)
+        expect(reorderAlbumRecordingsMock).toHaveBeenCalledWith({
+            id: 1,
+            body: { recordingIds: [12, 11] },
+        })
     })
 })
