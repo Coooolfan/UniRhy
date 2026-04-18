@@ -19,6 +19,33 @@ export type StorageNodeForm = {
     readonly: boolean
 }
 
+type StorageNodeFormValidationResult =
+    | { error: string }
+    | {
+          payload: {
+              name: string
+              parentPath: string
+              readonly: boolean
+          }
+      }
+
+const validateStorageNodeForm = (form: StorageNodeForm): StorageNodeFormValidationResult => {
+    const name = form.name.trim()
+    const parentPath = form.parentPath.trim()
+
+    if (!name || !parentPath) {
+        return { error: '请填写名称与路径' }
+    }
+
+    return {
+        payload: {
+            name,
+            parentPath,
+            readonly: form.readonly,
+        },
+    }
+}
+
 export const useStorageSettings = () => {
     const storageNodes = ref<StorageNode[]>([])
     const systemConfig = ref<SystemConfig>({
@@ -147,10 +174,9 @@ export const useStorageSettings = () => {
         if (isEditing.value === null) {
             return
         }
-        const name = editForm.name.trim()
-        const parentPath = editForm.parentPath.trim()
-        if (!name || !parentPath) {
-            storageError.value = '请填写名称与路径'
+        const validated = validateStorageNodeForm(editForm)
+        if ('error' in validated) {
+            storageError.value = validated.error
             return
         }
         if (isSaving.value) {
@@ -161,11 +187,7 @@ export const useStorageSettings = () => {
         try {
             await api.fileSystemStorageController.update({
                 id: isEditing.value,
-                body: {
-                    name,
-                    parentPath,
-                    readonly: editForm.readonly,
-                },
+                body: validated.payload,
             })
             await fetchStorageNodes()
             isEditing.value = null
@@ -185,10 +207,9 @@ export const useStorageSettings = () => {
     }
 
     const saveCreate = async () => {
-        const name = editForm.name.trim()
-        const parentPath = editForm.parentPath.trim()
-        if (!name || !parentPath) {
-            storageError.value = '请填写名称与路径'
+        const validated = validateStorageNodeForm(editForm)
+        if ('error' in validated) {
+            storageError.value = validated.error
             return
         }
         if (isSaving.value) {
@@ -198,11 +219,7 @@ export const useStorageSettings = () => {
         storageError.value = ''
         try {
             await api.fileSystemStorageController.create({
-                body: {
-                    name,
-                    parentPath,
-                    readonly: editForm.readonly,
-                },
+                body: validated.payload,
             })
             await fetchStorageNodes()
             isCreating.value = false
@@ -210,6 +227,53 @@ export const useStorageSettings = () => {
         } catch (error) {
             const normalized = normalizeApiError(error)
             storageError.value = normalized.message ?? '创建失败'
+        } finally {
+            isSaving.value = false
+        }
+    }
+
+    const createStorageNode = async (form: StorageNodeForm) => {
+        const validated = validateStorageNodeForm(form)
+        if ('error' in validated) {
+            return validated.error
+        }
+        if (isSaving.value) {
+            return '已有保存操作正在执行'
+        }
+
+        isSaving.value = true
+        storageError.value = ''
+
+        try {
+            await api.fileSystemStorageController.create({
+                body: validated.payload,
+            })
+            await fetchStorageNodes()
+            return null
+        } catch (error) {
+            const normalized = normalizeApiError(error)
+            return normalized.message ?? '创建失败'
+        } finally {
+            isSaving.value = false
+        }
+    }
+
+    const deleteStorageNode = async (id: number) => {
+        if (isSaving.value) {
+            return '已有保存操作正在执行'
+        }
+
+        isSaving.value = true
+        storageError.value = ''
+
+        try {
+            await api.fileSystemStorageController.delete({ id })
+            await Promise.all([fetchStorageNodes(), fetchSystemConfig()])
+            return null
+        } catch (error) {
+            const normalized = normalizeApiError(error)
+            storageError.value = normalized.message ?? '删除失败'
+            return storageError.value
         } finally {
             isSaving.value = false
         }
@@ -238,5 +302,7 @@ export const useStorageSettings = () => {
         saveEdit,
         startCreate,
         saveCreate,
+        createStorageNode,
+        deleteStorageNode,
     }
 }

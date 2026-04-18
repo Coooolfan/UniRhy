@@ -11,8 +11,6 @@ const {
     editForm,
     activeFsLabel,
     isEditing,
-    isCreating,
-    isDeleting,
     isSaving,
     isLoadingSystem,
     isLoadingStorage,
@@ -20,14 +18,11 @@ const {
     storageError,
     loadData,
     updateEditForm,
-    startDelete,
-    cancelDelete,
-    confirmDelete,
     startEdit,
     cancelEdit,
     saveEdit,
-    startCreate,
-    saveCreate,
+    createStorageNode,
+    deleteStorageNode,
 } = useStorageSettings()
 
 const activeNode = computed(
@@ -64,19 +59,14 @@ onMounted(() => {
                 :system-config="systemConfig"
                 :is-loading="isLoadingStorage"
                 :error="storageError"
-                :is-creating="isCreating"
                 :is-editing="isEditing"
-                :is-deleting="isDeleting"
                 :is-saving="isSaving"
                 :edit-form="editForm"
-                @start-create="startCreate"
+                :create-storage-node="createStorageNode"
+                :delete-storage-node="deleteStorageNode"
                 @cancel-edit="cancelEdit"
-                @save-create="saveCreate"
                 @start-edit="startEdit"
                 @save-edit="saveEdit"
-                @start-delete="startDelete"
-                @cancel-delete="cancelDelete"
-                @confirm-delete="confirmDelete"
                 @update-form="updateEditForm"
             />
         </div>

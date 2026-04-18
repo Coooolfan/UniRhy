@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { Plus } from 'lucide-vue-next'
+import { useModal } from '@/composables/useModal'
+import StorageNodeFormDialogContent from '@/components/settings/StorageNodeFormDialogContent.vue'
 import StorageNodeCard from '@/components/settings/StorageNodeCard.vue'
-import StorageNodeDeleteModal from '@/components/settings/StorageNodeDeleteModal.vue'
 import StorageNodeEditCard from '@/components/settings/StorageNodeEditCard.vue'
-import StorageNodeFormModal from '@/components/settings/StorageNodeFormModal.vue'
 import type { StorageNode, StorageNodeForm, SystemConfig } from '@/composables/useStorageSettings'
 
 type Props = {
@@ -11,25 +11,22 @@ type Props = {
     systemConfig: SystemConfig
     isLoading: boolean
     error: string
-    isCreating: boolean
     isEditing: number | null
-    isDeleting: number | null
     isSaving: boolean
     editForm: StorageNodeForm
+    createStorageNode: (value: StorageNodeForm) => Promise<string | null>
+    deleteStorageNode: (id: number) => Promise<string | null>
 }
 
-defineProps<Props>()
+const props = defineProps<Props>()
 const emit = defineEmits<{
-    (event: 'start-create'): void
     (event: 'cancel-edit'): void
-    (event: 'save-create'): void
     (event: 'start-edit', node: StorageNode): void
     (event: 'save-edit'): void
-    (event: 'start-delete', id: number): void
-    (event: 'cancel-delete'): void
-    (event: 'confirm-delete'): void
     (event: 'update-form', value: Partial<StorageNodeForm>): void
 }>()
+
+const modal = useModal()
 
 const handleUpdateName = (value: string) => {
     emit('update-form', { name: value })
@@ -42,6 +39,54 @@ const handleUpdateParentPath = (value: string) => {
 const handleUpdateReadonly = (value: boolean) => {
     emit('update-form', { readonly: value })
 }
+
+const openCreateStorageNodeModal = async () => {
+    if (props.isSaving) {
+        return
+    }
+
+    await modal.open(StorageNodeFormDialogContent, {
+        title: '新增存储节点',
+        size: 'md',
+        closable: false,
+        closeOnBackdrop: false,
+        closeOnEscape: false,
+        props: {
+            initialReadonly: true,
+            submit: props.createStorageNode,
+        },
+    })
+}
+
+const confirmDeleteStorageNode = async (nodeId: number) => {
+    if (props.isSaving) {
+        return
+    }
+
+    const confirmed = await modal.confirm({
+        title: '移除节点',
+        content: '确定要永久移除此存储节点配置吗？',
+        confirmText: '确认移除',
+        cancelText: '取消',
+        tone: 'danger',
+    })
+
+    if (!confirmed) {
+        return
+    }
+
+    const error = await props.deleteStorageNode(nodeId)
+    if (!error) {
+        return
+    }
+
+    await modal.alert({
+        title: '移除失败',
+        content: error,
+        confirmText: '确认',
+        tone: 'danger',
+    })
+}
 </script>
 
 <template>
@@ -52,8 +97,8 @@ const handleUpdateReadonly = (value: boolean) => {
             <h2 class="text-2xl font-serif text-[#4A3B32] tracking-wide">存储节点</h2>
             <button
                 class="group flex w-full items-center justify-center gap-2 bg-[#C67C4E] px-6 py-2 text-[#F7F5F0] transition-all duration-300 shadow-md hover:bg-[#A6633C] hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto sm:justify-start"
-                :disabled="isCreating || isSaving"
-                @click="emit('start-create')"
+                :disabled="isSaving"
+                @click="openCreateStorageNodeModal"
             >
                 <Plus :size="16" />
                 <span>新增节点</span>
@@ -66,28 +111,6 @@ const handleUpdateReadonly = (value: boolean) => {
         <div v-else-if="isLoading" class="text-sm text-[#8A8A8A] mb-4">加载中...</div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
-            <!-- 新建节点弹窗 -->
-            <StorageNodeFormModal
-                :open="isCreating"
-                :name="editForm.name"
-                :parent-path="editForm.parentPath"
-                :readonly="editForm.readonly"
-                :is-saving="isSaving"
-                @update:name="handleUpdateName"
-                @update:parent-path="handleUpdateParentPath"
-                @update:readonly="handleUpdateReadonly"
-                @cancel="emit('cancel-edit')"
-                @save="emit('save-create')"
-            />
-
-            <!-- 删除确认弹窗 -->
-            <StorageNodeDeleteModal
-                :open="isDeleting !== null"
-                :is-saving="isSaving"
-                @cancel="emit('cancel-delete')"
-                @confirm="emit('confirm-delete')"
-            />
-
             <!-- 节点列表 -->
             <div v-for="node in storageNodes" :key="node.id">
                 <StorageNodeEditCard
@@ -108,7 +131,7 @@ const handleUpdateReadonly = (value: boolean) => {
                     :active-fs-id="systemConfig.fsProviderId"
                     :is-saving="isSaving"
                     @edit="emit('start-edit', node)"
-                    @delete="emit('start-delete', node.id)"
+                    @delete="confirmDeleteStorageNode(node.id)"
                 />
             </div>
         </div>

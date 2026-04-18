@@ -1,0 +1,101 @@
+import { describe, expect, it } from 'vitest'
+import { mount } from '@vue/test-utils'
+import BaseModalShell from '@/components/modals/BaseModalShell.vue'
+
+const mountShell = (
+    overrides: Partial<InstanceType<typeof BaseModalShell>['$props']> = {},
+    slotOverrides: Record<string, string> = {},
+) =>
+    mount(BaseModalShell, {
+        props: {
+            title: '测试弹窗',
+            ...overrides,
+        },
+        slots: {
+            default: '<div>modal body</div>',
+            ...slotOverrides,
+        },
+        global: {
+            stubs: {
+                teleport: true,
+                transition: false,
+            },
+        },
+    })
+
+describe('BaseModalShell', () => {
+    it('renders the shell and default tone styles', () => {
+        const wrapper = mountShell()
+
+        expect(wrapper.get('[data-testid="app-modal-root"]').text()).toContain('测试弹窗')
+        expect(wrapper.html()).toContain('bg-[#2B221B]/50')
+        expect(wrapper.html()).toContain('border-[#EAE6DE]')
+    })
+
+    it('renders danger tone styles', () => {
+        const wrapper = mountShell({ tone: 'danger' })
+
+        expect(wrapper.html()).toContain('bg-black/55')
+        expect(wrapper.html()).toContain('border-[#E3C8C8]')
+    })
+
+    it('does not render a header when no title or header slot is provided', () => {
+        const wrapper = mount(BaseModalShell, {
+            slots: {
+                default: '<div>modal body</div>',
+            },
+            global: {
+                stubs: {
+                    teleport: true,
+                    transition: false,
+                },
+            },
+        })
+
+        expect(wrapper.find('[data-testid="app-modal-header"]').exists()).toBe(false)
+        expect(wrapper.text()).toContain('modal body')
+    })
+
+    it('renders a custom header slot instead of the default title header', () => {
+        const wrapper = mountShell(
+            {},
+            {
+                header: '<div data-testid="custom-modal-header">custom header</div>',
+            },
+        )
+
+        expect(wrapper.find('[data-testid="app-modal-header"]').exists()).toBe(true)
+        expect(wrapper.get('[data-testid="custom-modal-header"]').text()).toBe('custom header')
+        expect(wrapper.text()).not.toContain('测试弹窗')
+    })
+
+    it('emits close on escape when it is topmost and closable', async () => {
+        const wrapper = mountShell()
+
+        window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+        await wrapper.vm.$nextTick()
+
+        expect(wrapper.emitted('close')).toHaveLength(1)
+    })
+
+    it('does not emit close on escape when it is not topmost', async () => {
+        const wrapper = mountShell({ isTopmost: false })
+
+        window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+        await wrapper.vm.$nextTick()
+
+        expect(wrapper.emitted('close')).toBeUndefined()
+    })
+
+    it('respects closeOnBackdrop and closable settings', async () => {
+        const wrapper = mountShell({
+            closable: false,
+            closeOnBackdrop: false,
+        })
+
+        expect(wrapper.find('[data-testid="app-modal-close"]').exists()).toBe(false)
+
+        await wrapper.get('[data-testid="app-modal-backdrop"]').trigger('click')
+        expect(wrapper.emitted('close')).toBeUndefined()
+    })
+})

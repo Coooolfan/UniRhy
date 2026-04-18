@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { RouterView, useRoute } from 'vue-router'
 import AudioPlayer from '@/components/AudioPlayer.vue'
+import AppModalHost from '@/components/modals/AppModalHost.vue'
 import { getPlatformRuntime } from '@/runtime/platform'
 
 const route = useRoute()
@@ -31,6 +32,7 @@ const startMacWindowDrag = async (event: MouseEvent) => {
     ></div>
     <RouterView />
     <AudioPlayer />
+    <AppModalHost />
 </template>
 
 <style scoped></style>

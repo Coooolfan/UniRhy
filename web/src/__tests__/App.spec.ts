@@ -13,11 +13,15 @@ describe('App', () => {
                     AudioPlayer: {
                         template: '<div data-test="audio-player" />',
                     },
+                    AppModalHost: {
+                        template: '<div data-test="app-modal-host" />',
+                    },
                 },
             },
         })
 
         expect(wrapper.find('[data-test="router-view"]').exists()).toBe(true)
         expect(wrapper.find('[data-test="audio-player"]').exists()).toBe(true)
+        expect(wrapper.find('[data-test="app-modal-host"]').exists()).toBe(true)
     })
 })
