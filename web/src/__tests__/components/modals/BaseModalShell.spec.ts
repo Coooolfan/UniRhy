@@ -39,6 +39,15 @@ describe('BaseModalShell', () => {
         expect(wrapper.html()).toContain('border-[#E3C8C8]')
     })
 
+    it('uses content-sized width constraints instead of filling the whole size tier', () => {
+        const wrapper = mountShell({ size: 'sm' })
+        const panel = wrapper.get('.pointer-events-auto')
+
+        expect(panel.attributes('style')).toContain('width: fit-content;')
+        expect(panel.attributes('style')).toContain('min-width: min(320px, calc(100vw - 2rem));')
+        expect(panel.attributes('style')).toContain('max-width: min(420px, calc(100vw - 2rem));')
+    })
+
     it('does not render a header when no title or header slot is provided', () => {
         const wrapper = mount(BaseModalShell, {
             slots: {

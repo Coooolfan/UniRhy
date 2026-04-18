@@ -2,6 +2,7 @@
 import { ref, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Menu, Search } from 'lucide-vue-next'
+import { useModal } from '@/composables/useModal'
 import { useUserStore } from '@/stores/user'
 import avatarPlaceholderUrl from '@/assets/avatar-placeholder.svg'
 import { useDashboardLayout } from '@/composables/useDashboardLayout'
@@ -18,10 +19,10 @@ const emit = defineEmits<{
 }>()
 
 const router = useRouter()
+const modal = useModal()
 const userStore = useUserStore()
 const { toggleSidebar } = useDashboardLayout()
 const inputValue = ref(props.modelValue ?? '')
-const isProfileModalOpen = ref(false)
 
 onMounted(() => {
     if (!userStore.user) {
@@ -53,12 +54,11 @@ const handleSearch = () => {
     }
 }
 
-const openProfileModal = () => {
-    isProfileModalOpen.value = true
-}
-
-const closeProfileModal = () => {
-    isProfileModalOpen.value = false
+const openProfileModal = async () => {
+    await modal.open(ProfileModal, {
+        title: '账号信息',
+        size: 'sm',
+    })
 }
 </script>
 
@@ -97,6 +97,4 @@ const closeProfileModal = () => {
             <img :src="avatarPlaceholderUrl" alt="avatar" class="h-full w-full object-cover" />
         </button>
     </header>
-
-    <ProfileModal :is-open="isProfileModalOpen" @close="closeProfileModal" />
 </template>

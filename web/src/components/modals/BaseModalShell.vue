@@ -32,16 +32,31 @@ const emit = defineEmits<{
 }>()
 const slots = useSlots()
 
-const sizeClass = computed(() => {
+const panelFrameStyle = computed(() => {
+    let minWidth = 420
+    let maxWidth = 560
+
     switch (props.size) {
         case 'sm':
-            return 'max-w-[420px]'
+            minWidth = 320
+            maxWidth = 420
+            break
         case 'lg':
-            return 'max-w-[720px]'
+            minWidth = 560
+            maxWidth = 720
+            break
         case 'xl':
-            return 'max-w-[920px]'
+            minWidth = 720
+            maxWidth = 920
+            break
         default:
-            return 'max-w-[560px]'
+            break
+    }
+
+    return {
+        width: 'fit-content',
+        minWidth: `min(${minWidth}px, calc(100vw - 2rem))`,
+        maxWidth: `min(${maxWidth}px, calc(100vw - 2rem))`,
     }
 })
 
@@ -130,7 +145,10 @@ onUnmounted(() => {
                 ></div>
 
                 <div class="absolute inset-0 flex items-center justify-center p-4 sm:p-6">
-                    <div class="relative w-full pointer-events-auto" :class="sizeClass">
+                    <div
+                        class="relative max-w-full pointer-events-auto transition-[width,height] duration-300 ease-out"
+                        :style="panelFrameStyle"
+                    >
                         <div
                             class="absolute inset-0 bg-[#F0EEE6] shadow-md transform -rotate-2"
                         ></div>
@@ -160,7 +178,7 @@ onUnmounted(() => {
                                     v-if="closable"
                                     type="button"
                                     data-testid="app-modal-close"
-                                    class="shrink-0 rounded-full p-2 transition-colors"
+                                    class="shrink-0 p-2 transition-colors"
                                     :class="closeButtonClass"
                                     @click="requestClose"
                                 >
