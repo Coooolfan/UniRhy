@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import DashboardTopBar from '@/components/dashboard/DashboardTopBar.vue'
+import { useModal } from '@/composables/useModal'
 import TaskSubmissionModal from '@/components/tasks/TaskSubmissionModal.vue'
 import type { TaskStatus } from '@/__generated/model/enums/TaskStatus'
 import type { TaskType } from '@/__generated/model/enums/TaskType'
@@ -65,8 +66,8 @@ const {
     clearSubmitError,
     init,
 } = useTaskManagement()
+const modal = useModal()
 
-const isTaskModalOpen = ref(false)
 const submitFeedbackStatus = ref<SubmitFeedbackStatus>('idle')
 let submitFeedbackTimer: ReturnType<typeof setTimeout> | null = null
 let autoRefreshTimer: ReturnType<typeof setInterval> | null = null
@@ -277,42 +278,45 @@ watch(activeTaskCount, () => {
     ensureAutoRefresh()
 })
 
-const openTaskModal = () => {
+const openTaskModal = async () => {
     if (isTaskActionButtonDisabled.value) {
         return
     }
     clearSubmitFeedbackTimer()
     submitFeedbackStatus.value = 'idle'
     clearSubmitError()
-    isTaskModalOpen.value = true
-    void fetchProviders()
-}
 
-const closeTaskModal = () => {
-    if (isSubmitting.value) {
-        return
-    }
-    isTaskModalOpen.value = false
+    const submitted = await modal.open<boolean>(TaskSubmissionModal, {
+        size: 'xl',
+        props: {
+            loadProviders: async () => {
+                await fetchProviders()
+                return providerOptions.value
+            },
+            submitMetadataParse: async (payload: ScanTaskRequest) => {
+                const submitOk = await startMetadataParseTask(
+                    payload.providerType,
+                    payload.providerId,
+                )
+                if (!submitOk) {
+                    throw new Error(submitError.value || '提交任务失败')
+                }
+            },
+            submitTranscode: async (payload: TranscodeTaskRequest) => {
+                const submitOk = await startTranscodeTask(payload)
+                if (!submitOk) {
+                    throw new Error(submitError.value || '提交任务失败')
+                }
+            },
+        },
+    })
+
     clearSubmitError()
     refreshTaskCounts()
-}
 
-const handleMetadataParseSubmit = async (payload: ScanTaskRequest) => {
-    const submitOk = await startMetadataParseTask(payload.providerType, payload.providerId)
-    if (!submitOk) {
-        return
+    if (submitted) {
+        showSubmitFeedback()
     }
-    closeTaskModal()
-    showSubmitFeedback()
-}
-
-const handleTranscodeSubmit = async (payload: TranscodeTaskRequest) => {
-    const submitOk = await startTranscodeTask(payload)
-    if (!submitOk) {
-        return
-    }
-    closeTaskModal()
-    showSubmitFeedback()
 }
 
 const refreshAll = () => {
@@ -594,17 +598,6 @@ const refreshAll = () => {
                 </div>
             </div>
         </div>
-
-        <TaskSubmissionModal
-            :open="isTaskModalOpen"
-            :provider-options="providerOptions"
-            :is-loading-providers="isLoadingProviders"
-            :is-submitting="isSubmitting"
-            :submit-error="submitError"
-            @close="closeTaskModal"
-            @submit-metadata-parse="handleMetadataParseSubmit"
-            @submit-transcode="handleTranscodeSubmit"
-        />
     </div>
 </template>
 

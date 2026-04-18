@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { nextTick } from 'vue'
+import AppModalHost from '@/components/modals/AppModalHost.vue'
 
 vi.mock('vue-router', () => ({
     useRoute: () => ({
@@ -37,6 +38,31 @@ const flushView = async () => {
     await Promise.resolve()
     await nextTick()
 }
+
+const mountWithModalHost = () =>
+    mount(
+        {
+            components: {
+                AlbumDetailView,
+                AppModalHost,
+            },
+            template: `
+                <div>
+                    <AlbumDetailView />
+                    <AppModalHost />
+                </div>
+            `,
+        },
+        {
+            global: {
+                stubs: {
+                    teleport: true,
+                    transition: false,
+                    DashboardTopBar: true,
+                },
+            },
+        },
+    )
 
 const createDragTransfer = () => ({
     effectAllowed: '',
@@ -92,15 +118,7 @@ describe('AlbumDetailView', () => {
     it('disables hero play button when no playable recordings exist', async () => {
         getAlbumMock.mockResolvedValueOnce(buildAlbumResponse())
 
-        const wrapper = mount(AlbumDetailView, {
-            global: {
-                stubs: {
-                    teleport: true,
-                    transition: false,
-                    DashboardTopBar: true,
-                },
-            },
-        })
+        const wrapper = mountWithModalHost()
 
         await flushView()
 
@@ -114,15 +132,7 @@ describe('AlbumDetailView', () => {
     it('shows recording duration in list', async () => {
         getAlbumMock.mockResolvedValueOnce(buildAlbumResponse())
 
-        const wrapper = mount(AlbumDetailView, {
-            global: {
-                stubs: {
-                    teleport: true,
-                    transition: false,
-                    DashboardTopBar: true,
-                },
-            },
-        })
+        const wrapper = mountWithModalHost()
 
         await flushView()
 
@@ -133,15 +143,7 @@ describe('AlbumDetailView', () => {
         getAlbumMock.mockResolvedValueOnce(buildAlbumResponse())
         updateRecordingMock.mockResolvedValueOnce()
 
-        const wrapper = mount(AlbumDetailView, {
-            global: {
-                stubs: {
-                    teleport: true,
-                    transition: false,
-                    DashboardTopBar: true,
-                },
-            },
-        })
+        const wrapper = mountWithModalHost()
 
         await flushView()
 
@@ -177,15 +179,7 @@ describe('AlbumDetailView', () => {
     it('reorders recordings and persists order locally', async () => {
         getAlbumMock.mockResolvedValueOnce(buildAlbumResponse())
 
-        const wrapper = mount(AlbumDetailView, {
-            global: {
-                stubs: {
-                    teleport: true,
-                    transition: false,
-                    DashboardTopBar: true,
-                },
-            },
-        })
+        const wrapper = mountWithModalHost()
 
         await flushView()
 

@@ -5,6 +5,7 @@ import DashboardTopBar from '@/components/dashboard/DashboardTopBar.vue'
 import LibraryEmptyHint from '@/components/dashboard/LibraryEmptyHint.vue'
 import AlbumGridCard from '@/components/media/AlbumGridCard.vue'
 import WorkGridCard from '@/components/media/WorkGridCard.vue'
+import { useModal } from '@/composables/useModal'
 import MergeSelectModal from '@/components/modals/MergeSelectModal.vue'
 import { api, normalizeApiError } from '@/ApiInstance'
 import { resolveCover, formatYear } from '@/composables/recordingMedia'
@@ -18,6 +19,7 @@ import { useAudioStore } from '@/stores/audio'
 const route = useRoute()
 const router = useRouter()
 const audioStore = useAudioStore()
+const modal = useModal()
 
 const searchQuery = ref('')
 const searchedQuery = ref('')
@@ -51,19 +53,9 @@ type SelectedWorkOption = {
 
 const selectedWorkIds = ref<Set<number>>(new Set())
 const selectedWorks = ref<Map<number, SelectedWorkOption>>(new Map())
-const mergeModalOpen = ref(false)
-const mergeTargetWorkId = ref<number | null>(null)
-const mergeModalError = ref('')
-const mergeSubmitting = ref(false)
 
 const selectedWorkOptions = computed(() => Array.from(selectedWorks.value.values()))
 const hasSelectedWorks = computed(() => selectedWorkOptions.value.length > 0)
-const canSubmitMerge = computed(
-    () =>
-        !mergeSubmitting.value &&
-        selectedWorkOptions.value.length >= 2 &&
-        mergeTargetWorkId.value !== null,
-)
 
 const isWorkSelected = (item: SearchResultItem) =>
     item.type === 'work' && typeof item.id === 'number' && selectedWorkIds.value.has(item.id)
@@ -92,26 +84,7 @@ const toggleWorkSelection = (item: SearchResultItem) => {
     selectedWorks.value = nextSelectedWorks
 }
 
-const openMergeModal = () => {
-    if (!hasSelectedWorks.value) {
-        return
-    }
-
-    mergeModalError.value = ''
-    mergeTargetWorkId.value = selectedWorkOptions.value[0]?.id ?? null
-    mergeModalOpen.value = true
-}
-
-const closeMergeModal = () => {
-    if (mergeSubmitting.value) {
-        return
-    }
-    mergeModalOpen.value = false
-    mergeModalError.value = ''
-    mergeTargetWorkId.value = null
-}
-
-const performSearch = async (query: string) => {
+async function performSearch(query: string) {
     const keyword = query.trim()
     if (!keyword) {
         artists.value = []
@@ -174,48 +147,40 @@ const performSearch = async (query: string) => {
     }
 }
 
-const submitMerge = async () => {
-    if (selectedWorkOptions.value.length < 2) {
-        mergeModalError.value = '至少选择 2 个作品后才能合并。'
+const openMergeModal = async () => {
+    if (!hasSelectedWorks.value) {
         return
     }
 
-    if (mergeTargetWorkId.value === null) {
-        mergeModalError.value = '请选择一个目标作品。'
-        return
-    }
+    await modal.open(MergeSelectModal, {
+        title: '合并作品',
+        size: 'md',
+        props: {
+            description: '请选择保留的目标作品，其余已选作品将合并到该作品。',
+            options: selectedWorkOptions.value,
+            missingTargetMessage: '请选择一个目标作品。',
+            onConfirm: async (targetId: number) => {
+                const sourceWorkIds = selectedWorkOptions.value
+                    .map((work) => work.id)
+                    .filter((id) => id !== targetId)
 
-    const sourceWorkIds = selectedWorkOptions.value
-        .map((work) => work.id)
-        .filter((id) => id !== mergeTargetWorkId.value)
+                if (sourceWorkIds.length === 0) {
+                    throw new Error('请选择至少一个要合并的来源作品。')
+                }
 
-    if (sourceWorkIds.length === 0) {
-        mergeModalError.value = '请选择至少一个要合并的来源作品。'
-        return
-    }
+                await api.workController.mergeWork({
+                    body: {
+                        targetId,
+                        needMergeIds: sourceWorkIds,
+                    },
+                })
 
-    mergeSubmitting.value = true
-    mergeModalError.value = ''
-
-    try {
-        await api.workController.mergeWork({
-            body: {
-                targetId: mergeTargetWorkId.value,
-                needMergeIds: sourceWorkIds,
+                selectedWorkIds.value = new Set()
+                selectedWorks.value = new Map()
+                await performSearch(searchQuery.value)
             },
-        })
-
-        selectedWorkIds.value = new Set()
-        selectedWorks.value = new Map()
-        mergeModalOpen.value = false
-        mergeTargetWorkId.value = null
-        await performSearch(searchQuery.value)
-    } catch (error) {
-        const normalized = normalizeApiError(error)
-        mergeModalError.value = normalized.message ?? '合并作品失败。'
-    } finally {
-        mergeSubmitting.value = false
-    }
+        },
+    })
 }
 
 const resolveSearchTab = (tabValue: unknown): SearchTab => {
@@ -542,18 +507,4 @@ const playItem = async (item: SearchResultItem) => {
             </div>
         </div>
     </div>
-
-    <MergeSelectModal
-        :open="mergeModalOpen"
-        title="合并作品"
-        description="请选择保留的目标作品，其余已选作品将合并到该作品。"
-        :options="selectedWorkOptions"
-        :target-id="mergeTargetWorkId"
-        :error="mergeModalError"
-        :submitting="mergeSubmitting"
-        :confirm-disabled="!canSubmitMerge"
-        @update:target-id="mergeTargetWorkId = $event"
-        @close="closeMergeModal"
-        @confirm="submitMerge"
-    />
 </template>

@@ -4,7 +4,9 @@ import { computed, onMounted, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRoute, useRouter } from 'vue-router'
 import { api, normalizeApiError } from '@/ApiInstance'
+import PlaylistCreateDialogContent from '@/components/playlist/PlaylistCreateDialogContent.vue'
 import { useDashboardLayout } from '@/composables/useDashboardLayout'
+import { useModal } from '@/composables/useModal'
 import { useAudioStore } from '@/stores/audio'
 import { usePlaylistStore } from '@/stores/playlist'
 
@@ -18,6 +20,7 @@ const router = useRouter()
 const route = useRoute()
 const audioStore = useAudioStore()
 const playlistStore = usePlaylistStore()
+const modal = useModal()
 const {
     isDesktopViewport,
     isDesktopSidebarCollapsed,
@@ -36,11 +39,6 @@ const navItems: NavItem[] = [
     { label: '任务管理', routeName: 'tasks' },
     { label: '系统设置', routeName: 'settings' },
 ]
-const isCreatePlaylistModalOpen = ref(false)
-const isCreatingPlaylist = ref(false)
-const createPlaylistName = ref('')
-const createPlaylistComment = ref('')
-const createPlaylistError = ref('')
 
 const playlistSectionPaddingBottom = computed(() => {
     if (!audioStore.currentTrack || audioStore.isPlayerHidden) {
@@ -93,55 +91,22 @@ const handlePlaylistClick = (playlistId: number) => {
     closeMobileSidebar()
 }
 
-const resetCreatePlaylistForm = () => {
-    createPlaylistName.value = ''
-    createPlaylistComment.value = ''
-    createPlaylistError.value = ''
-}
-
-const openCreatePlaylistModal = () => {
-    if (isCreatingPlaylist.value) {
-        return
-    }
-    resetCreatePlaylistForm()
-    isCreatePlaylistModalOpen.value = true
-}
-
-const closeCreatePlaylistModal = () => {
-    if (isCreatingPlaylist.value) {
-        return
-    }
-    isCreatePlaylistModalOpen.value = false
-    resetCreatePlaylistForm()
-}
-
-const submitCreatePlaylist = async () => {
-    const name = createPlaylistName.value.trim()
-    if (!name) {
-        createPlaylistError.value = '请输入歌单名称'
-        return
-    }
-    if (isCreatingPlaylist.value) {
-        return
-    }
-    isCreatingPlaylist.value = true
-    createPlaylistError.value = ''
-    try {
-        await api.playlistController.createPlaylist({
-            body: {
-                name,
-                comment: createPlaylistComment.value.trim(),
+const openCreatePlaylistModal = async () => {
+    await modal.open(PlaylistCreateDialogContent, {
+        title: '创建新歌单',
+        size: 'sm',
+        props: {
+            onSubmit: async ({ name, comment }: { name: string; comment: string }) => {
+                await api.playlistController.createPlaylist({
+                    body: {
+                        name,
+                        comment,
+                    },
+                })
+                await playlistStore.fetchPlaylists(true)
             },
-        })
-        isCreatePlaylistModalOpen.value = false
-        resetCreatePlaylistForm()
-        await playlistStore.fetchPlaylists(true)
-    } catch (error) {
-        const normalized = normalizeApiError(error)
-        createPlaylistError.value = normalized.message ?? '创建歌单失败'
-    } finally {
-        isCreatingPlaylist.value = false
-    }
+        },
+    })
 }
 
 onMounted(() => {
@@ -270,98 +235,4 @@ onMounted(() => {
             </div>
         </aside>
     </div>
-
-    <Teleport to="body">
-        <Transition
-            enter-active-class="transition duration-200 ease-out"
-            enter-from-class="opacity-0"
-            enter-to-class="opacity-100"
-            leave-active-class="transition duration-150 ease-in"
-            leave-from-class="opacity-100"
-            leave-to-class="opacity-0"
-        >
-            <div
-                v-if="isCreatePlaylistModalOpen"
-                class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#2B221B]/60"
-                @click.self="closeCreatePlaylistModal"
-            >
-                <div
-                    class="bg-[#fffcf5] p-8 w-full max-w-md shadow-[0_8px_30px_rgba(0,0,0,0.12)] border border-[#EAE6DE] relative transform transition-all"
-                >
-                    <div
-                        class="absolute top-0 right-0 w-16 h-16 bg-linear-to-bl from-[#EAE6DE]/30 to-transparent pointer-events-none"
-                    ></div>
-
-                    <div class="mb-8 text-center">
-                        <div
-                            class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-[#FAF9F6] mb-4 border border-[#EAE6DE]"
-                        >
-                            <Music :size="24" class="text-[#C67C4E]" />
-                        </div>
-                        <h3 class="font-serif text-2xl text-[#2B221B]">创建新歌单</h3>
-                        <p class="text-xs text-[#8A8A8A] mt-2 font-serif italic">
-                            Create New Playlist
-                        </p>
-                    </div>
-
-                    <div class="space-y-6">
-                        <label class="block">
-                            <span
-                                class="text-xs uppercase tracking-wider text-[#8A8A8A] font-serif block mb-2"
-                                >Name</span
-                            >
-                            <input
-                                v-model="createPlaylistName"
-                                type="text"
-                                maxlength="100"
-                                class="w-full bg-[#F7F5F0] border-b border-[#D6D1C4] p-3 text-[#3D3D3D] focus:outline-none focus:border-[#C67C4E] transition-colors font-serif placeholder:text-[#BDB9AE]"
-                                placeholder="e.g. Commute Daily"
-                                :disabled="isCreatingPlaylist"
-                            />
-                        </label>
-
-                        <label class="block">
-                            <span
-                                class="text-xs uppercase tracking-wider text-[#8A8A8A] font-serif block mb-2"
-                            >
-                                Description
-                            </span>
-                            <textarea
-                                v-model="createPlaylistComment"
-                                rows="3"
-                                maxlength="500"
-                                class="w-full resize-none bg-[#F7F5F0] border-b border-[#D6D1C4] p-3 text-[#3D3D3D] focus:outline-none focus:border-[#C67C4E] transition-colors font-serif placeholder:text-[#BDB9AE]"
-                                placeholder="Optional short note for this playlist"
-                                :disabled="isCreatingPlaylist"
-                            />
-                        </label>
-
-                        <p v-if="createPlaylistError" class="text-sm text-[#B95D5D]">
-                            {{ createPlaylistError }}
-                        </p>
-
-                        <div class="flex gap-3 mt-8 pt-6 border-t border-[#EAE6DE]">
-                            <button
-                                type="button"
-                                class="flex-1 px-4 py-2.5 border border-[#D6D1C4] text-[#8A8A8A] hover:bg-[#F7F5F0] hover:text-[#5A5A5A] transition-colors text-sm uppercase tracking-wide"
-                                :disabled="isCreatingPlaylist"
-                                @click="closeCreatePlaylistModal"
-                            >
-                                取消
-                            </button>
-                            <button
-                                type="button"
-                                class="flex-1 px-4 py-2.5 bg-[#2B221B] text-[#F7F5F0] hover:bg-[#C67C4E] transition-colors text-sm uppercase tracking-wide shadow-md disabled:opacity-60 disabled:cursor-not-allowed"
-                                :disabled="isCreatingPlaylist"
-                                @click="submitCreatePlaylist"
-                            >
-                                <span v-if="isCreatingPlaylist">Creating...</span>
-                                <span v-else>创建歌单</span>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </Transition>
-    </Teleport>
 </template>

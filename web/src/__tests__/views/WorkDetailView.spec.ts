@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { nextTick } from 'vue'
+import AppModalHost from '@/components/modals/AppModalHost.vue'
 
 vi.mock('vue-router', () => ({
     useRoute: () => ({
@@ -40,6 +41,31 @@ const flushView = async () => {
     await Promise.resolve()
     await nextTick()
 }
+
+const mountWithModalHost = () =>
+    mount(
+        {
+            components: {
+                WorkDetailView,
+                AppModalHost,
+            },
+            template: `
+                <div>
+                    <WorkDetailView />
+                    <AppModalHost />
+                </div>
+            `,
+        },
+        {
+            global: {
+                stubs: {
+                    teleport: true,
+                    transition: false,
+                    DashboardTopBar: true,
+                },
+            },
+        },
+    )
 
 const createDragTransfer = () => ({
     effectAllowed: '',
@@ -92,15 +118,7 @@ describe('WorkDetailView', () => {
     it('disables hero play button when no playable recordings exist', async () => {
         getWorkByIdMock.mockResolvedValueOnce(buildWorkResponse())
 
-        const wrapper = mount(WorkDetailView, {
-            global: {
-                stubs: {
-                    teleport: true,
-                    transition: false,
-                    DashboardTopBar: true,
-                },
-            },
-        })
+        const wrapper = mountWithModalHost()
 
         await flushView()
 
@@ -114,15 +132,7 @@ describe('WorkDetailView', () => {
     it('shows recording durations in list', async () => {
         getWorkByIdMock.mockResolvedValueOnce(buildWorkResponse())
 
-        const wrapper = mount(WorkDetailView, {
-            global: {
-                stubs: {
-                    teleport: true,
-                    transition: false,
-                    DashboardTopBar: true,
-                },
-            },
-        })
+        const wrapper = mountWithModalHost()
 
         await flushView()
 
@@ -134,15 +144,7 @@ describe('WorkDetailView', () => {
         getWorkByIdMock.mockResolvedValueOnce(buildWorkResponse())
         updateRecordingMock.mockResolvedValueOnce()
 
-        const wrapper = mount(WorkDetailView, {
-            global: {
-                stubs: {
-                    teleport: true,
-                    transition: false,
-                    DashboardTopBar: true,
-                },
-            },
-        })
+        const wrapper = mountWithModalHost()
 
         await flushView()
 
@@ -190,15 +192,7 @@ describe('WorkDetailView', () => {
     it('shows merge button only when at least two recordings are selected and modal target options are selected items only', async () => {
         getWorkByIdMock.mockResolvedValueOnce(buildWorkResponse())
 
-        const wrapper = mount(WorkDetailView, {
-            global: {
-                stubs: {
-                    teleport: true,
-                    transition: false,
-                    DashboardTopBar: true,
-                },
-            },
-        })
+        const wrapper = mountWithModalHost()
 
         await flushView()
 
@@ -233,15 +227,7 @@ describe('WorkDetailView', () => {
         getWorkByIdMock.mockResolvedValue(buildWorkResponse())
         mergeRecordingMock.mockResolvedValueOnce()
 
-        const wrapper = mount(WorkDetailView, {
-            global: {
-                stubs: {
-                    teleport: true,
-                    transition: false,
-                    DashboardTopBar: true,
-                },
-            },
-        })
+        const wrapper = mountWithModalHost()
 
         await flushView()
 
@@ -284,15 +270,7 @@ describe('WorkDetailView', () => {
         getWorkByIdMock.mockResolvedValue(buildWorkResponse())
         mergeRecordingMock.mockRejectedValueOnce({ message: '合并曲目失败（测试）' })
 
-        const wrapper = mount(WorkDetailView, {
-            global: {
-                stubs: {
-                    teleport: true,
-                    transition: false,
-                    DashboardTopBar: true,
-                },
-            },
-        })
+        const wrapper = mountWithModalHost()
 
         await flushView()
 
@@ -322,15 +300,7 @@ describe('WorkDetailView', () => {
     it('reorders recordings locally and reuses stored order on remount', async () => {
         getWorkByIdMock.mockResolvedValue(buildWorkResponse())
 
-        const wrapper = mount(WorkDetailView, {
-            global: {
-                stubs: {
-                    teleport: true,
-                    transition: false,
-                    DashboardTopBar: true,
-                },
-            },
-        })
+        const wrapper = mountWithModalHost()
 
         await flushView()
 

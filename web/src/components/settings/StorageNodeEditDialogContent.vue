@@ -95,7 +95,7 @@ const handleSubmit = async () => {
                 </div>
                 <p class="text-xs leading-relaxed text-[#B95D5D] font-serif">
                     修改存储路径根节点会导致此存储节点下的所有资产被重定向。
-                    <br/>
+                    <br />
                     除非您理解这意味着什么，否则不要更改此项
                 </p>
             </div>

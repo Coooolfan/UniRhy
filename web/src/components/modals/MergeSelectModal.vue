@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { ref } from 'vue'
+import { normalizeApiError } from '@/ApiInstance'
+import { useModalContext } from '@/components/modals/modalContext'
 
 export type MergeSelectOption = {
     id: number
@@ -9,130 +11,122 @@ export type MergeSelectOption = {
 
 const props = withDefaults(
     defineProps<{
-        open: boolean
-        title: string
         description: string
         options: MergeSelectOption[]
-        targetId: number | null
-        error?: string
         note?: string
-        submitting?: boolean
-        confirmDisabled?: boolean
         confirmText?: string
         submittingText?: string
         modalTestId?: string
         optionRadioTestId?: string
         confirmTestId?: string
+        missingTargetMessage?: string
+        onConfirm: (targetId: number) => Promise<void> | void
     }>(),
     {
-        error: '',
         note: '',
-        submitting: false,
-        confirmDisabled: false,
         confirmText: '确认合并',
         submittingText: '合并中...',
         modalTestId: undefined,
         optionRadioTestId: undefined,
         confirmTestId: undefined,
+        missingTargetMessage: '请选择一个目标项。',
     },
 )
 
-const emit = defineEmits<{
-    (e: 'close'): void
-    (e: 'confirm'): void
-    (e: 'update:targetId', value: number): void
-}>()
+const modal = useModalContext<undefined>()
 
-const selectedTargetId = computed({
-    get: () => props.targetId,
-    set: (value: number | null) => {
-        if (value !== null) {
-            emit('update:targetId', value)
-        }
-    },
-})
+const selectedTargetId = ref<number | null>(props.options[0]?.id ?? null)
+const error = ref('')
+const submitting = ref(false)
+
+const closeModal = () => {
+    if (submitting.value) {
+        return
+    }
+
+    modal.close()
+}
+
+const submit = async () => {
+    if (selectedTargetId.value === null) {
+        error.value = props.missingTargetMessage
+        return
+    }
+
+    submitting.value = true
+    error.value = ''
+
+    try {
+        await props.onConfirm(selectedTargetId.value)
+        modal.resolve(undefined)
+    } catch (submitError) {
+        error.value = normalizeApiError(submitError).message ?? '合并失败'
+    } finally {
+        submitting.value = false
+    }
+}
 </script>
 
 <template>
-    <Teleport to="body">
-        <Transition
-            enter-active-class="transition duration-200 ease-out"
-            enter-from-class="opacity-0"
-            enter-to-class="opacity-100"
-            leave-active-class="transition duration-150 ease-in"
-            leave-from-class="opacity-100"
-            leave-to-class="opacity-0"
-        >
-            <div
-                v-if="open"
-                :data-testid="modalTestId"
-                class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#2B221B]/60"
-                @click.self="emit('close')"
+    <div :data-testid="modalTestId" class="space-y-6">
+        <p class="text-sm text-[#8C857B]">
+            {{ description }}
+        </p>
+
+        <div class="max-h-[50vh] space-y-3 overflow-y-auto">
+            <label
+                v-for="option in options"
+                :key="option.id"
+                class="flex cursor-pointer items-start gap-3 border border-[#EAE6DE] p-3 transition-colors hover:bg-[#F7F5F0]"
             >
-                <div
-                    class="bg-[#fffcf5] w-full max-w-lg max-h-[85vh] flex flex-col shadow-[0_8px_30px_rgba(0,0,0,0.12)] border border-[#EAE6DE]"
-                >
-                    <div class="px-8 pt-8 pb-6 border-b border-[#EAE6DE]">
-                        <h3 class="font-serif text-2xl text-[#2B221B]">{{ title }}</h3>
-                        <p class="text-sm text-[#8C857B] mt-2">{{ description }}</p>
-                    </div>
+                <input
+                    v-model="selectedTargetId"
+                    type="radio"
+                    :value="option.id"
+                    :data-testid="optionRadioTestId"
+                    class="mt-1 accent-[#C27E46]"
+                    :disabled="submitting"
+                />
+                <span class="min-w-0">
+                    <span class="block truncate font-serif text-[#2B221B]">
+                        {{ option.title }}
+                    </span>
+                    <span class="block truncate text-xs text-[#8C857B]">
+                        {{ option.subtitle }}
+                    </span>
+                </span>
+            </label>
+        </div>
 
-                    <div class="px-8 py-6 overflow-y-auto">
-                        <div class="space-y-3">
-                            <label
-                                v-for="option in options"
-                                :key="option.id"
-                                class="flex items-start gap-3 p-3 border border-[#EAE6DE] cursor-pointer hover:bg-[#F7F5F0] transition-colors"
-                            >
-                                <input
-                                    v-model="selectedTargetId"
-                                    type="radio"
-                                    :value="option.id"
-                                    :data-testid="optionRadioTestId"
-                                    class="mt-1 accent-[#C27E46]"
-                                />
-                                <span class="min-w-0">
-                                    <span class="block text-[#2B221B] font-serif truncate">
-                                        {{ option.title }}
-                                    </span>
-                                    <span class="block text-xs text-[#8C857B] truncate">
-                                        {{ option.subtitle }}
-                                    </span>
-                                </span>
-                            </label>
-                        </div>
+        <p v-if="note" class="text-xs leading-relaxed text-[#8C857B]">
+            {{ note }}
+        </p>
 
-                        <p v-if="note" class="mt-4 text-xs text-[#8C857B] leading-relaxed">
-                            {{ note }}
-                        </p>
+        <p v-if="error" class="text-sm text-[#B95D5D]">
+            {{ error }}
+        </p>
+        <p v-else-if="options.length < 2" class="text-sm text-[#8C857B]">
+            需要至少选中 2 项才能执行合并。
+        </p>
 
-                        <p v-if="error" class="text-sm text-[#B95D5D] mt-4">{{ error }}</p>
-                        <p v-else-if="options.length < 2" class="text-sm text-[#8C857B] mt-4">
-                            需要至少选中 2 项才能执行合并。
-                        </p>
-                    </div>
-
-                    <div class="p-8 pt-6 border-t border-[#EAE6DE] grid grid-cols-2 gap-3">
-                        <button
-                            type="button"
-                            class="px-4 py-2.5 border border-[#D6D1C4] text-[#8A8A8A] hover:bg-[#F7F5F0] hover:text-[#5A5A5A] transition-colors text-sm tracking-wide"
-                            :disabled="submitting"
-                            @click="emit('close')"
-                        >
-                            取消
-                        </button>
-                        <button
-                            type="button"
-                            :data-testid="confirmTestId"
-                            class="px-4 py-2.5 bg-[#C27E46] text-white text-sm tracking-wide transition-colors hover:bg-[#B06D39] disabled:opacity-50 disabled:cursor-not-allowed"
-                            :disabled="confirmDisabled"
-                            @click="emit('confirm')"
-                        >
-                            {{ submitting ? submittingText : confirmText }}
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </Transition>
-    </Teleport>
+        <div class="grid grid-cols-2 gap-3 border-t border-[#EAE6DE] pt-6">
+            <button
+                type="button"
+                class="border border-[#D6D1C4] px-4 py-2.5 text-sm tracking-wide text-[#8A8A8A] transition-colors hover:bg-[#F7F5F0] hover:text-[#5A5A5A]"
+                :disabled="submitting"
+                @click="closeModal"
+            >
+                取消
+            </button>
+            <button
+                type="button"
+                :data-testid="confirmTestId"
+                class="bg-[#C27E46] px-4 py-2.5 text-sm tracking-wide text-white transition-colors hover:bg-[#B06D39] disabled:cursor-not-allowed disabled:opacity-50"
+                :disabled="options.length < 2 || selectedTargetId === null || submitting"
+                @click="submit"
+            >
+                {{ submitting ? submittingText : confirmText }}
+            </button>
+        </div>
+    </div>
 </template>

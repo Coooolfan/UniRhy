@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
-import { defineComponent, nextTick } from 'vue'
+import { nextTick } from 'vue'
+import AppModalHost from '@/components/modals/AppModalHost.vue'
 
 vi.mock('@/ApiInstance', async (importOriginal) => {
     const actual = await importOriginal<typeof import('@/ApiInstance')>()
@@ -35,25 +36,37 @@ const listFileSystemStorageMock = vi.mocked(api.fileSystemStorageController.list
 const listOssStorageMock = vi.mocked(api.ossStorageController.list)
 const getSystemConfigMock = vi.mocked(api.systemConfigController.get)
 
-const TaskSubmissionModalStub = defineComponent({
-    name: 'TaskSubmissionModal',
-    props: {
-        open: {
-            type: Boolean,
-            default: false,
-        },
-    },
-    emits: ['submit-metadata-parse', 'submit-transcode', 'close'],
-    template:
-        '<div v-if="open"><button data-test="submit-metadata-parse" @click="$emit(\'submit-metadata-parse\', { providerType: \'FILE_SYSTEM\', providerId: 1 })">submit-metadata-parse</button><button data-test="close-task-modal" @click="$emit(\'close\')">close</button></div>',
-})
-
 const flushView = async () => {
     await Promise.resolve()
     await nextTick()
     await Promise.resolve()
     await nextTick()
 }
+
+const mountWithModalHost = () =>
+    mount(
+        {
+            components: {
+                TasksView,
+                AppModalHost,
+            },
+            template: `
+                <div>
+                    <TasksView />
+                    <AppModalHost />
+                </div>
+            `,
+        },
+        {
+            global: {
+                stubs: {
+                    DashboardTopBar: true,
+                    teleport: true,
+                    transition: false,
+                },
+            },
+        },
+    )
 
 describe('TasksView', () => {
     beforeEach(() => {
@@ -77,14 +90,7 @@ describe('TasksView', () => {
             { taskType: 'TRANSCODE', status: 'COMPLETED', count: 7 },
             { taskType: 'TRANSCODE', status: 'FAILED', count: 0 },
         ])
-        const wrapper = mount(TasksView, {
-            global: {
-                stubs: {
-                    DashboardTopBar: true,
-                    TaskSubmissionModal: TaskSubmissionModalStub,
-                },
-            },
-        })
+        const wrapper = mountWithModalHost()
 
         await flushView()
 
@@ -113,14 +119,7 @@ describe('TasksView', () => {
             ossProviderId: undefined,
         })
 
-        const wrapper = mount(TasksView, {
-            global: {
-                stubs: {
-                    DashboardTopBar: true,
-                    TaskSubmissionModal: TaskSubmissionModalStub,
-                },
-            },
-        })
+        const wrapper = mountWithModalHost()
 
         await flushView()
 
@@ -138,7 +137,7 @@ describe('TasksView', () => {
         expect(listOssStorageMock).toHaveBeenCalledTimes(1)
         expect(getSystemConfigMock).toHaveBeenCalledTimes(1)
 
-        await wrapper.get('[data-test="submit-metadata-parse"]').trigger('click')
+        await wrapper.get('[data-test="task-submit-button"]').trigger('click')
         await flushView()
 
         expect(executeScanTaskMock).toHaveBeenCalledWith({
@@ -161,14 +160,7 @@ describe('TasksView', () => {
             .mockResolvedValueOnce([{ taskType: 'METADATA_PARSE', status: 'PENDING', count: 1 }])
             .mockResolvedValueOnce([])
 
-        mount(TasksView, {
-            global: {
-                stubs: {
-                    DashboardTopBar: true,
-                    TaskSubmissionModal: TaskSubmissionModalStub,
-                },
-            },
-        })
+        mountWithModalHost()
 
         await flushView()
         expect(listTaskLogsMock).toHaveBeenCalledTimes(1)
@@ -192,21 +184,18 @@ describe('TasksView', () => {
             ossProviderId: undefined,
         })
 
-        const wrapper = mount(TasksView, {
-            global: {
-                stubs: {
-                    DashboardTopBar: true,
-                    TaskSubmissionModal: TaskSubmissionModalStub,
-                },
-            },
-        })
+        const wrapper = mountWithModalHost()
 
         await flushView()
         expect(listTaskLogsMock).toHaveBeenCalledTimes(1)
 
         await wrapper.get('[data-test="open-task-button"]').trigger('click')
         await flushView()
-        await wrapper.get('[data-test="close-task-modal"]').trigger('click')
+        const cancelButton = wrapper
+            .findAll('button')
+            .find((button) => button.text().includes('取消'))
+        expect(cancelButton).toBeTruthy()
+        await cancelButton!.trigger('click')
         await flushView()
 
         expect(listTaskLogsMock).toHaveBeenCalledTimes(2)
@@ -225,20 +214,17 @@ describe('TasksView', () => {
             ossProviderId: undefined,
         })
 
-        const wrapper = mount(TasksView, {
-            global: {
-                stubs: {
-                    DashboardTopBar: true,
-                    TaskSubmissionModal: TaskSubmissionModalStub,
-                },
-            },
-        })
+        const wrapper = mountWithModalHost()
 
         await flushView()
 
         await wrapper.get('[data-test="open-task-button"]').trigger('click')
         await flushView()
-        await wrapper.get('[data-test="close-task-modal"]').trigger('click')
+        const cancelButton = wrapper
+            .findAll('button')
+            .find((button) => button.text().includes('取消'))
+        expect(cancelButton).toBeTruthy()
+        await cancelButton!.trigger('click')
         await flushView()
         await wrapper.get('[data-test="open-task-button"]').trigger('click')
         await flushView()

@@ -5,6 +5,7 @@ import { api, normalizeApiError } from '@/ApiInstance'
 import DashboardTopBar from '@/components/dashboard/DashboardTopBar.vue'
 import MediaListPanel from '@/components/MediaListPanel.vue'
 import MediaListItem from '@/components/MediaListItem.vue'
+import { useModal } from '@/composables/useModal'
 import MergeSelectModal from '@/components/modals/MergeSelectModal.vue'
 import AddRecordingToPlaylistModal from '@/components/playlist/AddRecordingToPlaylistModal.vue'
 import RecordingEditModal, {
@@ -33,27 +34,9 @@ import {
 } from '@/utils/recordingOrder'
 
 const route = useRoute()
+const modal = useModal()
 const currentRecordingId = ref<number | null>(null)
 const isLoading = ref(true)
-const isAddToPlaylistModalOpen = ref(false)
-const selectedRecordingForPlaylist = ref<Recording | null>(null)
-
-const isEditModalOpen = ref(false)
-const isEditing = ref(false)
-const editTitle = ref('')
-const editError = ref('')
-
-const isEditRecordingModalOpen = ref(false)
-const isEditingRecording = ref(false)
-const editingRecording = ref<Recording | null>(null)
-const editRecordingForm = ref<RecordingEditForm>({
-    title: '',
-    label: '',
-    comment: '',
-    type: '',
-    isDefault: false,
-})
-const editRecordingError = ref('')
 
 type WorkData = {
     title: string
@@ -192,185 +175,99 @@ const {
     selectedIds: selectedRecordingIds,
     selectedOptions: selectedRecordingOptions,
     hasEnoughSelectedItems: hasEnoughSelectedRecordings,
-    canSubmitMerge: canSubmitRecordingMerge,
-    mergeModalOpen,
-    mergeTargetId: mergeTargetRecordingId,
-    mergeModalError,
-    mergeSubmitting,
     toggleSelection: toggleRecordingSelection,
-    openMergeModal,
-    closeMergeModal,
-    submitMerge: submitRecordingMerge,
     resetState: resetMergeState,
 } = mergeState
 mergeStateActions.resetState = resetMergeState
 
-const openEditModal = () => {
-    if (isEditing.value) {
-        return
-    }
-
-    editTitle.value = workData.value.title
-    editError.value = ''
-    isEditModalOpen.value = true
-}
-
-const closeEditModal = () => {
-    if (isEditing.value) {
-        return
-    }
-
-    isEditModalOpen.value = false
-    editTitle.value = ''
-    editError.value = ''
-}
-
-const submitEdit = async () => {
+const openEditModal = async () => {
     const id = Number(route.params.id)
-    const title = editTitle.value.trim()
-
     if (Number.isNaN(id)) {
         return
     }
-    if (!title) {
-        editError.value = '作品标题不能为空。'
-        return
-    }
-    if (isEditing.value) {
-        return
-    }
 
-    isEditing.value = true
-    editError.value = ''
+    await modal.open(WorkTitleEditModal, {
+        title: '编辑作品',
+        size: 'sm',
+        props: {
+            initialTitle: workData.value.title,
+            onSubmit: async (title: string) => {
+                const updated = await api.workController.updateWork({
+                    id,
+                    body: { title },
+                })
 
-    try {
-        const updated = await api.workController.updateWork({
-            id,
-            body: { title },
-        })
-
-        workData.value = {
-            ...workData.value,
-            title: updated.title || title,
-        }
-
-        isEditModalOpen.value = false
-    } catch (error) {
-        const normalized = normalizeApiError(error)
-        editError.value = normalized.message ?? '更新作品失败'
-    } finally {
-        isEditing.value = false
-    }
-}
-
-const openEditRecordingModal = (recording: Recording) => {
-    if (isEditingRecording.value) {
-        return
-    }
-
-    editingRecording.value = recording
-    editRecordingForm.value = {
-        title: recording.title,
-        label: recording.label,
-        comment: recording.comment,
-        type: recording.type,
-        isDefault: recording.isDefault,
-    }
-    editRecordingError.value = ''
-    isEditRecordingModalOpen.value = true
-}
-
-const closeEditRecordingModal = () => {
-    if (isEditingRecording.value) {
-        return
-    }
-
-    isEditRecordingModalOpen.value = false
-    editingRecording.value = null
-    editRecordingForm.value = {
-        title: '',
-        label: '',
-        comment: '',
-        type: '',
-        isDefault: false,
-    }
-    editRecordingError.value = ''
-}
-
-const updateEditRecordingForm = (value: RecordingEditForm) => {
-    editRecordingForm.value = value
-}
-
-const submitRecordingEdit = async () => {
-    if (!editingRecording.value || isEditingRecording.value) {
-        return
-    }
-
-    const { title, label, comment, type, isDefault } = editRecordingForm.value
-    if (!title.trim()) {
-        editRecordingError.value = '标题不能为空'
-        return
-    }
-
-    isEditingRecording.value = true
-    editRecordingError.value = ''
-
-    try {
-        await api.recordingController.updateRecording({
-            id: editingRecording.value.id,
-            body: {
-                title: title.trim(),
-                label: label?.trim(),
-                comment: comment?.trim() || '',
-                kind: type.trim(),
-                defaultInWork: isDefault,
-            },
-        })
-
-        const index = recordings.value.findIndex(
-            (recording) => recording.id === editingRecording.value!.id,
-        )
-        if (index !== -1) {
-            const current = recordings.value[index]
-            if (current) {
-                recordings.value[index] = {
-                    ...current,
-                    title: title.trim(),
-                    label: label?.trim() || '',
-                    comment: comment?.trim() || '',
-                    type: type.trim(),
-                    isDefault,
+                workData.value = {
+                    ...workData.value,
+                    title: updated.title || title,
                 }
-            }
-        }
+            },
+        },
+    })
+}
 
-        if (isDefault) {
-            recordings.value.forEach((recording, recordingIndex) => {
-                if (recordingIndex !== index && recording.isDefault) {
-                    recordings.value[recordingIndex] = {
-                        ...recording,
-                        isDefault: false,
+const openEditRecordingModal = async (recording: Recording) => {
+    await modal.open(RecordingEditModal, {
+        size: 'xl',
+        props: {
+            recording,
+            initialForm: {
+                title: recording.title,
+                label: recording.label,
+                comment: recording.comment,
+                type: recording.type,
+                isDefault: recording.isDefault,
+            } satisfies RecordingEditForm,
+            showDefaultToggle: true,
+            onSubmit: async ({ title, label, comment, type, isDefault }: RecordingEditForm) => {
+                await api.recordingController.updateRecording({
+                    id: recording.id,
+                    body: {
+                        title: title.trim(),
+                        label: label?.trim(),
+                        comment: comment?.trim() || '',
+                        kind: type.trim(),
+                        defaultInWork: isDefault,
+                    },
+                })
+
+                const index = recordings.value.findIndex((item) => item.id === recording.id)
+                if (index !== -1) {
+                    const current = recordings.value[index]
+                    if (current) {
+                        recordings.value[index] = {
+                            ...current,
+                            title: title.trim(),
+                            label: label?.trim() || '',
+                            comment: comment?.trim() || '',
+                            type: type.trim(),
+                            isDefault,
+                        }
                     }
                 }
-            })
-        }
 
-        closeEditRecordingModal()
-    } catch (error) {
-        const normalized = normalizeApiError(error)
-        editRecordingError.value = normalized.message ?? '更新曲目失败'
-    } finally {
-        isEditingRecording.value = false
-    }
+                if (isDefault) {
+                    recordings.value.forEach((item, recordingIndex) => {
+                        if (recordingIndex !== index && item.isDefault) {
+                            recordings.value[recordingIndex] = {
+                                ...item,
+                                isDefault: false,
+                            }
+                        }
+                    })
+                }
+            },
+        },
+    })
 }
 
 const openAddToPlaylistModal = (recording: Recording) => {
-    selectedRecordingForPlaylist.value = recording
-    isAddToPlaylistModalOpen.value = true
-}
-
-const closeAddToPlaylistModal = () => {
-    isAddToPlaylistModalOpen.value = false
+    void modal.open(AddRecordingToPlaylistModal, {
+        title: '添加到歌单',
+        props: {
+            recordingId: recording.id,
+        },
+    })
 }
 
 const buildRecordingLabel = (recording: Recording) => {
@@ -387,6 +284,50 @@ const buildRecordingLabel = (recording: Recording) => {
 const buildRecordingSubtitle = (recording: Recording) => {
     const parts = [recording.artist, recording.type].filter(Boolean)
     return parts.join(' · ')
+}
+
+const openRecordingMergeModal = async () => {
+    if (!hasEnoughSelectedRecordings.value) {
+        return
+    }
+
+    const workId = Number(route.params.id)
+    if (Number.isNaN(workId)) {
+        return
+    }
+
+    await modal.open(MergeSelectModal, {
+        title: '合并曲目',
+        size: 'md',
+        props: {
+            description: '请选择保留的目标曲目，其余已选曲目将合并到该曲目。',
+            options: selectedRecordingOptions.value,
+            note: '来源曲目的音频资源、专辑关联、歌单关联、艺人关联会并入目标曲目，来源曲目将被删除；Default 标记按后端结果保持原样。',
+            modalTestId: 'recording-merge-modal',
+            optionRadioTestId: 'recording-merge-target-radio',
+            confirmTestId: 'submit-recording-merge-button',
+            missingTargetMessage: '请选择一个目标曲目。',
+            onConfirm: async (targetId: number) => {
+                const sourceIds = selectedRecordingOptions.value
+                    .map((option) => option.id)
+                    .filter((id) => id !== targetId)
+
+                if (sourceIds.length === 0) {
+                    throw new Error('请选择至少一条来源曲目。')
+                }
+
+                await api.recordingController.mergeRecording({
+                    body: {
+                        targetId,
+                        needMergeIds: sourceIds,
+                    },
+                })
+
+                await fetchWork(workId)
+                resetMergeState()
+            },
+        },
+    })
 }
 
 const handleRecordingReorder = (payload: ReorderPayload) => {
@@ -466,7 +407,7 @@ watch(
                         type="button"
                         data-testid="open-merge-recording-button"
                         class="px-3 py-1 border border-[#C27E46] text-[#C27E46] text-xs tracking-wide transition-colors hover:bg-[#C27E46] hover:text-white uppercase"
-                        @click="openMergeModal"
+                        @click="openRecordingMergeModal"
                     >
                         合并
                     </button>
@@ -490,52 +431,5 @@ watch(
                 </template>
             </MediaListPanel>
         </div>
-
-        <AddRecordingToPlaylistModal
-            :open="isAddToPlaylistModalOpen"
-            :recording-id="selectedRecordingForPlaylist?.id ?? null"
-            :recording-title="selectedRecordingForPlaylist?.title"
-            @close="closeAddToPlaylistModal"
-        />
-
-        <WorkTitleEditModal
-            :open="isEditModalOpen"
-            :title="editTitle"
-            :error="editError"
-            :is-saving="isEditing"
-            @update:title="editTitle = $event"
-            @cancel="closeEditModal"
-            @save="submitEdit"
-        />
-
-        <RecordingEditModal
-            :open="isEditRecordingModalOpen"
-            :recording="editingRecording"
-            :form="editRecordingForm"
-            :error="editRecordingError"
-            :is-saving="isEditingRecording"
-            :show-default-toggle="true"
-            @update:form="updateEditRecordingForm"
-            @close="closeEditRecordingModal"
-            @submit="submitRecordingEdit"
-        />
-
-        <MergeSelectModal
-            :open="mergeModalOpen"
-            title="合并曲目"
-            description="请选择保留的目标曲目，其余已选曲目将合并到该曲目。"
-            :options="selectedRecordingOptions"
-            :target-id="mergeTargetRecordingId"
-            :error="mergeModalError"
-            :note="'来源曲目的音频资源、专辑关联、歌单关联、艺人关联会并入目标曲目，来源曲目将被删除；Default 标记按后端结果保持原样。'"
-            :submitting="mergeSubmitting"
-            :confirm-disabled="!canSubmitRecordingMerge"
-            modal-test-id="recording-merge-modal"
-            option-radio-test-id="recording-merge-target-radio"
-            confirm-test-id="submit-recording-merge-button"
-            @update:target-id="mergeTargetRecordingId = $event"
-            @close="closeMergeModal"
-            @confirm="submitRecordingMerge"
-        />
     </div>
 </template>

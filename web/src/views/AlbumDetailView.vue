@@ -5,6 +5,7 @@ import { api, normalizeApiError } from '@/ApiInstance'
 import DashboardTopBar from '@/components/dashboard/DashboardTopBar.vue'
 import MediaListPanel from '@/components/MediaListPanel.vue'
 import MediaListItem from '@/components/MediaListItem.vue'
+import { useModal } from '@/composables/useModal'
 import AddRecordingToPlaylistModal from '@/components/playlist/AddRecordingToPlaylistModal.vue'
 import AlbumDetailHero from '@/components/album/AlbumDetailHero.vue'
 import RecordingEditModal, {
@@ -31,23 +32,10 @@ import {
 } from '@/utils/recordingOrder'
 
 const route = useRoute()
+const modal = useModal()
 const currentRecordingId = ref<number | null>(null)
 const isLoading = ref(true)
 const isCdVisible = ref(false)
-const isAddToPlaylistModalOpen = ref(false)
-const selectedRecordingForPlaylist = ref<Recording | null>(null)
-
-const isEditRecordingModalOpen = ref(false)
-const isEditingRecording = ref(false)
-const editingRecording = ref<Recording | null>(null)
-const editRecordingForm = ref<RecordingEditForm>({
-    title: '',
-    label: '',
-    comment: '',
-    type: '',
-    isDefault: false,
-})
-const editRecordingError = ref('')
 
 type AlbumData = {
     title: string
@@ -160,12 +148,13 @@ const fetchAlbum = async (id: number) => {
 }
 
 const openAddToPlaylistModal = (recording: Recording) => {
-    selectedRecordingForPlaylist.value = recording
-    isAddToPlaylistModalOpen.value = true
-}
-
-const closeAddToPlaylistModal = () => {
-    isAddToPlaylistModalOpen.value = false
+    void modal.open(AddRecordingToPlaylistModal, {
+        title: '添加到歌单',
+        size: 'sm',
+        props: {
+            recordingId: recording.id,
+        },
+    })
 }
 
 const buildRecordingLabel = (recording: Recording) => {
@@ -197,92 +186,46 @@ const handleRecordingReorder = (payload: ReorderPayload) => {
     )
 }
 
-const openEditRecordingModal = (recording: Recording) => {
-    if (isEditingRecording.value) {
-        return
-    }
+const openEditRecordingModal = async (recording: Recording) => {
+    await modal.open(RecordingEditModal, {
+        size: 'xl',
+        props: {
+            recording,
+            initialForm: {
+                title: recording.title,
+                label: recording.label,
+                comment: recording.comment,
+                type: recording.type,
+                isDefault: recording.isDefault,
+            } satisfies RecordingEditForm,
+            showDefaultToggle: false,
+            onSubmit: async ({ title, label, comment, type }: RecordingEditForm) => {
+                await api.recordingController.updateRecording({
+                    id: recording.id,
+                    body: {
+                        title: title.trim(),
+                        label: label?.trim(),
+                        comment: comment?.trim() || '',
+                        kind: type.trim(),
+                    },
+                })
 
-    editingRecording.value = recording
-    editRecordingForm.value = {
-        title: recording.title,
-        label: recording.label,
-        comment: recording.comment,
-        type: recording.type,
-        isDefault: recording.isDefault,
-    }
-    editRecordingError.value = ''
-    isEditRecordingModalOpen.value = true
-}
-
-const closeEditRecordingModal = () => {
-    if (isEditingRecording.value) {
-        return
-    }
-
-    isEditRecordingModalOpen.value = false
-    editingRecording.value = null
-    editRecordingForm.value = {
-        title: '',
-        label: '',
-        comment: '',
-        type: '',
-        isDefault: false,
-    }
-    editRecordingError.value = ''
-}
-
-const updateEditRecordingForm = (value: RecordingEditForm) => {
-    editRecordingForm.value = value
-}
-
-const submitRecordingEdit = async () => {
-    if (!editingRecording.value || isEditingRecording.value) {
-        return
-    }
-
-    const { title, label, comment, type } = editRecordingForm.value
-    if (!title.trim()) {
-        editRecordingError.value = '标题不能为空'
-        return
-    }
-
-    isEditingRecording.value = true
-    editRecordingError.value = ''
-
-    try {
-        await api.recordingController.updateRecording({
-            id: editingRecording.value.id,
-            body: {
-                title: title.trim(),
-                label: label?.trim(),
-                comment: comment?.trim() || '',
-                kind: type.trim(),
-            },
-        })
-
-        const index = recordings.value.findIndex(
-            (recording) => recording.id === editingRecording.value!.id,
-        )
-        if (index !== -1) {
-            const current = recordings.value[index]
-            if (current) {
-                recordings.value[index] = {
-                    ...current,
-                    title: title.trim(),
-                    label: label?.trim() || '',
-                    comment: comment?.trim() || '',
-                    type: type.trim(),
+                const index = recordings.value.findIndex((item) => item.id === recording.id)
+                if (index !== -1) {
+                    const current = recordings.value[index]
+                    if (current) {
+                        recordings.value[index] = {
+                            ...current,
+                            title: title.trim(),
+                            label: label?.trim() || '',
+                            comment: comment?.trim() || '',
+                            type: type.trim(),
+                        }
+                    }
                 }
-            }
-        }
-
-        closeEditRecordingModal()
-    } catch (error) {
-        const normalized = normalizeApiError(error)
-        editRecordingError.value = normalized.message ?? '更新曲目失败'
-    } finally {
-        isEditingRecording.value = false
-    }
+            },
+        },
+    })
 }
 
 onMounted(() => {
@@ -351,24 +294,5 @@ watch(
                 </template>
             </MediaListPanel>
         </div>
-
-        <AddRecordingToPlaylistModal
-            :open="isAddToPlaylistModalOpen"
-            :recording-id="selectedRecordingForPlaylist?.id ?? null"
-            :recording-title="selectedRecordingForPlaylist?.title"
-            @close="closeAddToPlaylistModal"
-        />
-
-        <RecordingEditModal
-            :open="isEditRecordingModalOpen"
-            :recording="editingRecording"
-            :form="editRecordingForm"
-            :error="editRecordingError"
-            :is-saving="isEditingRecording"
-            :show-default-toggle="false"
-            @update:form="updateEditRecordingForm"
-            @close="closeEditRecordingModal"
-            @submit="submitRecordingEdit"
-        />
     </div>
 </template>

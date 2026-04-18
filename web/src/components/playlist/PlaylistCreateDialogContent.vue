@@ -4,18 +4,18 @@ import { normalizeApiError } from '@/ApiInstance'
 import { useModalContext } from '@/components/modals/modalContext'
 
 const props = defineProps<{
-    initialTitle: string
-    onSubmit: (title: string) => Promise<void> | void
+    onSubmit: (payload: { name: string; comment: string }) => Promise<void> | void
 }>()
 
 const modal = useModalContext<undefined>()
 
-const title = ref(props.initialTitle)
+const name = ref('')
+const comment = ref('')
 const error = ref('')
-const isSaving = ref(false)
+const isSubmitting = ref(false)
 
 const closeModal = () => {
-    if (isSaving.value) {
+    if (isSubmitting.value) {
         return
     }
 
@@ -23,27 +23,29 @@ const closeModal = () => {
 }
 
 const submit = async () => {
-    const nextTitle = title.value.trim()
-
-    if (!nextTitle) {
-        error.value = '作品标题不能为空。'
+    const trimmedName = name.value.trim()
+    if (!trimmedName) {
+        error.value = '请输入歌单名称'
         return
     }
 
-    if (isSaving.value) {
+    if (isSubmitting.value) {
         return
     }
 
-    isSaving.value = true
+    isSubmitting.value = true
     error.value = ''
 
     try {
-        await props.onSubmit(nextTitle)
+        await props.onSubmit({
+            name: trimmedName,
+            comment: comment.value.trim(),
+        })
         modal.resolve(undefined)
     } catch (submitError) {
-        error.value = normalizeApiError(submitError).message ?? '更新作品失败'
+        error.value = normalizeApiError(submitError).message ?? '创建歌单失败'
     } finally {
-        isSaving.value = false
+        isSubmitting.value = false
     }
 }
 </script>
@@ -52,15 +54,29 @@ const submit = async () => {
     <div class="space-y-6">
         <label class="block">
             <span class="mb-2 block font-serif text-xs uppercase tracking-wider text-[#8A8A8A]">
-                Title
+                歌单名
             </span>
             <input
-                v-model="title"
+                v-model="name"
                 type="text"
-                maxlength="255"
+                maxlength="100"
                 class="w-full border-b border-[#D6D1C4] bg-[#F7F5F0] p-3 font-serif text-[#3D3D3D] transition-colors placeholder:text-[#BDB9AE] focus:border-[#C67C4E] focus:outline-none"
-                placeholder="e.g. New Work Title"
-                :disabled="isSaving"
+                placeholder="例如：通勤日常"
+                :disabled="isSubmitting"
+            />
+        </label>
+
+        <label class="block">
+            <span class="mb-2 block font-serif text-xs uppercase tracking-wider text-[#8A8A8A]">
+                歌单描述
+            </span>
+            <textarea
+                v-model="comment"
+                rows="3"
+                maxlength="500"
+                class="w-full resize-none border-b border-[#D6D1C4] bg-[#F7F5F0] p-3 font-serif text-[#3D3D3D] transition-colors placeholder:text-[#BDB9AE] focus:border-[#C67C4E] focus:outline-none"
+                placeholder="可选的歌单描述"
+                :disabled="isSubmitting"
             />
         </label>
 
@@ -68,11 +84,11 @@ const submit = async () => {
             {{ error }}
         </p>
 
-        <div class="flex gap-3 border-t border-[#EAE6DE] pt-6">
+        <div class="mt-8 flex gap-3 border-t border-[#EAE6DE] pt-6">
             <button
                 type="button"
                 class="flex-1 border border-[#D6D1C4] px-4 py-2.5 text-sm uppercase tracking-wide text-[#8A8A8A] transition-colors hover:bg-[#F7F5F0] hover:text-[#5A5A5A]"
-                :disabled="isSaving"
+                :disabled="isSubmitting"
                 @click="closeModal"
             >
                 取消
@@ -80,10 +96,11 @@ const submit = async () => {
             <button
                 type="button"
                 class="flex-1 bg-[#2B221B] px-4 py-2.5 text-sm uppercase tracking-wide text-[#F7F5F0] shadow-md transition-colors hover:bg-[#C67C4E] disabled:cursor-not-allowed disabled:opacity-60"
-                :disabled="isSaving"
+                :disabled="isSubmitting"
                 @click="submit"
             >
-                {{ isSaving ? '更新中...' : '保存更改' }}
+                <span v-if="isSubmitting">Creating...</span>
+                <span v-else>创建歌单</span>
             </button>
         </div>
     </div>
