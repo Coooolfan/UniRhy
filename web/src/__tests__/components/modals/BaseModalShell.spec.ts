@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { mount } from '@vue/test-utils'
+import { nextTick } from 'vue'
 import BaseModalShell from '@/components/modals/BaseModalShell.vue'
 
 const mountShell = (
@@ -106,5 +107,63 @@ describe('BaseModalShell', () => {
 
         await wrapper.get('[data-testid="app-modal-backdrop"]').trigger('click')
         expect(wrapper.emitted('close')).toBeUndefined()
+    })
+
+    it('moves focus into the modal when opened', async () => {
+        const outsideButton = document.createElement('button')
+        outsideButton.type = 'button'
+        outsideButton.textContent = 'outside'
+        document.body.append(outsideButton)
+        outsideButton.focus()
+
+        const wrapper = mountShell(
+            {},
+            {
+                default:
+                    '<div><button type="button" data-testid="first-focusable">first</button><button type="button">second</button></div>',
+            },
+        )
+
+        await nextTick()
+
+        expect(document.activeElement).toBe(wrapper.get('[data-testid="first-focusable"]').element)
+
+        wrapper.unmount()
+        outsideButton.remove()
+    })
+
+    it('keeps Tab navigation cycling inside the modal', async () => {
+        const wrapper = mountShell(
+            {},
+            {
+                default:
+                    '<div><button type="button" data-testid="first-focusable">first</button><button type="button" data-testid="last-focusable">last</button></div>',
+            },
+        )
+
+        await nextTick()
+
+        const firstButton = wrapper.get('[data-testid="first-focusable"]').element
+        const lastButton = wrapper.get('[data-testid="last-focusable"]').element
+
+        expect(firstButton).toBeInstanceOf(HTMLButtonElement)
+        expect(lastButton).toBeInstanceOf(HTMLButtonElement)
+
+        if (
+            !(firstButton instanceof HTMLButtonElement) ||
+            !(lastButton instanceof HTMLButtonElement)
+        ) {
+            throw new TypeError('Expected modal focus targets to be buttons')
+        }
+
+        lastButton.focus()
+        window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab' }))
+        expect(document.activeElement).toBe(firstButton)
+
+        firstButton.focus()
+        window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true }))
+        expect(document.activeElement).toBe(lastButton)
+
+        wrapper.unmount()
     })
 })

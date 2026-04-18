@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, useSlots } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, useSlots, watch } from 'vue'
 import { X } from 'lucide-vue-next'
 import { lockBodyScroll, unlockBodyScroll } from '@/components/modals/bodyScrollLock'
 import type { ModalSize, ModalTone } from '@/stores/modal'
@@ -35,6 +35,22 @@ const emit = defineEmits<{
     (event: 'close'): void
 }>()
 const slots = useSlots()
+const modalContainerRef = ref<HTMLElement | null>(null)
+const focusableSelector = [
+    'a[href]',
+    'area[href]',
+    'button:not([disabled])',
+    'input:not([disabled]):not([type="hidden"])',
+    'select:not([disabled])',
+    'textarea:not([disabled])',
+    'summary',
+    'iframe',
+    'audio[controls]',
+    'video[controls]',
+    '[contenteditable="true"]',
+    '[tabindex]:not([tabindex="-1"])',
+].join(',')
+let previouslyFocusedElement: HTMLElement | null = null
 
 const panelFrameStyle = computed(() => {
     let minWidth = 420
@@ -94,6 +110,78 @@ const hasCustomHeader = computed(() => Boolean(slots.header))
 const shouldRenderDefaultHeader = computed(() => !hasCustomHeader.value && Boolean(props.title))
 const shouldRenderHeader = computed(() => hasCustomHeader.value || shouldRenderDefaultHeader.value)
 
+const isFocusableElement = (element: Element): element is HTMLElement => {
+    if (!(element instanceof HTMLElement)) {
+        return false
+    }
+
+    if (element.hidden || element.closest('[hidden], [aria-hidden="true"]')) {
+        return false
+    }
+
+    const style = window.getComputedStyle(element)
+    return style.display !== 'none' && style.visibility !== 'hidden'
+}
+
+const getFocusableElements = () => {
+    const container = modalContainerRef.value
+    if (!container) {
+        return []
+    }
+
+    return Array.from(container.querySelectorAll(focusableSelector)).filter((element) =>
+        isFocusableElement(element),
+    )
+}
+
+const focusModalContainer = () => {
+    modalContainerRef.value?.focus({ preventScroll: true })
+}
+
+const focusFirstFocusableElement = () => {
+    const focusableElements = getFocusableElements()
+    const firstElement = focusableElements[0]
+
+    if (firstElement) {
+        firstElement.focus({ preventScroll: true })
+        return
+    }
+
+    focusModalContainer()
+}
+
+const focusLastFocusableElement = () => {
+    const focusableElements = getFocusableElements()
+    const [lastElement] = focusableElements.slice(-1)
+
+    if (lastElement) {
+        lastElement.focus({ preventScroll: true })
+        return
+    }
+
+    focusModalContainer()
+}
+
+const syncFocusToModal = async () => {
+    if (!props.isTopmost) {
+        return
+    }
+
+    await nextTick()
+
+    const container = modalContainerRef.value
+    if (!container) {
+        return
+    }
+
+    const activeElement = document.activeElement
+    if (activeElement instanceof HTMLElement && container.contains(activeElement)) {
+        return
+    }
+
+    focusFirstFocusableElement()
+}
+
 const requestClose = () => {
     if (!props.isTopmost || !props.closable) {
         return
@@ -119,14 +207,108 @@ const handleEscape = (event: KeyboardEvent) => {
     emit('close')
 }
 
+const handleTab = (event: KeyboardEvent) => {
+    if (event.key !== 'Tab' || !props.isTopmost) {
+        return
+    }
+
+    const container = modalContainerRef.value
+    if (!container) {
+        return
+    }
+
+    const focusableElements = getFocusableElements()
+    if (focusableElements.length === 0) {
+        event.preventDefault()
+        focusModalContainer()
+        return
+    }
+
+    const firstElement = focusableElements[0]
+    const [lastElement] = focusableElements.slice(-1)
+    const activeElement = document.activeElement
+
+    if (activeElement === container) {
+        event.preventDefault()
+
+        if (event.shiftKey) {
+            focusLastFocusableElement()
+            return
+        }
+
+        focusFirstFocusableElement()
+        return
+    }
+
+    if (!(activeElement instanceof HTMLElement) || !container.contains(activeElement)) {
+        event.preventDefault()
+
+        if (event.shiftKey) {
+            focusLastFocusableElement()
+            return
+        }
+
+        focusFirstFocusableElement()
+        return
+    }
+
+    if (!event.shiftKey && activeElement === lastElement) {
+        event.preventDefault()
+        focusFirstFocusableElement()
+        return
+    }
+
+    if (event.shiftKey && activeElement === firstElement) {
+        event.preventDefault()
+        focusLastFocusableElement()
+    }
+}
+
+const handleFocusIn = (event: FocusEvent) => {
+    if (!props.isTopmost) {
+        return
+    }
+
+    const container = modalContainerRef.value
+    const target = event.target
+
+    if (!container || !(target instanceof Node) || container.contains(target)) {
+        return
+    }
+
+    focusFirstFocusableElement()
+}
+
 onMounted(() => {
+    previouslyFocusedElement =
+        document.activeElement instanceof HTMLElement ? document.activeElement : null
     lockBodyScroll()
     window.addEventListener('keydown', handleEscape)
+    window.addEventListener('keydown', handleTab)
+    document.addEventListener('focusin', handleFocusIn)
+    void syncFocusToModal()
 })
+
+watch(
+    () => props.isTopmost,
+    (isTopmost) => {
+        if (!isTopmost) {
+            return
+        }
+
+        void syncFocusToModal()
+    },
+)
 
 onUnmounted(() => {
     window.removeEventListener('keydown', handleEscape)
+    window.removeEventListener('keydown', handleTab)
+    document.removeEventListener('focusin', handleFocusIn)
     unlockBodyScroll()
+
+    if (props.isTopmost && previouslyFocusedElement?.isConnected) {
+        previouslyFocusedElement.focus({ preventScroll: true })
+    }
 })
 </script>
 
@@ -156,6 +338,11 @@ onUnmounted(() => {
                         ></div>
 
                         <div
+                            ref="modalContainerRef"
+                            data-testid="app-modal-container"
+                            tabindex="-1"
+                            role="dialog"
+                            aria-modal="true"
                             class="relative flex max-h-[min(85vh,720px)] flex-col overflow-hidden border shadow-[0_20px_40px_-12px_rgba(43,34,27,0.16)]"
                             :class="shellClass"
                         >
