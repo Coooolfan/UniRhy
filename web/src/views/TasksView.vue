@@ -288,6 +288,8 @@ const openTaskModal = async () => {
 
     const submitted = await modal.open<boolean>(TaskSubmissionModal, {
         size: 'xl',
+        bodyPadding: false,
+        fitContent: false,
         props: {
             loadProviders: async () => {
                 await fetchProviders()

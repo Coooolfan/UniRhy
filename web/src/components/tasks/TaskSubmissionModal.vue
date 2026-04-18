@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch, type Component } from 'vue'
+import { computed, onMounted, ref, watch, type Component } from 'vue'
 import { useRouter } from 'vue-router'
 import {
     ArrowRight,
@@ -88,7 +88,7 @@ const transcodeSourceProviderValue = ref('')
 const transcodeDestinationProviderValue = ref('')
 const targetCodec = ref<CodecType>('OPUS')
 const providerOptions = ref<TaskProviderOption[]>([])
-const isLoadingProviders = ref(false)
+const isLoadingProviders = ref(true)
 const isSubmitting = ref(false)
 const submitError = ref('')
 
@@ -245,7 +245,9 @@ const loadProviders = async () => {
     }
 }
 
-await loadProviders()
+onMounted(() => {
+    void loadProviders()
+})
 
 const submit = async () => {
     if (!canSubmit.value || isSubmitting.value) {

@@ -33,6 +33,8 @@ provide(modalContextKey, context)
         :closable="entry.closable"
         :close-on-backdrop="entry.closeOnBackdrop"
         :close-on-escape="entry.closeOnEscape"
+        :body-padding="entry.bodyPadding"
+        :fit-content="entry.fitContent"
         :is-topmost="isTopmost"
         :z-index="zIndex"
         @close="modalStore.closeById(entry.id)"

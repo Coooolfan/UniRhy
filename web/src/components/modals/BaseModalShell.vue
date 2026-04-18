@@ -12,8 +12,10 @@ const props = withDefaults(
         closable?: boolean
         closeOnBackdrop?: boolean
         closeOnEscape?: boolean
+        bodyPadding?: boolean
         isTopmost?: boolean
         zIndex?: number
+        fitContent?: boolean
     }>(),
     {
         title: '',
@@ -22,8 +24,10 @@ const props = withDefaults(
         closable: true,
         closeOnBackdrop: true,
         closeOnEscape: true,
+        bodyPadding: true,
         isTopmost: true,
         zIndex: 500,
+        fitContent: true,
     },
 )
 
@@ -47,14 +51,14 @@ const panelFrameStyle = computed(() => {
             break
         case 'xl':
             minWidth = 720
-            maxWidth = 920
+            maxWidth = 1152
             break
         default:
             break
     }
 
     return {
-        width: 'fit-content',
+        width: props.fitContent ? 'fit-content' : '100%',
         minWidth: `min(${minWidth}px, calc(100vw - 2rem))`,
         maxWidth: `min(${maxWidth}px, calc(100vw - 2rem))`,
     }
@@ -75,6 +79,12 @@ const closeButtonClass = computed(() =>
 )
 
 const titleClass = computed(() => (props.tone === 'danger' ? 'text-[#2B221B]' : 'text-[#2B221B]'))
+
+const bodyClass = computed(() =>
+    props.bodyPadding
+        ? 'min-h-0 flex-1 overflow-y-auto px-8 py-8'
+        : 'min-h-0 flex-1 overflow-y-auto',
+)
 
 const rootStyle = computed(() => ({
     zIndex: props.zIndex,
@@ -178,7 +188,7 @@ onUnmounted(() => {
                                 </button>
                             </div>
 
-                            <div class="min-h-0 flex-1 overflow-y-auto px-8 py-8">
+                            <div :class="bodyClass">
                                 <slot />
                             </div>
 

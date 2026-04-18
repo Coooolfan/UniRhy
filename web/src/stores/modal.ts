@@ -12,6 +12,8 @@ export type OpenModalOptions<Props extends Record<string, unknown> = Record<stri
     closable?: boolean
     closeOnBackdrop?: boolean
     closeOnEscape?: boolean
+    bodyPadding?: boolean
+    fitContent?: boolean
 }
 
 export type ModalEntry = {
@@ -24,6 +26,8 @@ export type ModalEntry = {
     closable: boolean
     closeOnBackdrop: boolean
     closeOnEscape: boolean
+    bodyPadding: boolean
+    fitContent: boolean
     resolve: (value: unknown) => void
 }
 
@@ -34,6 +38,8 @@ const DEFAULT_MODAL_OPTIONS = {
     closable: true,
     closeOnBackdrop: true,
     closeOnEscape: true,
+    bodyPadding: true,
+    fitContent: true,
 } satisfies Omit<Required<OpenModalOptions>, 'props'>
 
 export const useModalStore = defineStore('modal', () => {
@@ -58,6 +64,8 @@ export const useModalStore = defineStore('modal', () => {
                 closable: options.closable ?? DEFAULT_MODAL_OPTIONS.closable,
                 closeOnBackdrop: options.closeOnBackdrop ?? DEFAULT_MODAL_OPTIONS.closeOnBackdrop,
                 closeOnEscape: options.closeOnEscape ?? DEFAULT_MODAL_OPTIONS.closeOnEscape,
+                bodyPadding: options.bodyPadding ?? DEFAULT_MODAL_OPTIONS.bodyPadding,
+                fitContent: options.fitContent ?? DEFAULT_MODAL_OPTIONS.fitContent,
                 resolve: (value) => {
                     // oxlint-disable-next-line typescript-eslint/no-unsafe-type-assertion
                     resolve(value as TResult | null)
