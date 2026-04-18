@@ -18,6 +18,9 @@ const mountSection = ({
     createStorageNode = vi
         .fn<(_: StorageNodeForm) => Promise<string | null>>()
         .mockResolvedValue(null),
+    updateStorageNode = vi
+        .fn<(_: number, __: StorageNodeForm) => Promise<string | null>>()
+        .mockResolvedValue(null),
     deleteStorageNode = vi.fn<(_: number) => Promise<string | null>>().mockResolvedValue(null),
 } = {}) => {
     const Wrapper = {
@@ -32,10 +35,9 @@ const mountSection = ({
                     :system-config="systemConfig"
                     :is-loading="false"
                     error=""
-                    :is-editing="null"
                     :is-saving="false"
-                    :edit-form="editForm"
                     :create-storage-node="createStorageNode"
+                    :update-storage-node="updateStorageNode"
                     :delete-storage-node="deleteStorageNode"
                 />
                 <AppModalHost />
@@ -47,12 +49,8 @@ const mountSection = ({
                 fsProviderId: null,
                 ossProviderId: null,
             },
-            editForm: {
-                name: '',
-                parentPath: '',
-                readonly: true,
-            },
             createStorageNode,
+            updateStorageNode,
             deleteStorageNode,
         }),
     }
@@ -70,6 +68,7 @@ const mountSection = ({
     return {
         wrapper,
         createStorageNode,
+        updateStorageNode,
         deleteStorageNode,
     }
 }
@@ -122,6 +121,46 @@ describe('StorageNodesSection', () => {
 
         expect(createStorageNode).toHaveBeenCalled()
         expect(wrapper.get('[data-testid="storage-node-form-error"]').text()).toContain('创建失败')
+    })
+
+    it('opens the edit modal with initial node values and submits updates', async () => {
+        const { wrapper, updateStorageNode } = mountSection()
+
+        await wrapper.get('button[title="编辑"]').trigger('click')
+        await flushPromises()
+
+        const nameInputElement = wrapper.get('[data-testid="storage-node-form-name"]').element
+        const parentPathInputElement = wrapper.get(
+            '[data-testid="storage-node-form-parent-path"]',
+        ).element
+
+        expect(nameInputElement).toBeInstanceOf(HTMLInputElement)
+        expect(parentPathInputElement).toBeInstanceOf(HTMLInputElement)
+
+        if (!(nameInputElement instanceof HTMLInputElement)) {
+            throw new TypeError('storage-node-form-name is not an input')
+        }
+        if (!(parentPathInputElement instanceof HTMLInputElement)) {
+            throw new TypeError('storage-node-form-parent-path is not an input')
+        }
+
+        expect(nameInputElement.value).toBe('Library')
+        expect(parentPathInputElement.value).toBe('/music/library')
+        expect(wrapper.text()).toContain('修改存储路径根节点会导致此存储节点下的所有资产被重定向')
+
+        await wrapper.get('[data-testid="storage-node-form-name"]').setValue('Updated Library')
+        await wrapper
+            .get('[data-testid="storage-node-form-parent-path"]')
+            .setValue('/music/updated')
+        await wrapper.get('[data-testid="storage-node-form-submit"]').trigger('click')
+        await flushPromises()
+
+        expect(updateStorageNode).toHaveBeenCalledWith(1, {
+            name: 'Updated Library',
+            parentPath: '/music/updated',
+            readonly: true,
+        })
+        expect(wrapper.find('[data-testid="storage-node-form-name"]').exists()).toBe(false)
     })
 
     it('confirms deletion before calling deleteStorageNode', async () => {

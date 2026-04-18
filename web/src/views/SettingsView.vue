@@ -8,20 +8,15 @@ import { useStorageSettings } from '@/composables/useStorageSettings'
 const {
     storageNodes,
     systemConfig,
-    editForm,
     activeFsLabel,
-    isEditing,
     isSaving,
     isLoadingSystem,
     isLoadingStorage,
     systemError,
     storageError,
     loadData,
-    updateEditForm,
-    startEdit,
-    cancelEdit,
-    saveEdit,
     createStorageNode,
+    updateStorageNode,
     deleteStorageNode,
 } = useStorageSettings()
 
@@ -59,15 +54,10 @@ onMounted(() => {
                 :system-config="systemConfig"
                 :is-loading="isLoadingStorage"
                 :error="storageError"
-                :is-editing="isEditing"
                 :is-saving="isSaving"
-                :edit-form="editForm"
                 :create-storage-node="createStorageNode"
+                :update-storage-node="updateStorageNode"
                 :delete-storage-node="deleteStorageNode"
-                @cancel-edit="cancelEdit"
-                @start-edit="startEdit"
-                @save-edit="saveEdit"
-                @update-form="updateEditForm"
             />
         </div>
     </div>

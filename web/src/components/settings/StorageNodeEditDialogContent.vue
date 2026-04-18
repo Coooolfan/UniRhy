@@ -5,21 +5,12 @@ import type { StorageNodeForm } from '@/composables/useStorageSettings'
 
 type SubmitStorageNodeForm = (payload: StorageNodeForm) => Promise<string | null>
 
-const props = withDefaults(
-    defineProps<{
-        initialName?: string
-        initialParentPath?: string
-        initialReadonly?: boolean
-        submitText?: string
-        submit: SubmitStorageNodeForm
-    }>(),
-    {
-        initialName: '',
-        initialParentPath: '',
-        initialReadonly: true,
-        submitText: '创建节点',
-    },
-)
+const props = defineProps<{
+    initialName: string
+    initialParentPath: string
+    initialReadonly: boolean
+    submit: SubmitStorageNodeForm
+}>()
 
 const modal = useModalContext<undefined>()
 const isSubmitting = ref(false)
@@ -87,19 +78,24 @@ const handleSubmit = async () => {
                 />
             </div>
 
-            <div>
-                <label
-                    class="text-xs uppercase tracking-wider text-[#8A8A8A] font-serif block mb-2"
-                >
-                    存储节点根路径
-                </label>
-                <input
-                    v-model="form.parentPath"
-                    data-testid="storage-node-form-parent-path"
-                    type="text"
-                    placeholder="/path/to/dir"
-                    class="w-full bg-[#F7F5F0] border-b border-[#D6D1C4] p-3 text-[#3D3D3D] focus:outline-none focus:border-[#C67C4E] transition-colors font-serif placeholder:text-[#BDB9AE]"
-                />
+            <div class="space-y-2">
+                <div>
+                    <label
+                        class="text-xs uppercase tracking-wider text-[#8A8A8A] font-serif block mb-2"
+                    >
+                        存储节点根路径
+                    </label>
+                    <input
+                        v-model="form.parentPath"
+                        data-testid="storage-node-form-parent-path"
+                        type="text"
+                        placeholder="/path/to/dir"
+                        class="w-full bg-[#F7F5F0] border-b border-[#D6D1C4] p-3 text-[#3D3D3D] focus:outline-none focus:border-[#C67C4E] transition-colors font-serif placeholder:text-[#BDB9AE]"
+                    />
+                </div>
+                <p class="text-xs leading-relaxed text-[#B95D5D] font-serif">
+                    修改存储路径根节点会导致此存储节点下的所有资产被重定向，除非您理解这意味着什么，否则不要更改此项
+                </p>
             </div>
 
             <div class="flex flex-col gap-1.5">
@@ -156,8 +152,8 @@ const handleSubmit = async () => {
                     :disabled="isSubmitting"
                     @click="handleSubmit"
                 >
-                    <span v-if="isSubmitting">正在创建...</span>
-                    <span v-else>{{ submitText }}</span>
+                    <span v-if="isSubmitting">正在保存...</span>
+                    <span v-else>保存更改</span>
                 </button>
             </div>
         </div>
