@@ -14,7 +14,7 @@ import LibraryEmptyHint from '@/components/dashboard/LibraryEmptyHint.vue'
 import AlbumGridCard from '@/components/media/AlbumGridCard.vue'
 import WorkGridCard from '@/components/media/WorkGridCard.vue'
 import { api, normalizeApiError } from '@/ApiInstance'
-import { formatYear, resolveCover } from '@/composables/recordingMedia'
+import { resolveCover } from '@/composables/recordingMedia'
 import {
     resolveAlbumPlayableTrack,
     resolveWorkPlayableTrack,
@@ -27,10 +27,8 @@ type DisplayItem = {
     type: 'album' | 'work'
     title: string
     subtitle: string
-    details: string
     cover: string
     stackedImages?: { id: number | string; cover?: string }[]
-    badge?: string
     playableTrack?: PlayableTrack
 }
 
@@ -63,9 +61,7 @@ const fetchAlbums = async () => {
             type: 'album',
             title: album.title || 'Untitled Album',
             subtitle: album.recordings?.[0]?.label || 'Unknown Artist',
-            details: formatYear(album.releaseDate),
             cover: resolveCover(album.cover),
-            badge: album.kind?.trim() ? album.kind : '其他',
         }))
     } catch (error) {
         const normalized = normalizeApiError(error)
@@ -96,7 +92,6 @@ const fetchWorks = async () => {
                 type: 'work',
                 title: work.title || 'Untitled Work',
                 subtitle: artistName,
-                details: `${work.recordings?.length ?? 0} Tracks`,
                 cover: resolveCover(mainRecording?.cover),
                 stackedImages: work.recordings?.map((recording) => ({
                     id: recording.id,
@@ -324,8 +319,6 @@ const playItem = async (item: DisplayItem) => {
                             :key="item.id"
                             :title="item.title"
                             :subtitle="item.subtitle"
-                            :details="item.details"
-                            :badge="item.badge"
                             :cover="item.cover"
                             :show-play-button="false"
                             :play-loading="playLoadingItemId === item.id"
@@ -340,7 +333,6 @@ const playItem = async (item: DisplayItem) => {
                             :key="item.id"
                             :title="item.title"
                             :subtitle="item.subtitle"
-                            :details="item.details"
                             :cover="item.cover"
                             :stacked-images="item.stackedImages || []"
                             :show-play-button="false"
@@ -359,7 +351,6 @@ const playItem = async (item: DisplayItem) => {
                         <div class="col-span-1">#</div>
                         <div class="col-span-5">Title</div>
                         <div class="col-span-4">Subtitle</div>
-                        <div class="col-span-2 text-right">Details</div>
                     </div>
                     <div
                         v-for="(item, idx) in displayItems"
@@ -405,18 +396,12 @@ const playItem = async (item: DisplayItem) => {
                                 <div class="font-serif text-base text-[#2C2420]">
                                     {{ item.title }}
                                 </div>
-                                <div v-if="item.badge" class="text-[10px] text-[#B0AAA0]">
-                                    {{ item.badge }}
-                                </div>
                             </div>
                         </div>
                         <div class="hidden text-sm text-[#5E5950] md:col-span-4 md:block">
                             {{ item.subtitle }}
                         </div>
                         <div class="ml-auto text-right md:col-span-2">
-                            <div class="text-sm text-[#8C857B]">
-                                {{ item.details }}
-                            </div>
                             <div class="mt-1 text-xs text-[#5E5950] md:hidden">
                                 {{ item.subtitle }}
                             </div>

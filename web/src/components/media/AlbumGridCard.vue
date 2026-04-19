@@ -5,15 +5,12 @@ const props = withDefaults(
     defineProps<{
         title: string
         subtitle: string
-        details: string
-        badge?: string
         cover?: string
         showPlayButton?: boolean
         playLoading?: boolean
         isPlaying?: boolean
     }>(),
     {
-        badge: '',
         cover: '',
         showPlayButton: true,
         playLoading: false,
@@ -80,9 +77,6 @@ const emit = defineEmits<{
             </h3>
             <p class="text-xs text-[#8C857B] uppercase tracking-wider truncate">
                 {{ subtitle }}
-            </p>
-            <p class="text-[10px] text-[#B0AAA0] mt-1">
-                {{ details }} <span v-if="badge">· {{ badge }}</span>
             </p>
         </div>
     </div>

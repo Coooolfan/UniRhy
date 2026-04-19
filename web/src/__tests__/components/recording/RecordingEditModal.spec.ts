@@ -15,6 +15,7 @@ const buildForm = (): RecordingEditForm => ({
 })
 
 const buildRecording = (): RecordingPreview => ({
+    id: 42,
     cover: '/cover.jpg',
     rawArtists: [
         { id: 1, name: 'Artist A' },
@@ -70,6 +71,8 @@ describe('RecordingEditModal', () => {
     it('renders artists and assets', () => {
         const wrapper = mountModal()
 
+        expect(wrapper.text()).toContain('Track ID')
+        expect(wrapper.text()).toContain('#42')
         expect(wrapper.text()).toContain('Artists')
         expect(wrapper.text()).toContain('Artist A')
         expect(wrapper.text()).toContain('file(s) attached')

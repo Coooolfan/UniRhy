@@ -7,8 +7,8 @@ import AlbumGridCard from '@/components/media/AlbumGridCard.vue'
 import WorkGridCard from '@/components/media/WorkGridCard.vue'
 import { useModal } from '@/composables/useModal'
 import MergeSelectModal from '@/components/modals/MergeSelectModal.vue'
-import { api, normalizeApiError } from '@/ApiInstance'
-import { resolveCover, formatYear } from '@/composables/recordingMedia'
+import { api } from '@/ApiInstance'
+import { resolveCover } from '@/composables/recordingMedia'
 import {
     resolveAlbumPlayableTrack,
     resolveWorkPlayableTrack,
@@ -33,9 +33,7 @@ type SearchResultItem = {
     type: 'album' | 'work' | 'artist'
     title: string
     subtitle: string
-    details: string
     cover: string
-    badge?: string
     stackedImages?: { id: number | string; cover?: string }[]
     playableTrack?: PlayableTrack
 }
@@ -108,9 +106,7 @@ async function performSearch(query: string) {
             type: 'album',
             title: album.title || 'Untitled Album',
             subtitle: album.recordings?.[0]?.label || 'Unknown Artist',
-            details: formatYear(album.releaseDate),
             cover: resolveCover(album.cover),
-            badge: album.kind?.trim() ? album.kind : 'Album',
         }))
 
         works.value = workResults.map((work) => {
@@ -123,7 +119,6 @@ async function performSearch(query: string) {
                 type: 'work',
                 title: work.title || 'Untitled Work',
                 subtitle: mainRecording?.artists?.[0]?.displayName || 'Unknown Artist',
-                details: `${work.recordings?.length ?? 0} Tracks`,
                 cover: resolveCover(mainRecording?.cover),
                 stackedImages: work.recordings?.map((recording) => ({
                     id: recording.id,
@@ -468,8 +463,6 @@ const playItem = async (item: SearchResultItem) => {
                             :key="item.id"
                             :title="item.title"
                             :subtitle="item.subtitle"
-                            :details="item.details"
-                            :badge="item.badge"
                             :cover="item.cover"
                             :play-loading="playLoadingItemId === item.id"
                             :is-playing="isItemPlaying(item)"
@@ -491,7 +484,6 @@ const playItem = async (item: SearchResultItem) => {
                             :key="item.id"
                             :title="item.title"
                             :subtitle="item.subtitle"
-                            :details="item.details"
                             :cover="item.cover"
                             :stacked-images="item.stackedImages || []"
                             :is-selected="isWorkSelected(item)"

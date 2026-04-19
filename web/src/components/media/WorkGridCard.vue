@@ -11,7 +11,6 @@ const props = withDefaults(
     defineProps<{
         title: string
         subtitle: string
-        details: string
         cover?: string
         stackedImages?: CoverItem[]
         isSelected?: boolean
@@ -77,7 +76,6 @@ const emit = defineEmits<{
             <p class="text-xs text-[#8C857B] uppercase tracking-wider truncate">
                 {{ subtitle }}
             </p>
-            <p class="text-[10px] text-[#B0AAA0] mt-1">{{ details }}</p>
         </div>
     </div>
 </template>

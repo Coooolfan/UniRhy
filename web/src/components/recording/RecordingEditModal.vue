@@ -15,6 +15,7 @@ export type RecordingAsset = {
 }
 
 export type RecordingPreview = {
+    id: number
     cover: string
     rawArtists: readonly { id: number; displayName?: string; name?: string }[]
     assets: readonly RecordingAsset[]
@@ -97,7 +98,7 @@ const submit = async () => {
                 v-if="recording"
                 class="flex h-full flex-col rounded-sm border border-[#D6D1C4] bg-[#F7F5F0] p-5"
             >
-                <div class="mb-6 flex gap-5">
+                <div class="flex gap-5">
                     <div
                         class="h-24 w-24 shrink-0 overflow-hidden rounded-sm bg-[#EAE6DE] shadow-sm"
                     >
@@ -115,26 +116,14 @@ const submit = async () => {
                     </div>
                     <div class="min-w-0 flex-1 space-y-3 py-1">
                         <div>
-                            <div
-                                class="mb-1 flex items-center gap-1.5 text-xs uppercase tracking-wider text-[#8C857B]"
-                            >
-                                <Users :size="12" />
-                                <span>Artists</span>
+                            <div class="mb-1 text-xs uppercase tracking-wider text-[#8C857B]">
+                                曲目 ID
                             </div>
-                            <div class="font-medium leading-snug text-[#2C2420]">
-                                {{
-                                    recording.rawArtists
-                                        .map((artist) => artist.displayName || artist.name)
-                                        .join(', ') || 'Unknown Artist'
-                                }}
-                            </div>
+                            <div class="font-mono text-sm text-[#5E564D]">#{{ recording.id }}</div>
                         </div>
                         <div>
-                            <div
-                                class="mb-1 flex items-center gap-1.5 text-xs uppercase tracking-wider text-[#8C857B]"
-                            >
-                                <FileAudio :size="12" />
-                                <span>Assets</span>
+                            <div class="mb-1 text-xs uppercase tracking-wider text-[#8C857B]">
+                                资产
                             </div>
                             <div class="truncate text-[#2C2420]">
                                 {{ recording.assets.length }} file(s) attached
@@ -142,14 +131,21 @@ const submit = async () => {
                         </div>
                     </div>
                 </div>
-
+                <div>
+                    <div class="mt-2 text-xs uppercase tracking-wider text-[#8C857B]">艺术家</div>
+                    <div class="font-medium leading-snug text-[#2C2420]">
+                        {{
+                            recording.rawArtists
+                                .map((artist) => artist.displayName || artist.name)
+                                .join(', ') || '未知艺术家'
+                        }}
+                    </div>
+                </div>
                 <div
                     v-if="recording.assets.length > 0"
-                    class="flex-1 border-t border-[#D6D1C4] pt-4"
+                    class="flex-1 border-t border-[#D6D1C4] pt-4 mt-4"
                 >
-                    <div class="mb-3 text-xs uppercase tracking-wider text-[#8C857B]">
-                        Attached Files
-                    </div>
+                    <div class="mb-3 text-xs uppercase tracking-wider text-[#8C857B]">资产文件</div>
                     <div class="flex flex-col gap-2">
                         <div
                             v-for="asset in recording.assets"
@@ -191,7 +187,7 @@ const submit = async () => {
                     v-else
                     class="flex flex-1 items-center justify-center text-xs italic text-[#8C857B] opacity-70"
                 >
-                    No audio assets attached
+                    无附加音频资产
                 </div>
             </div>
         </div>
@@ -203,15 +199,15 @@ const submit = async () => {
                 >
                     <Disc :size="20" class="text-[#C67C4E]" />
                 </div>
-                <div>
+                <!-- 向上对齐 -->
+                <div class="flex items-start">
                     <div class="font-serif text-lg">关于曲目</div>
-                    <div class="text-xs italic text-[#8A8A8A]">About Track</div>
                 </div>
             </div>
 
             <label class="block">
                 <span class="mb-2 block font-serif text-xs uppercase tracking-wider text-[#8A8A8A]">
-                    Title
+                    曲目名
                 </span>
                 <input
                     v-model="form.title"
@@ -228,7 +224,7 @@ const submit = async () => {
                     <span
                         class="mb-2 block font-serif text-xs uppercase tracking-wider text-[#8A8A8A]"
                     >
-                        Type
+                        曲目类型
                     </span>
                     <input
                         v-model="form.type"
@@ -243,7 +239,7 @@ const submit = async () => {
                     <span
                         class="mb-2 block font-serif text-xs uppercase tracking-wider text-[#8A8A8A]"
                     >
-                        Label
+                        标签
                     </span>
                     <input
                         v-model="form.label"
@@ -258,12 +254,12 @@ const submit = async () => {
 
             <label class="flex min-h-[100px] flex-1 flex-col">
                 <span class="mb-2 block font-serif text-xs uppercase tracking-wider text-[#8A8A8A]">
-                    Comment
+                    描述
                 </span>
                 <textarea
                     v-model="form.comment"
                     class="flex-1 resize-none border-b border-[#D6D1C4] bg-[#F7F5F0] p-3 font-serif text-[#3D3D3D] transition-colors placeholder:text-[#BDB9AE] focus:border-[#C67C4E] focus:outline-none"
-                    placeholder="Add a comment..."
+                    placeholder="在此添加曲目描述"
                     :disabled="isSaving"
                 ></textarea>
             </label>
@@ -290,7 +286,7 @@ const submit = async () => {
                     </svg>
                 </div>
                 <span class="text-sm text-[#5E564D] transition-colors group-hover:text-[#2C2420]">
-                    默认版本 (Default Version)
+                    作品默认曲目
                 </span>
             </label>
 
