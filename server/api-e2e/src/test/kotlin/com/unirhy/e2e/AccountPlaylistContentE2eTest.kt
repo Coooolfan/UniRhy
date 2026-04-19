@@ -242,6 +242,12 @@ class AccountPlaylistContentE2eTest {
         E2eAssert.jsonAt(accountAMeResponse.body(), "/id", accountA.id, "[accounts] me id should match account A")
         E2eAssert.jsonAt(accountAMeResponse.body(), "/email", accountA.email, "[accounts] me email should match account A")
         E2eAssert.jsonMissing(accountAMeResponse.body(), "/password", "[accounts] me should not expose password")
+        E2eAssert.jsonAt(
+            accountAMeResponse.body(),
+            "/preferences/preferredAssetFormat",
+            "audio/opus",
+            "[accounts] me should expose default preferred asset format",
+        )
 
         val updatedAName = "acc-a-updated-$suffix"
         val updateSelfResponse = accountAApi.put(
@@ -251,6 +257,52 @@ class AccountPlaylistContentE2eTest {
         E2eAssert.status(updateSelfResponse, 200, "[accounts] account A self update should succeed")
         E2eAssert.jsonAt(updateSelfResponse.body(), "/id", accountA.id, "[accounts] updated account id should match")
         E2eAssert.jsonAt(updateSelfResponse.body(), "/name", updatedAName, "[accounts] updated account name should match")
+
+        val updatePreferencesResponse = accountAApi.put(
+            path = "/api/accounts/${accountA.id}",
+            json = mapOf("preferences" to mapOf("preferredAssetFormat" to "audio/flac")),
+        )
+        E2eAssert.status(updatePreferencesResponse, 200, "[accounts] account A self update preferences should succeed")
+        E2eAssert.jsonAt(
+            updatePreferencesResponse.body(),
+            "/preferences/preferredAssetFormat",
+            "audio/flac",
+            "[accounts] update preferences response should reflect new value",
+        )
+
+        val preferencesAfterUpdateResponse = accountAApi.get("/api/accounts/me")
+        E2eAssert.status(preferencesAfterUpdateResponse, 200, "[accounts] me after preferences update should succeed")
+        E2eAssert.jsonAt(
+            preferencesAfterUpdateResponse.body(),
+            "/preferences/preferredAssetFormat",
+            "audio/flac",
+            "[accounts] preferences should persist across requests",
+        )
+
+        val adminUpdatePreferencesResponse = state.api.put(
+            path = "/api/accounts/${accountA.id}",
+            json = mapOf("preferences" to mapOf("preferredAssetFormat" to "audio/mpeg")),
+        )
+        E2eAssert.apiError(
+            response = adminUpdatePreferencesResponse,
+            family = "COMMON",
+            code = "FORBIDDEN",
+            expectedStatus = 403,
+            step = "[accounts] admin should not change another account preferences",
+        )
+
+        val nameOnlyUpdateResponse = accountAApi.put(
+            path = "/api/accounts/${accountA.id}",
+            json = mapOf("name" to updatedAName),
+        )
+        E2eAssert.status(nameOnlyUpdateResponse, 200, "[accounts] account A name-only update should succeed")
+        val preferencesIsolationResponse = accountAApi.get("/api/accounts/me")
+        E2eAssert.jsonAt(
+            preferencesIsolationResponse.body(),
+            "/preferences/preferredAssetFormat",
+            "audio/flac",
+            "[accounts] unrelated update should not overwrite preferences",
+        )
 
         val forbiddenUpdateAdminResponse = accountAApi.put(
             path = "/api/accounts/$adminId",

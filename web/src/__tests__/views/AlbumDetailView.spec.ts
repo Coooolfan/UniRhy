@@ -28,6 +28,7 @@ vi.mock('@/ApiInstance', async (importOriginal) => {
 
 import { api } from '@/ApiInstance'
 import AlbumDetailView from '@/views/AlbumDetailView.vue'
+import { useUserStore } from '@/stores/user'
 
 const getAlbumMock = vi.mocked(api.albumController.getAlbum)
 const reorderAlbumRecordingsMock = vi.mocked(api.albumController.reorderAlbumRecordings)
@@ -108,6 +109,19 @@ const buildAlbumResponse = () => ({
     ],
 })
 
+const setPreferredAssetFormat = (preferredAssetFormat: string) => {
+    const userStore = useUserStore()
+    userStore.user = {
+        id: 1,
+        name: 'Tester',
+        email: 'tester@example.com',
+        admin: false,
+        preferences: {
+            preferredAssetFormat,
+        },
+    }
+}
+
 describe('AlbumDetailView', () => {
     beforeEach(() => {
         setActivePinia(createPinia())
@@ -115,6 +129,7 @@ describe('AlbumDetailView', () => {
         getAlbumMock.mockReset()
         reorderAlbumRecordingsMock.mockReset()
         updateRecordingMock.mockReset()
+        setPreferredAssetFormat('audio/opus')
     })
 
     it('disables hero play button when no playable recordings exist', async () => {

@@ -67,22 +67,45 @@ export const resolveCover = (cover?: { url?: string } | null) => {
     return cover?.url ? buildApiUrl(cover.url) : ''
 }
 
+const normalizeMimeType = (mimeType?: string | null) => {
+    const normalized = mimeType?.trim().toLowerCase()
+    return normalized || null
+}
+
 export const resolvePlayableAudio = (
     assets: readonly RecordingAsset[],
+    preferredAssetFormat?: string,
 ): PlayableAudioSource | undefined => {
-    const audioAsset = assets.find((asset) => asset.mediaFile.mimeType.startsWith('audio/'))
-    if (audioAsset?.mediaFile.url) {
-        return {
-            src: buildApiUrl(audioAsset.mediaFile.url),
-            mediaFileId: audioAsset.mediaFile.id,
+    const normalizedPreferredFormat = normalizeMimeType(preferredAssetFormat)
+    let firstPlayableAudio: PlayableAudioSource | undefined
+
+    for (const asset of assets) {
+        const mimeType = normalizeMimeType(asset.mediaFile.mimeType)
+        if (!mimeType?.startsWith('audio/') || !asset.mediaFile.url) {
+            continue
+        }
+
+        const playableAudio = {
+            src: buildApiUrl(asset.mediaFile.url),
+            mediaFileId: asset.mediaFile.id,
+        }
+
+        if (!firstPlayableAudio) {
+            firstPlayableAudio = playableAudio
+        }
+
+        if (normalizedPreferredFormat && mimeType === normalizedPreferredFormat) {
+            return playableAudio
         }
     }
-    return undefined
+
+    return firstPlayableAudio
 }
 
 type NormalizeRecordingsBaseOptions = {
     fallbackArtist?: string
     fallbackCover?: string
+    preferredAssetFormat?: string
 }
 
 export const resolveArtistName = (artists?: ReadonlyArray<RecordingArtist>) => {
@@ -119,7 +142,10 @@ export function normalizeRecordings<
         | (NormalizeRecordingsBaseOptions & NormalizeRecordingsOptions<TRecording, TOutput>) = {},
 ) {
     return recordings.map((recording) => {
-        const playableAudio = resolvePlayableAudio(recording.assets ?? [])
+        const playableAudio = resolvePlayableAudio(
+            recording.assets ?? [],
+            options.preferredAssetFormat,
+        )
         const base: NormalizedRecordingBase = {
             id: recording.id,
             title: recording.title || recording.comment || 'Untitled Track',
@@ -155,6 +181,7 @@ export const pickInitialRecordingId = (
 
 export const pickPlayableRecordingEntry = <TRecording extends PlayableRecordingCandidate>(
     recordings: readonly TRecording[],
+    preferredAssetFormat?: string,
 ):
     | {
           recording: TRecording
@@ -169,7 +196,7 @@ export const pickPlayableRecordingEntry = <TRecording extends PlayableRecordingC
         | undefined
 
     for (const recording of recordings) {
-        const playableAudio = resolvePlayableAudio(recording.assets ?? [])
+        const playableAudio = resolvePlayableAudio(recording.assets ?? [], preferredAssetFormat)
         if (!playableAudio) {
             continue
         }

@@ -3,6 +3,7 @@ import { api } from '@/ApiInstance'
 import { resolveCover, resolvePlayableAudio } from '@/composables/recordingMedia'
 import { buildApiUrl } from '@/runtime/platform'
 import type { CurrentQueueDto, CurrentQueueItemDto } from '@/services/playbackSyncProtocol'
+import { useUserStore } from '@/stores/user'
 import {
     type AudioTrack,
     MAX_KNOWN_TRACKS,
@@ -23,6 +24,7 @@ type UseAudioTrackCatalogOptions = {
 }
 
 export const useAudioTrackCatalog = (options: UseAudioTrackCatalogOptions) => {
+    const userStore = useUserStore()
     const knownTracks = new Map<number, AudioTrack>()
     const hydratedTrackIds = new Set<number>()
     const trackMetadataRequests = new Map<number, Promise<void>>()
@@ -138,12 +140,21 @@ export const useAudioTrackCatalog = (options: UseAudioTrackCatalogOptions) => {
         }
     }
 
-    const buildTrackWithResolvedSource = (
+    const buildTrackWithResolvedSource = async (
         track: AudioTrack,
         metadata: PlaybackRecordingMetadata,
-    ): AudioTrack | null => {
+    ): Promise<AudioTrack | null> => {
         const enrichedTrack = applyRecordingMetadata(track, metadata)
-        const playableAudio = resolvePlayableAudio(metadata.assets ?? [])
+        if (track.src && track.mediaFileId !== undefined) {
+            return {
+                ...enrichedTrack,
+                src: track.src,
+                mediaFileId: track.mediaFileId,
+            }
+        }
+
+        const preferredAssetFormat = await userStore.getPreferredAssetFormat()
+        const playableAudio = resolvePlayableAudio(metadata.assets ?? [], preferredAssetFormat)
         if (!playableAudio) {
             return null
         }
@@ -190,40 +201,38 @@ export const useAudioTrackCatalog = (options: UseAudioTrackCatalogOptions) => {
         return recordingMetadataCache.get(recordingId) ?? null
     }
 
-    const hydrateTrackMetadata = (track: AudioTrack) => {
+    const hydrateTrackMetadata = async (track: AudioTrack) => {
         if (hydratedTrackIds.has(track.id)) {
-            return Promise.resolve()
+            return
         }
 
         const generation = trackMetadataGeneration
-        return fetchRecordingMetadata(track.id)
-            .then((metadata) => {
-                if (!metadata || generation !== trackMetadataGeneration) {
-                    return
-                }
+        try {
+            const metadata = await fetchRecordingMetadata(track.id)
+            if (!metadata || generation !== trackMetadataGeneration) {
+                return
+            }
 
-                const hydratedTrack =
-                    buildTrackWithResolvedSource(track, metadata) ??
-                    applyRecordingMetadata(track, metadata)
-                rememberHydratedTrack(hydratedTrack)
+            const resolvedTrack = await buildTrackWithResolvedSource(track, metadata)
+            const hydratedTrack = resolvedTrack ?? applyRecordingMetadata(track, metadata)
+            rememberHydratedTrack(hydratedTrack)
 
-                if (options.currentTrack.value?.id === track.id) {
-                    options.currentTrack.value = cloneTrack({
-                        ...options.currentTrack.value,
-                        ...hydratedTrack,
-                    })
-                }
+            if (options.currentTrack.value?.id === track.id) {
+                options.currentTrack.value = cloneTrack({
+                    ...options.currentTrack.value,
+                    ...hydratedTrack,
+                })
+            }
 
-                if (options.currentBufferTrack.value?.id === track.id) {
-                    options.currentBufferTrack.value = {
-                        ...options.currentBufferTrack.value,
-                        ...hydratedTrack,
-                    }
+            if (options.currentBufferTrack.value?.id === track.id) {
+                options.currentBufferTrack.value = {
+                    ...options.currentBufferTrack.value,
+                    ...hydratedTrack,
                 }
-            })
-            .catch(() => {
-                // Metadata enrichment is best-effort and must not interrupt sync playback.
-            })
+            }
+        } catch {
+            // Metadata enrichment is best-effort and must not interrupt sync playback.
+        }
     }
 
     const createTrackShell = (recordingId: number): AudioTrack => {
@@ -254,7 +263,7 @@ export const useAudioTrackCatalog = (options: UseAudioTrackCatalogOptions) => {
             return null
         }
 
-        const resolvedTrack = buildTrackWithResolvedSource(track, metadata)
+        const resolvedTrack = await buildTrackWithResolvedSource(track, metadata)
         if (!resolvedTrack) {
             rememberHydratedTrack(applyRecordingMetadata(track, metadata))
             return null

@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { Pause, Play } from 'lucide-vue-next'
 import { featuredAlbum as defaultFeaturedAlbum } from './data'
-import { computed, ref, onMounted } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '@/ApiInstance'
 import { resolveArtistName, resolveCover, resolvePlayableAudio } from '@/composables/recordingMedia'
 import { useAudioStore } from '@/stores/audio'
+import { useUserStore } from '@/stores/user'
 
 type Album = {
     workId?: number
@@ -23,6 +24,8 @@ const router = useRouter()
 const album = ref<Album | null>(null)
 const featuredStatus = ref<FeaturedStatus>('loading')
 const audioStore = useAudioStore()
+const userStore = useUserStore()
+const featuredWork = ref<Awaited<ReturnType<typeof api.workController.randomWork>> | null>(null)
 
 const isFeaturedPlaying = computed(() => {
     return (
@@ -80,10 +83,47 @@ const handleFeaturedAction = () => {
     })
 }
 
+const applyFeaturedWork = () => {
+    const work = featuredWork.value
+    if (!work || work.recordings.length === 0) {
+        featuredStatus.value = 'empty'
+        album.value = null
+        return
+    }
+
+    const defaultRecording = work.recordings.find((recording) => recording.defaultInWork)
+    const featuredRecording = defaultRecording ?? work.recordings[0]
+    const featuredAudio = resolvePlayableAudio(
+        featuredRecording?.assets || [],
+        userStore.preferredAssetFormat,
+    )
+
+    if (!featuredRecording || !featuredAudio) {
+        featuredStatus.value = 'empty'
+        album.value = null
+        return
+    }
+
+    album.value = {
+        workId: work.id,
+        recordingId: featuredRecording.id,
+        title: work.title,
+        artist: resolveArtistName(featuredRecording.artists),
+        cover: featuredRecording.cover?.url
+            ? resolveCover(featuredRecording.cover)
+            : defaultFeaturedAlbum.cover,
+        audioSrc: featuredAudio.src,
+        mediaFileId: featuredAudio.mediaFileId,
+    }
+    featuredStatus.value = 'ready'
+}
+
 onMounted(async () => {
     featuredStatus.value = 'loading'
     album.value = null
+    featuredWork.value = null
     try {
+        await userStore.ensureUserLoaded()
         const work = await api.workController.randomWork({
             offset: new Date().getTimezoneOffset() * 60000,
         })
@@ -92,32 +132,23 @@ onMounted(async () => {
             return
         }
 
-        const defaultRecording = work.recordings?.find((recording) => recording.defaultInWork)
-        const featuredRecording = defaultRecording ?? work.recordings?.[0]
-        const featuredAudio = resolvePlayableAudio(featuredRecording?.assets || [])
-
-        if (!featuredRecording || !featuredAudio) {
-            featuredStatus.value = 'empty'
-            return
-        }
-
-        album.value = {
-            workId: work.id,
-            recordingId: featuredRecording.id,
-            title: work.title,
-            artist: resolveArtistName(featuredRecording.artists),
-            cover: featuredRecording.cover?.url
-                ? resolveCover(featuredRecording.cover)
-                : defaultFeaturedAlbum.cover,
-            audioSrc: featuredAudio.src,
-            mediaFileId: featuredAudio.mediaFileId,
-        }
-        featuredStatus.value = 'ready'
+        featuredWork.value = work
+        applyFeaturedWork()
     } catch (e) {
         featuredStatus.value = 'empty'
         console.error('Failed to fetch daily pick:', e)
     }
 })
+
+watch(
+    () => userStore.preferredAssetFormat,
+    () => {
+        if (!featuredWork.value) {
+            return
+        }
+        applyFeaturedWork()
+    },
+)
 </script>
 
 <template>

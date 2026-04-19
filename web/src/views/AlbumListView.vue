@@ -21,6 +21,7 @@ import {
     type PlayableTrack,
 } from '@/services/playableTrackResolver'
 import { useAudioStore } from '@/stores/audio'
+import { useUserStore } from '@/stores/user'
 
 type DisplayItem = {
     id: number
@@ -35,6 +36,7 @@ type DisplayItem = {
 const router = useRouter()
 const route = useRoute()
 const audioStore = useAudioStore()
+const userStore = useUserStore()
 const viewMode = ref<'grid' | 'list'>('grid')
 const activeTab = ref<'Albums' | 'Works'>('Albums')
 const displayItems = ref<DisplayItem[]>([])
@@ -215,6 +217,15 @@ const playItem = async (item: DisplayItem) => {
         playLoadingItemId.value = null
     }
 }
+
+watch(
+    () => userStore.preferredAssetFormat,
+    () => {
+        displayItems.value.forEach((item) => {
+            item.playableTrack = undefined
+        })
+    },
+)
 </script>
 
 <template>

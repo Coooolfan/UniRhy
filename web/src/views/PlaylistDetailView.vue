@@ -12,14 +12,18 @@ import PlaylistRemoveRecordingModal from '@/components/playlist/PlaylistRemoveRe
 import {
     normalizeRecordings,
     pickInitialRecordingId,
+    resolvePlayableAudio,
     resolveCover,
+    type RecordingAsset,
 } from '@/composables/recordingMedia'
 import { useRecordingPlayback, type PlayableRecording } from '@/composables/useRecordingPlayback'
+import { useUserStore } from '@/stores/user'
 import { hasSameItemOrder, moveItemById, type ReorderPayload } from '@/utils/recordingOrder'
 import { usePlaylistStore } from '@/stores/playlist'
 
 const route = useRoute()
 const router = useRouter()
+const userStore = useUserStore()
 const playlistStore = usePlaylistStore()
 const modal = useModal()
 const currentRecordingId = ref<number | null>(null)
@@ -35,6 +39,7 @@ type PlaylistData = {
 
 type Recording = PlayableRecording & {
     label: string
+    assets: readonly RecordingAsset[]
 }
 
 type PlaylistRecordingDto = Awaited<
@@ -48,6 +53,17 @@ const playlistData = ref<PlaylistData>({
 })
 
 const recordings = ref<Recording[]>([])
+
+const syncRecordingPlaybackSources = () => {
+    recordings.value = recordings.value.map((recording) => {
+        const playableAudio = resolvePlayableAudio(recording.assets, userStore.preferredAssetFormat)
+        return {
+            ...recording,
+            audioSrc: playableAudio?.src,
+            mediaFileId: playableAudio?.mediaFileId,
+        }
+    })
+}
 
 const {
     audioStore,
@@ -69,7 +85,10 @@ const fetchPlaylist = async (id: number) => {
         isLoading.value = true
         reorderRecordingError.value = ''
 
-        const data = await api.playlistController.getPlaylist({ id })
+        const [, data] = await Promise.all([
+            userStore.ensureUserLoaded(),
+            api.playlistController.getPlaylist({ id }),
+        ])
         const firstCover =
             data.recordings && data.recordings.length > 0 ? data.recordings[0]?.cover : undefined
 
@@ -82,9 +101,11 @@ const fetchPlaylist = async (id: number) => {
         recordings.value = normalizeRecordings(
             (data.recordings || []) as readonly PlaylistRecordingDto[],
             {
+                preferredAssetFormat: userStore.preferredAssetFormat,
                 transform: (recording, base) => ({
                     ...base,
                     label: recording.label || '',
+                    assets: (recording.assets || []) as readonly RecordingAsset[],
                 }),
             },
         )
@@ -238,6 +259,16 @@ watch(
         if (!Number.isNaN(id)) {
             fetchPlaylist(id)
         }
+    },
+)
+
+watch(
+    () => userStore.preferredAssetFormat,
+    () => {
+        if (recordings.value.length === 0) {
+            return
+        }
+        syncRecordingPlaybackSources()
     },
 )
 </script>

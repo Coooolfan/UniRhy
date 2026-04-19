@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, reactive, nextTick, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { LogOut, User, Mail, Lock, Edit2, Eye, EyeOff } from 'lucide-vue-next'
+import { LogOut, User, Mail, Lock, Edit2, Eye, EyeOff, SlidersHorizontal } from 'lucide-vue-next'
 import { useModalContext } from '@/components/modals/modalContext'
 import { useUserStore } from '@/stores/user'
 import { normalizeApiError } from '@/ApiInstance'
@@ -100,6 +100,11 @@ const handleUpdate = async () => {
     }
 }
 
+const openPreferences = () => {
+    modal.resolve(undefined)
+    router.push({ name: 'preferences' })
+}
+
 const requestLogout = () => {
     mode.value = 'logout_confirm'
 }
@@ -172,6 +177,16 @@ onUnmounted(() => {
                             class="text-[#8C857B] transition-colors group-hover:text-[#2B221B]"
                         />
                         编辑资料
+                    </button>
+                    <button
+                        @click="openPreferences"
+                        class="group flex w-full items-center justify-center gap-2 border border-[#D6D1C4] py-3 text-sm uppercase tracking-wide text-[#2B221B] transition-colors hover:bg-[#F7F5F0]"
+                    >
+                        <SlidersHorizontal
+                            :size="16"
+                            class="text-[#8C857B] transition-colors group-hover:text-[#2B221B]"
+                        />
+                        个人偏好
                     </button>
                 </div>
 

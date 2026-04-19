@@ -6,6 +6,8 @@ input AccountUpdate {
     password?
 
     email?
+
+    preferences?
 }
 
 input AccountCreate {

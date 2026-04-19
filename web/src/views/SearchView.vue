@@ -15,10 +15,12 @@ import {
     type PlayableTrack,
 } from '@/services/playableTrackResolver'
 import { useAudioStore } from '@/stores/audio'
+import { useUserStore } from '@/stores/user'
 
 const route = useRoute()
 const router = useRouter()
 const audioStore = useAudioStore()
+const userStore = useUserStore()
 const modal = useModal()
 
 const searchQuery = ref('')
@@ -295,6 +297,18 @@ const playItem = async (item: SearchResultItem) => {
         playLoadingItemId.value = null
     }
 }
+
+watch(
+    () => userStore.preferredAssetFormat,
+    () => {
+        albums.value.forEach((item) => {
+            item.playableTrack = undefined
+        })
+        works.value.forEach((item) => {
+            item.playableTrack = undefined
+        })
+    },
+)
 </script>
 
 <template>

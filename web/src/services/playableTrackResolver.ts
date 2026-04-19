@@ -6,6 +6,7 @@ import {
     resolveArtistName,
     resolveCover,
 } from '@/composables/recordingMedia'
+import { useUserStore } from '@/stores/user'
 
 type AlbumDetail = AlbumDto['AlbumController/DETAIL_ALBUM_FETCHER']
 type WorkDetail = WorkDto['WorkController/DEFAULT_WORK_FETCHER']
@@ -29,10 +30,13 @@ export type PlayableTrackFallback = {
 
 const resolveTrack = (
     recording: DetailRecording,
-    detailTitle: string,
-    fallback: PlayableTrackFallback,
+    options: {
+        detailTitle: string
+        fallback: PlayableTrackFallback
+        preferredAssetFormat?: string
+    },
 ): Omit<PlayableTrack, 'workId'> | undefined => {
-    const playableAudio = resolvePlayableAudio(recording.assets)
+    const playableAudio = resolvePlayableAudio(recording.assets, options.preferredAssetFormat)
     if (!playableAudio) {
         return undefined
     }
@@ -42,11 +46,11 @@ const resolveTrack = (
         title:
             recording.title ||
             recording.comment ||
-            detailTitle ||
-            fallback.title ||
+            options.detailTitle ||
+            options.fallback.title ||
             'Untitled Track',
-        artist: resolveArtistName(recording.artists) || fallback.artist || 'Unknown Artist',
-        cover: recording.cover?.url ? resolveCover(recording.cover) : fallback.cover || '',
+        artist: resolveArtistName(recording.artists) || options.fallback.artist || 'Unknown Artist',
+        cover: recording.cover?.url ? resolveCover(recording.cover) : options.fallback.cover || '',
         src: playableAudio.src,
         mediaFileId: playableAudio.mediaFileId,
     }
@@ -56,25 +60,37 @@ export const resolveAlbumPlayableTrack = async (
     albumId: number,
     fallback: PlayableTrackFallback = {},
 ): Promise<PlayableTrack | undefined> => {
+    const userStore = useUserStore()
+    const preferredAssetFormat = await userStore.getPreferredAssetFormat()
     const detail = await api.albumController.getAlbum({ id: albumId })
-    const playableEntry = pickPlayableRecordingEntry(detail.recordings)
+    const playableEntry = pickPlayableRecordingEntry(detail.recordings, preferredAssetFormat)
     if (!playableEntry) {
         return undefined
     }
-    return resolveTrack(playableEntry.recording, detail.title, fallback)
+    return resolveTrack(playableEntry.recording, {
+        detailTitle: detail.title,
+        fallback,
+        preferredAssetFormat,
+    })
 }
 
 export const resolveWorkPlayableTrack = async (
     workId: number,
     fallback: PlayableTrackFallback = {},
 ): Promise<PlayableTrack | undefined> => {
+    const userStore = useUserStore()
+    const preferredAssetFormat = await userStore.getPreferredAssetFormat()
     const detail = await api.workController.getWorkById({ id: workId })
-    const playableEntry = pickPlayableRecordingEntry(detail.recordings)
+    const playableEntry = pickPlayableRecordingEntry(detail.recordings, preferredAssetFormat)
     if (!playableEntry) {
         return undefined
     }
 
-    const track = resolveTrack(playableEntry.recording, detail.title, fallback)
+    const track = resolveTrack(playableEntry.recording, {
+        detailTitle: detail.title,
+        fallback,
+        preferredAssetFormat,
+    })
     if (!track) {
         return undefined
     }

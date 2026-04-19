@@ -122,6 +122,7 @@ class AccountController(private val service: AccountService) {
         private val DEFAULT_ACCOUNT_FETCHER = newFetcher(Account::class).by {
             allScalarFields()
             password(false)
+            preferences()
         }
     }
 }

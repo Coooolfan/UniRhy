@@ -30,6 +30,7 @@ vi.mock('@/ApiInstance', async (importOriginal) => {
 import { api } from '@/ApiInstance'
 import { buildRecordingOrderStorageKey } from '@/utils/recordingOrder'
 import WorkDetailView from '@/views/WorkDetailView.vue'
+import { useUserStore } from '@/stores/user'
 
 const getWorkByIdMock = vi.mocked(api.workController.getWorkById)
 const updateRecordingMock = vi.mocked(api.recordingController.updateRecording)
@@ -106,6 +107,19 @@ const buildWorkResponse = () => ({
     ],
 })
 
+const setPreferredAssetFormat = (preferredAssetFormat: string) => {
+    const userStore = useUserStore()
+    userStore.user = {
+        id: 1,
+        name: 'Tester',
+        email: 'tester@example.com',
+        admin: false,
+        preferences: {
+            preferredAssetFormat,
+        },
+    }
+}
+
 describe('WorkDetailView', () => {
     beforeEach(() => {
         setActivePinia(createPinia())
@@ -113,6 +127,7 @@ describe('WorkDetailView', () => {
         getWorkByIdMock.mockReset()
         updateRecordingMock.mockReset()
         mergeRecordingMock.mockReset()
+        setPreferredAssetFormat('audio/opus')
     })
 
     it('disables hero play button when no playable recordings exist', async () => {

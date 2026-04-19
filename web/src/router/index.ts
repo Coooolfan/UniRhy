@@ -67,6 +67,11 @@ const router = createRouter({
                     component: () => import('../views/SettingsView.vue'),
                 },
                 {
+                    path: 'preferences',
+                    name: 'preferences',
+                    component: () => import('../views/PreferencesView.vue'),
+                },
+                {
                     path: 'tasks',
                     name: 'tasks',
                     component: () => import('../views/TasksView.vue'),

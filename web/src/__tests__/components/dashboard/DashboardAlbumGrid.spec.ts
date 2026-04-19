@@ -27,6 +27,7 @@ vi.mock('@/ApiInstance', async (importOriginal) => {
 import { api } from '@/ApiInstance'
 import DashboardAlbumGrid from '@/components/dashboard/DashboardAlbumGrid.vue'
 import { useAudioStore } from '@/stores/audio'
+import { useUserStore } from '@/stores/user'
 
 const listAlbumsMock = vi.mocked(api.albumController.listAlbums)
 const getAlbumMock = vi.mocked(api.albumController.getAlbum)
@@ -53,12 +54,26 @@ const buildAlbumPage = () => ({
     totalRowCount: 1,
 })
 
+const setPreferredAssetFormat = (preferredAssetFormat: string) => {
+    const userStore = useUserStore()
+    userStore.user = {
+        id: 1,
+        name: 'Tester',
+        email: 'tester@example.com',
+        admin: false,
+        preferences: {
+            preferredAssetFormat,
+        },
+    }
+}
+
 describe('DashboardAlbumGrid', () => {
     beforeEach(() => {
         setActivePinia(createPinia())
         listAlbumsMock.mockReset()
         getAlbumMock.mockReset()
         pushMock.mockReset()
+        setPreferredAssetFormat('audio/opus')
     })
 
     it('shows centered empty state and navigates to settings when album list is empty', async () => {
@@ -203,6 +218,81 @@ describe('DashboardAlbumGrid', () => {
                 cover: '/api/media/702?_sig=c&_exp=9999999999',
                 src: '/api/media/602?_sig=b&_exp=9999999999',
                 mediaFileId: 602,
+            }),
+        )
+    })
+
+    it('prefers the user selected asset format when album playback has multiple audio assets', async () => {
+        setPreferredAssetFormat('audio/flac')
+        listAlbumsMock.mockResolvedValueOnce(buildAlbumPage())
+        getAlbumMock.mockResolvedValueOnce({
+            id: 101,
+            title: 'Album A',
+            kind: 'Album',
+            comment: 'Album Comment',
+            recordings: [
+                {
+                    id: 502,
+                    kind: 'Studio',
+                    title: 'Playable Default',
+                    comment: '',
+                    durationMs: 200000,
+                    defaultInWork: true,
+                    assets: [
+                        {
+                            id: 901,
+                            comment: 'Audio mp3',
+                            mediaFile: {
+                                id: 602,
+                                sha256: 'hash-602',
+                                mimeType: 'audio/mpeg',
+                                size: 123,
+                                objectKey: 'track-602.mp3',
+                                url: '/api/media/602?_sig=b&_exp=9999999999',
+                            },
+                        },
+                        {
+                            id: 902,
+                            comment: 'Audio flac',
+                            mediaFile: {
+                                id: 603,
+                                sha256: 'hash-603',
+                                mimeType: 'audio/flac',
+                                size: 456,
+                                objectKey: 'track-603.flac',
+                                url: '/api/media/603?_sig=c&_exp=9999999999',
+                            },
+                        },
+                    ],
+                    artists: [{ id: 802, displayName: 'Artist B', alias: [], comment: '' }],
+                    cover: {
+                        id: 702,
+                        sha256: 'cover-702',
+                        objectKey: 'cover-702.jpg',
+                        mimeType: 'image/jpeg',
+                        size: 456,
+                        url: '/api/media/702?_sig=d&_exp=9999999999',
+                    },
+                },
+            ],
+        })
+
+        const wrapper = mount(DashboardAlbumGrid)
+        await flushView()
+
+        const playButtons = wrapper.findAll('button')
+        const albumPlayButton = playButtons.find((button) => button.attributes('type') === 'button')
+        expect(albumPlayButton).toBeTruthy()
+
+        await albumPlayButton!.trigger('click')
+        await flushView()
+
+        const audioStore = useAudioStore()
+        expect(audioStore.currentTrack).toEqual(
+            expect.objectContaining({
+                id: 502,
+                src: '/api/media/603?_sig=c&_exp=9999999999',
+                mediaFileId: 603,
             }),
         )
     })

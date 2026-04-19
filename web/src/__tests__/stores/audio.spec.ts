@@ -326,6 +326,7 @@ import type {
     LoadAudioSourceMessage,
     ScheduledActionMessage,
 } from '@/services/playbackSyncProtocol'
+import { useUserStore } from '@/stores/user'
 import { nowClientMs } from '@/utils/time'
 
 const getRecordingMock = vi.mocked(api.recordingController.getRecording)
@@ -534,6 +535,19 @@ const buildRecordingMetadata = (
     }
 }
 
+const setPreferredAssetFormat = (preferredAssetFormat: string) => {
+    const userStore = useUserStore()
+    userStore.user = {
+        id: 1,
+        name: 'Tester',
+        email: 'tester@example.com',
+        admin: false,
+        preferences: {
+            preferredAssetFormat,
+        },
+    }
+}
+
 const createResponse = (duration: number, status = 200) => {
     return new Response(new Uint8Array([duration]).buffer, { status })
 }
@@ -571,6 +585,7 @@ describe('audio store', () => {
         setActivePinia(createPinia())
         window.localStorage.clear()
         delete window.__UNIRHY_RUNTIME__
+        setPreferredAssetFormat('audio/opus')
         playbackSyncMockState.clients.length = 0
         nextAnimationFrameId = 1
         animationFrameCallbacks = new Map()
@@ -621,6 +636,136 @@ describe('audio store', () => {
         vi.stubGlobal('cancelAnimationFrame', (id: number) => {
             animationFrameCallbacks.delete(id)
         })
+    })
+
+    it('prefers the configured asset format when hydrating synced audio sources', async () => {
+        setPreferredAssetFormat('audio/flac')
+        getRecordingMock.mockResolvedValueOnce(
+            buildRecordingMetadata(7, {
+                assets: [
+                    {
+                        id: 47_001,
+                        comment: 'Audio mp3',
+                        mediaFile: {
+                            id: 2_071,
+                            sha256: 'audio-sha-7-mp3',
+                            objectKey: 'audio/7.mp3',
+                            mimeType: 'audio/mpeg',
+                            size: 2_048,
+                            url: '/api/media/2071',
+                        },
+                    },
+                    {
+                        id: 47_002,
+                        comment: 'Audio flac',
+                        mediaFile: {
+                            id: 2_072,
+                            sha256: 'audio-sha-7-flac',
+                            objectKey: 'audio/7.flac',
+                            mimeType: 'audio/flac',
+                            size: 4_096,
+                            url: '/api/media/2072',
+                        },
+                    },
+                ],
+            }),
+        )
+        fetchMock.mockResolvedValue(createResponse(45))
+
+        const audioStore = useAudioStore()
+        audioStore.connectPlaybackSync()
+        const client = latestClient()
+
+        client.emitMessage({
+            type: 'ROOM_EVENT_LOAD_AUDIO_SOURCE',
+            payload: {
+                commandId: 'cmd-pref-flac',
+                currentIndex: 0,
+                recordingId: 7,
+            },
+        } satisfies LoadAudioSourceMessage)
+        await flushPromises(12)
+
+        expect(fetchMock).toHaveBeenCalledWith('/api/media/2072', { credentials: 'include' })
+        expect(audioStore.currentTrack?.mediaFileId).toBe(2_072)
+        expect(audioStore.playbackSyncDebugSnapshot.currentBuffer?.mediaFileId).toBe(2_072)
+    })
+
+    it('does not hot-switch the current source when the preferred format changes later', async () => {
+        setPreferredAssetFormat('audio/mpeg')
+        getRecordingMock.mockResolvedValueOnce(
+            buildRecordingMetadata(7, {
+                assets: [
+                    {
+                        id: 47_001,
+                        comment: 'Audio mp3',
+                        mediaFile: {
+                            id: 2_071,
+                            sha256: 'audio-sha-7-mp3',
+                            objectKey: 'audio/7.mp3',
+                            mimeType: 'audio/mpeg',
+                            size: 2_048,
+                            url: '/api/media/2071',
+                        },
+                    },
+                    {
+                        id: 47_002,
+                        comment: 'Audio flac',
+                        mediaFile: {
+                            id: 2_072,
+                            sha256: 'audio-sha-7-flac',
+                            objectKey: 'audio/7.flac',
+                            mimeType: 'audio/flac',
+                            size: 4_096,
+                            url: '/api/media/2072',
+                        },
+                    },
+                ],
+            }),
+        )
+
+        const audioStore = useAudioStore()
+        audioStore.connectPlaybackSync()
+        const client = latestClient()
+
+        client.emitMessage({
+            type: 'SNAPSHOT',
+            payload: {
+                state: {
+                    status: 'PAUSED',
+                    currentIndex: 0,
+                    positionSeconds: 12,
+                    serverTimeToExecuteMs: nowClientMs(),
+                    version: 5,
+                    updatedAtMs: nowClientMs(),
+                },
+                queue: buildQueue([buildTrack(7)], 0),
+                serverNowMs: nowClientMs(),
+            },
+        })
+        await flushPromises(12)
+
+        expect(audioStore.currentTrack?.mediaFileId).toBe(2_071)
+
+        setPreferredAssetFormat('audio/flac')
+        client.emitMessage({
+            type: 'SNAPSHOT',
+            payload: {
+                state: {
+                    status: 'PAUSED',
+                    currentIndex: 0,
+                    positionSeconds: 18,
+                    serverTimeToExecuteMs: nowClientMs(),
+                    version: 6,
+                    updatedAtMs: nowClientMs(),
+                },
+                queue: buildQueue([buildTrack(7)], 0),
+                serverNowMs: nowClientMs(),
+            },
+        })
+        await flushPromises(12)
+
+        expect(audioStore.currentTrack?.mediaFileId).toBe(2_071)
     })
 
     it('queues only the latest play intent until sync becomes ready', async () => {

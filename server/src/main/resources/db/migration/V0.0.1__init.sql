@@ -125,12 +125,15 @@ CREATE TABLE public.recording_artist_mapping
 -- 用户账户表：存储基本登录信息与权限
 CREATE TABLE public.account
 (
-    id        BIGSERIAL PRIMARY KEY,
-    name      TEXT    NOT NULL,                                             -- 用户名（唯一）
-    password  TEXT    NOT NULL,                                             -- 密码（应存储加密后的 hash）
-    email     TEXT    NOT NULL,                                             -- 电子邮箱（唯一）
-    admin     BOOLEAN NOT NULL DEFAULT FALSE,                               -- 是否为管理员
-    avatar_id BIGINT  REFERENCES public.media_file (id) ON DELETE SET NULL, -- 用户头像
+    id          BIGSERIAL PRIMARY KEY,
+    name        TEXT    NOT NULL,                                             -- 用户名（唯一）
+    password    TEXT    NOT NULL,                                             -- 密码（应存储加密后的 hash）
+    email       TEXT    NOT NULL,                                             -- 电子邮箱（唯一）
+    admin       BOOLEAN NOT NULL DEFAULT FALSE,                               -- 是否为管理员
+    avatar_id   BIGINT  REFERENCES public.media_file (id) ON DELETE SET NULL, -- 用户头像
+    preferences JSONB   NOT NULL DEFAULT '{
+      "preferredAssetFormat": "audio/opus"
+    }'::jsonb,                                                                -- 偏好设置
     CONSTRAINT account_unique_name UNIQUE (name),
     CONSTRAINT account_unique_email UNIQUE (email)
 );

@@ -31,6 +31,7 @@ vi.mock('@/ApiInstance', async (importOriginal) => {
 
 import { api } from '@/ApiInstance'
 import PlaylistDetailView from '@/views/PlaylistDetailView.vue'
+import { useUserStore } from '@/stores/user'
 
 const getPlaylistMock = vi.mocked(api.playlistController.getPlaylist)
 const reorderPlaylistRecordingsMock = vi.mocked(api.playlistController.reorderPlaylistRecordings)
@@ -84,11 +85,25 @@ const buildPlaylistResponse = () => ({
     ],
 })
 
+const setPreferredAssetFormat = (preferredAssetFormat: string) => {
+    const userStore = useUserStore()
+    userStore.user = {
+        id: 1,
+        name: 'Tester',
+        email: 'tester@example.com',
+        admin: false,
+        preferences: {
+            preferredAssetFormat,
+        },
+    }
+}
+
 describe('PlaylistDetailView', () => {
     beforeEach(() => {
         setActivePinia(createPinia())
         getPlaylistMock.mockReset()
         reorderPlaylistRecordingsMock.mockReset()
+        setPreferredAssetFormat('audio/opus')
     })
 
     it('reorders recordings via reorderPlaylistRecordings API', async () => {

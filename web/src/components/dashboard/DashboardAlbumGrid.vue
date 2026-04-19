@@ -1,14 +1,16 @@
 <script setup lang="ts">
 import { Pause, Play } from 'lucide-vue-next'
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '@/ApiInstance'
 import { pickPlayableRecordingEntry, resolveCover } from '@/composables/recordingMedia'
 import { useAudioStore } from '@/stores/audio'
+import { useUserStore } from '@/stores/user'
 import LibraryEmptyHint from '@/components/dashboard/LibraryEmptyHint.vue'
 
 const router = useRouter()
 const audioStore = useAudioStore()
+const userStore = useUserStore()
 const pageSize = 10
 
 type AlbumCard = {
@@ -55,8 +57,9 @@ const playAlbum = async (album: AlbumCard) => {
             album.defaultRecordingId === undefined ||
             album.defaultTrackMediaFileId === undefined
         ) {
+            const preferredAssetFormat = await userStore.getPreferredAssetFormat()
             const detail = await api.albumController.getAlbum({ id: album.id })
-            const targetEntry = pickPlayableRecordingEntry(detail.recordings)
+            const targetEntry = pickPlayableRecordingEntry(detail.recordings, preferredAssetFormat)
             if (!targetEntry?.playableAudio) {
                 console.warn('No playable track for album', album.id)
                 return
@@ -123,6 +126,20 @@ const fetchAlbums = async () => {
 onMounted(() => {
     fetchAlbums()
 })
+
+watch(
+    () => userStore.preferredAssetFormat,
+    () => {
+        albums.value.forEach((album) => {
+            album.defaultRecordingId = undefined
+            album.defaultTrackTitle = undefined
+            album.defaultTrackArtist = undefined
+            album.defaultTrackCover = undefined
+            album.defaultTrackSrc = undefined
+            album.defaultTrackMediaFileId = undefined
+        })
+    },
+)
 </script>
 
 <template>

@@ -26,6 +26,7 @@ vi.mock('@/ApiInstance', async (importOriginal) => {
 import { api } from '@/ApiInstance'
 import DashboardHero from '@/components/dashboard/DashboardHero.vue'
 import { useAudioStore } from '@/stores/audio'
+import { useUserStore } from '@/stores/user'
 
 const randomWorkMock = vi.mocked(api.workController.randomWork)
 
@@ -75,6 +76,19 @@ const buildPlayableWork = () => ({
     ],
 })
 
+const setPreferredAssetFormat = (preferredAssetFormat: string) => {
+    const userStore = useUserStore()
+    userStore.user = {
+        id: 1,
+        name: 'Tester',
+        email: 'tester@example.com',
+        admin: false,
+        preferences: {
+            preferredAssetFormat,
+        },
+    }
+}
+
 const buildUnplayableWork = () => ({
     id: 12,
     title: 'Unplayable Work',
@@ -119,6 +133,7 @@ describe('DashboardHero', () => {
         setActivePinia(createPinia())
         randomWorkMock.mockReset()
         pushMock.mockReset()
+        setPreferredAssetFormat('audio/opus')
     })
 
     it('shows playable action when daily pick has playable audio', async () => {
@@ -181,5 +196,57 @@ describe('DashboardHero', () => {
 
         expect(pushMock).toHaveBeenCalledTimes(1)
         expect(pushMock).toHaveBeenCalledWith({ name: 'settings' })
+    })
+
+    it('prefers the user selected asset format for the featured work', async () => {
+        setPreferredAssetFormat('audio/flac')
+        randomWorkMock.mockResolvedValueOnce({
+            ...buildPlayableWork(),
+            recordings: [
+                {
+                    ...buildPlayableWork().recordings[0],
+                    assets: [
+                        {
+                            id: 31,
+                            comment: 'Audio mp3',
+                            mediaFile: {
+                                id: 41,
+                                sha256: 'hash-audio-mp3',
+                                mimeType: 'audio/mpeg',
+                                size: 123,
+                                objectKey: 'track-a.mp3',
+                                url: '/api/media/41?_sig=a&_exp=9999999999',
+                            },
+                        },
+                        {
+                            id: 32,
+                            comment: 'Audio flac',
+                            mediaFile: {
+                                id: 42,
+                                sha256: 'hash-audio-flac',
+                                mimeType: 'audio/flac',
+                                size: 456,
+                                objectKey: 'track-a.flac',
+                                url: '/api/media/42?_sig=b&_exp=9999999999',
+                            },
+                        },
+                    ],
+                },
+            ],
+        })
+
+        const wrapper = mount(DashboardHero)
+        await flushView()
+
+        const playButton = wrapper
+            .findAll('button')
+            .find((button) => button.text().includes('立即播放'))
+        expect(playButton).toBeTruthy()
+
+        const audioStore = useAudioStore()
+        await playButton!.trigger('click')
+
+        expect(audioStore.currentTrack?.mediaFileId).toBe(42)
+        expect(audioStore.currentTrack?.src).toBe('/api/media/42?_sig=b&_exp=9999999999')
     })
 })

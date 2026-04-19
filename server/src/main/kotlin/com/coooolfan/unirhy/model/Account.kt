@@ -20,6 +20,8 @@ interface Account {
 
     val admin: Boolean
 
+    val preferences: AccountPreferences
+
     @ManyToOne
     val avatar: MediaFile?
 }

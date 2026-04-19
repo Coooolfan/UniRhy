@@ -18,14 +18,17 @@ import {
     normalizeRecordings,
     pickInitialRecordingId,
     resolveCover,
+    resolvePlayableAudio,
     type NormalizedRecordingBase,
     type RecordingAsset,
 } from '@/composables/recordingMedia'
 import { useRecordingPlayback } from '@/composables/useRecordingPlayback'
+import { useUserStore } from '@/stores/user'
 import { hasSameItemOrder, moveItemById, type ReorderPayload } from '@/utils/recordingOrder'
 
 const route = useRoute()
 const modal = useModal()
+const userStore = useUserStore()
 const currentRecordingId = ref<number | null>(null)
 const isLoading = ref(true)
 const isCdVisible = ref(false)
@@ -75,6 +78,17 @@ const albumEditInitial = ref<AlbumEditForm>({
 
 const recordings = ref<Recording[]>([])
 
+const syncRecordingPlaybackSources = () => {
+    recordings.value = recordings.value.map((recording) => {
+        const playableAudio = resolvePlayableAudio(recording.assets, userStore.preferredAssetFormat)
+        return {
+            ...recording,
+            audioSrc: playableAudio?.src,
+            mediaFileId: playableAudio?.mediaFileId,
+        }
+    })
+}
+
 const {
     audioStore,
     hasPlayableRecording,
@@ -96,7 +110,10 @@ const fetchAlbum = async (id: number) => {
         isCdVisible.value = false
         reorderRecordingError.value = ''
 
-        const data = await api.albumController.getAlbum({ id })
+        const [, data] = await Promise.all([
+            userStore.ensureUserLoaded(),
+            api.albumController.getAlbum({ id }),
+        ])
 
         const releaseYear = data.releaseDate
             ? new Date(data.releaseDate).getFullYear().toString()
@@ -123,6 +140,7 @@ const fetchAlbum = async (id: number) => {
             (data.recordings || []) as readonly AlbumRecordingDto[],
             {
                 fallbackArtist: artistName,
+                preferredAssetFormat: userStore.preferredAssetFormat,
                 transform: (recording: AlbumRecordingDto, base: NormalizedRecordingBase) => ({
                     ...base,
                     label: recording.label || '',
@@ -282,6 +300,16 @@ watch(
         if (!Number.isNaN(id)) {
             void fetchAlbum(id)
         }
+    },
+)
+
+watch(
+    () => userStore.preferredAssetFormat,
+    () => {
+        if (recordings.value.length === 0) {
+            return
+        }
+        syncRecordingPlaybackSources()
     },
 )
 </script>

@@ -64,6 +64,10 @@ class AccountService(
             throw CommonException.Forbidden()
         }
 
+        if (isLoaded(account, Account::preferences) && account.id != currentLoginId) {
+            throw CommonException.Forbidden()
+        }
+
         val encodedAccount = Account(account) {
             if (isLoaded(account, Account::password))
                 this.password = passwordEncoder.encodePassword(account.password)

@@ -114,4 +114,91 @@ describe('recordingMedia', () => {
             ]),
         ).toBeUndefined()
     })
+
+    it('prefers the configured MIME over the first playable asset', () => {
+        expect(
+            recordingMedia.resolvePlayableAudio(
+                [
+                    {
+                        mediaFile: {
+                            id: 21,
+                            mimeType: 'audio/mpeg',
+                            objectKey: 'track-a.mp3',
+                            url: '/api/media/21',
+                        },
+                    },
+                    {
+                        mediaFile: {
+                            id: 22,
+                            mimeType: 'audio/flac',
+                            objectKey: 'track-a.flac',
+                            url: '/api/media/22',
+                        },
+                    },
+                ],
+                'audio/flac',
+            ),
+        ).toEqual({
+            src: '/api/media/22',
+            mediaFileId: 22,
+        })
+    })
+
+    it('falls back to the first playable asset when the preferred MIME is missing', () => {
+        expect(
+            recordingMedia.resolvePlayableAudio(
+                [
+                    {
+                        mediaFile: {
+                            id: 21,
+                            mimeType: 'audio/mpeg',
+                            objectKey: 'track-a.mp3',
+                            url: '/api/media/21',
+                        },
+                    },
+                    {
+                        mediaFile: {
+                            id: 22,
+                            mimeType: 'audio/flac',
+                            objectKey: 'track-a.flac',
+                            url: '/api/media/22',
+                        },
+                    },
+                ],
+                'audio/opus',
+            ),
+        ).toEqual({
+            src: '/api/media/21',
+            mediaFileId: 21,
+        })
+    })
+
+    it('matches preferred MIME after trimming and lowercasing', () => {
+        expect(
+            recordingMedia.resolvePlayableAudio(
+                [
+                    {
+                        mediaFile: {
+                            id: 21,
+                            mimeType: 'audio/mpeg',
+                            objectKey: 'track-a.mp3',
+                            url: '/api/media/21',
+                        },
+                    },
+                    {
+                        mediaFile: {
+                            id: 22,
+                            mimeType: ' Audio/FLAC ',
+                            objectKey: 'track-a.flac',
+                            url: '/api/media/22',
+                        },
+                    },
+                ],
+                '  audio/flac  ',
+            ),
+        ).toEqual({
+            src: '/api/media/22',
+            mediaFileId: 22,
+        })
+    })
 })

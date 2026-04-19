@@ -19,13 +19,16 @@ import {
     normalizeRecordings,
     pickInitialRecordingId,
     resolveCover,
+    resolvePlayableAudio,
     type RecordingAsset,
 } from '@/composables/recordingMedia'
 import { useRecordingMergeState } from '@/composables/useRecordingMergeState'
 import { useRecordingPlayback } from '@/composables/useRecordingPlayback'
+import { useUserStore } from '@/stores/user'
 
 const route = useRoute()
 const modal = useModal()
+const userStore = useUserStore()
 const currentRecordingId = ref<number | null>(null)
 const isLoading = ref(true)
 
@@ -63,11 +66,25 @@ const mergeStateActions: { resetState: () => void } = {
     resetState: () => undefined,
 }
 
+const syncRecordingPlaybackSources = () => {
+    recordings.value = recordings.value.map((recording) => {
+        const playableAudio = resolvePlayableAudio(recording.assets, userStore.preferredAssetFormat)
+        return {
+            ...recording,
+            audioSrc: playableAudio?.src,
+            mediaFileId: playableAudio?.mediaFileId,
+        }
+    })
+}
+
 async function fetchWork(id: number) {
     try {
         isLoading.value = true
 
-        const data = await api.workController.getWorkById({ id })
+        const [, data] = await Promise.all([
+            userStore.ensureUserLoaded(),
+            api.workController.getWorkById({ id }),
+        ])
 
         const defaultRecording =
             data.recordings?.find((recording) => recording.defaultInWork) ?? data.recordings?.[0]
@@ -82,6 +99,7 @@ async function fetchWork(id: number) {
         const normalizedRecordings = normalizeRecordings(
             (data.recordings || []) as readonly WorkRecordingDto[],
             {
+                preferredAssetFormat: userStore.preferredAssetFormat,
                 transform: (recording, base) => ({
                     ...base,
                     type: recording.kind,
@@ -327,6 +345,16 @@ watch(
             resetMergeState()
             void fetchWork(id)
         }
+    },
+)
+
+watch(
+    () => userStore.preferredAssetFormat,
+    () => {
+        if (recordings.value.length === 0) {
+            return
+        }
+        syncRecordingPlaybackSources()
     },
 )
 </script>
