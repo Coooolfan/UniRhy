@@ -1,0 +1,11 @@
+export com.coooolfan.unirhy.model.Album
+
+input AlbumUpdate {
+    title
+
+    kind
+
+    releaseDate
+
+    comment
+}

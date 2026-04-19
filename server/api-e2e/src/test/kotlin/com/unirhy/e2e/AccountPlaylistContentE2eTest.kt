@@ -156,6 +156,18 @@ class AccountPlaylistContentE2eTest {
             "[auth] update work should require login",
         )
         assertAuthenticationFailed(
+            api.put(
+                path = "/api/albums/1",
+                json = mapOf(
+                    "title" to "blocked-album",
+                    "kind" to "CD",
+                    "releaseDate" to null,
+                    "comment" to "blocked-album-comment",
+                ),
+            ),
+            "[auth] update album should require login",
+        )
+        assertAuthenticationFailed(
             api.post(
                 path = "/api/works/merge",
                 json = mapOf(
@@ -1103,6 +1115,38 @@ class AccountPlaylistContentE2eTest {
             400,
             "[playlist-reorder] extra recording id should fail",
         )
+    }
+
+    @Test
+    @Order(10)
+    fun `album update should modify scalar fields and return updated detail`() {
+        val state = bootstrapAdminSession(baseUrl())
+        val suffix = suffix()
+
+        val albumId = insertAlbum(
+            title = "album-update-$suffix",
+            comment = "album-update-comment-$suffix",
+        )
+
+        val updateResponse = state.api.put(
+            path = "/api/albums/$albumId",
+            json = mapOf(
+                "title" to "album-updated-$suffix",
+                "kind" to "VINYL",
+                "releaseDate" to "2025-01-01",
+                "comment" to "album-updated-comment-$suffix",
+            ),
+        )
+        E2eAssert.status(updateResponse, 200, "[album-update] update should succeed")
+        E2eAssert.jsonAt(updateResponse.body(), "/id", albumId, "[album-update] updated id should match")
+        E2eAssert.jsonAt(updateResponse.body(), "/title", "album-updated-$suffix", "[album-update] title should match")
+        E2eAssert.jsonAt(updateResponse.body(), "/kind", "VINYL", "[album-update] kind should match")
+        E2eAssert.jsonAt(updateResponse.body(), "/releaseDate", "2025-01-01", "[album-update] releaseDate should match")
+        E2eAssert.jsonAt(updateResponse.body(), "/comment", "album-updated-comment-$suffix", "[album-update] comment should match")
+
+        val detailResponse = state.api.get("/api/albums/$albumId")
+        E2eAssert.status(detailResponse, 200, "[album-update] detail after update should succeed")
+        E2eAssert.jsonAt(detailResponse.body(), "/title", "album-updated-$suffix", "[album-update] detail title should persist")
     }
 
     private fun createAccountByAdmin(

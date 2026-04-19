@@ -3,6 +3,7 @@ package com.coooolfan.unirhy.controller
 import cn.dev33.satoken.annotation.SaCheckLogin
 import com.coooolfan.unirhy.model.Album
 import com.coooolfan.unirhy.model.by
+import com.coooolfan.unirhy.model.dto.AlbumUpdate
 import com.coooolfan.unirhy.model.dto.RecordingReorderReq
 import com.coooolfan.unirhy.service.AlbumService
 import org.babyfish.jimmer.Page
@@ -75,6 +76,28 @@ class AlbumController(private val service: AlbumService) {
         @RequestParam(required = true) name: String,
     ): List<@FetchBy("DEFAULT_ALBUM_FETCHER") Album> {
         return service.getAlbumByName(name, DEFAULT_ALBUM_FETCHER)
+    }
+
+    /**
+     * 更新专辑
+     *
+     * 按请求体内提供的字段更新指定专辑的标量信息
+     *
+     * @param id 专辑 ID
+     * @param input 专辑更新参数
+     * @return Album 返回更新后的专辑（默认 fetcher）
+     *
+     * @api PUT /api/albums/{id}
+     * @permission 需要登录认证
+     * @description 调用AlbumService.updateAlbum()方法更新专辑
+     */
+    @PutMapping("/{id}")
+    @ResponseStatus(HttpStatus.OK)
+    fun updateAlbum(
+        @PathVariable id: Long,
+        @RequestBody input: AlbumUpdate,
+    ): @FetchBy("DEFAULT_ALBUM_FETCHER") Album {
+        return service.updateAlbum(input.toEntity { this.id = id }, DEFAULT_ALBUM_FETCHER)
     }
 
     /**

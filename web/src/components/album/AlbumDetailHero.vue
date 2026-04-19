@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Play, Pause } from 'lucide-vue-next'
+import { Pause, Pencil, Play } from 'lucide-vue-next'
 
 export type AlbumHeroData = {
     title: string
@@ -19,12 +19,13 @@ defineProps<{
 
 const emit = defineEmits<{
     (event: 'play'): void
+    (event: 'edit'): void
 }>()
 </script>
 
 <template>
     <div
-        class="mb-12 mt-6 flex flex-col items-center gap-8 md:mb-16 md:mt-8 md:flex-row md:items-end md:gap-12"
+        class="group mb-12 mt-6 flex flex-col items-center gap-8 md:mb-16 md:mt-8 md:flex-row md:items-end md:gap-12"
     >
         <div
             class="relative z-0 group h-56 w-56 shrink-0 select-none perspective-1000 sm:h-64 sm:w-64 md:h-80 md:w-80"
@@ -68,6 +69,13 @@ const emit = defineEmits<{
                 <span>{{ albumData.type }}</span>
                 <span class="w-8 h-px bg-[#C17D46]"></span>
                 <span>{{ albumData.year }}</span>
+                <button
+                    class="cursor-pointer p-1 text-[#8C857B] opacity-100 transition-all hover:text-[#C17D46] md:opacity-0 md:group-hover:opacity-100"
+                    title="编辑专辑"
+                    @click="emit('edit')"
+                >
+                    <Pencil :size="14" />
+                </button>
             </div>
 
             <h1 class="font-serif text-4xl leading-tight text-[#2C2420] sm:text-5xl md:text-7xl">

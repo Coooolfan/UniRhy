@@ -8,6 +8,7 @@ import MediaListItem from '@/components/MediaListItem.vue'
 import { useModal } from '@/composables/useModal'
 import AddRecordingToPlaylistModal from '@/components/playlist/AddRecordingToPlaylistModal.vue'
 import AlbumDetailHero from '@/components/album/AlbumDetailHero.vue'
+import AlbumEditModal, { type AlbumEditForm } from '@/components/album/AlbumEditModal.vue'
 import RecordingEditModal, {
     type RecordingEditForm,
     type RecordingPreview,
@@ -65,6 +66,13 @@ const albumData = ref<AlbumData>({
     cover: '',
 })
 
+const albumEditInitial = ref<AlbumEditForm>({
+    title: '',
+    kind: '',
+    releaseDate: '',
+    comment: '',
+})
+
 const recordings = ref<Recording[]>([])
 
 const {
@@ -104,6 +112,13 @@ const fetchAlbum = async (id: number) => {
             cover: resolveCover(data.cover),
         }
 
+        albumEditInitial.value = {
+            title: data.title,
+            kind: data.kind ?? '',
+            releaseDate: data.releaseDate ? data.releaseDate.slice(0, 10) : '',
+            comment: data.comment ?? '',
+        }
+
         recordings.value = normalizeRecordings(
             (data.recordings || []) as readonly AlbumRecordingDto[],
             {
@@ -137,6 +152,33 @@ const openAddToPlaylistModal = (recording: Recording) => {
         size: 'sm',
         props: {
             recordingId: recording.id,
+        },
+    })
+}
+
+const openEditAlbumModal = async () => {
+    const albumId = Number(route.params.id)
+    if (Number.isNaN(albumId)) {
+        return
+    }
+
+    await modal.open(AlbumEditModal, {
+        title: '编辑专辑',
+        size: 'md',
+        props: {
+            initialForm: { ...albumEditInitial.value },
+            onSubmit: async (formValue: AlbumEditForm) => {
+                await api.albumController.updateAlbum({
+                    id: albumId,
+                    body: {
+                        title: formValue.title,
+                        kind: formValue.kind,
+                        releaseDate: formValue.releaseDate || undefined,
+                        comment: formValue.comment,
+                    },
+                })
+                await fetchAlbum(albumId)
+            },
         },
     })
 }
@@ -259,6 +301,7 @@ watch(
                 :has-playable-recording="hasPlayableRecording"
                 :is-current-playing="isCurrentRecordingPlaying"
                 @play="handlePlay()"
+                @edit="openEditAlbumModal"
             />
 
             <MediaListPanel

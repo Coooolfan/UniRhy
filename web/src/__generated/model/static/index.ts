@@ -1,5 +1,6 @@
 export type {AccountCreate} from './AccountCreate';
 export type {AccountUpdate} from './AccountUpdate';
+export type {AlbumUpdate} from './AlbumUpdate';
 export type {AsyncTaskLogCountRow} from './AsyncTaskLogCountRow';
 export type {CurrentQueueAppendRequest} from './CurrentQueueAppendRequest';
 export type {CurrentQueueDto} from './CurrentQueueDto';

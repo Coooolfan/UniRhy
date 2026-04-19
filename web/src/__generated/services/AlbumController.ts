@@ -1,6 +1,6 @@
 import type {Executor} from '../';
 import type {AlbumDto} from '../model/dto/';
-import type {Page, RecordingReorderReq} from '../model/static/';
+import type {AlbumUpdate, Page, RecordingReorderReq} from '../model/static/';
 
 /**
  * 专辑管理接口
@@ -102,6 +102,25 @@ export class AlbumController {
         _uri += '/recordings/reorder';
         return (await this.executor({uri: _uri, method: 'PUT', body: options.body})) as Promise<void>;
     }
+    
+    /**
+     * 更新专辑
+     * 
+     * 按请求体内提供的字段更新指定专辑的标量信息
+     * 
+     * @parameter {AlbumControllerOptions['updateAlbum']} options
+     * - id 专辑 ID
+     * - input 专辑更新参数
+     * @return Album 返回更新后的专辑（默认 fetcher）
+     * 
+     */
+    readonly updateAlbum: (options: AlbumControllerOptions['updateAlbum']) => Promise<
+        AlbumDto['AlbumController/DEFAULT_ALBUM_FETCHER']
+    > = async(options) => {
+        let _uri = '/api/albums/';
+        _uri += encodeURIComponent(options.id);
+        return (await this.executor({uri: _uri, method: 'PUT', body: options.body})) as Promise<AlbumDto['AlbumController/DEFAULT_ALBUM_FETCHER']>;
+    }
 }
 
 export type AlbumControllerOptions = {
@@ -120,6 +139,16 @@ export type AlbumControllerOptions = {
          * 专辑名称
          */
         readonly name: string
+    }, 
+    'updateAlbum': {
+        /**
+         * 专辑 ID
+         */
+        readonly id: number, 
+        /**
+         * 专辑更新参数
+         */
+        readonly body: AlbumUpdate
     }, 
     'reorderAlbumRecordings': {
         /**

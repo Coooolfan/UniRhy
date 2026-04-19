@@ -33,6 +33,8 @@ object ApiCoverageRegistry {
         "com.unirhy.e2e.AccountPlaylistContentE2eTest#playlists should support owner scoped crud and recording association"
     private const val CONTENT_SEARCH_UPDATE_MERGE_CASE =
         "com.unirhy.e2e.AccountPlaylistContentE2eTest#content endpoints should support search update recording update and merge flow"
+    private const val ALBUM_UPDATE_CASE =
+        "com.unirhy.e2e.AccountPlaylistContentE2eTest#album update should modify scalar fields and return updated detail"
     private const val PLAYBACK_QUEUE_AUTH_REQUIRED_CASE =
         "com.unirhy.e2e.PlaybackQueueE2eTest#all playback queue endpoints should reject unauthenticated access"
     private const val PLAYBACK_QUEUE_FLOW_CASE =
@@ -326,6 +328,12 @@ object ApiCoverageRegistry {
             "/api/albums/{id}",
             testRef = WORK_ALBUM_READ_CASE,
             note = "auth: $TASK_CONTENT_AUTH_REQUIRED_CASE",
+        ),
+        full(
+            "PUT",
+            "/api/albums/{id}",
+            testRef = ALBUM_UPDATE_CASE,
+            note = "auth: $ACCOUNT_PLAYLIST_CONTENT_AUTH_REQUIRED_CASE",
         ),
         full(
             "GET",

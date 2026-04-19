@@ -50,6 +50,10 @@ class AlbumService(private val sql: KSqlClient) {
 
     }
 
+    fun updateAlbum(input: Album, fetcher: Fetcher<Album>): Album {
+        return sql.saveCommand(input, SaveMode.UPDATE_ONLY).execute(fetcher).modifiedEntity
+    }
+
     @Transactional
     fun reorderAlbumRecordings(albumId: Long, recordingIds: List<Long>) {
         val requestedSet = recordingIds.toSet()
