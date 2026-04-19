@@ -1,9 +1,12 @@
 import type { Ref, ShallowRef } from 'vue'
 import { api } from '@/ApiInstance'
-import { resolveCover, resolvePlayableAudio } from '@/composables/recordingMedia'
+import { resolveCover } from '@/composables/recordingMedia'
 import { buildApiUrl } from '@/runtime/platform'
+import {
+    createRecordingPlaybackCandidate,
+    resolvePlaybackTrackFromCandidate,
+} from '@/services/recordingPlaybackResolver'
 import type { CurrentQueueDto, CurrentQueueItemDto } from '@/services/playbackSyncProtocol'
-import { useUserStore } from '@/stores/user'
 import {
     type AudioTrack,
     MAX_KNOWN_TRACKS,
@@ -24,7 +27,6 @@ type UseAudioTrackCatalogOptions = {
 }
 
 export const useAudioTrackCatalog = (options: UseAudioTrackCatalogOptions) => {
-    const userStore = useUserStore()
     const knownTracks = new Map<number, AudioTrack>()
     const hydratedTrackIds = new Set<number>()
     const trackMetadataRequests = new Map<number, Promise<void>>()
@@ -144,25 +146,20 @@ export const useAudioTrackCatalog = (options: UseAudioTrackCatalogOptions) => {
         track: AudioTrack,
         metadata: PlaybackRecordingMetadata,
     ): Promise<AudioTrack | null> => {
-        const enrichedTrack = applyRecordingMetadata(track, metadata)
-        if (track.src && track.mediaFileId !== undefined) {
-            return {
-                ...enrichedTrack,
-                src: track.src,
-                mediaFileId: track.mediaFileId,
-            }
-        }
-
-        const preferredAssetFormat = await userStore.getPreferredAssetFormat()
-        const playableAudio = resolvePlayableAudio(metadata.assets ?? [], preferredAssetFormat)
-        if (!playableAudio) {
+        const candidate = createRecordingPlaybackCandidate(metadata, {
+            title: track.title,
+            artist: track.artist,
+            cover: track.cover,
+            workId: metadata.work?.id ?? track.workId,
+        })
+        const resolvedTrack = await resolvePlaybackTrackFromCandidate(candidate)
+        if (!resolvedTrack) {
             return null
         }
 
         return {
-            ...enrichedTrack,
-            src: playableAudio.src,
-            mediaFileId: playableAudio.mediaFileId,
+            ...applyRecordingMetadata(track, metadata),
+            ...resolvedTrack,
         }
     }
 
@@ -284,6 +281,19 @@ export const useAudioTrackCatalog = (options: UseAudioTrackCatalogOptions) => {
         recordingMetadataCache.clear()
     }
 
+    const invalidateCachedTrackSources = () => {
+        for (const [id, track] of knownTracks) {
+            if (track.src === undefined && track.mediaFileId === undefined) {
+                continue
+            }
+            knownTracks.set(id, {
+                ...track,
+                src: undefined,
+                mediaFileId: undefined,
+            })
+        }
+    }
+
     return {
         cacheTrack,
         createTrackFromQueueItem,
@@ -294,5 +304,6 @@ export const useAudioTrackCatalog = (options: UseAudioTrackCatalogOptions) => {
         resolveTrackForPlayback,
         hydrateTrackMetadata,
         resetTrackCatalog,
+        invalidateCachedTrackSources,
     }
 }

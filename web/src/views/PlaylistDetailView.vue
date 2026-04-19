@@ -11,19 +11,16 @@ import PlaylistEditModal from '@/components/playlist/PlaylistEditModal.vue'
 import PlaylistRemoveRecordingModal from '@/components/playlist/PlaylistRemoveRecordingModal.vue'
 import {
     normalizeRecordings,
-    pickInitialRecordingId,
-    resolvePlayableAudio,
     resolveCover,
     type RecordingAsset,
 } from '@/composables/recordingMedia'
 import { useRecordingPlayback, type PlayableRecording } from '@/composables/useRecordingPlayback'
-import { useUserStore } from '@/stores/user'
+import { pickInitialRecordingIdFromCandidates } from '@/services/recordingPlaybackResolver'
 import { hasSameItemOrder, moveItemById, type ReorderPayload } from '@/utils/recordingOrder'
 import { usePlaylistStore } from '@/stores/playlist'
 
 const route = useRoute()
 const router = useRouter()
-const userStore = useUserStore()
 const playlistStore = usePlaylistStore()
 const modal = useModal()
 const currentRecordingId = ref<number | null>(null)
@@ -54,17 +51,6 @@ const playlistData = ref<PlaylistData>({
 
 const recordings = ref<Recording[]>([])
 
-const syncRecordingPlaybackSources = () => {
-    recordings.value = recordings.value.map((recording) => {
-        const playableAudio = resolvePlayableAudio(recording.assets, userStore.preferredAssetFormat)
-        return {
-            ...recording,
-            audioSrc: playableAudio?.src,
-            mediaFileId: playableAudio?.mediaFileId,
-        }
-    })
-}
-
 const {
     audioStore,
     hasPlayableRecording,
@@ -78,6 +64,7 @@ const {
     recordings,
     currentRecordingId,
     fallbackCover: () => playlistData.value.cover,
+    initialStrategy: 'first-playable',
 })
 
 const fetchPlaylist = async (id: number) => {
@@ -85,10 +72,7 @@ const fetchPlaylist = async (id: number) => {
         isLoading.value = true
         reorderRecordingError.value = ''
 
-        const [, data] = await Promise.all([
-            userStore.ensureUserLoaded(),
-            api.playlistController.getPlaylist({ id }),
-        ])
+        const data = await api.playlistController.getPlaylist({ id })
         const firstCover =
             data.recordings && data.recordings.length > 0 ? data.recordings[0]?.cover : undefined
 
@@ -101,7 +85,6 @@ const fetchPlaylist = async (id: number) => {
         recordings.value = normalizeRecordings(
             (data.recordings || []) as readonly PlaylistRecordingDto[],
             {
-                preferredAssetFormat: userStore.preferredAssetFormat,
                 transform: (recording, base) => ({
                     ...base,
                     label: recording.label || '',
@@ -109,7 +92,10 @@ const fetchPlaylist = async (id: number) => {
                 }),
             },
         )
-        currentRecordingId.value = pickInitialRecordingId(recordings.value, 'first-playable')
+        currentRecordingId.value = pickInitialRecordingIdFromCandidates(
+            recordings.value,
+            'first-playable',
+        )
     } catch (error) {
         console.error('Failed to fetch playlist details:', error)
     } finally {
@@ -179,7 +165,10 @@ const removeRecording = async (recording: Recording) => {
     recordings.value = nextRecordings
 
     if (currentRecordingId.value === recording.id) {
-        currentRecordingId.value = pickInitialRecordingId(nextRecordings, 'first-playable')
+        currentRecordingId.value = pickInitialRecordingIdFromCandidates(
+            nextRecordings,
+            'first-playable',
+        )
     }
 
     if (audioStore.currentTrack?.id === recording.id) {
@@ -259,16 +248,6 @@ watch(
         if (!Number.isNaN(id)) {
             fetchPlaylist(id)
         }
-    },
-)
-
-watch(
-    () => userStore.preferredAssetFormat,
-    () => {
-        if (recordings.value.length === 0) {
-            return
-        }
-        syncRecordingPlaybackSources()
     },
 )
 </script>

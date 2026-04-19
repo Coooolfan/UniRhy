@@ -17,18 +17,20 @@ import WorkTitleEditModal from '@/components/work/WorkTitleEditModal.vue'
 import {
     formatDurationMs,
     normalizeRecordings,
-    pickInitialRecordingId,
     resolveCover,
-    resolvePlayableAudio,
     type RecordingAsset,
 } from '@/composables/recordingMedia'
 import { useRecordingMergeState } from '@/composables/useRecordingMergeState'
 import { useRecordingPlayback } from '@/composables/useRecordingPlayback'
-import { useUserStore } from '@/stores/user'
+import {
+    invalidateResolvedPlayableTrack,
+    invalidateResolvedPlayableTracksByRecording,
+    pickInitialRecordingIdFromCandidates,
+    type RecordingPlaybackCandidate,
+} from '@/services/recordingPlaybackResolver'
 
 const route = useRoute()
 const modal = useModal()
-const userStore = useUserStore()
 const currentRecordingId = ref<number | null>(null)
 const isLoading = ref(true)
 
@@ -38,18 +40,15 @@ type WorkData = {
     cover: string
 }
 
-type Recording = RecordingPreview & {
-    id: number
-    title: string
-    artist: string
-    type: string
-    label: string
-    comment: string
-    cover: string
-    isDefault: boolean
-    audioSrc?: string
-    durationMs: number
-}
+type Recording = RecordingPreview &
+    RecordingPlaybackCandidate & {
+        type: string
+        label: string
+        comment: string
+        cover: string
+        isDefault: boolean
+        durationMs: number
+    }
 
 type WorkRecordingDto = Awaited<
     ReturnType<typeof api.workController.getWorkById>
@@ -66,25 +65,22 @@ const mergeStateActions: { resetState: () => void } = {
     resetState: () => undefined,
 }
 
-const syncRecordingPlaybackSources = () => {
-    recordings.value = recordings.value.map((recording) => {
-        const playableAudio = resolvePlayableAudio(recording.assets, userStore.preferredAssetFormat)
-        return {
-            ...recording,
-            audioSrc: playableAudio?.src,
-            mediaFileId: playableAudio?.mediaFileId,
-        }
+const invalidateWorkPlaybackCache = (recordingIds: readonly number[]) => {
+    recordingIds.forEach((recordingId) => {
+        invalidateResolvedPlayableTracksByRecording(recordingId)
     })
+
+    const workId = Number(route.params.id)
+    if (!Number.isNaN(workId)) {
+        invalidateResolvedPlayableTrack('work', workId)
+    }
 }
 
 async function fetchWork(id: number) {
     try {
         isLoading.value = true
 
-        const [, data] = await Promise.all([
-            userStore.ensureUserLoaded(),
-            api.workController.getWorkById({ id }),
-        ])
+        const data = await api.workController.getWorkById({ id })
 
         const defaultRecording =
             data.recordings?.find((recording) => recording.defaultInWork) ?? data.recordings?.[0]
@@ -99,7 +95,6 @@ async function fetchWork(id: number) {
         const normalizedRecordings = normalizeRecordings(
             (data.recordings || []) as readonly WorkRecordingDto[],
             {
-                preferredAssetFormat: userStore.preferredAssetFormat,
                 transform: (recording, base) => ({
                     ...base,
                     type: recording.kind,
@@ -114,7 +109,10 @@ async function fetchWork(id: number) {
         )
         recordings.value = normalizedRecordings
 
-        currentRecordingId.value = pickInitialRecordingId(recordings.value, 'default-first')
+        currentRecordingId.value = pickInitialRecordingIdFromCandidates(
+            recordings.value,
+            'default-first',
+        )
 
         mergeStateActions.resetState()
     } catch (error) {
@@ -136,6 +134,7 @@ const {
     recordings,
     currentRecordingId,
     fallbackCover: () => workData.value.cover,
+    initialStrategy: 'default-first',
     trackExtra: () => {
         const workId = Number(route.params.id)
         if (Number.isNaN(workId)) {
@@ -164,6 +163,7 @@ const mergeState = useRecordingMergeState<Recording>({
                 needMergeIds: sourceIds,
             },
         })
+        invalidateWorkPlaybackCache([targetId, ...sourceIds])
         await fetchWork(workId)
     },
     parseError: (error) => normalizeApiError(error).message ?? '合并曲目失败',
@@ -229,6 +229,7 @@ const openEditRecordingModal = async (recording: Recording) => {
                         defaultInWork: isDefault,
                     },
                 })
+                invalidateWorkPlaybackCache([recording.id])
 
                 const index = recordings.value.findIndex((item) => item.id === recording.id)
                 if (index !== -1) {
@@ -322,6 +323,7 @@ const openRecordingMergeModal = async () => {
                     },
                 })
 
+                invalidateWorkPlaybackCache([targetId, ...sourceIds])
                 await fetchWork(workId)
                 resetMergeState()
             },
@@ -345,16 +347,6 @@ watch(
             resetMergeState()
             void fetchWork(id)
         }
-    },
-)
-
-watch(
-    () => userStore.preferredAssetFormat,
-    () => {
-        if (recordings.value.length === 0) {
-            return
-        }
-        syncRecordingPlaybackSources()
     },
 )
 </script>

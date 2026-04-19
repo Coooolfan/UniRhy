@@ -16,12 +16,11 @@ import WorkGridCard from '@/components/media/WorkGridCard.vue'
 import { api, normalizeApiError } from '@/ApiInstance'
 import { resolveCover } from '@/composables/recordingMedia'
 import {
+    peekResolvedPlayableTrack,
     resolveAlbumPlayableTrack,
     resolveWorkPlayableTrack,
-    type PlayableTrack,
 } from '@/services/playableTrackResolver'
 import { useAudioStore } from '@/stores/audio'
-import { useUserStore } from '@/stores/user'
 
 type DisplayItem = {
     id: number
@@ -30,13 +29,11 @@ type DisplayItem = {
     subtitle: string
     cover: string
     stackedImages?: { id: number | string; cover?: string }[]
-    playableTrack?: PlayableTrack
 }
 
 const router = useRouter()
 const route = useRoute()
 const audioStore = useAudioStore()
-const userStore = useUserStore()
 const viewMode = ref<'grid' | 'list'>('grid')
 const activeTab = ref<'Albums' | 'Works'>('Albums')
 const displayItems = ref<DisplayItem[]>([])
@@ -178,11 +175,8 @@ const navigateToDetail = (id: number) => {
 }
 
 const isItemPlaying = (item: DisplayItem) => {
-    return (
-        audioStore.isPlaying &&
-        item.playableTrack !== undefined &&
-        audioStore.currentTrack?.id === item.playableTrack.id
-    )
+    const track = peekResolvedPlayableTrack(item.type, item.id)
+    return audioStore.isPlaying && track !== null && audioStore.currentTrack?.id === track.id
 }
 
 const playItem = async (item: DisplayItem) => {
@@ -193,39 +187,28 @@ const playItem = async (item: DisplayItem) => {
     try {
         playLoadingItemId.value = item.id
 
-        if (!item.playableTrack) {
-            const fallback = {
-                title: item.title,
-                artist: item.subtitle,
-                cover: item.cover,
-            }
-            item.playableTrack =
-                item.type === 'album'
-                    ? await resolveAlbumPlayableTrack(item.id, fallback)
-                    : await resolveWorkPlayableTrack(item.id, fallback)
+        const fallback = {
+            title: item.title,
+            artist: item.subtitle,
+            cover: item.cover,
         }
+        const playableTrack =
+            item.type === 'album'
+                ? await resolveAlbumPlayableTrack(item.id, fallback)
+                : await resolveWorkPlayableTrack(item.id, fallback)
 
-        if (!item.playableTrack) {
+        if (!playableTrack) {
             console.warn('No playable track for item', item.id)
             return
         }
 
-        audioStore.play(item.playableTrack)
+        audioStore.play(playableTrack)
     } catch (error) {
         console.error('Failed to play item:', error)
     } finally {
         playLoadingItemId.value = null
     }
 }
-
-watch(
-    () => userStore.preferredAssetFormat,
-    () => {
-        displayItems.value.forEach((item) => {
-            item.playableTrack = undefined
-        })
-    },
-)
 </script>
 
 <template>

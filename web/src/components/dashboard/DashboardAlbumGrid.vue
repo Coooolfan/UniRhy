@@ -1,16 +1,18 @@
 <script setup lang="ts">
 import { Pause, Play } from 'lucide-vue-next'
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '@/ApiInstance'
-import { pickPlayableRecordingEntry, resolveCover } from '@/composables/recordingMedia'
+import { resolveCover } from '@/composables/recordingMedia'
 import { useAudioStore } from '@/stores/audio'
-import { useUserStore } from '@/stores/user'
 import LibraryEmptyHint from '@/components/dashboard/LibraryEmptyHint.vue'
+import {
+    peekResolvedPlayableTrack,
+    resolveAlbumPlayableTrack,
+} from '@/services/recordingPlaybackResolver'
 
 const router = useRouter()
 const audioStore = useAudioStore()
-const userStore = useUserStore()
 const pageSize = 10
 
 type AlbumCard = {
@@ -18,12 +20,6 @@ type AlbumCard = {
     title: string
     artist: string
     cover: string
-    defaultRecordingId?: number
-    defaultTrackTitle?: string
-    defaultTrackArtist?: string
-    defaultTrackCover?: string
-    defaultTrackSrc?: string
-    defaultTrackMediaFileId?: number
 }
 
 const albums = ref<AlbumCard[]>([])
@@ -38,11 +34,8 @@ const navigateToAlbum = (id: number) => {
 }
 
 const isAlbumPlaying = (album: AlbumCard) => {
-    return (
-        audioStore.isPlaying &&
-        album.defaultRecordingId !== undefined &&
-        audioStore.currentTrack?.id === album.defaultRecordingId
-    )
+    const track = peekResolvedPlayableTrack('album', album.id)
+    return audioStore.isPlaying && track !== null && audioStore.currentTrack?.id === track.id
 }
 
 const playAlbum = async (album: AlbumCard) => {
@@ -52,47 +45,16 @@ const playAlbum = async (album: AlbumCard) => {
 
     try {
         playLoadingAlbumId.value = album.id
-        if (
-            !album.defaultTrackSrc ||
-            album.defaultRecordingId === undefined ||
-            album.defaultTrackMediaFileId === undefined
-        ) {
-            const preferredAssetFormat = await userStore.getPreferredAssetFormat()
-            const detail = await api.albumController.getAlbum({ id: album.id })
-            const targetEntry = pickPlayableRecordingEntry(detail.recordings, preferredAssetFormat)
-            if (!targetEntry?.playableAudio) {
-                console.warn('No playable track for album', album.id)
-                return
-            }
-
-            const targetTrack = targetEntry.recording
-            album.defaultRecordingId = targetTrack.id
-            album.defaultTrackTitle = targetTrack.title || targetTrack.comment || detail.title
-            album.defaultTrackArtist =
-                targetTrack.artists.map((artist) => artist.displayName).join(', ') || album.artist
-            album.defaultTrackCover = targetTrack.cover?.url
-                ? resolveCover(targetTrack.cover)
-                : album.cover
-            album.defaultTrackSrc = targetEntry.playableAudio.src
-            album.defaultTrackMediaFileId = targetEntry.playableAudio.mediaFileId
-        }
-
-        if (
-            !album.defaultTrackSrc ||
-            album.defaultRecordingId === undefined ||
-            album.defaultTrackMediaFileId === undefined
-        ) {
+        const track = await resolveAlbumPlayableTrack(album.id, {
+            title: album.title,
+            artist: album.artist,
+            cover: album.cover,
+        })
+        if (!track) {
             return
         }
 
-        audioStore.play({
-            id: album.defaultRecordingId,
-            title: album.defaultTrackTitle || album.title,
-            artist: album.defaultTrackArtist || album.artist,
-            cover: album.defaultTrackCover || album.cover,
-            src: album.defaultTrackSrc,
-            mediaFileId: album.defaultTrackMediaFileId,
-        })
+        audioStore.play(track)
     } catch (error) {
         console.error('Failed to play album:', error)
     } finally {
@@ -126,20 +88,6 @@ const fetchAlbums = async () => {
 onMounted(() => {
     fetchAlbums()
 })
-
-watch(
-    () => userStore.preferredAssetFormat,
-    () => {
-        albums.value.forEach((album) => {
-            album.defaultRecordingId = undefined
-            album.defaultTrackTitle = undefined
-            album.defaultTrackArtist = undefined
-            album.defaultTrackCover = undefined
-            album.defaultTrackSrc = undefined
-            album.defaultTrackMediaFileId = undefined
-        })
-    },
-)
 </script>
 
 <template>

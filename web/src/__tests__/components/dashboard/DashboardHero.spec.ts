@@ -25,6 +25,7 @@ vi.mock('@/ApiInstance', async (importOriginal) => {
 
 import { api } from '@/ApiInstance'
 import DashboardHero from '@/components/dashboard/DashboardHero.vue'
+import { resetRecordingPlaybackResolverCaches } from '@/services/recordingPlaybackResolver'
 import { useAudioStore } from '@/stores/audio'
 import { useUserStore } from '@/stores/user'
 
@@ -131,9 +132,18 @@ const buildUnplayableWork = () => ({
 describe('DashboardHero', () => {
     beforeEach(() => {
         setActivePinia(createPinia())
+        resetRecordingPlaybackResolverCaches()
         randomWorkMock.mockReset()
         pushMock.mockReset()
         setPreferredAssetFormat('audio/opus')
+
+        const audioStore = useAudioStore()
+        audioStore.currentTrack = null
+        audioStore.isPlaying = false
+        audioStore.play = vi.fn((track) => {
+            audioStore.currentTrack = track
+            return Promise.resolve()
+        })
     })
 
     it('shows playable action when daily pick has playable audio', async () => {
@@ -152,8 +162,10 @@ describe('DashboardHero', () => {
 
         const audioStore = useAudioStore()
         await playButton!.trigger('click')
+        await vi.waitFor(() => {
+            expect(audioStore.currentTrack?.id).toBe(21)
+        })
 
-        expect(audioStore.currentTrack?.id).toBe(21)
         expect(audioStore.currentTrack?.mediaFileId).toBe(41)
         expect(audioStore.isPlaying).toBe(false)
         expect(pushMock).not.toHaveBeenCalled()
@@ -245,8 +257,10 @@ describe('DashboardHero', () => {
 
         const audioStore = useAudioStore()
         await playButton!.trigger('click')
+        await vi.waitFor(() => {
+            expect(audioStore.currentTrack?.mediaFileId).toBe(42)
+        })
 
-        expect(audioStore.currentTrack?.mediaFileId).toBe(42)
         expect(audioStore.currentTrack?.src).toBe('/api/media/42?_sig=b&_exp=9999999999')
     })
 })

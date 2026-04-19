@@ -16,19 +16,21 @@ import RecordingEditModal, {
 import {
     formatDurationMs,
     normalizeRecordings,
-    pickInitialRecordingId,
     resolveCover,
-    resolvePlayableAudio,
     type NormalizedRecordingBase,
     type RecordingAsset,
 } from '@/composables/recordingMedia'
 import { useRecordingPlayback } from '@/composables/useRecordingPlayback'
-import { useUserStore } from '@/stores/user'
+import {
+    invalidateResolvedPlayableTrack,
+    invalidateResolvedPlayableTracksByRecording,
+    pickInitialRecordingIdFromCandidates,
+    type RecordingPlaybackCandidate,
+} from '@/services/recordingPlaybackResolver'
 import { hasSameItemOrder, moveItemById, type ReorderPayload } from '@/utils/recordingOrder'
 
 const route = useRoute()
 const modal = useModal()
-const userStore = useUserStore()
 const currentRecordingId = ref<number | null>(null)
 const isLoading = ref(true)
 const isCdVisible = ref(false)
@@ -44,17 +46,14 @@ type AlbumData = {
     cover: string
 }
 
-type Recording = RecordingPreview & {
-    id: number
-    title: string
-    artist: string
-    label: string
-    audioSrc?: string
-    type: string
-    comment: string
-    isDefault: boolean
-    durationMs: number
-}
+type Recording = RecordingPreview &
+    RecordingPlaybackCandidate & {
+        label: string
+        type: string
+        comment: string
+        isDefault: boolean
+        durationMs: number
+    }
 
 type AlbumRecordingDto = Awaited<
     ReturnType<typeof api.albumController.getAlbum>
@@ -78,15 +77,13 @@ const albumEditInitial = ref<AlbumEditForm>({
 
 const recordings = ref<Recording[]>([])
 
-const syncRecordingPlaybackSources = () => {
-    recordings.value = recordings.value.map((recording) => {
-        const playableAudio = resolvePlayableAudio(recording.assets, userStore.preferredAssetFormat)
-        return {
-            ...recording,
-            audioSrc: playableAudio?.src,
-            mediaFileId: playableAudio?.mediaFileId,
-        }
-    })
+const invalidateAlbumPlaybackCache = (recordingId: number) => {
+    invalidateResolvedPlayableTracksByRecording(recordingId)
+
+    const albumId = Number(route.params.id)
+    if (!Number.isNaN(albumId)) {
+        invalidateResolvedPlayableTrack('album', albumId)
+    }
 }
 
 const {
@@ -102,6 +99,7 @@ const {
     recordings,
     currentRecordingId,
     fallbackCover: () => albumData.value.cover,
+    initialStrategy: 'first-playable',
 })
 
 const fetchAlbum = async (id: number) => {
@@ -110,10 +108,7 @@ const fetchAlbum = async (id: number) => {
         isCdVisible.value = false
         reorderRecordingError.value = ''
 
-        const [, data] = await Promise.all([
-            userStore.ensureUserLoaded(),
-            api.albumController.getAlbum({ id }),
-        ])
+        const data = await api.albumController.getAlbum({ id })
 
         const releaseYear = data.releaseDate
             ? new Date(data.releaseDate).getFullYear().toString()
@@ -140,7 +135,6 @@ const fetchAlbum = async (id: number) => {
             (data.recordings || []) as readonly AlbumRecordingDto[],
             {
                 fallbackArtist: artistName,
-                preferredAssetFormat: userStore.preferredAssetFormat,
                 transform: (recording: AlbumRecordingDto, base: NormalizedRecordingBase) => ({
                     ...base,
                     label: recording.label || '',
@@ -153,7 +147,10 @@ const fetchAlbum = async (id: number) => {
                 }),
             },
         )
-        currentRecordingId.value = pickInitialRecordingId(recordings.value, 'first-playable')
+        currentRecordingId.value = pickInitialRecordingIdFromCandidates(
+            recordings.value,
+            'first-playable',
+        )
     } catch (error) {
         console.error('Failed to fetch album details:', error)
     } finally {
@@ -235,6 +232,7 @@ const handleRecordingReorder = async (payload: ReorderPayload) => {
                 recordingIds: nextRecordings.map((recording) => recording.id),
             },
         })
+        invalidateResolvedPlayableTrack('album', albumId)
     } catch (error) {
         recordings.value = previousRecordings
         const normalized = normalizeApiError(error)
@@ -267,6 +265,7 @@ const openEditRecordingModal = async (recording: Recording) => {
                         kind: type.trim(),
                     },
                 })
+                invalidateAlbumPlaybackCache(recording.id)
 
                 const index = recordings.value.findIndex((item) => item.id === recording.id)
                 if (index !== -1) {
@@ -300,16 +299,6 @@ watch(
         if (!Number.isNaN(id)) {
             void fetchAlbum(id)
         }
-    },
-)
-
-watch(
-    () => userStore.preferredAssetFormat,
-    () => {
-        if (recordings.value.length === 0) {
-            return
-        }
-        syncRecordingPlaybackSources()
     },
 )
 </script>

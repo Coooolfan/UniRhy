@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
+import { resetRecordingPlaybackResolverCaches } from '@/services/recordingPlaybackResolver'
 
 const apiMockState = vi.hoisted(() => ({
     getRecording: vi.fn(),
@@ -583,6 +584,7 @@ const latestClient = () => {
 describe('audio store', () => {
     beforeEach(() => {
         setActivePinia(createPinia())
+        resetRecordingPlaybackResolverCaches()
         window.localStorage.clear()
         delete window.__UNIRHY_RUNTIME__
         setPreferredAssetFormat('audio/opus')
@@ -766,6 +768,99 @@ describe('audio store', () => {
         await flushPromises(12)
 
         expect(audioStore.currentTrack?.mediaFileId).toBe(2_071)
+    })
+
+    it('resolves the next queue entry with the latest preferred format after a format change', async () => {
+        setPreferredAssetFormat('audio/mpeg')
+        const track8Metadata = buildRecordingMetadata(8, {
+            assets: [
+                {
+                    id: 48_001,
+                    comment: 'Audio mp3',
+                    mediaFile: {
+                        id: 2_081,
+                        sha256: 'audio-sha-8-mp3',
+                        objectKey: 'audio/8.mp3',
+                        mimeType: 'audio/mpeg',
+                        size: 2_048,
+                        url: '/api/media/2081',
+                    },
+                },
+                {
+                    id: 48_002,
+                    comment: 'Audio flac',
+                    mediaFile: {
+                        id: 2_082,
+                        sha256: 'audio-sha-8-flac',
+                        objectKey: 'audio/8.flac',
+                        mimeType: 'audio/flac',
+                        size: 4_096,
+                        url: '/api/media/2082',
+                    },
+                },
+            ],
+        })
+        getRecordingMock.mockImplementation(({ id }: { id: number }) => {
+            if (id === 8) {
+                return Promise.resolve(track8Metadata)
+            }
+            return Promise.reject(new Error(`unexpected recording ${id}`))
+        })
+        replaceCurrentQueueMock.mockImplementationOnce(
+            ({
+                body,
+            }: {
+                body: { recordingIds: number[]; currentIndex: number; version: number }
+            }) =>
+                Promise.resolve(
+                    buildQueue(
+                        body.recordingIds.map((recordingId: number) => buildTrack(recordingId)),
+                        body.currentIndex,
+                    ),
+                ),
+        )
+        fetchMock.mockResolvedValue(createResponse(60))
+
+        const audioStore = useAudioStore()
+        audioStore.connectPlaybackSync()
+        const client = latestClient()
+        client.setState({
+            phase: 'ready',
+            clockOffsetMs: 0,
+            roundTripEstimateMs: 10,
+        })
+
+        await audioStore.replaceQueueAndPlay(
+            [buildTrack(7, '/api/media/2071'), buildTrack(8, '/api/media/2081')],
+            0,
+        )
+        await flushPromises(12)
+
+        expect(audioStore.currentTrack?.id).toBe(7)
+        expect(audioStore.currentTrack?.mediaFileId).toBe(1_007)
+
+        setPreferredAssetFormat('audio/flac')
+        await flushPromises()
+
+        client.emitMessage({
+            type: 'SCHEDULED_ACTION',
+            payload: {
+                commandId: 'cmd-play-next-flac',
+                serverTimeToExecuteMs: nowClientMs(),
+                scheduledAction: {
+                    action: 'PLAY',
+                    status: 'PLAYING',
+                    currentIndex: 1,
+                    positionSeconds: 0,
+                    version: 2,
+                },
+            },
+        } satisfies ScheduledActionMessage)
+        await flushPromises(12)
+
+        expect(audioStore.currentTrack?.id).toBe(8)
+        expect(audioStore.currentTrack?.mediaFileId).toBe(2_082)
+        expect(audioStore.currentTrack?.src).toBe('/api/media/2082')
     })
 
     it('queues only the latest play intent until sync becomes ready', async () => {

@@ -1,6 +1,7 @@
-import { computed, ref, shallowRef } from 'vue'
+import { computed, ref, shallowRef, watch } from 'vue'
 import { defineStore } from 'pinia'
 import { api } from '@/ApiInstance'
+import { useUserStore } from '@/stores/user'
 import {
     PlaybackSyncClient,
     type PlaybackSyncClientDiagnosticsSnapshot,
@@ -113,6 +114,7 @@ export const useAudioStore = defineStore('audio', () => {
         resolveTrackForPlayback,
         hydrateTrackMetadata,
         resetTrackCatalog,
+        invalidateCachedTrackSources,
     } = useAudioTrackCatalog({
         currentTrack,
         currentQueue,
@@ -120,6 +122,17 @@ export const useAudioStore = defineStore('audio', () => {
         currentBufferTrack,
         duration,
     })
+
+    const userStore = useUserStore()
+    watch(
+        () => userStore.preferredAssetFormat,
+        (nextFormat, prevFormat) => {
+            if (prevFormat === undefined || nextFormat === prevFormat) {
+                return
+            }
+            invalidateCachedTrackSources()
+        },
+    )
 
     const currentQueueEntry = computed(() => {
         const { currentIndex, items } = currentQueue.value

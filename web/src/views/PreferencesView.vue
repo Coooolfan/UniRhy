@@ -99,7 +99,7 @@ const handleSubmit = async () => {
         <div class="mx-auto max-w-5xl px-4 pt-4 sm:px-6 sm:pt-6 lg:px-8">
             <header class="mb-10 sm:mb-12">
                 <h1 class="mb-2 font-serif text-3xl tracking-tight text-[#2B221B]">个人偏好</h1>
-                <p class="font-serif text-sm italic text-[#8A8A8A]">管理客户端播放与体验偏好</p>
+                <p class="font-serif text-sm italic text-[#8A8A8A]">客户端播放与体验偏好</p>
             </header>
         </div>
 
@@ -114,7 +114,7 @@ const handleSubmit = async () => {
                     <div>
                         <h2 class="font-serif text-xl text-[#2B221B]">首选资产格式</h2>
                         <p class="text-xs text-[#8C857B]">
-                            当同一录音存在多个资产时，客户端将优先选用匹配此 MIME 的版本
+                            当同一曲目存在多个资产格式时，客户端将优先选用匹配此 MIME 的版本
                         </p>
                     </div>
                 </div>
@@ -144,7 +144,7 @@ const handleSubmit = async () => {
                             >
                                 {{ preset.label }}
                             </option>
-                            <option :value="CUSTOM_SENTINEL">自定义…</option>
+                            <option :value="CUSTOM_SENTINEL">自定义</option>
                         </select>
                     </div>
 
@@ -162,16 +162,11 @@ const handleSubmit = async () => {
                             class="w-full border border-[#D6D1C4] bg-white px-3 py-2.5 text-[#2C2825] outline-none transition-all placeholder-[#E0DCD6] focus:border-[#D98C28] focus:ring-1 focus:ring-[#D98C28]"
                         />
                         <p class="ml-1 text-xs text-[#B8B0A3]">
-                            服务器不做 MIME 合法性校验，请填写标准 MIME 字符串
+                            服务器不验证 MIME 合法性，请填写标准 MIME 字符串
                         </p>
                     </div>
 
-                    <div class="flex items-center justify-between gap-3 pt-2">
-                        <p class="text-xs text-[#B8B0A3]">
-                            当前：<span class="text-[#5E5950]">{{
-                                currentFormat || '未设置'
-                            }}</span>
-                        </p>
+                    <div class="flex items-center justify-end gap-3 pt-2">
                         <button
                             type="submit"
                             :disabled="!canSubmit || isSubmitting"

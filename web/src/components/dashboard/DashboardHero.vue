@@ -4,18 +4,18 @@ import { featuredAlbum as defaultFeaturedAlbum } from './data'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '@/ApiInstance'
-import { resolveArtistName, resolveCover, resolvePlayableAudio } from '@/composables/recordingMedia'
+import { resolveArtistName, resolveCover, type RecordingAsset } from '@/composables/recordingMedia'
 import { useAudioStore } from '@/stores/audio'
 import { useUserStore } from '@/stores/user'
+import {
+    hasPlayableRecordingCandidate,
+    resolvePlaybackTrackFromCandidate,
+    type RecordingPlaybackCandidate,
+} from '@/services/recordingPlaybackResolver'
 
 type Album = {
-    workId?: number
-    recordingId?: number
     title: string
-    artist: string
-    cover: string
-    audioSrc?: string
-    mediaFileId?: number
+    recording: RecordingPlaybackCandidate
 }
 
 type FeaturedStatus = 'loading' | 'ready' | 'empty'
@@ -31,12 +31,16 @@ const isFeaturedPlaying = computed(() => {
     return (
         featuredStatus.value === 'ready' &&
         audioStore.isPlaying &&
-        audioStore.currentTrack?.id === album.value?.recordingId
+        audioStore.currentTrack?.id === album.value?.recording.id
     )
 })
 
 const hasPlayableFeatured = computed(() => {
-    return featuredStatus.value === 'ready' && !!album.value?.recordingId && !!album.value.audioSrc
+    return (
+        featuredStatus.value === 'ready' &&
+        !!album.value &&
+        hasPlayableRecordingCandidate(album.value.recording)
+    )
 })
 
 const featuredActionLabel = computed(() => {
@@ -63,23 +67,11 @@ const handleFeaturedAction = () => {
     if (featuredStatus.value !== 'ready' || !album.value) {
         return
     }
-    const featuredAlbum = album.value
-    const recordingId = featuredAlbum.recordingId
-    const audioSrc = featuredAlbum.audioSrc
-    const mediaFileId = featuredAlbum.mediaFileId
-
-    if (recordingId === undefined || audioSrc === undefined || mediaFileId === undefined) {
-        return
-    }
-
-    audioStore.play({
-        id: recordingId,
-        title: featuredAlbum.title,
-        artist: featuredAlbum.artist,
-        cover: featuredAlbum.cover,
-        src: audioSrc,
-        mediaFileId,
-        workId: featuredAlbum.workId,
+    void resolvePlaybackTrackFromCandidate(album.value.recording).then((track) => {
+        if (!track) {
+            return
+        }
+        audioStore.play(track)
     })
 }
 
@@ -93,29 +85,29 @@ const applyFeaturedWork = () => {
 
     const defaultRecording = work.recordings.find((recording) => recording.defaultInWork)
     const featuredRecording = defaultRecording ?? work.recordings[0]
-    const featuredAudio = resolvePlayableAudio(
-        featuredRecording?.assets || [],
-        userStore.preferredAssetFormat,
-    )
-
-    if (!featuredRecording || !featuredAudio) {
+    if (!featuredRecording) {
         featuredStatus.value = 'empty'
         album.value = null
         return
     }
 
-    album.value = {
-        workId: work.id,
-        recordingId: featuredRecording.id,
+    const recording: RecordingPlaybackCandidate = {
+        id: featuredRecording.id,
         title: work.title,
         artist: resolveArtistName(featuredRecording.artists),
         cover: featuredRecording.cover?.url
             ? resolveCover(featuredRecording.cover)
             : defaultFeaturedAlbum.cover,
-        audioSrc: featuredAudio.src,
-        mediaFileId: featuredAudio.mediaFileId,
+        assets: (featuredRecording.assets || []) as readonly RecordingAsset[],
+        defaultInWork: featuredRecording.defaultInWork,
+        workId: work.id,
     }
-    featuredStatus.value = 'ready'
+
+    album.value = {
+        title: work.title,
+        recording,
+    }
+    featuredStatus.value = hasPlayableRecordingCandidate(recording) ? 'ready' : 'empty'
 }
 
 onMounted(async () => {
@@ -123,7 +115,6 @@ onMounted(async () => {
     album.value = null
     featuredWork.value = null
     try {
-        await userStore.ensureUserLoaded()
         const work = await api.workController.randomWork({
             offset: new Date().getTimezoneOffset() * 60000,
         })
@@ -176,7 +167,7 @@ watch(
                 >
                     <template v-if="featuredStatus === 'ready' && album">
                         <img
-                            :src="album.cover"
+                            :src="album.recording.cover"
                             alt="Album Cover"
                             class="absolute inset-0 w-full h-full object-cover opacity-90"
                         />
@@ -256,7 +247,7 @@ watch(
                                 class="mb-6 flex items-center text-base font-serif italic text-[#8A857D] sm:text-lg md:mb-10"
                             >
                                 <span class="w-8 h-px bg-[#C27E46] mr-3 inline-block"></span>
-                                {{ album.artist }}
+                                {{ album.recording.artist }}
                             </p>
                         </template>
                         <template v-else>

@@ -10,17 +10,15 @@ import MergeSelectModal from '@/components/modals/MergeSelectModal.vue'
 import { api } from '@/ApiInstance'
 import { resolveCover } from '@/composables/recordingMedia'
 import {
+    peekResolvedPlayableTrack,
     resolveAlbumPlayableTrack,
     resolveWorkPlayableTrack,
-    type PlayableTrack,
 } from '@/services/playableTrackResolver'
 import { useAudioStore } from '@/stores/audio'
-import { useUserStore } from '@/stores/user'
 
 const route = useRoute()
 const router = useRouter()
 const audioStore = useAudioStore()
-const userStore = useUserStore()
 const modal = useModal()
 
 const searchQuery = ref('')
@@ -37,7 +35,6 @@ type SearchResultItem = {
     subtitle: string
     cover: string
     stackedImages?: { id: number | string; cover?: string }[]
-    playableTrack?: PlayableTrack
 }
 
 const artists = ref<SearchResultItem[]>([])
@@ -134,7 +131,6 @@ async function performSearch(query: string) {
             type: 'artist',
             title: artist.displayName || 'Unknown Artist',
             subtitle: artist.alias.length > 0 ? artist.alias.join(' / ') : '艺术家',
-            details: artist.comment || '',
             cover: '',
         }))
     } catch (error) {
@@ -255,11 +251,11 @@ const navigateToDetail = (item: SearchResultItem) => {
 }
 
 const isItemPlaying = (item: SearchResultItem) => {
-    return (
-        audioStore.isPlaying &&
-        item.playableTrack !== undefined &&
-        audioStore.currentTrack?.id === item.playableTrack.id
-    )
+    if (item.type === 'artist' || typeof item.id !== 'number') {
+        return false
+    }
+    const track = peekResolvedPlayableTrack(item.type, item.id)
+    return audioStore.isPlaying && track !== null && audioStore.currentTrack?.id === track.id
 }
 
 const playItem = async (item: SearchResultItem) => {
@@ -273,42 +269,28 @@ const playItem = async (item: SearchResultItem) => {
     try {
         playLoadingItemId.value = item.id
 
-        if (!item.playableTrack) {
-            const fallback = {
-                title: item.title,
-                artist: item.subtitle,
-                cover: item.cover,
-            }
-            item.playableTrack =
-                item.type === 'album'
-                    ? await resolveAlbumPlayableTrack(item.id, fallback)
-                    : await resolveWorkPlayableTrack(item.id, fallback)
+        const fallback = {
+            title: item.title,
+            artist: item.subtitle,
+            cover: item.cover,
         }
+        const playableTrack =
+            item.type === 'album'
+                ? await resolveAlbumPlayableTrack(item.id, fallback)
+                : await resolveWorkPlayableTrack(item.id, fallback)
 
-        if (!item.playableTrack) {
+        if (!playableTrack) {
             console.warn('No playable track found', item.id)
             return
         }
 
-        audioStore.play(item.playableTrack)
+        audioStore.play(playableTrack)
     } catch (error) {
         console.error('Failed to play', error)
     } finally {
         playLoadingItemId.value = null
     }
 }
-
-watch(
-    () => userStore.preferredAssetFormat,
-    () => {
-        albums.value.forEach((item) => {
-            item.playableTrack = undefined
-        })
-        works.value.forEach((item) => {
-            item.playableTrack = undefined
-        })
-    },
-)
 </script>
 
 <template>

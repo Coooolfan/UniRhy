@@ -26,6 +26,7 @@ vi.mock('@/ApiInstance', async (importOriginal) => {
 
 import { api } from '@/ApiInstance'
 import DashboardAlbumGrid from '@/components/dashboard/DashboardAlbumGrid.vue'
+import { resetRecordingPlaybackResolverCaches } from '@/services/recordingPlaybackResolver'
 import { useAudioStore } from '@/stores/audio'
 import { useUserStore } from '@/stores/user'
 
@@ -70,6 +71,7 @@ const setPreferredAssetFormat = (preferredAssetFormat: string) => {
 describe('DashboardAlbumGrid', () => {
     beforeEach(() => {
         setActivePinia(createPinia())
+        resetRecordingPlaybackResolverCaches()
         listAlbumsMock.mockReset()
         getAlbumMock.mockReset()
         pushMock.mockReset()

@@ -7,7 +7,7 @@ describe('recordingMedia', () => {
         delete window.__UNIRHY_RUNTIME__
     })
 
-    it('normalizes shared recording playback fields', () => {
+    it('normalizes shared recording display fields', () => {
         const recordings = recordingMedia.normalizeRecordings([
             {
                 id: 1,
@@ -34,8 +34,6 @@ describe('recordingMedia', () => {
                 title: 'Fallback Title',
                 artist: 'Artist A',
                 cover: '/api/media/11?_sig=abc&_exp=9999999999',
-                audioSrc: '/api/media/21?_sig=def&_exp=9999999999',
-                mediaFileId: 21,
             },
         ])
     })
@@ -44,8 +42,21 @@ describe('recordingMedia', () => {
         expect(
             recordingMedia.pickInitialRecordingId(
                 [
-                    { id: 1, audioSrc: undefined, isDefault: false },
-                    { id: 2, audioSrc: '/api/media/2', isDefault: false },
+                    { id: 1, assets: [], defaultInWork: false },
+                    {
+                        id: 2,
+                        assets: [
+                            {
+                                mediaFile: {
+                                    id: 21,
+                                    mimeType: 'audio/mpeg',
+                                    objectKey: 'track-a.mp3',
+                                    url: '/api/media/21',
+                                },
+                            },
+                        ],
+                        defaultInWork: false,
+                    },
                 ],
                 'first-playable',
             ),
@@ -54,8 +65,21 @@ describe('recordingMedia', () => {
         expect(
             recordingMedia.pickInitialRecordingId(
                 [
-                    { id: 1, audioSrc: '/api/media/1', isDefault: false },
-                    { id: 2, audioSrc: undefined, isDefault: true },
+                    {
+                        id: 1,
+                        assets: [
+                            {
+                                mediaFile: {
+                                    id: 21,
+                                    mimeType: 'audio/mpeg',
+                                    objectKey: 'track-a.mp3',
+                                    url: '/api/media/21',
+                                },
+                            },
+                        ],
+                        defaultInWork: false,
+                    },
+                    { id: 2, assets: [], defaultInWork: true },
                 ],
                 'default-first',
             ),
