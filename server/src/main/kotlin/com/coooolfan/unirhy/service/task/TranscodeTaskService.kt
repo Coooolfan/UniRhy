@@ -126,7 +126,8 @@ class TranscodeTaskService(
         val srcRoot = File(srcProvider.parentPath)
         val dstRoot = ensureDestinationRoot(dstProvider)
         val srcFile = File(srcRoot, payload.srcObjectKey)
-        val outputFile = File(dstRoot, "${UUID.randomUUID()}.opus")
+        val dstObjectKey = "${UUID.randomUUID()}.opus"
+        val outputFile = File(dstRoot, dstObjectKey)
 
         executeFfmpegCommand(
             command = buildFfmpegCommand(srcFile, outputFile),
@@ -138,7 +139,7 @@ class TranscodeTaskService(
             recording = Recording { id = payload.recordingId }
             mediaFile {
                 sha256 = "mocked-sha256"
-                objectKey = outputFile.toString()
+                objectKey = dstObjectKey
                 mimeType = "audio/opus"
                 size = outputFile.length()
                 width = null
