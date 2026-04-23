@@ -323,6 +323,7 @@ vi.mock('@/services/playbackSyncClient', () => {
 
 import { useAudioStore, type AudioTrack } from '@/stores/audio'
 import { api } from '@/ApiInstance'
+import { PLAYBACK_MODE_STORAGE_KEY, useClientPreferencesStore } from '@/stores/clientPreferences'
 import type {
     LoadAudioSourceMessage,
     ScheduledActionMessage,
@@ -549,6 +550,10 @@ const setPreferredAssetFormat = (preferredAssetFormat: string) => {
     }
 }
 
+const setIndependentPlaybackMode = () => {
+    window.localStorage.setItem(PLAYBACK_MODE_STORAGE_KEY, 'INDEPENDENT')
+}
+
 const createResponse = (duration: number, status = 200) => {
     return new Response(new Uint8Array([duration]).buffer, { status })
 }
@@ -638,6 +643,100 @@ describe('audio store', () => {
         vi.stubGlobal('cancelAnimationFrame', (id: number) => {
             animationFrameCallbacks.delete(id)
         })
+    })
+
+    it('does not create a playback sync client in independent playback mode', () => {
+        setIndependentPlaybackMode()
+
+        const audioStore = useAudioStore()
+        audioStore.connectPlaybackSync()
+
+        expect(playbackSyncMockState.clients).toHaveLength(0)
+        expect(audioStore.syncState).toBe('independent')
+        expect(audioStore.syncStatusText).toBe('独立播放')
+        expect(audioStore.canSendRealtimeControl).toBe(true)
+    })
+
+    it('plays and controls the queue locally in independent playback mode', async () => {
+        setIndependentPlaybackMode()
+        fetchMock.mockResolvedValue(createResponse(44))
+
+        const audioStore = useAudioStore()
+        await audioStore.replaceQueueAndPlay([buildTrack(1), buildTrack(2)], 0)
+        await flushPromises(12)
+
+        expect(playbackSyncMockState.clients).toHaveLength(0)
+        expect(replaceCurrentQueueMock).not.toHaveBeenCalled()
+        expect(audioStore.currentTrack?.id).toBe(1)
+        expect(audioStore.currentQueueIndex).toBe(0)
+        expect(audioStore.queueEntries).toHaveLength(2)
+        expect(audioStore.isPlaying).toBe(true)
+        expect(audioStore.duration).toBe(44)
+        expect(MockAudioContext.instances[0]?.sourceNodes[0]?.start).toHaveBeenCalledWith(0, 0)
+
+        audioStore.pause()
+        expect(audioStore.isPlaying).toBe(false)
+
+        audioStore.seek(12)
+        expect(audioStore.currentTime).toBe(12)
+
+        await audioStore.resume()
+        await flushPromises(12)
+        expect(audioStore.isPlaying).toBe(true)
+        expect(MockAudioContext.instances[0]?.sourceNodes[1]?.start).toHaveBeenCalledWith(0, 12)
+
+        await audioStore.playNext()
+        await flushPromises(12)
+        expect(audioStore.currentTrack?.id).toBe(2)
+        expect(audioStore.currentQueueIndex).toBe(1)
+        expect(playNextInCurrentQueueMock).not.toHaveBeenCalled()
+    })
+
+    it('keeps independent queue mutations local', async () => {
+        setIndependentPlaybackMode()
+
+        const audioStore = useAudioStore()
+        await audioStore.appendToQueue([buildTrack(1), buildTrack(2), buildTrack(3)])
+        await audioStore.updateQueueStrategies('SHUFFLE', 'TRACK')
+        await audioStore.reorderQueue([3, 1, 2], 0)
+        await audioStore.removeQueueEntry(1)
+
+        expect(audioStore.queueEntries.map((entry) => entry.recordingId)).toEqual([3, 2])
+        expect(audioStore.playbackStrategy).toBe('SHUFFLE')
+        expect(audioStore.stopStrategy).toBe('TRACK')
+        expect(appendToCurrentQueueMock).not.toHaveBeenCalled()
+        expect(updateCurrentQueueStrategyMock).not.toHaveBeenCalled()
+        expect(reorderCurrentQueueMock).not.toHaveBeenCalled()
+        expect(removeCurrentQueueEntryMock).not.toHaveBeenCalled()
+
+        await audioStore.clearQueue()
+
+        expect(audioStore.queueEntries).toHaveLength(0)
+        expect(clearCurrentQueueMock).not.toHaveBeenCalled()
+    })
+
+    it('disconnects sync transport but preserves playback when switching to independent mode', async () => {
+        fetchMock.mockResolvedValue(createResponse(30))
+
+        const audioStore = useAudioStore()
+        audioStore.connectPlaybackSync()
+        const client = latestClient()
+        client.setState({
+            phase: 'ready',
+            clockOffsetMs: 0,
+            roundTripEstimateMs: 10,
+        })
+
+        await audioStore.replaceQueueAndPlay([buildTrack(1)], 0)
+        await flushPromises(12)
+
+        useClientPreferencesStore().setPlaybackMode('INDEPENDENT')
+        await flushPromises()
+
+        expect(client.disconnect).toHaveBeenCalledTimes(1)
+        expect(audioStore.currentTrack?.id).toBe(1)
+        expect(audioStore.queueEntries).toHaveLength(1)
+        expect(audioStore.syncState).toBe('independent')
     })
 
     it('prefers the configured asset format when hydrating synced audio sources', async () => {
@@ -903,7 +1002,7 @@ describe('audio store', () => {
             body: {
                 recordingIds: [2],
                 currentIndex: 0,
-                version: 0,
+                version: 1,
             },
         })
     })

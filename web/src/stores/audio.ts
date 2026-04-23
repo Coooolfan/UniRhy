@@ -1,6 +1,7 @@
 import { computed, ref, shallowRef, watch } from 'vue'
 import { defineStore } from 'pinia'
 import { api } from '@/ApiInstance'
+import { useClientPreferencesStore } from '@/stores/clientPreferences'
 import { useUserStore } from '@/stores/user'
 import {
     PlaybackSyncClient,
@@ -9,6 +10,7 @@ import {
 } from '@/services/playbackSyncClient'
 import type {
     DeviceChangePayload,
+    CurrentQueueItemDto,
     LoadAudioSourcePayload,
     PlaybackStrategy,
     PlaybackSyncStatePayload,
@@ -124,6 +126,11 @@ export const useAudioStore = defineStore('audio', () => {
     })
 
     const userStore = useUserStore()
+    const clientPreferencesStore = useClientPreferencesStore()
+    const isIndependentPlaybackMode = computed(
+        () => clientPreferencesStore.isIndependentPlaybackMode,
+    )
+
     watch(
         () => userStore.preferredAssetFormat,
         (nextFormat, prevFormat) => {
@@ -167,6 +174,9 @@ export const useAudioStore = defineStore('audio', () => {
     )
 
     const effectiveSyncState = computed<AudioSyncState>(() => {
+        if (isIndependentPlaybackMode.value) {
+            return 'independent'
+        }
         if (clientPhase.value === 'error') {
             return 'error'
         }
@@ -184,6 +194,8 @@ export const useAudioStore = defineStore('audio', () => {
 
     const syncStatusText = computed(() => {
         switch (effectiveSyncState.value) {
+            case 'independent':
+                return '独立播放'
             case 'connecting':
                 return '同步连接中'
             case 'calibrating':
@@ -201,7 +213,9 @@ export const useAudioStore = defineStore('audio', () => {
         }
     })
 
-    const canSendRealtimeControl = computed(() => effectiveSyncState.value === 'ready')
+    const canSendRealtimeControl = computed(
+        () => isIndependentPlaybackMode.value || effectiveSyncState.value === 'ready',
+    )
 
     const canNavigateQueue = computed(() => {
         return currentQueue.value.items.length > 0 && canSendRealtimeControl.value
@@ -299,6 +313,22 @@ export const useAudioStore = defineStore('audio', () => {
 
     const getCurrentQueueVersion = () => {
         return Math.max(currentQueue.value.version, latestSnapshot.value?.version ?? 0)
+    }
+
+    const nextLocalQueueVersion = () => getCurrentQueueVersion() + 1
+
+    const updateLocalQueuePlaybackState = (
+        playbackStatus = currentQueue.value.playbackStatus,
+        positionSeconds = currentTime.value,
+    ) => {
+        currentQueue.value = {
+            ...currentQueue.value,
+            playbackStatus,
+            positionMs: Math.max(0, Math.round(positionSeconds * 1_000)),
+            serverTimeToExecuteMs: 0,
+            version: nextLocalQueueVersion(),
+            updatedAtMs: nowClientMs(),
+        }
     }
 
     const getQueueRecordingId = (queueIndex: number | null | undefined) => {
@@ -480,6 +510,24 @@ export const useAudioStore = defineStore('audio', () => {
         sourceNode.value = null
     }
 
+    const localPlaybackEndedActions: { playNext: (() => void) | null } = {
+        playNext: null,
+    }
+
+    const handleLocalPlaybackEnded = () => {
+        stopAnimationLoop()
+        isPlaying.value = false
+        playbackStartContextTime.value = 0
+
+        const endedAt = currentBuffer.value?.duration ?? duration.value
+        updatePausedTime(endedAt)
+        updateLocalQueuePlaybackState('PAUSED', endedAt)
+
+        if (currentQueue.value.stopStrategy === 'LIST' && currentQueue.value.items.length > 1) {
+            localPlaybackEndedActions.playNext?.()
+        }
+    }
+
     const handlePlaybackEnded = (node: AudioBufferSourceNode) => {
         const isIgnored = ignoredEndedNodes.has(node)
         if (isIgnored) {
@@ -493,6 +541,11 @@ export const useAudioStore = defineStore('audio', () => {
         }
 
         if (isIgnored || sourceNode.value !== null) {
+            return
+        }
+
+        if (isIndependentPlaybackMode.value) {
+            handleLocalPlaybackEnded()
             return
         }
 
@@ -661,6 +714,75 @@ export const useAudioStore = defineStore('audio', () => {
     const nextCommandId = (prefix: string) => {
         commandSequence += 1
         return `${prefix}-${Date.now()}-${commandSequence}`
+    }
+
+    const findExistingQueueItem = (recordingId: number) => {
+        return currentQueue.value.items.find((item) => item.recordingId === recordingId) ?? null
+    }
+
+    const createLocalQueueItem = (track: AudioTrack): CurrentQueueItemDto => {
+        const existingItem = findExistingQueueItem(track.id)
+        const bufferedDurationMs =
+            currentBufferTrack.value?.id === track.id && currentBuffer.value
+                ? Math.round(currentBuffer.value.duration * 1_000)
+                : null
+
+        return {
+            recordingId: track.id,
+            title: track.title,
+            artistLabel: track.artist,
+            coverUrl: track.cover,
+            durationMs: bufferedDurationMs ?? existingItem?.durationMs ?? 0,
+        }
+    }
+
+    const updateLocalQueueCurrentIndex = (currentIndex: number) => {
+        currentQueue.value = {
+            ...currentQueue.value,
+            currentIndex,
+            version: nextLocalQueueVersion(),
+            updatedAtMs: nowClientMs(),
+        }
+    }
+
+    const applyLocalQueue = (tracks: AudioTrack[], currentIndex: number) => {
+        tracks.forEach((track) => {
+            rememberHydratedTrack(track)
+        })
+
+        currentQueue.value = {
+            items: tracks.map((track) => createLocalQueueItem(track)),
+            recordingIds: tracks.map((track) => track.id),
+            currentIndex,
+            playbackStrategy: currentQueue.value.playbackStrategy,
+            stopStrategy: currentQueue.value.stopStrategy,
+            playbackStatus: currentQueue.value.playbackStatus,
+            positionMs: currentQueue.value.positionMs,
+            serverTimeToExecuteMs: 0,
+            version: nextLocalQueueVersion(),
+            updatedAtMs: nowClientMs(),
+        }
+    }
+
+    const updateLocalCurrentQueueItemDuration = (track: AudioTrack, buffer: AudioBuffer) => {
+        const itemIndex = currentQueue.value.items.findIndex(
+            (item) => item.recordingId === track.id,
+        )
+        if (itemIndex < 0) {
+            return
+        }
+
+        const nextItems = currentQueue.value.items.map((item, index) =>
+            index === itemIndex
+                ? { ...item, durationMs: Math.round(buffer.duration * 1_000) }
+                : item,
+        )
+        currentQueue.value = {
+            ...currentQueue.value,
+            items: nextItems,
+            version: nextLocalQueueVersion(),
+            updatedAtMs: nowClientMs(),
+        }
     }
 
     const requestSyncRecovery = () => {
@@ -941,7 +1063,8 @@ export const useAudioStore = defineStore('audio', () => {
         syncQueuePlaybackState(latestSnapshot.value)
 
         const actionToken = scheduledAction.version
-        const scheduledRecordingId = getQueueRecordingId(scheduledAction.currentIndex)
+        const scheduledRecordingId =
+            getQueueRecordingId(scheduledAction.currentIndex) ?? scheduledAction.currentIndex
         const shellTrack =
             scheduledRecordingId === null ? null : createTrackShell(scheduledRecordingId)
         if (shellTrack) {
@@ -976,6 +1099,10 @@ export const useAudioStore = defineStore('audio', () => {
     }
 
     const handleServerMessage = async (message: ServerPlaybackSyncMessage) => {
+        if (isIndependentPlaybackMode.value) {
+            return
+        }
+
         const receivedAtMs = nowClientMs()
         switch (message.type) {
             case 'SNAPSHOT':
@@ -1079,6 +1206,109 @@ export const useAudioStore = defineStore('audio', () => {
         })
     }
 
+    const startLocalPlayback = async (track: AudioTrack, positionSeconds: number) => {
+        rememberHydratedTrack(track)
+        primeTrackState(track, positionSeconds)
+
+        const buffer = await ensureTrackBuffer(track)
+        if (!buffer) {
+            updateLocalQueuePlaybackState('PAUSED', positionSeconds)
+            return
+        }
+        updateLocalCurrentQueueItemDuration(track, buffer)
+
+        const context = await ensureAudioContextResumed()
+        if (!context) {
+            updateLocalQueuePlaybackState('PAUSED', positionSeconds)
+            return
+        }
+
+        const nextTime = clampTime(positionSeconds, buffer.duration)
+        stopAllSourceNodes()
+        const nextNode = createSourceNode(buffer)
+        if (!nextNode) {
+            error.value = PLAYBACK_ERROR_MESSAGE
+            updateLocalQueuePlaybackState('PAUSED', nextTime)
+            return
+        }
+
+        sourceNode.value = nextNode
+        playbackOffsetSec.value = nextTime
+        playbackStartContextTime.value = context.currentTime
+        currentTime.value = nextTime
+        isPlaying.value = true
+        nextNode.start(context.currentTime, nextTime)
+        updateLocalQueuePlaybackState('PLAYING', nextTime)
+        startAnimationLoop()
+    }
+
+    const pauseLocalPlayback = () => {
+        if (!currentTrack.value) {
+            return
+        }
+
+        const pausedAt = getCurrentPlaybackTime()
+        applyPausedState(currentTrack.value, pausedAt)
+        updateLocalQueuePlaybackState('PAUSED', pausedAt)
+    }
+
+    const seekLocalPlayback = (time: number) => {
+        if (!currentTrack.value) {
+            return
+        }
+
+        const bufferDuration = currentBuffer.value?.duration ?? duration.value
+        const nextTime = clampTime(time, bufferDuration)
+        if (!isPlaying.value) {
+            updatePausedTime(nextTime)
+            updateLocalQueuePlaybackState('PAUSED', nextTime)
+            return
+        }
+
+        void startLocalPlayback(currentTrack.value, nextTime)
+    }
+
+    const getLocalQueueTrack = (currentIndex: number) => {
+        const item = currentQueue.value.items[currentIndex]
+        if (!item) {
+            return null
+        }
+        return createTrackFromQueueItem(item)
+    }
+
+    const playLocalQueueIndex = async (currentIndex: number, positionSeconds = 0) => {
+        const track = getLocalQueueTrack(currentIndex)
+        if (!track) {
+            return
+        }
+
+        updateLocalQueueCurrentIndex(currentIndex)
+        await startLocalPlayback(track, positionSeconds)
+    }
+
+    const getNextLocalQueueIndex = (direction: -1 | 1) => {
+        const {
+            items,
+            currentIndex,
+            playbackStrategy: currentPlaybackStrategy,
+        } = currentQueue.value
+        if (items.length === 0) {
+            return -1
+        }
+        if (items.length === 1) {
+            return 0
+        }
+
+        if (direction > 0 && currentPlaybackStrategy === 'SHUFFLE') {
+            const availableIndexes = items
+                .map((_, index) => index)
+                .filter((index) => index !== currentIndex)
+            return availableIndexes[Math.floor(Math.random() * availableIndexes.length)] ?? 0
+        }
+
+        return (currentIndex + direction + items.length) % items.length
+    }
+
     const requestPlay = async (
         track: AudioTrack,
         positionSeconds: number,
@@ -1090,6 +1320,15 @@ export const useAudioStore = defineStore('audio', () => {
         rememberHydratedTrack(track)
 
         const isSameTrack = isSameTrackRef(currentTrack.value, track)
+        if (isIndependentPlaybackMode.value) {
+            if (toggleIfSameTrack && isSameTrack && isPlaying.value) {
+                pauseLocalPlayback()
+                return
+            }
+            await startLocalPlayback(track, positionSeconds)
+            return
+        }
+
         if (toggleIfSameTrack && isSameTrack && isPlaying.value) {
             const controlContext = getCurrentQueueControlContext()
             if (!controlContext) {
@@ -1139,6 +1378,13 @@ export const useAudioStore = defineStore('audio', () => {
         if (!targetTrack) {
             return
         }
+
+        if (isIndependentPlaybackMode.value) {
+            applyLocalQueue(tracks, currentIndex)
+            await requestPlay(targetTrack, 0, { toggleIfSameTrack: true })
+            return
+        }
+
         const recordingIds = tracks.map((track) => track.id)
 
         if (queueRecordingIdsEqual(recordingIds)) {
@@ -1193,6 +1439,24 @@ export const useAudioStore = defineStore('audio', () => {
         tracks.forEach((track) => {
             rememberHydratedTrack(track)
         })
+
+        if (isIndependentPlaybackMode.value) {
+            currentQueue.value = {
+                ...currentQueue.value,
+                items: [
+                    ...currentQueue.value.items,
+                    ...tracks.map((track) => createLocalQueueItem(track)),
+                ],
+                recordingIds: [
+                    ...currentQueue.value.recordingIds,
+                    ...tracks.map((track) => track.id),
+                ],
+                version: nextLocalQueueVersion(),
+                updatedAtMs: nowClientMs(),
+            }
+            return
+        }
+
         const queue = await api.playbackQueueController.appendToCurrentQueue({
             body: {
                 recordingIds: tracks.map((track) => track.id),
@@ -1207,6 +1471,23 @@ export const useAudioStore = defineStore('audio', () => {
             return
         }
 
+        if (isIndependentPlaybackMode.value) {
+            const itemByRecordingId = new Map(
+                currentQueue.value.items.map((item) => [item.recordingId, item]),
+            )
+            currentQueue.value = {
+                ...currentQueue.value,
+                items: recordingIds
+                    .map((recordingId) => itemByRecordingId.get(recordingId))
+                    .filter((item): item is CurrentQueueItemDto => item !== undefined),
+                recordingIds,
+                currentIndex,
+                version: nextLocalQueueVersion(),
+                updatedAtMs: nowClientMs(),
+            }
+            return
+        }
+
         const queue = await api.playbackQueueController.reorderCurrentQueue({
             body: { recordingIds, currentIndex, version: getCurrentQueueVersion() },
         })
@@ -1214,6 +1495,11 @@ export const useAudioStore = defineStore('audio', () => {
     }
 
     async function playQueueEntry(currentIndex: number) {
+        if (isIndependentPlaybackMode.value) {
+            await playLocalQueueIndex(currentIndex)
+            return
+        }
+
         const queue = await api.playbackQueueController.setCurrentIndex({
             body: { currentIndex, version: getCurrentQueueVersion() },
         })
@@ -1230,16 +1516,38 @@ export const useAudioStore = defineStore('audio', () => {
         if (currentQueue.value.items.length === 0) {
             return
         }
+
+        if (isIndependentPlaybackMode.value) {
+            const nextIndex = getNextLocalQueueIndex(1)
+            if (nextIndex >= 0) {
+                await playLocalQueueIndex(nextIndex)
+            }
+            return
+        }
+
         const queue = await api.playbackQueueController.playNextInCurrentQueue({
             body: { version: getCurrentQueueVersion() },
         })
         applyQueueSnapshot(queue)
     }
 
+    localPlaybackEndedActions.playNext = () => {
+        void playNext()
+    }
+
     async function playPrevious() {
         if (currentQueue.value.items.length === 0) {
             return
         }
+
+        if (isIndependentPlaybackMode.value) {
+            const nextIndex = getNextLocalQueueIndex(-1)
+            if (nextIndex >= 0) {
+                await playLocalQueueIndex(nextIndex)
+            }
+            return
+        }
+
         const queue = await api.playbackQueueController.playPreviousInCurrentQueue({
             body: { version: getCurrentQueueVersion() },
         })
@@ -1250,6 +1558,17 @@ export const useAudioStore = defineStore('audio', () => {
         nextPlaybackStrategy: PlaybackStrategy,
         nextStopStrategy: StopStrategy,
     ) {
+        if (isIndependentPlaybackMode.value) {
+            currentQueue.value = {
+                ...currentQueue.value,
+                playbackStrategy: nextPlaybackStrategy,
+                stopStrategy: nextStopStrategy,
+                version: nextLocalQueueVersion(),
+                updatedAtMs: nowClientMs(),
+            }
+            return
+        }
+
         const queue = await api.playbackQueueController.updateCurrentQueueStrategy({
             body: {
                 playbackStrategy: nextPlaybackStrategy,
@@ -1261,6 +1580,41 @@ export const useAudioStore = defineStore('audio', () => {
     }
 
     async function removeQueueEntry(index: number) {
+        if (isIndependentPlaybackMode.value) {
+            const nextItems = [...currentQueue.value.items]
+            if (index < 0 || index >= nextItems.length) {
+                return
+            }
+
+            const removedCurrentEntry = index === currentQueue.value.currentIndex
+            nextItems.splice(index, 1)
+            let nextCurrentIndex = currentQueue.value.currentIndex
+            if (nextItems.length === 0) {
+                currentQueue.value = createEmptyQueue()
+                clearTrackState()
+                return
+            }
+            if (index < nextCurrentIndex) {
+                nextCurrentIndex -= 1
+            } else if (index === nextCurrentIndex) {
+                nextCurrentIndex = Math.min(nextCurrentIndex, nextItems.length - 1)
+            }
+
+            currentQueue.value = {
+                ...currentQueue.value,
+                items: nextItems,
+                recordingIds: nextItems.map((item) => item.recordingId),
+                currentIndex: nextCurrentIndex,
+                version: nextLocalQueueVersion(),
+                updatedAtMs: nowClientMs(),
+            }
+
+            if (removedCurrentEntry) {
+                await playLocalQueueIndex(nextCurrentIndex)
+            }
+            return
+        }
+
         const queue = await api.playbackQueueController.removeCurrentQueueEntry({
             body: { index, version: getCurrentQueueVersion() },
         })
@@ -1268,6 +1622,12 @@ export const useAudioStore = defineStore('audio', () => {
     }
 
     async function clearQueue() {
+        if (isIndependentPlaybackMode.value) {
+            currentQueue.value = createEmptyQueue()
+            clearTrackState()
+            return
+        }
+
         const queue = await api.playbackQueueController.clearCurrentQueue({
             body: { version: getCurrentQueueVersion() },
         })
@@ -1275,6 +1635,11 @@ export const useAudioStore = defineStore('audio', () => {
     }
 
     function pause() {
+        if (isIndependentPlaybackMode.value) {
+            pauseLocalPlayback()
+            return
+        }
+
         const controlContext = getCurrentQueueControlContext()
         if (!currentTrack.value || !canSendRealtimeControl.value || !controlContext) {
             return
@@ -1294,6 +1659,11 @@ export const useAudioStore = defineStore('audio', () => {
 
     async function resume() {
         if (!currentTrack.value) {
+            return
+        }
+
+        if (isIndependentPlaybackMode.value) {
+            await startLocalPlayback(currentTrack.value, currentTime.value)
             return
         }
 
@@ -1321,6 +1691,14 @@ export const useAudioStore = defineStore('audio', () => {
     function stop() {
         queuedPlayIntent.value = null
         awaitingSyncRecovery.value = false
+
+        if (isIndependentPlaybackMode.value) {
+            latestSnapshot.value = null
+            latestSnapshotReceivedAtMs.value = null
+            currentQueue.value = createEmptyQueue()
+            clearTrackState()
+            return
+        }
 
         if (!canSendRealtimeControl.value) {
             latestSnapshot.value = null
@@ -1353,6 +1731,11 @@ export const useAudioStore = defineStore('audio', () => {
     }
 
     function seek(time: number) {
+        if (isIndependentPlaybackMode.value) {
+            seekLocalPlayback(time)
+            return
+        }
+
         const controlContext = getCurrentQueueControlContext()
         if (!currentTrack.value || !canSendRealtimeControl.value || !controlContext) {
             return
@@ -1379,6 +1762,10 @@ export const useAudioStore = defineStore('audio', () => {
     }
 
     function connectPlaybackSync() {
+        if (isIndependentPlaybackMode.value) {
+            return
+        }
+
         const client = ensureSyncClient()
         client.connect()
     }
@@ -1397,7 +1784,8 @@ export const useAudioStore = defineStore('audio', () => {
         })
     }
 
-    function disconnectPlaybackSync() {
+    function disconnectPlaybackSync(options: { preservePlayback?: boolean } = {}) {
+        const preservePlayback = options.preservePlayback ?? false
         playbackSyncClient.value?.disconnect()
         playbackSyncClient.value = null
         clientDiagnostics.value = null
@@ -1414,12 +1802,23 @@ export const useAudioStore = defineStore('audio', () => {
         roundTripEstimateMs.value = 0
         awaitingSyncRecovery.value = false
         audioUnlockRequired.value = false
+
+        if (preservePlayback) {
+            return
+        }
+
         isPlayerHidden.value = false
         currentQueue.value = createEmptyQueue()
         resetTrackCatalog()
         clearTrackState()
         destroyAudioContext()
     }
+
+    watch(isIndependentPlaybackMode, (isIndependent) => {
+        if (isIndependent) {
+            disconnectPlaybackSync({ preservePlayback: true })
+        }
+    })
 
     return {
         currentTrack,

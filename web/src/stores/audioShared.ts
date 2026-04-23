@@ -28,6 +28,7 @@ export type AudioQueueEntry = {
 }
 
 export type AudioSyncState =
+    | 'independent'
     | 'connecting'
     | 'calibrating'
     | 'ready'

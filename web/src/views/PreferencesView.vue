@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import { FileAudio } from 'lucide-vue-next'
+import { FileAudio, Radio } from 'lucide-vue-next'
 import DashboardTopBar from '@/components/dashboard/DashboardTopBar.vue'
 import { normalizeApiError } from '@/ApiInstance'
+import { useClientPreferencesStore, type PlaybackMode } from '@/stores/clientPreferences'
 import { useUserStore } from '@/stores/user'
 
 type PresetOption = {
@@ -22,6 +23,7 @@ const FORMAT_PRESETS: readonly PresetOption[] = [
 const CUSTOM_SENTINEL = '__custom__'
 
 const userStore = useUserStore()
+const clientPreferencesStore = useClientPreferencesStore()
 
 const isSubmitting = ref(false)
 const errorMessage = ref('')
@@ -90,6 +92,12 @@ const handleSubmit = async () => {
         isSubmitting.value = false
     }
 }
+
+const handlePlaybackModeChange = (event: Event) => {
+    clientPreferencesStore.setPlaybackMode(
+        (event.target as HTMLSelectElement).value as PlaybackMode,
+    )
+}
 </script>
 
 <template>
@@ -103,7 +111,41 @@ const handleSubmit = async () => {
             </header>
         </div>
 
-        <div class="mx-auto mt-10 max-w-5xl px-8">
+        <div class="mx-auto mt-10 max-w-5xl space-y-6 px-8">
+            <section class="border border-[#EAE6DE] bg-white p-6 sm:p-8">
+                <div class="mb-6 flex items-center gap-3">
+                    <div
+                        class="flex h-10 w-10 items-center justify-center rounded-full bg-[#F7F5F0] text-[#8C857B]"
+                    >
+                        <Radio :size="18" />
+                    </div>
+                    <div>
+                        <h2 class="font-serif text-xl text-[#2B221B]">播放模式</h2>
+                        <p class="text-xs text-[#8C857B]">
+                            控制播放器是否与后端房间通过 WebSocket 同步
+                        </p>
+                    </div>
+                </div>
+
+                <div class="space-y-1">
+                    <label class="ml-1 text-xs font-medium uppercase tracking-wider text-[#8C857B]">
+                        模式
+                    </label>
+                    <select
+                        data-test="playback-mode-select"
+                        :value="clientPreferencesStore.playbackMode"
+                        class="w-full border border-[#D6D1C4] bg-white px-3 py-2.5 text-[#2C2825] outline-none transition-all focus:border-[#D98C28] focus:ring-1 focus:ring-[#D98C28]"
+                        @change="handlePlaybackModeChange"
+                    >
+                        <option value="SYNC">同步</option>
+                        <option value="INDEPENDENT">独立</option>
+                    </select>
+                    <p class="ml-1 text-xs text-[#B8B0A3]">
+                        独立模式下播放队列和控制只保存在当前客户端，不连接同步 WebSocket
+                    </p>
+                </div>
+            </section>
+
             <section class="border border-[#EAE6DE] bg-white p-6 sm:p-8">
                 <div class="mb-6 flex items-center gap-3">
                     <div

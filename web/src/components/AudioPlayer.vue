@@ -141,6 +141,8 @@ const toggleQueue = () => {
 
 const syncStatusClass = computed(() => {
     switch (audioStore.syncState) {
+        case 'independent':
+            return 'text-[#42653F]'
         case 'calibrating':
             return 'text-[#8C857B]'
         case 'ready':
