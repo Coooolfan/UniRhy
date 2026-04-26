@@ -5,7 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "run-p type-check \"build-only {@}\" --",
+    "build": "run-s type-check build:client build:server build:prerender",
+    "build:client": "vite build",
+    "build:server": "vite build --ssr src/entry-server.ts --outDir dist/server --emptyOutDir false",
+    "build:prerender": "node ./scripts/prerender.mjs",
     "preview": "vite preview",
     "build-only": "vite build",
     "type-check": "oxlint . --type-aware --type-check -A all -A nursery --deny-warnings",
@@ -19,9 +22,12 @@
   },
   "dependencies": {
     "@types/three": "^0.183.1",
+    "@unhead/ssr": "^2",
+    "@unhead/vue": "^2",
     "gray-matter": "^4.0.3",
     "markdown-it": "^14.1.1",
     "three": "^0.183.2",
+    "unhead": "^2",
     "vue": "^3.5.30",
     "vue-router": "^5.0.4"
   },

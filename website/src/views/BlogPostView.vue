@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
+import { useHead } from '@unhead/vue'
 import BlogLayout from '@/components/BlogLayout.vue'
 import type { BlogModule } from '@/types/blog'
 import { useLang } from '@/composables/useLang'
@@ -8,8 +9,9 @@ import { useToc } from '@/composables/useToc'
 import { useBlogWidth } from '@/composables/useBlogWidth'
 
 const route = useRoute()
-const { lang } = useLang()
+const { lang, setLang } = useLang()
 const { isWide } = useBlogWidth()
+const blogListPath = computed(() => `/${lang.value}/blog`)
 
 const proseRef = ref<HTMLElement | null>(null)
 const { items: tocItems, activeIds, scrollTo, refresh: refreshToc } = useToc(proseRef)
@@ -27,6 +29,50 @@ const post = computed(() => {
   const mod = modules[key]
   if (!mod?.frontmatter.title) return null
   return mod
+})
+
+const altLangSlugExists = computed(() => {
+  const slug = route.params.slug as string
+  const otherLang = lang.value === 'zh' ? 'en' : 'zh'
+  return Boolean(modules[`/content/blog/${otherLang}/${slug}.md`]?.frontmatter.title)
+})
+
+useHead(() => {
+  const slug = route.params.slug as string
+  const fm = post.value?.frontmatter
+  let title: string
+  if (fm?.title) {
+    title = `${fm.title} · UniRhy`
+  } else if (lang.value === 'zh') {
+    title = '文章不存在 · UniRhy'
+  } else {
+    title = 'Post not found · UniRhy'
+  }
+  const description = fm?.description ?? ''
+  const otherLang = lang.value === 'zh' ? 'en' : 'zh'
+  const links = [
+    { rel: 'canonical', href: `/${lang.value}/blog/${slug}` },
+    {
+      rel: 'alternate',
+      hreflang: lang.value === 'zh' ? 'zh-CN' : 'en',
+      href: `/${lang.value}/blog/${slug}`,
+    },
+    ...(altLangSlugExists.value
+      ? [
+          {
+            rel: 'alternate',
+            hreflang: otherLang === 'zh' ? 'zh-CN' : 'en',
+            href: `/${otherLang}/blog/${slug}`,
+          },
+        ]
+      : []),
+  ]
+  return {
+    title,
+    htmlAttrs: { lang: lang.value === 'zh' ? 'zh-CN' : 'en' },
+    meta: description ? [{ name: 'description', content: description }] : [],
+    link: links,
+  }
 })
 
 function formatDate(epochSeconds: number): string {
@@ -50,7 +96,7 @@ function formatDate(epochSeconds: number): string {
           {{ lang === 'zh' ? '文章不存在' : 'Post not found' }}
         </p>
         <router-link
-          to="/blog"
+          :to="blogListPath"
           class="inline-block border border-[#d98c28] bg-transparent px-8 py-3 font-brand-sans text-sm font-bold tracking-[0.15em] text-[#d98c28] uppercase no-underline transition-all duration-300 hover:bg-[#d98c28] hover:text-white hover:shadow-[0_4px_15px_rgba(217,140,40,0.25)]"
         >
           {{ lang === 'zh' ? '返回博客' : 'Back to Blog' }}
@@ -62,7 +108,7 @@ function formatDate(epochSeconds: number): string {
     <div v-else class="px-6 py-16">
       <!-- Back Link (small screens only, sidebar has it on lg) -->
       <router-link
-        to="/blog"
+        :to="blogListPath"
         class="fixed top-4 left-4 z-10 inline-block font-brand-sans text-xs tracking-[0.2em] text-[#9c968b] uppercase no-underline transition-colors duration-300 hover:text-[#d98c28] lg:hidden"
       >
         ← Blog
@@ -73,7 +119,7 @@ function formatDate(epochSeconds: number): string {
         <nav>
           <!-- Back Link -->
           <router-link
-            to="/blog"
+            :to="blogListPath"
             class="mb-5 inline-block font-brand-sans text-xs tracking-[0.2em] text-[#9c968b] uppercase no-underline transition-colors duration-300 hover:text-[#d98c28]"
           >
             ← Blog
@@ -113,7 +159,7 @@ function formatDate(epochSeconds: number): string {
             :class="
               lang === 'zh' ? 'font-bold text-[#d98c28]' : 'text-[#9c968b] hover:text-[#2c2825]'
             "
-            @click="lang = 'zh'"
+            @click="setLang('zh')"
           >
             中文
           </span>
@@ -123,7 +169,7 @@ function formatDate(epochSeconds: number): string {
             :class="
               lang === 'en' ? 'font-bold text-[#d98c28]' : 'text-[#9c968b] hover:text-[#2c2825]'
             "
-            @click="lang = 'en'"
+            @click="setLang('en')"
           >
             EN
           </span>
@@ -190,7 +236,7 @@ function formatDate(epochSeconds: number): string {
           <!-- Footer Nav -->
           <footer class="mt-12 border-t border-[#dcd6cc] pt-8 text-center">
             <router-link
-              to="/blog"
+              :to="blogListPath"
               class="inline-block border border-[#d98c28] bg-transparent px-8 py-3 font-brand-sans text-sm font-bold tracking-[0.15em] text-[#d98c28] uppercase no-underline transition-all duration-300 hover:bg-[#d98c28] hover:text-white hover:shadow-[0_4px_15px_rgba(217,140,40,0.25)]"
             >
               {{ lang === 'zh' ? '返回博客' : 'Back to Blog' }}

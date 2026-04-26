@@ -1,12 +1,28 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useHead } from '@unhead/vue'
 import LightPillar from '@/components/LightPillar.vue'
 import BrandLogo from '@/components/BrandLogo.vue'
 import HeroSubtitle from '@/components/HeroSubtitle.vue'
 import { useLang } from '@/composables/useLang'
 
-const { lang } = useLang()
+const { lang, setLang } = useLang()
 const isChinese = computed(() => lang.value === 'zh')
+const blogPath = computed(() => `/${lang.value}/blog`)
+
+useHead(() => ({
+  title: 'UniRhy · 独一律',
+  htmlAttrs: { lang: lang.value === 'zh' ? 'zh-CN' : 'en' },
+  meta: [
+    {
+      name: 'description',
+      content:
+        lang.value === 'zh'
+          ? 'UniRhy（独一律）是一个私有化的音乐流媒体平台。'
+          : 'UniRhy is a self-hosted music streaming platform.',
+    },
+  ],
+}))
 </script>
 
 <template>
@@ -35,7 +51,7 @@ const isChinese = computed(() => lang.value === 'zh')
       >
         <router-link
           class="text-inherit no-underline transition-all duration-400 ease-[cubic-bezier(0.25,0.46,0.45,0.94)] hover:text-white/90"
-          to="/blog"
+          :to="blogPath"
         >
           {{ isChinese ? '博客' : 'Blog' }}
         </router-link>
@@ -59,7 +75,7 @@ const isChinese = computed(() => lang.value === 'zh')
               ? 'scale-110 font-bold text-white [text-shadow:0_0_15px_rgba(255,255,255,0.6)]'
               : ''
           "
-          @click="lang = 'zh'"
+          @click="setLang('zh')"
         >
           中文
         </span>
@@ -71,7 +87,7 @@ const isChinese = computed(() => lang.value === 'zh')
               ? 'scale-110 font-bold text-white [text-shadow:0_0_15px_rgba(255,255,255,0.6)]'
               : ''
           "
-          @click="lang = 'en'"
+          @click="setLang('en')"
         >
           English
         </span>

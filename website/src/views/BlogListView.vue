@@ -1,10 +1,30 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useHead } from '@unhead/vue'
 import BlogLayout from '@/components/BlogLayout.vue'
 import type { BlogModule, BlogPostMeta } from '@/types/blog'
 import { useLang } from '@/composables/useLang'
 
-const { lang } = useLang()
+const { lang, setLang } = useLang()
+
+useHead(() => ({
+  title: lang.value === 'zh' ? '博客 · UniRhy' : 'Blog · UniRhy',
+  htmlAttrs: { lang: lang.value === 'zh' ? 'zh-CN' : 'en' },
+  meta: [
+    {
+      name: 'description',
+      content:
+        lang.value === 'zh'
+          ? '关于音乐、技术和产品的思考。'
+          : 'Thoughts on music, technology and product.',
+    },
+  ],
+  link: [
+    { rel: 'alternate', hreflang: 'zh-CN', href: '/zh/blog' },
+    { rel: 'alternate', hreflang: 'en', href: '/en/blog' },
+    { rel: 'alternate', hreflang: 'x-default', href: '/zh/blog' },
+  ],
+}))
 
 const modules = import.meta.glob<BlogModule>('/content/blog/**/*.md', { eager: true })
 
@@ -59,7 +79,7 @@ function formatDate(epochSeconds: number): string {
           :class="
             lang === 'zh' ? 'font-bold text-[#d98c28]' : 'text-[#9c968b] hover:text-[#2c2825]'
           "
-          @click="lang = 'zh'"
+          @click="setLang('zh')"
         >
           中文
         </span>
@@ -69,7 +89,7 @@ function formatDate(epochSeconds: number): string {
           :class="
             lang === 'en' ? 'font-bold text-[#d98c28]' : 'text-[#9c968b] hover:text-[#2c2825]'
           "
-          @click="lang = 'en'"
+          @click="setLang('en')"
         >
           EN
         </span>
@@ -97,7 +117,7 @@ function formatDate(epochSeconds: number): string {
         <router-link
           v-for="post in posts"
           :key="post.slug"
-          :to="`/blog/${post.slug}`"
+          :to="`/${lang}/blog/${post.slug}`"
           class="blog-card group block no-underline"
         >
           <article class="blog-card-inner">

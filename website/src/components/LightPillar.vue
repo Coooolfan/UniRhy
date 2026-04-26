@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import * as THREE from 'three'
 import {
-  onBeforeMount,
   onBeforeUnmount,
   onMounted,
   ref,
@@ -52,7 +51,7 @@ const mouseRef = ref<THREE.Vector2>(new THREE.Vector2(0, 0))
 const timeRef = ref<number>(0)
 const webGLSupported = ref<boolean>(true)
 
-onBeforeMount(() => {
+function detectWebGL() {
   const canvas = document.createElement('canvas')
   const gl =
     canvas.getContext('webgl2') ||
@@ -65,7 +64,7 @@ onBeforeMount(() => {
   }
 
   canvas.remove()
-})
+}
 
 let cleanup: (() => void) | null = null
 const setup = () => {
@@ -357,6 +356,7 @@ const setup = () => {
 }
 
 onMounted(() => {
+  detectWebGL()
   setup()
 })
 
