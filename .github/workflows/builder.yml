@@ -52,6 +52,46 @@ jobs:
           name: frontend-dist
           path: web/dist
 
+  build-website:
+    name: 构建官网资源
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v5
+
+      - name: 设置 Node 环境
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: 启用 Corepack 并激活 Yarn 4
+        run: |
+          corepack enable
+          corepack prepare yarn@4.12.0 --activate
+
+      - name: 缓存 Yarn 包缓存
+        uses: actions/cache@v4
+        with:
+          path: website/.yarn/cache
+          key: ${{ runner.os }}-yarn-website-${{ hashFiles('website/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-yarn-website-
+
+      - name: 构建官网
+        working-directory: ./website
+        run: |
+          yarn --version
+          yarn install --immutable
+          yarn build
+
+      - name: 上传官网产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: website-dist
+          path: website/dist
+
   build-jar:
     name: 构建 JAR 包
     needs: build-frontend
@@ -164,6 +204,15 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      - name: 生成镜像 tags
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ secrets.DOCKERHUB_USERNAME }}/unirhy
+          tags: |
+            type=raw,value=${{ github.event.release.tag_name }}
+            type=raw,value=latest,enable=${{ !github.event.release.prerelease }}
+
       - name: 构建并推送 Docker 镜像
         uses: docker/build-push-action@v6
         with:
@@ -171,8 +220,38 @@ jobs:
           file: ./docker/Dockerfile.jvm
           push: true
           platforms: linux/amd64,linux/arm64
-          tags: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/unirhy:${{ github.event.release.tag_name }}
-            ${{ secrets.DOCKERHUB_USERNAME }}/unirhy:latest
+          tags: ${{ steps.meta.outputs.tags }}
           build-args: |
             JAR_FILE=dist/unirhy-v${{ github.event.release.tag_name }}.jar
+
+  deploy-cloudflare:
+    name: 部署官网到 Cloudflare Workers
+    if: github.event_name == 'release'
+    needs: build-website
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v5
+
+      - name: 下载官网产物
+        uses: actions/download-artifact@v4
+        with:
+          name: website-dist
+          path: website/dist
+
+      - name: 上传预览版本（不切生产流量）
+        if: github.event.release.prerelease
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: versions upload --tag ${{ github.event.release.tag_name }} --message "Prerelease ${{ github.event.release.tag_name }}"
+
+      - name: 部署到生产（上传并切 100% 流量）
+        if: ${{ !github.event.release.prerelease }}
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy
