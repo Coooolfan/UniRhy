@@ -42,7 +42,7 @@ const descriptionModel = computed({
             </div>
             <div class="flex items-start gap-2 text-sm text-[#6B635B]">
                 <Music4 class="mt-0.5 h-4 w-4 shrink-0 text-[#C27E46]" />
-                <span>嵌入模型和补全模型的 API 配置仍在系统设置页面维护。</span>
+                <span>嵌入模型和补全模型的 API 配置在系统设置页面维护。</span>
             </div>
         </div>
     </div>
