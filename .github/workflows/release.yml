@@ -1,0 +1,149 @@
+name: release
+run-name: Release ${{ github.ref_name }}
+on:
+  push:
+    tags:
+      - '*.*.*'
+
+jobs:
+  prepare-release:
+    name: 预检
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      tag: ${{ steps.parse-version.outputs.tag }}
+      prerelease: ${{ steps.parse-version.outputs.prerelease }}
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v5
+
+      - name: 解析版本信息
+        id: parse-version
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          echo "TAG=${TAG}" >> $GITHUB_ENV
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+
+          if [[ "$TAG" =~ -rc-|-beta-|-alpha- ]]; then
+            echo "PRERELEASE=true" >> $GITHUB_ENV
+            echo "prerelease=true" >> $GITHUB_OUTPUT
+          else
+            echo "PRERELEASE=false" >> $GITHUB_ENV
+            echo "prerelease=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: 校验 Release Notes 文件
+        run: |
+          NOTES_FILE="docs/release_notes/${TAG}.md"
+          if [ ! -f "$NOTES_FILE" ]; then
+            echo "::error::Release notes 文件不存在: $NOTES_FILE"
+            exit 1
+          fi
+
+  build-assets:
+    name: 构建
+    needs: prepare-release
+    permissions:
+      contents: write
+    uses: ./.github/workflows/builder.yml
+    with:
+      version: ${{ needs.prepare-release.outputs.tag }}
+      prerelease: ${{ needs.prepare-release.outputs.prerelease }}
+    secrets: inherit
+
+  create-draft-release:
+    name: 创建草稿 Release
+    needs:
+      - prepare-release
+      - build-assets
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v5
+
+      - name: 创建草稿 Release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ needs.prepare-release.outputs.tag }}
+          name: ${{ needs.prepare-release.outputs.tag }}
+          body_path: docs/release_notes/${{ needs.prepare-release.outputs.tag }}.md
+          prerelease: ${{ needs.prepare-release.outputs.prerelease == 'true' }}
+          draft: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  upload-release-assets:
+    name: 上传产物到 Release
+    needs:
+      - prepare-release
+      - create-draft-release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: 设置发布元信息
+        run: |
+          echo "VERSION=${{ needs.prepare-release.outputs.tag }}" >> $GITHUB_ENV
+
+      - name: 下载 Release 产物
+        uses: actions/download-artifact@v4
+        with:
+          name: jar
+          path: dist
+
+      - name: 查看产物结构
+        run: |
+          ls -R dist
+
+      - name: 安装 zip
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y zip
+
+      - name: 打包为 ZIP
+        working-directory: dist
+        run: |
+          TAG=${VERSION}
+          zip "unirhy-v${TAG}.jar.zip" "unirhy-v${TAG}.jar"
+
+      - name: 上传到 Release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ needs.prepare-release.outputs.tag }}
+          draft: true
+          files: |
+            dist/unirhy-v${{ needs.prepare-release.outputs.tag }}.jar.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  publish-release:
+    name: 公开 Release
+    needs:
+      - prepare-release
+      - upload-release-assets
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: 设置发布元信息
+        run: |
+          echo "VERSION=${{ needs.prepare-release.outputs.tag }}" >> $GITHUB_ENV
+          echo "PRERELEASE=${{ needs.prepare-release.outputs.prerelease }}" >> $GITHUB_ENV
+
+      - name: 公开 Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ "$PRERELEASE" = "true" ]; then
+            gh release edit "$VERSION" --draft=false --prerelease --repo "$GITHUB_REPOSITORY"
+          else
+            gh release edit "$VERSION" --draft=false --latest --repo "$GITHUB_REPOSITORY"
+          fi

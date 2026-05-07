@@ -1,7 +1,16 @@
 name: UniRhy Builder
 on:
-  release:
-    types: [ published ]
+  workflow_call:
+    inputs:
+      version:
+        description: "版本号"
+        required: true
+        type: string
+      prerelease:
+        description: "是否为预发布版本"
+        required: false
+        type: string
+        default: 'false'
   workflow_dispatch:
     inputs:
       version:
@@ -10,7 +19,7 @@ on:
         default: "dev"
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build-frontend:
@@ -63,11 +72,7 @@ jobs:
 
       - name: 设置版本号
         run: |
-          if [ "${{ github.event_name }}" = "release" ]; then
-            echo "VERSION=${{ github.event.release.tag_name }}" >> $GITHUB_ENV
-          else
-            echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_ENV
-          fi
+          echo "VERSION=${{ inputs.version }}" >> $GITHUB_ENV
 
       - name: 设置 JDK 环境
         uses: actions/setup-java@v5
@@ -110,69 +115,3 @@ jobs:
         with:
           name: jar
           path: server/build/libs/unirhy-v${{ env.VERSION }}.jar
-
-  upload-release-assets:
-    name: 上传产物到 Release
-    if: github.event_name == 'release'
-    needs: build-jar
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: 下载 JAR 产物
-        uses: actions/download-artifact@v4
-        with:
-          name: jar
-          path: dist
-
-      - name: 查看产物结构
-        run: ls -R dist
-
-      - name: 上传到 Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.event.release.tag_name }}
-          files: |
-            dist/unirhy-v${{ github.event.release.tag_name }}.jar
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  build-docker-for-jvm:
-    name: 构建并推送 Docker 镜像
-    if: github.event_name == 'release'
-    needs: build-jar
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: 检出代码
-        uses: actions/checkout@v5
-
-      - name: 设置 QEMU
-        uses: docker/setup-qemu-action@v3
-
-      - name: 设置 Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: 下载 JAR 产物
-        uses: actions/download-artifact@v4
-        with:
-          name: jar
-          path: dist
-
-      - name: 登录到 DockerHub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: 构建并推送 Docker 镜像
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: ./docker/Dockerfile.jvm
-          push: true
-          platforms: linux/amd64,linux/arm64
-          tags: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/unirhy:${{ github.event.release.tag_name }}
-            ${{ secrets.DOCKERHUB_USERNAME }}/unirhy:latest
-          build-args: |
-            JAR_FILE=dist/unirhy-v${{ github.event.release.tag_name }}.jar
