@@ -15,11 +15,6 @@ import org.babyfish.jimmer.sql.kt.fetcher.newFetcher
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.support.TransactionTemplate
-import java.net.URI
-import java.net.http.HttpClient
-import java.net.http.HttpRequest
-import java.net.http.HttpResponse
-import java.time.Duration
 
 @Service
 class VectorizeTaskService(
@@ -28,13 +23,10 @@ class VectorizeTaskService(
     private val queueStore: AsyncTaskQueueStore,
     private val transactionTemplate: TransactionTemplate,
     private val systemConfigService: SystemConfigService,
+    private val embeddingClient: EmbeddingClient,
 ) {
 
     private val logger = LoggerFactory.getLogger(VectorizeTaskService::class.java)
-
-    private val httpClient = HttpClient.newBuilder()
-        .connectTimeout(Duration.ofSeconds(30))
-        .build()
 
     fun submit(request: VectorizeTaskRequest) {
         val recordingIds = sql.createQuery(Recording::class) {
@@ -102,17 +94,8 @@ class VectorizeTaskService(
                         ).embeddingModel
                             ?: error("Embedding model not configured in system settings")
 
-                        if (embeddingModelConfig.requestFormat != AiRequestFormat.JINA) {
-                            error("Unsupported request format for vectorize: ${embeddingModelConfig.requestFormat}. Only JINA is supported.")
-                        }
-
                         val texts = tasksWithLyrics.map { it.lyrics }
-                        val embeddings = callEmbeddingApi(
-                            apiEndpoint = embeddingModelConfig.endpoint,
-                            apiKey = embeddingModelConfig.key,
-                            modelName = embeddingModelConfig.model,
-                            texts = texts,
-                        )
+                        val embeddings = embeddingClient.embed(embeddingModelConfig, texts)
 
                         val recordingUpdates = tasksWithLyrics.mapIndexed { index, item ->
                             Recording {
@@ -148,47 +131,6 @@ class VectorizeTaskService(
             logger.error("Failed to consume pending vectorize task", ex)
             false
         }
-    }
-
-    private fun callEmbeddingApi(
-        apiEndpoint: String,
-        apiKey: String,
-        modelName: String,
-        texts: List<String>,
-    ): List<FloatArray> {
-        val requestBody = objectMapper.writeValueAsString(
-            mapOf(
-                "model" to modelName,
-                "task" to "retrieval.query",
-                "normalized" to true,
-                "input" to texts,
-            )
-        )
-
-        val request = HttpRequest.newBuilder()
-            .uri(URI.create(apiEndpoint))
-            .header("Content-Type", "application/json")
-            .header("Authorization", "Bearer $apiKey")
-            .POST(HttpRequest.BodyPublishers.ofString(requestBody))
-            .timeout(Duration.ofSeconds(120))
-            .build()
-
-        val response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
-        if (response.statusCode() != 200) {
-            error("Embedding API error (${response.statusCode()}): ${response.body().take(500)}")
-        }
-
-        val responseJson = objectMapper.readTree(response.body())
-        val dataArray = responseJson["data"]
-            ?: error("Embedding API response missing 'data' field")
-
-        return (0 until dataArray.size())
-            .map { i -> dataArray[i] }
-            .sortedBy { it["index"].intValue() }
-            .map { item ->
-                val embArr = item["embedding"]
-                FloatArray(embArr.size()) { i -> embArr[i].floatValue() }
-            }
     }
 
     private companion object {

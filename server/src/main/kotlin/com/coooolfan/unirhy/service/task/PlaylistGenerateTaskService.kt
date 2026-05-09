@@ -29,6 +29,7 @@ class PlaylistGenerateTaskService(
     private val queueStore: AsyncTaskQueueStore,
     private val transactionTemplate: TransactionTemplate,
     private val systemConfigService: SystemConfigService,
+    private val embeddingClient: EmbeddingClient,
 ) {
 
     private val logger = LoggerFactory.getLogger(PlaylistGenerateTaskService::class.java)
@@ -73,16 +74,7 @@ class PlaylistGenerateTaskService(
                     ).embeddingModel
                         ?: error("Embedding model not configured in system settings")
 
-                    if (embeddingModelConfig.requestFormat != AiRequestFormat.JINA) {
-                        error("Unsupported request format for embedding: ${embeddingModelConfig.requestFormat}. Only JINA is supported.")
-                    }
-
-                    val queryEmbedding = callEmbeddingApi(
-                        apiEndpoint = embeddingModelConfig.endpoint,
-                        apiKey = embeddingModelConfig.key,
-                        modelName = embeddingModelConfig.model,
-                        text = payload.description,
-                    )
+                    val queryEmbedding = embeddingClient.embedOne(embeddingModelConfig, payload.description)
                     logger.info(
                         "[playlist-generate] embedding complete, taskId={}, inputLength={}, vectorDim={}",
                         task.id, payload.description.length, queryEmbedding.size,
@@ -185,42 +177,6 @@ class PlaylistGenerateTaskService(
             logger.error("Failed to consume pending playlist-generate task", ex)
             false
         }
-    }
-
-    private fun callEmbeddingApi(
-        apiEndpoint: String,
-        apiKey: String,
-        modelName: String,
-        text: String,
-    ): FloatArray {
-        val requestBody = objectMapper.writeValueAsString(
-            mapOf(
-                "model" to modelName,
-                "task" to "retrieval.query",
-                "normalized" to true,
-                "input" to listOf(text),
-            )
-        )
-
-        val request = HttpRequest.newBuilder()
-            .uri(URI.create(apiEndpoint))
-            .header("Content-Type", "application/json")
-            .header("Authorization", "Bearer $apiKey")
-            .POST(HttpRequest.BodyPublishers.ofString(requestBody))
-            .timeout(Duration.ofSeconds(120))
-            .build()
-
-        val response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
-        if (response.statusCode() != 200) {
-            error("Embedding API error (${response.statusCode()}): ${response.body().take(500)}")
-        }
-
-        val responseJson = objectMapper.readTree(response.body())
-        val dataArray = responseJson["data"]
-            ?: error("Embedding API response missing 'data' field")
-        val embArr = dataArray[0]["embedding"]
-            ?: error("Embedding API response missing 'embedding' in first data entry")
-        return FloatArray(embArr.size()) { i -> embArr[i].floatValue() }
     }
 
     private fun searchSimilarRecordings(queryEmbedding: FloatArray, limit: Int): List<Long> {
