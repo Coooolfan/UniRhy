@@ -53,6 +53,7 @@ class TokenController(private val service: AccountService) {
      * @api DELETE /api/tokens/current
      * @description 调用AccountService.logout()方法退出登录
      */
+    @SaCheckLogin
     @DeleteMapping("/current")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     fun logout() {
