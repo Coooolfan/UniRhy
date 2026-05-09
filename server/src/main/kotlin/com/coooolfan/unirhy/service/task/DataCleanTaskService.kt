@@ -20,6 +20,7 @@ import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.time.Duration
+import java.time.Instant
 
 @Service
 class DataCleanTaskService(
@@ -57,6 +58,7 @@ class DataCleanTaskService(
                     return@executeWithoutResult
                 }
                 consumedTask = true
+                val completedAt = Instant.now()
 
                 val completionUpdates = mutableListOf<AsyncTaskLog>()
 
@@ -80,12 +82,14 @@ class DataCleanTaskService(
                         completionUpdates += AsyncTaskLog {
                             id = task.id
                             status = TaskStatus.COMPLETED
+                            this.completedAt = completedAt
                             completedReason = "SKIPPED: recording not found"
                         }
                     } else if (recording.title.isNullOrBlank()) {
                         completionUpdates += AsyncTaskLog {
                             id = task.id
                             status = TaskStatus.COMPLETED
+                            this.completedAt = completedAt
                             completedReason = "SKIPPED: empty title"
                         }
                     } else {
@@ -116,25 +120,18 @@ class DataCleanTaskService(
 
                         val recordingUpdates = mutableListOf<Recording>()
                         for (item in tasksWithTitle) {
-                            val cleanedTitle = ruleMap[item.title]
-                            if (cleanedTitle == null) {
-                                completionUpdates += AsyncTaskLog {
-                                    id = item.task.id
-                                    status = TaskStatus.FAILED
-                                    completedReason = "API response missing rule for title: ${item.title.take(100)}"
+                            val cleanedTitle = ruleMap[item.title] ?: item.title
+                            if (cleanedTitle != item.title) {
+                                recordingUpdates += Recording {
+                                    id = item.payload.recordingId
+                                    title = cleanedTitle
                                 }
-                            } else {
-                                if (cleanedTitle != item.title) {
-                                    recordingUpdates += Recording {
-                                        id = item.payload.recordingId
-                                        title = cleanedTitle
-                                    }
-                                }
-                                completionUpdates += AsyncTaskLog {
-                                    id = item.task.id
-                                    status = TaskStatus.COMPLETED
-                                    completedReason = "SUCCESS"
-                                }
+                            }
+                            completionUpdates += AsyncTaskLog {
+                                id = item.task.id
+                                status = TaskStatus.COMPLETED
+                                this.completedAt = completedAt
+                                completedReason = "SUCCESS"
                             }
                         }
                         if (recordingUpdates.isNotEmpty()) {
@@ -146,6 +143,7 @@ class DataCleanTaskService(
                             completionUpdates += AsyncTaskLog {
                                 id = item.task.id
                                 status = TaskStatus.FAILED
+                                this.completedAt = completedAt
                                 completedReason = failureReason(ex)
                             }
                         }
@@ -248,6 +246,7 @@ class DataCleanTaskService(
             "你正在一个无人介入的数据清洗任务中。歌曲名字可能包含各种后缀、描述、提示。" +
                     "移除这些提示，仅保留纯粹的歌曲名字。" +
                     "例如`光年之外《粤语版》`->`光年之外`；`打火机-0.75x`->`打火机`；`画 (完整版|英文版[Live)`->`画`。" +
+                    "必须为每一个输入项目返回一条规则，before 必须和原始输入完全一致；不需要修改时 after 必须等于 before。" +
                     "严格按照要求的 JSON 格式输出，不要输出解释。以下每一个项目都是一个歌曲的名字。"
     }
 }
