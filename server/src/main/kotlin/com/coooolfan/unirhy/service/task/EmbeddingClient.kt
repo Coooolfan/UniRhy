@@ -62,7 +62,7 @@ class EmbeddingClient(
         return objectMapper.writeValueAsString(
             mapOf(
                 "model" to modelName,
-                "input" to texts,
+                "input" to texts.map { it.take(OPENAI_COMPATIBLE_MAX_INPUT_LENGTH) },
                 "encoding_format" to "float",
             )
         )
@@ -81,5 +81,9 @@ class EmbeddingClient(
                     ?: error("Embedding API response missing 'embedding' in data entry")
                 FloatArray(embArr.size()) { i -> embArr[i].floatValue() }
             }
+    }
+
+    private companion object {
+        private const val OPENAI_COMPATIBLE_MAX_INPUT_LENGTH = 8192
     }
 }

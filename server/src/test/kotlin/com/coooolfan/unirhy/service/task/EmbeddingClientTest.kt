@@ -47,6 +47,29 @@ class EmbeddingClientTest {
     }
 
     @Test
+    fun `openai embedding format truncates input to provider limit`() {
+        val capturedBodies = mutableListOf<String>()
+        val server = startEmbeddingServer(capturedBodies)
+        try {
+            val client = EmbeddingClient(objectMapper)
+            client.embed(
+                config = AiModelConfig(
+                    endpoint = "http://127.0.0.1:${server.address.port}/v1/embeddings",
+                    model = "text-embedding-v4",
+                    key = "test-key",
+                    requestFormat = AiRequestFormat.OPENAI,
+                ),
+                texts = listOf("x".repeat(9000)),
+            )
+
+            val requestJson = objectMapper.readTree(capturedBodies.single())
+            assertEquals(8192, requestJson["input"][0].asText().length)
+        } finally {
+            server.stop(0)
+        }
+    }
+
+    @Test
     fun `jina embedding format keeps existing request shape`() {
         val capturedBodies = mutableListOf<String>()
         val server = startEmbeddingServer(capturedBodies)
