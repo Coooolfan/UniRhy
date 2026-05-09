@@ -86,6 +86,17 @@ class PlaybackSyncWebSocketHandlerTest {
     }
 
     @Test
+    fun `hello token authenticates pending connection`() {
+        val session = TestWebSocketSession(sessionId = "session-1", accountId = null)
+        handler.afterConnectionEstablished(session)
+
+        handler.handleMessage(session, TextMessage(helloPayload("web-7c2f", token = "valid-token")))
+
+        val snapshot = session.serverMessages().first() as SnapshotMessage
+        assertEquals(PlaybackStatus.PAUSED, snapshot.payload.state.status)
+    }
+
+    @Test
     fun `play switches current index and broadcasts queue load and scheduled action`() {
         val queue = currentQueueService.replaceQueue(
             accountId = 42L,
@@ -173,7 +184,7 @@ class PlaybackSyncWebSocketHandlerTest {
         )
         return PlaybackSyncWebSocketHandler(
             objectMapper = objectMapper,
-            authenticator = FakePlaybackSyncAuthenticator(mapOf("valid-token" to 42L)),
+            authenticator = FakePlaybackSyncHandlerAuthenticator(mapOf("valid-token" to 42L)),
             currentQueueService = currentQueueService,
             playbackSessionService = playbackSessionService,
             deviceRuntimeService = deviceRuntimeService,
@@ -189,16 +200,21 @@ class PlaybackSyncWebSocketHandlerTest {
         )
     }
 
-    private fun helloPayload(deviceId: String): String = """
-        {
-          "type": "HELLO",
-          "payload": {
-            "deviceId": "$deviceId",
-            "clientVersion": "web@0.1.0",
-            "token": "valid-token"
-          }
+    private fun helloPayload(deviceId: String, token: String? = null): String {
+        val payload = linkedMapOf<String, Any?>(
+            "deviceId" to deviceId,
+            "clientVersion" to "web@0.1.0",
+        )
+        if (token != null) {
+            payload["token"] = token
         }
-    """.trimIndent()
+        return objectMapper.writeValueAsString(
+            mapOf(
+                "type" to "HELLO",
+                "payload" to payload,
+            )
+        )
+    }
 
     private fun playPayload(
         currentIndex: Int,
@@ -245,7 +261,7 @@ private class FakeCurrentQueueRecordingCatalog : CurrentQueueRecordingCatalog {
     ): Long? = null
 }
 
-private class FakePlaybackSyncAuthenticator(
+private class FakePlaybackSyncHandlerAuthenticator(
     private val tokenToAccountId: Map<String, Long>,
 ) : PlaybackSyncAuthenticator {
     override fun authenticate(tokenValue: String): Long? = tokenToAccountId[tokenValue]

@@ -1,6 +1,5 @@
 package com.coooolfan.unirhy.controller
 
-import cn.dev33.satoken.annotation.SaCheckLogin
 import cn.dev33.satoken.stp.StpUtil
 import com.coooolfan.unirhy.error.CommonException
 import com.coooolfan.unirhy.model.dto.TokenLoginRequest
@@ -48,7 +47,7 @@ class TokenController(private val service: AccountService) {
      * 退出当前会话
      *
      * 此接口用于注销当前登录会话
-     * 需要用户登录认证才能访问
+     * 无需登录认证即可访问
      *
      * @api DELETE /api/tokens/current
      * @description 调用AccountService.logout()方法退出登录

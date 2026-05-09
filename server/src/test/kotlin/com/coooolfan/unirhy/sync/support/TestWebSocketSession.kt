@@ -16,14 +16,17 @@ import java.security.Principal
 
 class TestWebSocketSession(
     private val sessionId: String,
-    accountId: Long,
+    accountId: Long?,
 ) : WebSocketSession {
     private val openUri = URI.create("ws://localhost/ws/playback-sync")
     private val attributes = mutableMapOf<String, Any>(
-        PlaybackSyncSessionAttributes.ACCOUNT_ID to accountId,
         PlaybackSyncSessionAttributes.TOKEN_VALUE to "token-$sessionId",
         PlaybackSyncSessionAttributes.SESSION_ID to sessionId,
-    )
+    ).also {
+        if (accountId != null) {
+            it[PlaybackSyncSessionAttributes.ACCOUNT_ID] = accountId
+        }
+    }
 
     override fun getId(): String = sessionId
 

@@ -7,7 +7,6 @@ import com.unirhy.e2e.support.E2eAssert
 import com.unirhy.e2e.support.E2eJson
 import com.unirhy.e2e.support.E2eRuntime
 import com.unirhy.e2e.support.E2eWebSocketClient
-import com.unirhy.e2e.support.E2eWebSocketMessage
 import com.unirhy.e2e.support.PreparedPlaybackData
 import com.unirhy.e2e.support.bootstrapAdminSession
 import com.unirhy.e2e.support.ensurePreparedPlaybackData
@@ -20,8 +19,9 @@ import org.springframework.boot.test.web.server.LocalServerPort
 import org.springframework.test.annotation.DirtiesContext
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
-import java.time.Duration
+import java.util.concurrent.CompletionException
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 @SpringBootTest(
@@ -47,7 +47,7 @@ class PlaybackSyncWebSocketE2eTest {
         resetQueue(state)
 
         E2eWebSocketClient.connect(baseUrl(), state.api.authToken()).use { client ->
-            hello(client, state, "web-hello")
+            hello(client, "web-hello")
 
             val snapshot = client.awaitMessage(PlaybackSyncMessageType.SNAPSHOT)
             assertEquals("PAUSED", snapshot.payload.path("state").path("status").asText(), "[hello] snapshot should start paused")
@@ -61,7 +61,7 @@ class PlaybackSyncWebSocketE2eTest {
     }
 
     @Test
-    fun `non hello first message should close unauthenticated connection`() {
+    fun `non hello first message should close authenticated connection`() {
         val state = bootstrapAdminSession(baseUrl())
 
         E2eWebSocketClient.connect(baseUrl(), state.api.authToken()).use { client ->
@@ -85,11 +85,11 @@ class PlaybackSyncWebSocketE2eTest {
         val state = bootstrapAdminSession(baseUrl())
 
         E2eWebSocketClient.connect(baseUrl(), state.api.authToken()).use { client ->
-            hello(client, state, "web-dup")
+            hello(client, "web-dup")
             client.awaitMessage(PlaybackSyncMessageType.SNAPSHOT)
             client.awaitMessage(PlaybackSyncMessageType.ROOM_EVENT_DEVICE_CHANGE)
 
-            hello(client, state, "web-dup")
+            hello(client, "web-dup")
 
             val error = client.awaitMessage(PlaybackSyncMessageType.ERROR)
             assertEquals("INVALID_MESSAGE", error.payload.path("code").asText(), "[hello] duplicate hello should return invalid message")
@@ -97,18 +97,9 @@ class PlaybackSyncWebSocketE2eTest {
     }
 
     @Test
-    fun `invalid hello token should close connection`() {
-        E2eWebSocketClient.connect(baseUrl()).use { client ->
-            client.send(
-                PlaybackSyncMessageType.HELLO,
-                mapOf(
-                    "deviceId" to "web-invalid-token",
-                    "clientVersion" to "e2e",
-                    "token" to "invalid-token",
-                ),
-            )
-
-            client.awaitClose()
+    fun `invalid handshake token should fail`() {
+        assertFailsWith<CompletionException> {
+            E2eWebSocketClient.connect(baseUrl(), "invalid-token")
         }
     }
 
@@ -117,12 +108,12 @@ class PlaybackSyncWebSocketE2eTest {
         val state = bootstrapAdminSession(baseUrl())
 
         E2eWebSocketClient.connect(baseUrl(), state.api.authToken()).use { first ->
-            hello(first, state, "web-replaced")
+            hello(first, "web-replaced")
             first.awaitMessage(PlaybackSyncMessageType.SNAPSHOT)
             first.awaitMessage(PlaybackSyncMessageType.ROOM_EVENT_DEVICE_CHANGE)
 
             E2eWebSocketClient.connect(baseUrl(), state.api.authToken()).use { second ->
-                hello(second, state, "web-replaced")
+                hello(second, "web-replaced")
 
                 first.awaitClose()
 
@@ -142,12 +133,12 @@ class PlaybackSyncWebSocketE2eTest {
 
         E2eWebSocketClient.connect(baseUrl(), state.api.authToken()).use { deviceA ->
             E2eWebSocketClient.connect(baseUrl(), state.api.authToken()).use { deviceB ->
-                hello(deviceA, state, "web-a")
+                hello(deviceA, "web-a")
                 val aSnapshot = deviceA.awaitMessage(PlaybackSyncMessageType.SNAPSHOT)
                 assertEquals(queue.path("version").longValue(), aSnapshot.payload.path("queue").path("version").longValue(), "[play] device A should see prepared queue")
                 deviceA.awaitMessage(PlaybackSyncMessageType.ROOM_EVENT_DEVICE_CHANGE)
 
-                hello(deviceB, state, "web-b")
+                hello(deviceB, "web-b")
                 deviceB.awaitMessage(PlaybackSyncMessageType.SNAPSHOT)
                 deviceB.awaitMessage(PlaybackSyncMessageType.ROOM_EVENT_DEVICE_CHANGE)
                 val joinedChange = deviceA.awaitMessage(PlaybackSyncMessageType.ROOM_EVENT_DEVICE_CHANGE)
@@ -214,7 +205,6 @@ class PlaybackSyncWebSocketE2eTest {
 
     private fun hello(
         client: E2eWebSocketClient,
-        state: E2eAdminSession,
         deviceId: String,
     ) {
         client.send(
@@ -222,7 +212,6 @@ class PlaybackSyncWebSocketE2eTest {
             mapOf(
                 "deviceId" to deviceId,
                 "clientVersion" to "api-e2e",
-                "token" to state.api.authToken(),
             ),
         )
     }

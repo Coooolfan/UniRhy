@@ -160,12 +160,10 @@ class PlaybackSyncWebSocketHandler(
             session.close(POLICY_VIOLATION_CLOSE_STATUS)
             return
         }
-        val token = clientMessage.payload.token
-        if (token.isNullOrBlank()) {
-            session.close(POLICY_VIOLATION_CLOSE_STATUS)
-            return
-        }
-        val accountId = authenticator.authenticate(token)
+        val accountId = session.getPlaybackSyncAccountId()
+            ?: clientMessage.payload.token
+                ?.takeIf { it.isNotBlank() }
+                ?.let(authenticator::authenticate)
         if (accountId == null) {
             session.close(POLICY_VIOLATION_CLOSE_STATUS)
             return
@@ -621,6 +619,16 @@ class PlaybackSyncWebSocketHandler(
 
     private fun cancelPendingTimeout(sessionId: String) {
         pendingTimeouts.remove(sessionId)?.cancel(false)
+    }
+
+    private fun WebSocketSession.getPlaybackSyncAccountId(): Long? {
+        return when (val accountId = attributes[PlaybackSyncSessionAttributes.ACCOUNT_ID]) {
+            is Long -> accountId
+            is Int -> accountId.toLong()
+            is Number -> accountId.toLong()
+            is String -> accountId.toLongOrNull()
+            else -> null
+        }
     }
 
     private fun WebSocketSession.getPlaybackSyncSessionId(): String {

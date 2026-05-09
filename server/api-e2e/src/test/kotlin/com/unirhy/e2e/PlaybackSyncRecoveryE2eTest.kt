@@ -47,7 +47,7 @@ class PlaybackSyncRecoveryE2eTest {
         replaceQueue(state, prepared, currentIndex = 0)
 
         E2eWebSocketClient.connect(baseUrl(), state.api.authToken()).use { client ->
-            hello(client, state, "web-sync")
+            hello(client, "web-sync")
             client.awaitMessage(PlaybackSyncMessageType.SNAPSHOT)
             client.awaitMessage(PlaybackSyncMessageType.ROOM_EVENT_DEVICE_CHANGE)
 
@@ -75,7 +75,7 @@ class PlaybackSyncRecoveryE2eTest {
         val queue = replaceQueue(state, prepared, currentIndex = 0)
 
         E2eWebSocketClient.connect(baseUrl(), state.api.authToken()).use { client ->
-            hello(client, state, "web-paused")
+            hello(client, "web-paused")
             client.awaitMessage(PlaybackSyncMessageType.SNAPSHOT)
             client.awaitMessage(PlaybackSyncMessageType.ROOM_EVENT_DEVICE_CHANGE)
 
@@ -111,7 +111,7 @@ class PlaybackSyncRecoveryE2eTest {
         val queue = replaceQueue(state, prepared, currentIndex = 0)
 
         E2eWebSocketClient.connect(baseUrl(), state.api.authToken()).use { client ->
-            hello(client, state, "web-playing")
+            hello(client, "web-playing")
             client.awaitMessage(PlaybackSyncMessageType.SNAPSHOT)
             client.awaitMessage(PlaybackSyncMessageType.ROOM_EVENT_DEVICE_CHANGE)
             sendNtp(client)
@@ -191,7 +191,7 @@ class PlaybackSyncRecoveryE2eTest {
 
         val client = E2eWebSocketClient.connect(baseUrl(), state.api.authToken())
         try {
-            hello(client, state, "web-disconnect")
+            hello(client, "web-disconnect")
             client.awaitMessage(PlaybackSyncMessageType.SNAPSHOT)
             client.awaitMessage(PlaybackSyncMessageType.ROOM_EVENT_DEVICE_CHANGE)
             sendNtp(client)
@@ -215,7 +215,7 @@ class PlaybackSyncRecoveryE2eTest {
         }
 
         E2eWebSocketClient.connect(baseUrl(), state.api.authToken()).use { reconnect ->
-            hello(reconnect, state, "web-after-disconnect")
+            hello(reconnect, "web-after-disconnect")
             val snapshot = reconnect.awaitMessage(PlaybackSyncMessageType.SNAPSHOT)
             assertEquals("PAUSED", snapshot.payload.path("state").path("status").asText(), "[disconnect] reconnect snapshot should show auto paused state")
         }
@@ -223,7 +223,6 @@ class PlaybackSyncRecoveryE2eTest {
 
     private fun hello(
         client: E2eWebSocketClient,
-        state: E2eAdminSession,
         deviceId: String,
     ) {
         client.send(
@@ -231,7 +230,6 @@ class PlaybackSyncRecoveryE2eTest {
             mapOf(
                 "deviceId" to deviceId,
                 "clientVersion" to "api-e2e",
-                "token" to state.api.authToken(),
             ),
         )
     }
