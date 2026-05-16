@@ -26,11 +26,12 @@ const emit = defineEmits<{
                 <HardDrive :size="32" stroke-width="1.5" />
             </div>
 
-            <div class="flex-1 p-6 flex flex-col">
-                <div class="flex justify-between items-start mb-2">
-                    <div>
+            <div class="min-w-0 flex-1 p-6 flex flex-col">
+                <div class="flex justify-between items-start gap-4 mb-2">
+                    <div class="min-w-0">
                         <h3
-                            class="text-xl font-medium group-hover:text-[#C67C4E] transition-colors duration-300"
+                            class="truncate text-xl font-medium group-hover:text-[#C67C4E] transition-colors duration-300"
+                            :title="node.name"
                         >
                             {{ node.name }}
                         </h3>
@@ -57,10 +58,10 @@ const emit = defineEmits<{
                 </div>
 
                 <div
-                    class="flex items-center gap-2 text-[#7A756D] text-sm font-mono bg-[#EAE6D9]/50 p-2 rounded-sm mt-auto"
+                    class="min-w-0 flex items-center gap-2 text-[#7A756D] text-sm font-mono bg-[#EAE6D9]/50 p-2 rounded-sm mt-auto"
                 >
-                    <FolderOpen :size="14" class="text-[#C67C4E]" />
-                    <span class="truncate" :title="node.parentPath">
+                    <FolderOpen :size="14" class="shrink-0 text-[#C67C4E]" />
+                    <span class="min-w-0 truncate" :title="node.parentPath">
                         {{ node.parentPath }}
                     </span>
                 </div>
