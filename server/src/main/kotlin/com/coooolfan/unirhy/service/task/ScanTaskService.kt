@@ -13,6 +13,7 @@ import org.babyfish.jimmer.sql.kt.KSqlClient
 import org.babyfish.jimmer.sql.kt.ast.expression.eq
 import org.jaudiotagger.audio.AudioFileIO
 import org.jaudiotagger.tag.FieldKey
+import org.jaudiotagger.tag.Tag
 import org.jaudiotagger.tag.images.Artwork
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
@@ -20,6 +21,7 @@ import org.springframework.transaction.support.TransactionTemplate
 import java.io.File
 import java.nio.file.Files
 import java.security.MessageDigest
+import java.time.LocalDate
 import kotlin.io.path.Path
 
 @Service
@@ -137,6 +139,7 @@ class ScanTaskService(
 }
 
 private val COVER_EXTENSIONS = hashSetOf("jpg", "jpeg", "png", "gif")
+private val TAG_DATE_REGEX = Regex("""(\d{4})(?:[-./](\d{1,2})(?:[-./](\d{1,2}))?)?""")
 private const val SCAN_ENQUEUE_BATCH_SIZE = 512
 private const val METADATA_PARSE_CLAIM_LIMIT = 10L
 
@@ -201,7 +204,7 @@ private fun buildWorkFromAudioFile(
                 album().apply {
                     title = tag?.getFirst(FieldKey.ALBUM).orEmpty()
                     kind = "CD"
-                    releaseDate = null
+                    releaseDate = tag?.albumReleaseDate()
                     comment = "load from local file: $objectKey"
                     cover = audioCover
                 }
@@ -221,6 +224,35 @@ private fun buildWorkFromAudioFile(
             }
         }
     }
+}
+
+private fun Tag.albumReleaseDate(): LocalDate? {
+    val dateFields = listOf(
+        FieldKey.ALBUM_YEAR,
+        FieldKey.YEAR,
+        FieldKey.ORIGINALRELEASEDATE,
+        FieldKey.ORIGINAL_YEAR,
+        FieldKey.RECORDINGDATE,
+        FieldKey.RECORDINGSTARTDATE,
+    )
+
+    return dateFields.asSequence()
+        .mapNotNull { getFirst(it).parseTagDate() }
+        .firstOrNull()
+}
+
+private fun String.parseTagDate(): LocalDate? {
+    val normalized = trim()
+    if (normalized.isBlank()) {
+        return null
+    }
+
+    val match = TAG_DATE_REGEX.find(normalized) ?: return null
+    val year = match.groupValues[1].toIntOrNull() ?: return null
+    val month = match.groupValues[2].toIntOrNull() ?: 1
+    val day = match.groupValues[3].toIntOrNull() ?: 1
+
+    return runCatching { LocalDate.of(year, month, day) }.getOrNull()
 }
 
 fun fetchCover(
