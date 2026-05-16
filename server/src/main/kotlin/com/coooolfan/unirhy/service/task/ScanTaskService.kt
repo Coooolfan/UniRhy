@@ -114,16 +114,21 @@ class ScanTaskService(
             return "SKIPPED: source file missing"
         }
 
-        val work = buildWorkFromAudioFile(
+        if (audioMediaFileExists(provider.id, payload.objectKey)) {
+            return "SKIPPED: media file already scanned"
+        }
+
+        val scannedRecording = buildRecordingFromAudioFile(
             file = file,
             objectKey = payload.objectKey,
             provider = provider,
             writeableProvider = writeableProvider,
         )
 
-        sql.saveEntities(listOf(work)) {
-            setMode(SaveMode.INSERT_IF_ABSENT)
+        sql.saveEntities(listOf(scannedRecording)) {
+            setMode(SaveMode.INSERT_ONLY)
             setAssociatedModeAll(AssociatedSaveMode.APPEND)
+            setAssociatedMode(Recording::work, AssociatedSaveMode.APPEND_IF_ABSENT)
             setAssociatedMode(Asset::mediaFile, AssociatedSaveMode.APPEND_IF_ABSENT)
             setAssociatedMode(MediaFile::fsProvider, AssociatedSaveMode.APPEND_IF_ABSENT)
             setAssociatedMode(Album::cover, AssociatedSaveMode.APPEND_IF_ABSENT)
@@ -134,6 +139,15 @@ class ScanTaskService(
         }
         return "SUCCESS"
     }
+
+    private fun audioMediaFileExists(providerId: Long, objectKey: String): Boolean {
+        return sql.createQuery(MediaFile::class) {
+            where(table.objectKey eq objectKey)
+            where(table.fsProviderId eq providerId)
+            selectCount()
+        }.execute().first() > 0
+    }
+
 }
 
 private val COVER_EXTENSIONS = hashSetOf("jpg", "jpeg", "png", "gif")
@@ -171,54 +185,94 @@ fun discoverScanFileTaskPayloads(
     }
 }
 
-private fun buildWorkFromAudioFile(
+private fun buildRecordingFromAudioFile(
     file: File,
     objectKey: String,
     provider: FileProviderFileSystem,
     writeableProvider: FileProviderFileSystem,
-): Work {
+): Recording {
     val audioTag = AudioFileIO.read(file)
     val tag = audioTag.tag
     val audioCover = fetchCover(file, provider, writeableProvider, tag?.firstArtwork)
+    val recordingTitle = tag?.getFirst(FieldKey.TITLE).orEmpty()
+    val parsedTitle = parseRecordingTitleMetadata(recordingTitle)
+    val labels = (tag?.getFirst(FieldKey.RECORD_LABEL).singleTagValueList() + parsedTitle.labels).distinct()
 
-    return Work {
-        title = tag?.getFirst(FieldKey.TITLE).orEmpty()
-        recordings().addBy {
-            label = tag?.getFirst(FieldKey.RECORD_LABEL).singleTagValueList()
-            title = tag?.getFirst(FieldKey.TITLE).orEmpty()
-            comment = tag?.getFirst(FieldKey.COMMENT).orEmpty()
-            cover = audioCover
-            durationMs = audioTag.audioHeader.preciseTrackLength.toLong() * 1000
-            defaultInWork = false
-            artists().addBy {
-                displayName = tag?.getFirst(FieldKey.ARTIST).orEmpty()
-                alias = listOf(tag?.getFirst(FieldKey.ARTIST).orEmpty())
+    return Recording {
+        work {
+            title = parsedTitle.workTitle
+        }
+        label = labels
+        title = recordingTitle
+        comment = tag?.getFirst(FieldKey.COMMENT).orEmpty()
+        cover = audioCover
+        durationMs = audioTag.audioHeader.preciseTrackLength.toLong() * 1000
+        defaultInWork = false
+        artists().addBy {
+            displayName = tag?.getFirst(FieldKey.ARTIST).orEmpty()
+            alias = listOf(tag?.getFirst(FieldKey.ARTIST).orEmpty())
+            comment = ""
+            avatar = null
+        }
+        albumRecordings().addBy {
+            sortOrder = 0
+            album().apply {
+                title = tag?.getFirst(FieldKey.ALBUM).orEmpty()
+                releaseDate = tag?.albumReleaseDate()
                 comment = ""
-                avatar = null
+                cover = audioCover
             }
-            albumRecordings().addBy {
-                sortOrder = 0
-                album().apply {
-                    title = tag?.getFirst(FieldKey.ALBUM).orEmpty()
-                    releaseDate = tag?.albumReleaseDate()
-                    comment = ""
-                    cover = audioCover
-                }
-            }
-            assets().addBy {
-                comment = ""
-                mediaFile {
-                    this.objectKey = objectKey
-                    mimeType = Files.probeContentType(file.toPath()) ?: "application/octet-stream"
-                    size = file.length()
-                    width = null
-                    height = null
-                    ossProvider = null
-                    fsProvider = provider
-                }
+        }
+        assets().addBy {
+            comment = ""
+            mediaFile {
+                this.objectKey = objectKey
+                mimeType = Files.probeContentType(file.toPath()) ?: "application/octet-stream"
+                size = file.length()
+                width = null
+                height = null
+                ossProvider = null
+                fsProvider = provider
             }
         }
     }
+}
+
+data class ParsedRecordingTitle(
+    val workTitle: String,
+    val labels: List<String>,
+)
+
+fun parseRecordingTitleMetadata(title: String): ParsedRecordingTitle {
+    var remaining = title.trimEnd()
+    val reversedGroups = mutableListOf<List<String>>()
+
+    while (remaining.isNotEmpty()) {
+        val closeChar = remaining.last()
+        val openChar = when (closeChar) {
+            ')' -> '('
+            '）' -> '（'
+            else -> break
+        }
+        val openIndex = remaining.lastIndexOf(openChar)
+        if (openIndex < 0) {
+            break
+        }
+
+        val content = remaining.substring(openIndex + 1, remaining.lastIndex).trim()
+        val labels = content.split(Regex("""\s+"""))
+            .map(String::trim)
+            .filter(String::isNotBlank)
+        if (labels.isNotEmpty()) {
+            reversedGroups += labels
+        }
+        remaining = remaining.substring(0, openIndex).trimEnd()
+    }
+
+    return ParsedRecordingTitle(
+        workTitle = remaining.trim(),
+        labels = reversedGroups.asReversed().flatten(),
+    )
 }
 
 private fun Tag.albumReleaseDate(): LocalDate? {
