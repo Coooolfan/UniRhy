@@ -83,6 +83,9 @@ CREATE TABLE public.recording
 CREATE UNIQUE INDEX recording_default_in_work_uniq
     ON public.recording (work_id) WHERE default_in_work = TRUE;
 
+CREATE INDEX recording_label_gin_idx
+    ON public.recording USING GIN (label);
+
 -- ==========================================================
 -- 3.1 艺术家 (Artist) 模块
 -- ==========================================================
