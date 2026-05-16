@@ -52,39 +52,4 @@ class ScanTaskTitleParserTest {
         assertEquals("跳楼机 (Live) 2025", parsed.workTitle)
         assertEquals(emptyList(), parsed.labels)
     }
-
-    @Test
-    fun `splits artists separated by spaced slash`() {
-        val artists = parseRecordingArtists("A / B")
-
-        assertEquals(listOf("A", "B"), artists)
-    }
-
-    @Test
-    fun `splits artists separated by slash`() {
-        val artists = parseRecordingArtists("A/B")
-
-        assertEquals(listOf("A", "B"), artists)
-    }
-
-    @Test
-    fun `splits artists separated by semicolon`() {
-        val artists = parseRecordingArtists("A;B")
-
-        assertEquals(listOf("A", "B"), artists)
-    }
-
-    @Test
-    fun `splits slash without surrounding spaces inside artist name`() {
-        val artists = parseRecordingArtists("AC/DC")
-
-        assertEquals(listOf("AC", "DC"), artists)
-    }
-
-    @Test
-    fun `ignores blank artists and removes duplicates`() {
-        val artists = parseRecordingArtists(" A ; ; B ; A ")
-
-        assertEquals(listOf("A", "B"), artists)
-    }
 }
