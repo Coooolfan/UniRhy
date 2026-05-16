@@ -7,6 +7,12 @@ export type AlbumDto = {
         readonly recordings: ReadonlyArray<{
             readonly id: number;
             readonly label: ReadonlyArray<string>;
+            readonly artists: ReadonlyArray<{
+                readonly id: number;
+                readonly displayName: string;
+                readonly alias: ReadonlyArray<string>;
+                readonly comment: string;
+            }>;
         }>;
         readonly cover?: {
             readonly id: number;

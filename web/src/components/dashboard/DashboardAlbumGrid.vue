@@ -3,7 +3,7 @@ import { Pause, Play } from 'lucide-vue-next'
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '@/ApiInstance'
-import { formatLabels, resolveCover } from '@/composables/recordingMedia'
+import { resolveArtistName, resolveCover } from '@/composables/recordingMedia'
 import { useAudioStore } from '@/stores/audio'
 import LibraryEmptyHint from '@/components/dashboard/LibraryEmptyHint.vue'
 import {
@@ -73,7 +73,7 @@ const fetchAlbums = async () => {
         albums.value = page.rows.map((album) => ({
             id: album.id,
             title: album.title ?? 'Untitled Album',
-            artist: formatLabels(album.recordings?.[0]?.label) || 'Unknown Artist',
+            artist: resolveArtistName(album.recordings?.[0]?.artists),
             cover: resolveCover(album.cover),
         }))
     } catch (error) {

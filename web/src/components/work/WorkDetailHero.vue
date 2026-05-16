@@ -53,7 +53,7 @@ const emit = defineEmits<{
             </h1>
 
             <div class="mb-2 font-serif text-lg italic text-[#5E564D] sm:text-xl">
-                Originally by {{ workData.artist }}
+                {{ workData.artist }}
             </div>
 
             <div class="mt-4 flex items-center justify-center gap-4 md:justify-start">

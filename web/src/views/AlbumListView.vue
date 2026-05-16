@@ -14,7 +14,7 @@ import LibraryEmptyHint from '@/components/dashboard/LibraryEmptyHint.vue'
 import AlbumGridCard from '@/components/media/AlbumGridCard.vue'
 import WorkGridCard from '@/components/media/WorkGridCard.vue'
 import { api, normalizeApiError } from '@/ApiInstance'
-import { formatLabels, resolveCover } from '@/composables/recordingMedia'
+import { resolveArtistName, resolveCover } from '@/composables/recordingMedia'
 import {
     peekResolvedPlayableTrack,
     resolveAlbumPlayableTrack,
@@ -59,7 +59,7 @@ const fetchAlbums = async () => {
             id: album.id,
             type: 'album',
             title: album.title || 'Untitled Album',
-            subtitle: formatLabels(album.recordings?.[0]?.label) || 'Unknown Artist',
+            subtitle: resolveArtistName(album.recordings?.[0]?.artists),
             cover: resolveCover(album.cover),
         }))
     } catch (error) {

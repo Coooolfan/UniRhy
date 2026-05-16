@@ -46,7 +46,13 @@ const buildAlbumPage = () => ({
             id: 101,
             title: 'Album A',
             comment: 'Test Album',
-            recordings: [{ id: 301, label: ['Artist A'] }],
+            recordings: [
+                {
+                    id: 301,
+                    label: [],
+                    artists: [{ id: 801, displayName: 'Artist A', alias: [], comment: '' }],
+                },
+            ],
             cover: { id: 401, url: '/api/media/401?_sig=a&_exp=9999999999' },
         },
     ],

@@ -124,7 +124,12 @@ class AlbumController(private val service: AlbumService) {
     companion object {
         private val DEFAULT_ALBUM_FETCHER = newFetcher(Album::class).by {
             allScalarFields()
-            recordings { label() }
+            recordings {
+                label()
+                artists {
+                    allScalarFields()
+                }
+            }
             cover { url() }
         }
 
