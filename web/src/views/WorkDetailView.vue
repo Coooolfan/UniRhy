@@ -16,7 +16,9 @@ import WorkDetailHero from '@/components/work/WorkDetailHero.vue'
 import WorkTitleEditModal from '@/components/work/WorkTitleEditModal.vue'
 import {
     formatDurationMs,
+    formatLabels,
     normalizeRecordings,
+    parseLabelInput,
     resolveCover,
     type RecordingAsset,
 } from '@/composables/recordingMedia'
@@ -42,7 +44,6 @@ type WorkData = {
 
 type Recording = RecordingPreview &
     RecordingPlaybackCandidate & {
-        type: string
         label: string
         comment: string
         cover: string
@@ -97,8 +98,7 @@ async function fetchWork(id: number) {
             {
                 transform: (recording, base) => ({
                     ...base,
-                    type: recording.kind,
-                    label: recording.label || '',
+                    label: formatLabels(recording.label),
                     comment: recording.comment,
                     isDefault: recording.defaultInWork,
                     durationMs: recording.durationMs,
@@ -149,7 +149,7 @@ const mergeState = useRecordingMergeState<Recording>({
     buildOption: (recording) => ({
         id: recording.id,
         title: recording.title,
-        subtitle: `${recording.artist}${recording.type ? ' · ' + recording.type : ''}`,
+        subtitle: recording.artist,
     }),
     mergeRequest: async ({ targetId, sourceIds }) => {
         const workId = Number(route.params.id)
@@ -214,18 +214,16 @@ const openEditRecordingModal = async (recording: Recording) => {
                 title: recording.title,
                 label: recording.label,
                 comment: recording.comment,
-                type: recording.type,
                 isDefault: recording.isDefault,
             } satisfies RecordingEditForm,
             showDefaultToggle: true,
-            onSubmit: async ({ title, label, comment, type, isDefault }: RecordingEditForm) => {
+            onSubmit: async ({ title, label, comment, isDefault }: RecordingEditForm) => {
                 await api.recordingController.updateRecording({
                     id: recording.id,
                     body: {
                         title: title.trim(),
-                        label: label?.trim(),
+                        label: parseLabelInput(label),
                         comment: comment?.trim() || '',
-                        kind: type.trim(),
                         defaultInWork: isDefault,
                     },
                 })
@@ -240,7 +238,6 @@ const openEditRecordingModal = async (recording: Recording) => {
                             title: title.trim(),
                             label: label?.trim() || '',
                             comment: comment?.trim() || '',
-                            type: type.trim(),
                             isDefault,
                         }
                     }
@@ -282,8 +279,7 @@ const buildRecordingLabel = (recording: Recording) => {
 }
 
 const buildRecordingSubtitle = (recording: Recording) => {
-    const parts = [recording.artist, recording.type].filter(Boolean)
-    return parts.join(' · ')
+    return recording.artist
 }
 
 const openRecordingMergeModal = async () => {

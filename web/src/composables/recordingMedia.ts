@@ -116,6 +116,22 @@ export const resolveArtistName = (artists?: ReadonlyArray<RecordingArtist>) => {
     return 'Unknown Artist'
 }
 
+export const formatLabels = (labels?: readonly string[] | null) => {
+    return (
+        labels
+            ?.map((label) => label.trim())
+            .filter(Boolean)
+            .join(', ') ?? ''
+    )
+}
+
+export const parseLabelInput = (value: string) => {
+    return value
+        .split(',')
+        .map((label) => label.trim())
+        .filter(Boolean)
+}
+
 export function normalizeRecordings(
     recordings: readonly NormalizableRecording[],
     options?: NormalizeRecordingsBaseOptions,

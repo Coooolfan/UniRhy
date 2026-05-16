@@ -10,6 +10,7 @@ import { useModal } from '@/composables/useModal'
 import PlaylistEditModal from '@/components/playlist/PlaylistEditModal.vue'
 import PlaylistRemoveRecordingModal from '@/components/playlist/PlaylistRemoveRecordingModal.vue'
 import {
+    formatLabels,
     normalizeRecordings,
     resolveCover,
     type RecordingAsset,
@@ -87,7 +88,7 @@ const fetchPlaylist = async (id: number) => {
             {
                 transform: (recording, base) => ({
                     ...base,
-                    label: recording.label || '',
+                    label: formatLabels(recording.label),
                     assets: (recording.assets || []) as readonly RecordingAsset[],
                 }),
             },

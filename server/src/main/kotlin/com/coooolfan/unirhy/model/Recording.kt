@@ -15,9 +15,7 @@ interface Recording {
     @ManyToMany
     val artists: List<Artist>
 
-    val kind: String
-
-    val label: String?
+    val label: List<String>
 
     val title: String?
 

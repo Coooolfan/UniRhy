@@ -31,7 +31,7 @@ export class TokenController {
      * 退出当前会话
      * 
      * 此接口用于注销当前登录会话
-     * 需要用户登录认证才能访问
+     * 无需登录认证即可访问
      * 
      */
     readonly logout: () => Promise<

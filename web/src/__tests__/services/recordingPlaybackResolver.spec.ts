@@ -144,14 +144,13 @@ describe('recordingPlaybackResolver', () => {
         getAlbumMock.mockResolvedValue({
             id: 101,
             title: 'Album A',
-            kind: 'Album',
             comment: 'Album Comment',
             recordings: [
                 {
                     id: 501,
-                    kind: 'Studio',
                     title: 'Track A',
                     comment: '',
+                    label: [],
                     durationMs: 200000,
                     defaultInWork: true,
                     assets: [
@@ -160,7 +159,6 @@ describe('recordingPlaybackResolver', () => {
                             comment: 'Audio mp3',
                             mediaFile: {
                                 id: 2_091,
-                                sha256: 'hash-2091',
                                 mimeType: 'audio/mpeg',
                                 size: 123,
                                 objectKey: 'track-a.mp3',
@@ -172,7 +170,6 @@ describe('recordingPlaybackResolver', () => {
                             comment: 'Audio flac',
                             mediaFile: {
                                 id: 2_092,
-                                sha256: 'hash-2092',
                                 mimeType: 'audio/flac',
                                 size: 456,
                                 objectKey: 'track-a.flac',
@@ -183,7 +180,6 @@ describe('recordingPlaybackResolver', () => {
                     artists: [{ id: 1, displayName: 'Artist A', alias: [], comment: '' }],
                     cover: {
                         id: 702,
-                        sha256: 'cover-702',
                         objectKey: 'cover-702.jpg',
                         mimeType: 'image/jpeg',
                         size: 456,
@@ -239,9 +235,9 @@ describe('recordingPlaybackResolver', () => {
                 recordings: [
                     {
                         id: 601,
-                        kind: 'Studio',
                         title: 'Track A',
                         comment: '',
+                        label: [],
                         durationMs: 200000,
                         defaultInWork: true,
                         assets: [
@@ -250,7 +246,6 @@ describe('recordingPlaybackResolver', () => {
                                 comment: 'Audio mp3',
                                 mediaFile: {
                                     id: 2_111,
-                                    sha256: 'hash-2111',
                                     mimeType: 'audio/mpeg',
                                     size: 123,
                                     objectKey: 'track-a.mp3',
@@ -269,9 +264,9 @@ describe('recordingPlaybackResolver', () => {
                 recordings: [
                     {
                         id: 602,
-                        kind: 'Studio',
                         title: 'Track B',
                         comment: '',
+                        label: [],
                         durationMs: 200000,
                         defaultInWork: true,
                         assets: [
@@ -280,7 +275,6 @@ describe('recordingPlaybackResolver', () => {
                                 comment: 'Audio mp3',
                                 mediaFile: {
                                     id: 2_112,
-                                    sha256: 'hash-2112',
                                     mimeType: 'audio/mpeg',
                                     size: 123,
                                     objectKey: 'track-b.mp3',
@@ -380,14 +374,13 @@ describe('recordingPlaybackResolver', () => {
             .mockResolvedValueOnce({
                 id: 401,
                 title: 'Album B',
-                kind: 'Album',
                 comment: '',
                 recordings: [
                     {
                         id: 701,
-                        kind: 'Studio',
                         title: 'Track B',
                         comment: '',
+                        label: [],
                         durationMs: 180000,
                         defaultInWork: true,
                         assets: [
@@ -396,7 +389,6 @@ describe('recordingPlaybackResolver', () => {
                                 comment: 'Audio mp3',
                                 mediaFile: {
                                     id: 2_211,
-                                    sha256: 'hash-2211',
                                     mimeType: 'audio/mpeg',
                                     size: 123,
                                     objectKey: 'track-b.mp3',
@@ -412,14 +404,13 @@ describe('recordingPlaybackResolver', () => {
             .mockResolvedValueOnce({
                 id: 401,
                 title: 'Album B',
-                kind: 'Album',
                 comment: '',
                 recordings: [
                     {
                         id: 701,
-                        kind: 'Studio',
                         title: 'Track B (Updated)',
                         comment: '',
+                        label: [],
                         durationMs: 180000,
                         defaultInWork: true,
                         assets: [
@@ -428,7 +419,6 @@ describe('recordingPlaybackResolver', () => {
                                 comment: 'Audio mp3 updated',
                                 mediaFile: {
                                     id: 2_212,
-                                    sha256: 'hash-2212',
                                     mimeType: 'audio/mpeg',
                                     size: 123,
                                     objectKey: 'track-b-updated.mp3',

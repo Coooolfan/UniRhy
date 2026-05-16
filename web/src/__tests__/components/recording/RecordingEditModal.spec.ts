@@ -10,7 +10,6 @@ const buildForm = (): RecordingEditForm => ({
     title: 'Original Title',
     label: 'Original Label',
     comment: 'Original Comment',
-    type: 'Studio',
     isDefault: false,
 })
 
@@ -89,10 +88,10 @@ describe('RecordingEditModal', () => {
         const titleInput = wrapper.find('input[placeholder="Track Title"]')
         await titleInput.setValue('Updated Title')
 
-        const labelInput = wrapper.find('input[placeholder="Optional label"]')
+        const labelInput = wrapper.find('input[placeholder="多个标签用英文逗号分隔"]')
         await labelInput.setValue('Updated Label')
 
-        const commentInput = wrapper.find('textarea[placeholder="Add a comment..."]')
+        const commentInput = wrapper.find('textarea[placeholder="在此添加曲目描述"]')
         await commentInput.setValue('Updated Comment')
 
         const submitButton = wrapper
@@ -107,7 +106,6 @@ describe('RecordingEditModal', () => {
             title: 'Updated Title',
             label: 'Updated Label',
             comment: 'Updated Comment',
-            type: 'Studio',
             isDefault: false,
         })
         expect(resolveMock).toHaveBeenCalledWith(undefined)

@@ -25,7 +25,6 @@ export type RecordingEditForm = {
     title: string
     label: string
     comment: string
-    type: string
     isDefault: boolean
 }
 
@@ -47,7 +46,6 @@ const form = reactive<RecordingEditForm>({
     title: props.initialForm.title,
     label: props.initialForm.label,
     comment: props.initialForm.comment,
-    type: props.initialForm.type,
     isDefault: props.initialForm.isDefault,
 })
 const error = ref('')
@@ -79,7 +77,6 @@ const submit = async () => {
             title: form.title,
             label: form.label,
             comment: form.comment,
-            type: form.type,
             isDefault: form.isDefault,
         })
         modal.resolve(undefined)
@@ -219,38 +216,19 @@ const submit = async () => {
                 />
             </label>
 
-            <div class="grid grid-cols-2 gap-4">
-                <label class="block">
-                    <span
-                        class="mb-2 block font-serif text-xs uppercase tracking-wider text-[#8A8A8A]"
-                    >
-                        曲目类型
-                    </span>
-                    <input
-                        v-model="form.type"
-                        type="text"
-                        maxlength="50"
-                        class="w-full border-b border-[#D6D1C4] bg-[#F7F5F0] p-3 font-serif text-[#3D3D3D] transition-colors placeholder:text-[#BDB9AE] focus:border-[#C67C4E] focus:outline-none"
-                        placeholder="e.g. Live, Studio"
-                        :disabled="isSaving"
-                    />
-                </label>
-                <label class="block">
-                    <span
-                        class="mb-2 block font-serif text-xs uppercase tracking-wider text-[#8A8A8A]"
-                    >
-                        标签
-                    </span>
-                    <input
-                        v-model="form.label"
-                        type="text"
-                        maxlength="50"
-                        class="w-full border-b border-[#D6D1C4] bg-[#F7F5F0] p-3 font-serif text-[#3D3D3D] transition-colors placeholder:text-[#BDB9AE] focus:border-[#C67C4E] focus:outline-none"
-                        placeholder="Optional label"
-                        :disabled="isSaving"
-                    />
-                </label>
-            </div>
+            <label class="block">
+                <span class="mb-2 block font-serif text-xs uppercase tracking-wider text-[#8A8A8A]">
+                    标签
+                </span>
+                <input
+                    v-model="form.label"
+                    type="text"
+                    maxlength="255"
+                    class="w-full border-b border-[#D6D1C4] bg-[#F7F5F0] p-3 font-serif text-[#3D3D3D] transition-colors placeholder:text-[#BDB9AE] focus:border-[#C67C4E] focus:outline-none"
+                    placeholder="多个标签用英文逗号分隔"
+                    :disabled="isSaving"
+                />
+            </label>
 
             <label class="flex min-h-[100px] flex-1 flex-col">
                 <span class="mb-2 block font-serif text-xs uppercase tracking-wider text-[#8A8A8A]">

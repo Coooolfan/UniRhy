@@ -44,8 +44,7 @@ const buildPlayableWork = () => ({
     recordings: [
         {
             id: 21,
-            kind: 'Studio',
-            label: 'Label A',
+            label: ['Label A'],
             title: 'Track A',
             comment: 'Track A Comment',
             durationMs: 180000,
@@ -56,7 +55,6 @@ const buildPlayableWork = () => ({
                     comment: 'Audio file',
                     mediaFile: {
                         id: 41,
-                        sha256: 'hash-audio',
                         mimeType: 'audio/mpeg',
                         size: 123,
                         objectKey: 'track-a.mp3',
@@ -67,7 +65,6 @@ const buildPlayableWork = () => ({
             artists: [{ id: 51, displayName: 'Artist A', alias: [], comment: '' }],
             cover: {
                 id: 61,
-                sha256: 'hash-cover',
                 objectKey: 'cover-a.jpg',
                 mimeType: 'image/jpeg',
                 size: 345,
@@ -96,8 +93,7 @@ const buildUnplayableWork = () => ({
     recordings: [
         {
             id: 22,
-            kind: 'Studio',
-            label: 'Label B',
+            label: ['Label B'],
             title: 'Track B',
             comment: 'Track B Comment',
             durationMs: 210000,
@@ -108,7 +104,6 @@ const buildUnplayableWork = () => ({
                     comment: 'Image only',
                     mediaFile: {
                         id: 42,
-                        sha256: 'hash-image',
                         mimeType: 'image/png',
                         size: 222,
                         objectKey: 'cover-b.png',
@@ -119,7 +114,6 @@ const buildUnplayableWork = () => ({
             artists: [{ id: 52, displayName: 'Artist B', alias: [], comment: '' }],
             cover: {
                 id: 62,
-                sha256: 'hash-cover-b',
                 objectKey: 'cover-b.jpg',
                 mimeType: 'image/jpeg',
                 size: 456,
@@ -223,7 +217,6 @@ describe('DashboardHero', () => {
                             comment: 'Audio mp3',
                             mediaFile: {
                                 id: 41,
-                                sha256: 'hash-audio-mp3',
                                 mimeType: 'audio/mpeg',
                                 size: 123,
                                 objectKey: 'track-a.mp3',
@@ -235,7 +228,6 @@ describe('DashboardHero', () => {
                             comment: 'Audio flac',
                             mediaFile: {
                                 id: 42,
-                                sha256: 'hash-audio-flac',
                                 mimeType: 'audio/flac',
                                 size: 456,
                                 objectKey: 'track-a.flac',

@@ -1,6 +1,5 @@
 export interface RecordingUpdate {
-    readonly kind: string;
-    readonly label?: string | undefined;
+    readonly label: ReadonlyArray<string>;
     readonly title?: string | undefined;
     readonly comment: string;
     readonly defaultInWork?: boolean | undefined;

@@ -75,15 +75,13 @@ const createDragTransfer = () => ({
 const buildAlbumResponse = () => ({
     id: 1,
     title: 'Album One',
-    kind: 'Album',
     releaseDate: '2024-01-01',
     comment: 'Album Comment',
     cover: undefined,
     recordings: [
         {
             id: 11,
-            kind: 'Studio',
-            label: 'Label A',
+            label: ['Label A'],
             title: 'Track One',
             comment: 'Track Comment',
             durationMs: 240000,
@@ -95,8 +93,7 @@ const buildAlbumResponse = () => ({
         },
         {
             id: 12,
-            kind: 'Live',
-            label: 'Label B',
+            label: ['Label B'],
             title: 'Track Two',
             comment: 'Track Comment B',
             durationMs: 180000,
@@ -186,9 +183,8 @@ describe('AlbumDetailView', () => {
             id: 11,
             body: {
                 title: 'Track One Updated',
-                label: 'Label A',
+                label: ['Label A'],
                 comment: 'Track Comment',
-                kind: 'Studio',
             },
         })
     })

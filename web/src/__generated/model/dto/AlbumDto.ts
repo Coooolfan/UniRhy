@@ -2,12 +2,11 @@ export type AlbumDto = {
     'AlbumController/DEFAULT_ALBUM_FETCHER': {
         readonly id: number;
         readonly title: string;
-        readonly kind: string;
         readonly releaseDate?: string | undefined;
         readonly comment: string;
         readonly recordings: ReadonlyArray<{
             readonly id: number;
-            readonly label?: string | undefined;
+            readonly label: ReadonlyArray<string>;
         }>;
         readonly cover?: {
             readonly id: number;
@@ -17,13 +16,11 @@ export type AlbumDto = {
     'AlbumController/DETAIL_ALBUM_FETCHER': {
         readonly id: number;
         readonly title: string;
-        readonly kind: string;
         readonly releaseDate?: string | undefined;
         readonly comment: string;
         readonly recordings: ReadonlyArray<{
             readonly id: number;
-            readonly kind: string;
-            readonly label?: string | undefined;
+            readonly label: ReadonlyArray<string>;
             readonly title?: string | undefined;
             readonly comment: string;
             readonly durationMs: number;
@@ -33,7 +30,6 @@ export type AlbumDto = {
                 readonly comment: string;
                 readonly mediaFile: {
                     readonly id: number;
-                    readonly sha256: string;
                     readonly mimeType: string;
                     readonly size: number;
                     readonly width?: number | undefined;
@@ -56,7 +52,6 @@ export type AlbumDto = {
             }>;
             readonly cover?: {
                 readonly id: number;
-                readonly sha256: string;
                 readonly objectKey: string;
                 readonly mimeType: string;
                 readonly size: number;
@@ -67,7 +62,6 @@ export type AlbumDto = {
         }>;
         readonly cover?: {
             readonly id: number;
-            readonly sha256: string;
             readonly objectKey: string;
             readonly mimeType: string;
             readonly size: number;

@@ -56,8 +56,7 @@ const buildPlaylistResponse = () => ({
     recordings: [
         {
             id: 31,
-            kind: 'Studio',
-            label: 'Label A',
+            label: ['Label A'],
             title: 'Track One',
             comment: 'Track One Comment',
             durationMs: 210000,
@@ -70,8 +69,7 @@ const buildPlaylistResponse = () => ({
         },
         {
             id: 32,
-            kind: 'Live',
-            label: 'Label B',
+            label: ['Label B'],
             title: 'Track Two',
             comment: 'Track Two Comment',
             durationMs: 180000,

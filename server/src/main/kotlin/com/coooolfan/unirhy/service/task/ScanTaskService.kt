@@ -184,8 +184,7 @@ private fun buildWorkFromAudioFile(
     return Work {
         title = tag?.getFirst(FieldKey.TITLE).orEmpty()
         recordings().addBy {
-            kind = "CD"
-            label = "CD"
+            label = tag?.getFirst(FieldKey.RECORD_LABEL).singleTagValueList()
             title = tag?.getFirst(FieldKey.TITLE).orEmpty()
             comment = tag?.getFirst(FieldKey.COMMENT).orEmpty()
             cover = audioCover
@@ -201,7 +200,6 @@ private fun buildWorkFromAudioFile(
                 sortOrder = 0
                 album().apply {
                     title = tag?.getFirst(FieldKey.ALBUM).orEmpty()
-                    kind = "CD"
                     releaseDate = tag?.albumReleaseDate()
                     comment = ""
                     cover = audioCover
@@ -250,6 +248,14 @@ private fun String.parseTagDate(): LocalDate? {
     val day = match.groupValues[3].toIntOrNull() ?: 1
 
     return runCatching { LocalDate.of(year, month, day) }.getOrNull()
+}
+
+private fun String?.singleTagValueList(): List<String> {
+    val value = this?.trim().orEmpty()
+    if (value.isBlank()) {
+        return emptyList()
+    }
+    return listOf(value)
 }
 
 fun fetchCover(

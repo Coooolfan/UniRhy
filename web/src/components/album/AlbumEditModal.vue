@@ -5,7 +5,6 @@ import { useModalContext } from '@/components/modals/modalContext'
 
 export type AlbumEditForm = {
     title: string
-    kind: string
     releaseDate: string
     comment: string
 }
@@ -19,7 +18,6 @@ const modal = useModalContext<undefined>()
 
 const form = reactive<AlbumEditForm>({
     title: props.initialForm.title,
-    kind: props.initialForm.kind,
     releaseDate: props.initialForm.releaseDate,
     comment: props.initialForm.comment,
 })
@@ -50,7 +48,6 @@ const submit = async () => {
     try {
         await props.onSubmit({
             title: form.title.trim(),
-            kind: form.kind.trim(),
             releaseDate: form.releaseDate,
             comment: form.comment,
         })
@@ -79,32 +76,17 @@ const submit = async () => {
             />
         </label>
 
-        <div class="grid grid-cols-2 gap-4">
-            <label class="block">
-                <span class="mb-2 block font-serif text-xs uppercase tracking-wider text-[#8A8A8A]">
-                    专辑类型
-                </span>
-                <input
-                    v-model="form.kind"
-                    type="text"
-                    maxlength="50"
-                    class="w-full border-b border-[#D6D1C4] bg-[#F7F5F0] p-3 font-serif text-[#3D3D3D] transition-colors placeholder:text-[#BDB9AE] focus:border-[#C67C4E] focus:outline-none"
-                    placeholder="专辑类型"
-                    :disabled="isSaving"
-                />
-            </label>
-            <label class="block">
-                <span class="mb-2 block font-serif text-xs uppercase tracking-wider text-[#8A8A8A]">
-                    发布日期
-                </span>
-                <input
-                    v-model="form.releaseDate"
-                    type="date"
-                    class="w-full border-b border-[#D6D1C4] bg-[#F7F5F0] p-3 font-serif text-[#3D3D3D] transition-colors placeholder:text-[#BDB9AE] focus:border-[#C67C4E] focus:outline-none"
-                    :disabled="isSaving"
-                />
-            </label>
-        </div>
+        <label class="block">
+            <span class="mb-2 block font-serif text-xs uppercase tracking-wider text-[#8A8A8A]">
+                发布日期
+            </span>
+            <input
+                v-model="form.releaseDate"
+                type="date"
+                class="w-full border-b border-[#D6D1C4] bg-[#F7F5F0] p-3 font-serif text-[#3D3D3D] transition-colors placeholder:text-[#BDB9AE] focus:border-[#C67C4E] focus:outline-none"
+                :disabled="isSaving"
+            />
+        </label>
 
         <label class="flex min-h-[120px] flex-col">
             <span class="mb-2 block font-serif text-xs uppercase tracking-wider text-[#8A8A8A]">

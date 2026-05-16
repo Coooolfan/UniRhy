@@ -21,8 +21,6 @@ interface Album {
     @ManyToManyView(prop = "albumRecordings", deeperProp = "recording")
     val recordings: List<Recording>
 
-    val kind: String
-
     val releaseDate: LocalDate?
 
     val comment: String

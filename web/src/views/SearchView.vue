@@ -8,7 +8,7 @@ import WorkGridCard from '@/components/media/WorkGridCard.vue'
 import { useModal } from '@/composables/useModal'
 import MergeSelectModal from '@/components/modals/MergeSelectModal.vue'
 import { api } from '@/ApiInstance'
-import { resolveCover } from '@/composables/recordingMedia'
+import { formatLabels, resolveCover } from '@/composables/recordingMedia'
 import {
     peekResolvedPlayableTrack,
     resolveAlbumPlayableTrack,
@@ -104,7 +104,7 @@ async function performSearch(query: string) {
             id: album.id,
             type: 'album',
             title: album.title || 'Untitled Album',
-            subtitle: album.recordings?.[0]?.label || 'Unknown Artist',
+            subtitle: formatLabels(album.recordings?.[0]?.label) || 'Unknown Artist',
             cover: resolveCover(album.cover),
         }))
 

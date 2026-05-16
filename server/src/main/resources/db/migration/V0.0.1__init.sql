@@ -71,8 +71,7 @@ CREATE TABLE public.recording
 (
     id              BIGSERIAL PRIMARY KEY,
     work_id         BIGINT  NOT NULL REFERENCES work (id) ON DELETE RESTRICT,     -- 关联的作品
-    kind            TEXT    NOT NULL,                                             -- 录音类型（如：录音室版、现场版）
-    label           TEXT,                                                         -- 唱片公司/厂牌
+    label           TEXT[]  NOT NULL DEFAULT '{}',                                -- 唱片公司/厂牌
     title           TEXT,                                                         -- 录音特定标题（可选）
     comment         TEXT    NOT NULL DEFAULT '',                                  -- 备注
     cover_id        BIGINT  REFERENCES public.media_file (id) ON DELETE SET NULL, -- 录音封面
@@ -161,7 +160,6 @@ CREATE TABLE public.album
 (
     id           BIGSERIAL PRIMARY KEY,
     title        TEXT   NOT NULL,                                            -- 专辑名称
-    kind         TEXT   NOT NULL DEFAULT 'album',                            -- 类型：album(专辑)/single(单曲)/ep/compilation(精选)
     release_date DATE,                                                       -- 发行日期
     comment      TEXT   NOT NULL DEFAULT '',                                 -- 专辑简介
     cover_id     BIGINT REFERENCES public.media_file (id) ON DELETE SET NULL -- 专辑封面

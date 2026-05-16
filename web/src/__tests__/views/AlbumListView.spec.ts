@@ -50,8 +50,8 @@ const buildWorkPage = () => ({
             recordings: [
                 {
                     id: 201,
-                    kind: 'Studio',
                     comment: '',
+                    label: [],
                     durationMs: 180000,
                     defaultInWork: true,
                     assets: [],
@@ -66,8 +66,8 @@ const buildWorkPage = () => ({
             recordings: [
                 {
                     id: 202,
-                    kind: 'Live',
                     comment: '',
+                    label: [],
                     durationMs: 200000,
                     defaultInWork: true,
                     assets: [],

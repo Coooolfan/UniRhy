@@ -15,7 +15,9 @@ import RecordingEditModal, {
 } from '@/components/recording/RecordingEditModal.vue'
 import {
     formatDurationMs,
+    formatLabels,
     normalizeRecordings,
+    parseLabelInput,
     resolveCover,
     type NormalizedRecordingBase,
     type RecordingAsset,
@@ -41,7 +43,6 @@ type AlbumData = {
     title: string
     artist: string
     year: string
-    type: string
     description: string
     cover: string
 }
@@ -49,7 +50,6 @@ type AlbumData = {
 type Recording = RecordingPreview &
     RecordingPlaybackCandidate & {
         label: string
-        type: string
         comment: string
         isDefault: boolean
         durationMs: number
@@ -63,14 +63,12 @@ const albumData = ref<AlbumData>({
     title: '',
     artist: '',
     year: '',
-    type: 'Album',
     description: '',
     cover: '',
 })
 
 const albumEditInitial = ref<AlbumEditForm>({
     title: '',
-    kind: '',
     releaseDate: '',
     comment: '',
 })
@@ -119,14 +117,12 @@ const fetchAlbum = async (id: number) => {
             title: data.title,
             artist: artistName,
             year: releaseYear,
-            type: data.kind || 'Album',
             description: data.comment || '',
             cover: resolveCover(data.cover),
         }
 
         albumEditInitial.value = {
             title: data.title,
-            kind: data.kind ?? '',
             releaseDate: data.releaseDate ? data.releaseDate.slice(0, 10) : '',
             comment: data.comment ?? '',
         }
@@ -137,8 +133,7 @@ const fetchAlbum = async (id: number) => {
                 fallbackArtist: artistName,
                 transform: (recording: AlbumRecordingDto, base: NormalizedRecordingBase) => ({
                     ...base,
-                    label: recording.label || '',
-                    type: recording.kind,
+                    label: formatLabels(recording.label),
                     comment: recording.comment,
                     durationMs: recording.durationMs,
                     rawArtists: recording.artists || [],
@@ -187,7 +182,6 @@ const openEditAlbumModal = async () => {
                     id: albumId,
                     body: {
                         title: formValue.title,
-                        kind: formValue.kind,
                         releaseDate: formValue.releaseDate || undefined,
                         comment: formValue.comment,
                     },
@@ -251,18 +245,16 @@ const openEditRecordingModal = async (recording: Recording) => {
                 title: recording.title,
                 label: recording.label,
                 comment: recording.comment,
-                type: recording.type,
                 isDefault: recording.isDefault,
             } satisfies RecordingEditForm,
             showDefaultToggle: false,
-            onSubmit: async ({ title, label, comment, type }: RecordingEditForm) => {
+            onSubmit: async ({ title, label, comment }: RecordingEditForm) => {
                 await api.recordingController.updateRecording({
                     id: recording.id,
                     body: {
                         title: title.trim(),
-                        label: label?.trim(),
+                        label: parseLabelInput(label),
                         comment: comment?.trim() || '',
-                        kind: type.trim(),
                     },
                 })
                 invalidateAlbumPlaybackCache(recording.id)
@@ -276,7 +268,6 @@ const openEditRecordingModal = async (recording: Recording) => {
                             title: title.trim(),
                             label: label?.trim() || '',
                             comment: comment?.trim() || '',
-                            type: type.trim(),
                         }
                     }
                 }

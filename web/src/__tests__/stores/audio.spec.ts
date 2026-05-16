@@ -492,8 +492,7 @@ const buildRecordingMetadata = (
 
     return {
         id,
-        kind: rest.kind ?? 'CD',
-        label: rest.label ?? `Label ${id}`,
+        label: rest.label ?? [`Label ${id}`],
         work: rest.work ?? { id: id + 10_000, title: `Work ${id}` },
         title: rest.title ?? `Hydrated Track ${id}`,
         comment: rest.comment ?? `Comment ${id}`,
@@ -514,7 +513,6 @@ const buildRecordingMetadata = (
                 comment: `Asset ${id}`,
                 mediaFile: {
                     id: id + 2_000,
-                    sha256: `audio-sha-${id}`,
                     objectKey: `audio/${id}.opus`,
                     mimeType: 'audio/opus',
                     size: 4_096,
@@ -527,7 +525,6 @@ const buildRecordingMetadata = (
             : {
                   cover: cover ?? {
                       id: id + 30_000,
-                      sha256: `sha-${id}`,
                       objectKey: `cover/${id}`,
                       mimeType: 'image/jpeg',
                       size: 1_024,
@@ -749,7 +746,6 @@ describe('audio store', () => {
                         comment: 'Audio mp3',
                         mediaFile: {
                             id: 2_071,
-                            sha256: 'audio-sha-7-mp3',
                             objectKey: 'audio/7.mp3',
                             mimeType: 'audio/mpeg',
                             size: 2_048,
@@ -761,7 +757,6 @@ describe('audio store', () => {
                         comment: 'Audio flac',
                         mediaFile: {
                             id: 2_072,
-                            sha256: 'audio-sha-7-flac',
                             objectKey: 'audio/7.flac',
                             mimeType: 'audio/flac',
                             size: 4_096,
@@ -802,7 +797,6 @@ describe('audio store', () => {
                         comment: 'Audio mp3',
                         mediaFile: {
                             id: 2_071,
-                            sha256: 'audio-sha-7-mp3',
                             objectKey: 'audio/7.mp3',
                             mimeType: 'audio/mpeg',
                             size: 2_048,
@@ -814,7 +808,6 @@ describe('audio store', () => {
                         comment: 'Audio flac',
                         mediaFile: {
                             id: 2_072,
-                            sha256: 'audio-sha-7-flac',
                             objectKey: 'audio/7.flac',
                             mimeType: 'audio/flac',
                             size: 4_096,
@@ -878,7 +871,6 @@ describe('audio store', () => {
                     comment: 'Audio mp3',
                     mediaFile: {
                         id: 2_081,
-                        sha256: 'audio-sha-8-mp3',
                         objectKey: 'audio/8.mp3',
                         mimeType: 'audio/mpeg',
                         size: 2_048,
@@ -890,7 +882,6 @@ describe('audio store', () => {
                     comment: 'Audio flac',
                     mediaFile: {
                         id: 2_082,
-                        sha256: 'audio-sha-8-flac',
                         objectKey: 'audio/8.flac',
                         mimeType: 'audio/flac',
                         size: 4_096,
@@ -1138,7 +1129,6 @@ describe('audio store', () => {
                         comment: 'Signed Audio 2008',
                         mediaFile: {
                             id: 2_008,
-                            sha256: 'audio-sha-8',
                             objectKey: 'audio/8.opus',
                             mimeType: 'audio/opus',
                             size: 4_096,

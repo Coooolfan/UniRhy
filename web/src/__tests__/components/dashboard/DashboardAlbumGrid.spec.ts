@@ -45,9 +45,8 @@ const buildAlbumPage = () => ({
         {
             id: 101,
             title: 'Album A',
-            kind: 'Album',
             comment: 'Test Album',
-            recordings: [{ id: 301, label: 'Artist A' }],
+            recordings: [{ id: 301, label: ['Artist A'] }],
             cover: { id: 401, url: '/api/media/401?_sig=a&_exp=9999999999' },
         },
     ],
@@ -129,14 +128,13 @@ describe('DashboardAlbumGrid', () => {
         getAlbumMock.mockResolvedValueOnce({
             id: 101,
             title: 'Album A',
-            kind: 'Album',
             comment: 'Album Comment',
             recordings: [
                 {
                     id: 501,
-                    kind: 'Demo',
                     title: 'Unplayable Default',
                     comment: '',
+                    label: [],
                     durationMs: 180000,
                     defaultInWork: true,
                     assets: [],
@@ -145,9 +143,9 @@ describe('DashboardAlbumGrid', () => {
                 },
                 {
                     id: 502,
-                    kind: 'Studio',
                     title: 'Playable Default',
                     comment: '',
+                    label: [],
                     durationMs: 200000,
                     defaultInWork: true,
                     assets: [
@@ -156,7 +154,6 @@ describe('DashboardAlbumGrid', () => {
                             comment: 'Audio 602',
                             mediaFile: {
                                 id: 602,
-                                sha256: 'hash-602',
                                 mimeType: 'audio/mpeg',
                                 size: 123,
                                 objectKey: 'track-602.mp3',
@@ -167,7 +164,6 @@ describe('DashboardAlbumGrid', () => {
                     artists: [{ id: 802, displayName: 'Artist B', alias: [], comment: '' }],
                     cover: {
                         id: 702,
-                        sha256: 'cover-702',
                         objectKey: 'cover-702.jpg',
                         mimeType: 'image/jpeg',
                         size: 456,
@@ -176,9 +172,9 @@ describe('DashboardAlbumGrid', () => {
                 },
                 {
                     id: 503,
-                    kind: 'Live',
                     title: 'Playable Fallback',
                     comment: '',
+                    label: [],
                     durationMs: 210000,
                     defaultInWork: false,
                     assets: [
@@ -187,7 +183,6 @@ describe('DashboardAlbumGrid', () => {
                             comment: 'Audio 603',
                             mediaFile: {
                                 id: 603,
-                                sha256: 'hash-603',
                                 mimeType: 'audio/mpeg',
                                 size: 124,
                                 objectKey: 'track-603.mp3',
@@ -230,14 +225,13 @@ describe('DashboardAlbumGrid', () => {
         getAlbumMock.mockResolvedValueOnce({
             id: 101,
             title: 'Album A',
-            kind: 'Album',
             comment: 'Album Comment',
             recordings: [
                 {
                     id: 502,
-                    kind: 'Studio',
                     title: 'Playable Default',
                     comment: '',
+                    label: [],
                     durationMs: 200000,
                     defaultInWork: true,
                     assets: [
@@ -246,7 +240,6 @@ describe('DashboardAlbumGrid', () => {
                             comment: 'Audio mp3',
                             mediaFile: {
                                 id: 602,
-                                sha256: 'hash-602',
                                 mimeType: 'audio/mpeg',
                                 size: 123,
                                 objectKey: 'track-602.mp3',
@@ -258,7 +251,6 @@ describe('DashboardAlbumGrid', () => {
                             comment: 'Audio flac',
                             mediaFile: {
                                 id: 603,
-                                sha256: 'hash-603',
                                 mimeType: 'audio/flac',
                                 size: 456,
                                 objectKey: 'track-603.flac',
@@ -269,7 +261,6 @@ describe('DashboardAlbumGrid', () => {
                     artists: [{ id: 802, displayName: 'Artist B', alias: [], comment: '' }],
                     cover: {
                         id: 702,
-                        sha256: 'cover-702',
                         objectKey: 'cover-702.jpg',
                         mimeType: 'image/jpeg',
                         size: 456,

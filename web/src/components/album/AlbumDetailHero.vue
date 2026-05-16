@@ -5,7 +5,6 @@ export type AlbumHeroData = {
     title: string
     artist: string
     year: string
-    type: string
     description: string
     cover: string
 }
@@ -66,9 +65,7 @@ const emit = defineEmits<{
             <div
                 class="flex flex-wrap items-center justify-center gap-3 text-sm tracking-wider uppercase text-[#8C857B] md:justify-start"
             >
-                <span>{{ albumData.type }}</span>
-                <span class="w-8 h-px bg-[#C17D46]"></span>
-                <span>{{ albumData.year }}</span>
+                <span v-if="albumData.year">{{ albumData.year }}</span>
                 <button
                     class="cursor-pointer p-1 text-[#8C857B] opacity-100 transition-all hover:text-[#C17D46] md:opacity-0 md:group-hover:opacity-100"
                     title="编辑专辑"

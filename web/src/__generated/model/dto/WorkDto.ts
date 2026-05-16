@@ -4,8 +4,7 @@ export type WorkDto = {
         readonly title: string;
         readonly recordings: ReadonlyArray<{
             readonly id: number;
-            readonly kind: string;
-            readonly label?: string | undefined;
+            readonly label: ReadonlyArray<string>;
             readonly title?: string | undefined;
             readonly comment: string;
             readonly durationMs: number;
@@ -15,7 +14,6 @@ export type WorkDto = {
                 readonly comment: string;
                 readonly mediaFile: {
                     readonly id: number;
-                    readonly sha256: string;
                     readonly mimeType: string;
                     readonly size: number;
                     readonly width?: number | undefined;
@@ -38,7 +36,6 @@ export type WorkDto = {
             }>;
             readonly cover?: {
                 readonly id: number;
-                readonly sha256: string;
                 readonly objectKey: string;
                 readonly mimeType: string;
                 readonly size: number;

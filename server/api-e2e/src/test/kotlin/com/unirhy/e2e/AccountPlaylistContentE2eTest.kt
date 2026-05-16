@@ -160,7 +160,6 @@ class AccountPlaylistContentE2eTest {
                 path = "/api/albums/1",
                 json = mapOf(
                     "title" to "blocked-album",
-                    "kind" to "CD",
                     "releaseDate" to null,
                     "comment" to "blocked-album-comment",
                 ),
@@ -181,8 +180,7 @@ class AccountPlaylistContentE2eTest {
             api.put(
                 path = "/api/recordings/1",
                 json = mapOf(
-                    "kind" to "CD",
-                    "label" to "blocked-label",
+                    "label" to listOf("blocked-label"),
                     "title" to "blocked-title",
                     "comment" to "blocked-comment",
                     "defaultInWork" to false,
@@ -775,8 +773,7 @@ class AccountPlaylistContentE2eTest {
         )
 
         val recordingUpdatePayload = mapOf(
-            "kind" to "VINYL",
-            "label" to "label-$runSuffix",
+            "label" to listOf("label-$runSuffix", "label-alt-$runSuffix"),
             "title" to "recording-updated-$runSuffix",
             "comment" to "recording-comment-updated-$runSuffix",
             "defaultInWork" to false,
@@ -827,13 +824,8 @@ class AccountPlaylistContentE2eTest {
         )
         assertNotNull(sourceRecordingNode, "[content] updated recording should exist in source work detail")
         assertEquals(
-            recordingUpdatePayload["kind"],
-            sourceRecordingNode.path("kind").asText(),
-            "[content] updated recording kind should match",
-        )
-        assertEquals(
             recordingUpdatePayload["label"],
-            sourceRecordingNode.path("label").asText(),
+            E2eJson.mapper.convertValue(sourceRecordingNode.path("label"), List::class.java),
             "[content] updated recording label should match",
         )
         assertEquals(
@@ -1184,7 +1176,6 @@ class AccountPlaylistContentE2eTest {
             path = "/api/albums/$albumId",
             json = mapOf(
                 "title" to "album-updated-$suffix",
-                "kind" to "VINYL",
                 "releaseDate" to "2025-01-01",
                 "comment" to "album-updated-comment-$suffix",
             ),
@@ -1192,7 +1183,6 @@ class AccountPlaylistContentE2eTest {
         E2eAssert.status(updateResponse, 200, "[album-update] update should succeed")
         E2eAssert.jsonAt(updateResponse.body(), "/id", albumId, "[album-update] updated id should match")
         E2eAssert.jsonAt(updateResponse.body(), "/title", "album-updated-$suffix", "[album-update] title should match")
-        E2eAssert.jsonAt(updateResponse.body(), "/kind", "VINYL", "[album-update] kind should match")
         E2eAssert.jsonAt(updateResponse.body(), "/releaseDate", "2025-01-01", "[album-update] releaseDate should match")
         E2eAssert.jsonAt(updateResponse.body(), "/comment", "album-updated-comment-$suffix", "[album-update] comment should match")
 
@@ -1450,8 +1440,8 @@ class AccountPlaylistContentE2eTest {
             .addValue("comment", comment)
         return jdbc.queryForObject(
             """
-                INSERT INTO album(title, kind, release_date, comment, cover_id)
-                VALUES (:title, 'CD', NULL, :comment, NULL)
+                INSERT INTO album(title, release_date, comment, cover_id)
+                VALUES (:title, NULL, :comment, NULL)
                 RETURNING id
             """.trimIndent(),
             params,
@@ -1466,8 +1456,8 @@ class AccountPlaylistContentE2eTest {
             .addValue("comment", comment)
         return jdbc.queryForObject(
             """
-                INSERT INTO recording(work_id, kind, label, title, comment, duration_ms, default_in_work, cover_id)
-                VALUES (:workId, 'CD', 'CD', :title, :comment, 0, false, NULL)
+                INSERT INTO recording(work_id, label, title, comment, duration_ms, default_in_work, cover_id)
+                VALUES (:workId, ARRAY['CD'], :title, :comment, 0, false, NULL)
                 RETURNING id
             """.trimIndent(),
             params,

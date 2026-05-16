@@ -80,8 +80,7 @@ const buildWorkResponse = () => ({
     recordings: [
         {
             id: 21,
-            kind: 'Live',
-            label: 'Label X',
+            label: ['Label X'],
             title: 'Version A',
             comment: 'Comment A',
             durationMs: 195000,
@@ -93,8 +92,7 @@ const buildWorkResponse = () => ({
         },
         {
             id: 22,
-            kind: 'Studio',
-            label: 'Label Y',
+            label: ['Label Y'],
             title: 'Version B',
             comment: 'Comment B',
             durationMs: 225000,
@@ -193,9 +191,8 @@ describe('WorkDetailView', () => {
             id: 22,
             body: {
                 title: 'Version B',
-                label: 'Label Y',
+                label: ['Label Y'],
                 comment: 'Comment B',
-                kind: 'Studio',
                 defaultInWork: true,
             },
         })
