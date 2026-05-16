@@ -4,15 +4,15 @@ import ModalStackItem from '@/components/modals/ModalStackItem.vue'
 import { useModalStore } from '@/stores/modal'
 
 const modalStore = useModalStore()
-const { stack } = storeToRefs(modalStore)
+const { renderedStack, stack } = storeToRefs(modalStore)
 </script>
 
 <template>
     <ModalStackItem
-        v-for="(entry, index) in stack"
+        v-for="(entry, index) in renderedStack"
         :key="entry.id"
         :entry="entry"
         :index="index"
-        :is-topmost="index === stack.length - 1"
+        :is-topmost="!entry.isClosing && entry.id === stack[stack.length - 1]?.id"
     />
 </template>

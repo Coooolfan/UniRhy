@@ -94,7 +94,7 @@ const handlePlaylistClick = (playlistId: number) => {
 const openCreatePlaylistModal = async () => {
     await modal.open(PlaylistCreateDialogContent, {
         title: '创建新歌单',
-        size: 'sm',
+        size: 'md',
         props: {
             onSubmit: async ({ name, comment }: { name: string; comment: string }) => {
                 await api.playlistController.createPlaylist({
@@ -140,7 +140,9 @@ onMounted(() => {
         >
             <div class="flex h-full min-h-0 flex-col md:pl-10 md:pr-6 md:pt-12">
                 <div class="mb-10 flex items-center justify-between md:mb-12">
-                    <h1 class="text-3xl font-serif tracking-tight text-[#2C2C2C]">UniRhy.</h1>
+                    <h1 class="select-none text-3xl font-serif tracking-tight text-[#2C2C2C]">
+                        UniRhy.
+                    </h1>
                     <button
                         type="button"
                         class="inline-flex h-9 w-9 items-center justify-center rounded-full text-[#8A857D] transition-colors hover:bg-white/60 hover:text-[#5E5950] md:hidden"

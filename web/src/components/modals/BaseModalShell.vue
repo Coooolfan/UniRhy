@@ -16,6 +16,7 @@ const props = withDefaults(
         isTopmost?: boolean
         zIndex?: number
         fitContent?: boolean
+        open?: boolean
     }>(),
     {
         title: '',
@@ -28,11 +29,13 @@ const props = withDefaults(
         isTopmost: true,
         zIndex: 500,
         fitContent: true,
+        open: true,
     },
 )
 
 const emit = defineEmits<{
     (event: 'close'): void
+    (event: 'afterLeave'): void
 }>()
 const slots = useSlots()
 const modalContainerRef = ref<HTMLElement | null>(null)
@@ -168,6 +171,7 @@ const syncFocusToModal = async () => {
     }
 
     await nextTick()
+    await nextTick()
 
     const container = modalContainerRef.value
     if (!container) {
@@ -290,6 +294,18 @@ onMounted(() => {
 })
 
 watch(
+    () => props.open,
+    (isOpen) => {
+        if (!isOpen) {
+            return
+        }
+
+        void syncFocusToModal()
+    },
+    { immediate: true, flush: 'post' },
+)
+
+watch(
     () => props.isTopmost,
     (isTopmost) => {
         if (!isTopmost) {
@@ -314,8 +330,14 @@ onUnmounted(() => {
 
 <template>
     <Teleport to="body">
-        <Transition appear name="app-modal">
+        <Transition
+            appear
+            name="app-modal"
+            @after-enter="void syncFocusToModal()"
+            @after-leave="emit('afterLeave')"
+        >
             <div
+                v-if="open"
                 data-testid="app-modal-root"
                 class="fixed inset-0"
                 :class="isTopmost ? '' : 'pointer-events-none'"

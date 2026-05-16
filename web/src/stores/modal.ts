@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { markRaw, ref, type Component } from 'vue'
+import { computed, markRaw, ref, type Component } from 'vue'
 
 export type ModalTone = 'default' | 'danger'
 export type ModalSize = 'sm' | 'md' | 'lg' | 'xl'
@@ -28,6 +28,7 @@ export type ModalEntry = {
     closeOnEscape: boolean
     bodyPadding: boolean
     fitContent: boolean
+    isClosing: boolean
     resolve: (value: unknown) => void
 }
 
@@ -43,7 +44,8 @@ const DEFAULT_MODAL_OPTIONS = {
 } satisfies Omit<Required<OpenModalOptions>, 'props'>
 
 export const useModalStore = defineStore('modal', () => {
-    const stack = ref<ModalEntry[]>([])
+    const renderedStack = ref<ModalEntry[]>([])
+    const stack = computed(() => renderedStack.value.filter((entry) => !entry.isClosing))
     let nextModalId = 1
 
     const open = <
@@ -54,7 +56,7 @@ export const useModalStore = defineStore('modal', () => {
         options: OpenModalOptions<TProps> = {},
     ) =>
         new Promise<TResult | null>((resolve) => {
-            stack.value.push({
+            renderedStack.value.push({
                 id: nextModalId++,
                 component: markRaw(component),
                 props: options.props ?? {},
@@ -66,6 +68,7 @@ export const useModalStore = defineStore('modal', () => {
                 closeOnEscape: options.closeOnEscape ?? DEFAULT_MODAL_OPTIONS.closeOnEscape,
                 bodyPadding: options.bodyPadding ?? DEFAULT_MODAL_OPTIONS.bodyPadding,
                 fitContent: options.fitContent ?? DEFAULT_MODAL_OPTIONS.fitContent,
+                isClosing: false,
                 resolve: (value) => {
                     // oxlint-disable-next-line typescript-eslint/no-unsafe-type-assertion
                     resolve(value as TResult | null)
@@ -74,13 +77,22 @@ export const useModalStore = defineStore('modal', () => {
         })
 
     const resolveById = (id: number, value: unknown) => {
-        const entryIndex = stack.value.findIndex((entry) => entry.id === id)
+        const entry = renderedStack.value.find((renderedEntry) => renderedEntry.id === id)
+        if (!entry || entry.isClosing) {
+            return
+        }
+
+        entry.isClosing = true
+        entry.resolve(value)
+    }
+
+    const removeById = (id: number) => {
+        const entryIndex = renderedStack.value.findIndex((entry) => entry.id === id)
         if (entryIndex === -1) {
             return
         }
 
-        const [entry] = stack.value.splice(entryIndex, 1)
-        entry?.resolve(value)
+        renderedStack.value.splice(entryIndex, 1)
     }
 
     const closeById = (id: number) => {
@@ -99,8 +111,10 @@ export const useModalStore = defineStore('modal', () => {
 
     return {
         stack,
+        renderedStack,
         open,
         resolveById,
+        removeById,
         closeById,
         closeTop,
     }

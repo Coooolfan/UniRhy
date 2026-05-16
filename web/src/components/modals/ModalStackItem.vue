@@ -37,7 +37,9 @@ provide(modalContextKey, context)
         :fit-content="entry.fitContent"
         :is-topmost="isTopmost"
         :z-index="zIndex"
+        :open="!entry.isClosing"
         @close="modalStore.closeById(entry.id)"
+        @after-leave="modalStore.removeById(entry.id)"
     >
         <component :is="entry.component" v-bind="entry.props" />
     </BaseModalShell>
