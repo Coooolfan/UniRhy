@@ -208,11 +208,13 @@ private fun buildRecordingFromAudioFile(
         cover = audioCover
         durationMs = audioTag.audioHeader.preciseTrackLength.toLong() * 1000
         defaultInWork = false
-        artists().addBy {
-            displayName = tag?.getFirst(FieldKey.ARTIST).orEmpty()
-            alias = listOf(tag?.getFirst(FieldKey.ARTIST).orEmpty())
-            comment = ""
-            avatar = null
+        for (artistName in parseRecordingArtists(tag?.getFirst(FieldKey.ARTIST))) {
+            artists().addBy {
+                displayName = artistName
+                alias = listOf(artistName)
+                comment = ""
+                avatar = null
+            }
         }
         albumRecordings().addBy {
             sortOrder = 0
@@ -273,6 +275,18 @@ fun parseRecordingTitleMetadata(title: String): ParsedRecordingTitle {
         workTitle = remaining.trim(),
         labels = reversedGroups.asReversed().flatten(),
     )
+}
+
+fun parseRecordingArtists(artistTag: String?): List<String> {
+    val value = artistTag?.trim().orEmpty()
+    if (value.isBlank()) {
+        return emptyList()
+    }
+
+    return value.split(Regex("""\s*[;/]\s*"""))
+        .map(String::trim)
+        .filter(String::isNotBlank)
+        .distinct()
 }
 
 private fun Tag.albumReleaseDate(): LocalDate? {
