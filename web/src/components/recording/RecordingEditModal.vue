@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { reactive, ref } from 'vue'
-import { Disc, FileAudio, Image as ImageIcon, Users } from 'lucide-vue-next'
+import { Disc, FileAudio, Image as ImageIcon, Pencil, Plus, Trash2 } from 'lucide-vue-next'
 import { normalizeApiError } from '@/ApiInstance'
 import { useModalContext } from '@/components/modals/modalContext'
+import { normalizeLabels } from '@/composables/recordingMedia'
 
 export type RecordingAsset = {
     mediaFile: {
@@ -23,7 +24,7 @@ export type RecordingPreview = {
 
 export type RecordingEditForm = {
     title: string
-    label: string
+    label: string[]
     comment: string
     isDefault: boolean
 }
@@ -44,12 +45,13 @@ const modal = useModalContext<undefined>()
 
 const form = reactive<RecordingEditForm>({
     title: props.initialForm.title,
-    label: props.initialForm.label,
+    label: [...props.initialForm.label],
     comment: props.initialForm.comment,
     isDefault: props.initialForm.isDefault,
 })
 const error = ref('')
 const isSaving = ref(false)
+const editingLabelIndex = ref<number | null>(null)
 
 const closeModal = () => {
     if (isSaving.value) {
@@ -57,6 +59,29 @@ const closeModal = () => {
     }
 
     modal.close()
+}
+
+const addLabel = () => {
+    form.label.push('')
+    const nextIndex = form.label.length - 1
+    editingLabelIndex.value = nextIndex
+}
+
+const removeLabel = (index: number) => {
+    form.label.splice(index, 1)
+    editingLabelIndex.value = null
+}
+
+const editLabel = (index: number) => {
+    if (isSaving.value) {
+        return
+    }
+
+    editingLabelIndex.value = index
+}
+
+const stopEditingLabel = () => {
+    editingLabelIndex.value = null
 }
 
 const submit = async () => {
@@ -73,10 +98,11 @@ const submit = async () => {
     error.value = ''
 
     try {
+        const labels = normalizeLabels(form.label)
         await props.onSubmit({
-            title: form.title,
-            label: form.label,
-            comment: form.comment,
+            title: form.title.trim(),
+            label: labels,
+            comment: form.comment.trim(),
             isDefault: form.isDefault,
         })
         modal.resolve(undefined)
@@ -89,7 +115,7 @@ const submit = async () => {
 </script>
 
 <template>
-    <div class="grid grid-cols-1 gap-8 md:grid-cols-2">
+    <div class="grid grid-cols-1 gap-8 md:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
         <div class="space-y-6">
             <div
                 v-if="recording"
@@ -123,7 +149,7 @@ const submit = async () => {
                                 资产
                             </div>
                             <div class="truncate text-[#2C2420]">
-                                {{ recording.assets.length }} file(s) attached
+                                已关联 {{ recording.assets.length }} 个文件
                             </div>
                         </div>
                     </div>
@@ -216,19 +242,77 @@ const submit = async () => {
                 />
             </label>
 
-            <label class="block">
-                <span class="mb-2 block font-serif text-xs uppercase tracking-wider text-[#8A8A8A]">
-                    标签
-                </span>
-                <input
-                    v-model="form.label"
-                    type="text"
-                    maxlength="255"
-                    class="w-full border-b border-[#D6D1C4] bg-[#F7F5F0] p-3 font-serif text-[#3D3D3D] transition-colors placeholder:text-[#BDB9AE] focus:border-[#C67C4E] focus:outline-none"
-                    placeholder="多个标签用英文逗号分隔"
-                    :disabled="isSaving"
-                />
-            </label>
+            <div class="block">
+                <div
+                    class="mb-2 flex items-center justify-between gap-3 font-serif text-xs uppercase tracking-wider text-[#8A8A8A]"
+                >
+                    <span> 标签 </span>
+                </div>
+                <ul
+                    class="label-strip flex h-14 min-w-0 items-start gap-2 overflow-x-auto overflow-y-hidden pb-3"
+                >
+                    <li
+                        v-for="(_, index) in form.label"
+                        :key="index"
+                        class="group flex h-10 max-w-[300px] shrink-0 items-center whitespace-nowrap rounded-sm border border-[#D6D1C4] bg-[#F7F5F0] px-2"
+                    >
+                        <input
+                            v-if="editingLabelIndex === index"
+                            v-model="form.label[index]"
+                            type="text"
+                            maxlength="255"
+                            class="h-8 min-w-0 flex-1 truncate border-b border-[#D6D1C4] bg-transparent px-1 font-serif text-sm text-[#3D3D3D] transition-colors placeholder:text-[#BDB9AE] focus:border-[#C67C4E] focus:outline-none"
+                            placeholder="未命名标签"
+                            :disabled="isSaving"
+                            @blur="stopEditingLabel"
+                            @keydown.enter.prevent="stopEditingLabel"
+                        />
+                        <button
+                            v-else
+                            type="button"
+                            class="h-8 max-w-[230px] truncate px-1 text-left font-serif text-sm text-[#3D3D3D] transition-colors hover:text-[#C67C4E]"
+                            :disabled="isSaving"
+                            :title="form.label[index] || '未命名标签'"
+                        >
+                            {{ form.label[index] || '未命名标签' }}
+                        </button>
+                        <div
+                            v-if="editingLabelIndex !== index"
+                            class="flex w-0 items-center gap-1 overflow-hidden opacity-0 transition-[width,opacity] duration-200 ease-out group-hover:w-14 group-hover:opacity-100"
+                        >
+                            <button
+                                type="button"
+                                class="inline-flex h-7 w-7 items-center justify-center rounded-sm text-[#8A8A8A] transition-colors hover:bg-[#EAE6DE] hover:text-[#C67C4E] disabled:cursor-not-allowed disabled:opacity-60"
+                                :disabled="isSaving"
+                                aria-label="修改标签"
+                                title="修改"
+                                @click.stop="editLabel(index)"
+                            >
+                                <Pencil :size="13" />
+                            </button>
+                            <button
+                                type="button"
+                                class="inline-flex h-7 w-7 items-center justify-center rounded-sm text-[#8A8A8A] transition-colors hover:bg-[#F1E3DF] hover:text-[#B95D5D] disabled:cursor-not-allowed disabled:opacity-60"
+                                :disabled="isSaving"
+                                aria-label="删除标签"
+                                title="删除"
+                                @click.stop="removeLabel(index)"
+                            >
+                                <Trash2 :size="13" />
+                            </button>
+                        </div>
+                    </li>
+                    <button
+                        type="button"
+                        class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-sm border border-[#D6D1C4] text-[#8A8A8A] transition-colors hover:border-[#C67C4E] hover:text-[#C67C4E] disabled:cursor-not-allowed disabled:opacity-60"
+                        :disabled="isSaving"
+                        aria-label="添加标签"
+                        @click="addLabel"
+                    >
+                        <Plus :size="14" />
+                    </button>
+                </ul>
+            </div>
 
             <label class="flex min-h-[100px] flex-1 flex-col">
                 <span class="mb-2 block font-serif text-xs uppercase tracking-wider text-[#8A8A8A]">
@@ -293,3 +377,29 @@ const submit = async () => {
         </div>
     </div>
 </template>
+
+<style scoped>
+.label-strip {
+    scrollbar-color: #d6d1c4 transparent;
+    scrollbar-gutter: stable;
+}
+
+.label-strip::-webkit-scrollbar {
+    height: 8px;
+}
+
+.label-strip::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.label-strip::-webkit-scrollbar-thumb {
+    background-color: #d6d1c4;
+    border: 2px solid transparent;
+    border-radius: 999px;
+    background-clip: content-box;
+}
+
+.label-strip::-webkit-scrollbar-thumb:hover {
+    background-color: #c67c4e;
+}
+</style>

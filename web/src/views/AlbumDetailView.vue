@@ -17,7 +17,7 @@ import {
     formatDurationMs,
     formatLabels,
     normalizeRecordings,
-    parseLabelInput,
+    normalizeLabels,
     resolveCover,
     type NormalizedRecordingBase,
     type RecordingAsset,
@@ -50,6 +50,7 @@ type AlbumData = {
 type Recording = RecordingPreview &
     RecordingPlaybackCandidate & {
         label: string
+        labels: string[]
         comment: string
         isDefault: boolean
         durationMs: number
@@ -134,6 +135,7 @@ const fetchAlbum = async (id: number) => {
                 transform: (recording: AlbumRecordingDto, base: NormalizedRecordingBase) => ({
                     ...base,
                     label: formatLabels(recording.label),
+                    labels: normalizeLabels(recording.label),
                     comment: recording.comment,
                     durationMs: recording.durationMs,
                     rawArtists: recording.artists || [],
@@ -243,7 +245,7 @@ const openEditRecordingModal = async (recording: Recording) => {
             recording,
             initialForm: {
                 title: recording.title,
-                label: recording.label,
+                label: recording.labels,
                 comment: recording.comment,
                 isDefault: recording.isDefault,
             } satisfies RecordingEditForm,
@@ -252,9 +254,9 @@ const openEditRecordingModal = async (recording: Recording) => {
                 await api.recordingController.updateRecording({
                     id: recording.id,
                     body: {
-                        title: title.trim(),
-                        label: parseLabelInput(label),
-                        comment: comment?.trim() || '',
+                        title,
+                        label,
+                        comment,
                     },
                 })
                 invalidateAlbumPlaybackCache(recording.id)
@@ -265,9 +267,10 @@ const openEditRecordingModal = async (recording: Recording) => {
                     if (current) {
                         recordings.value[index] = {
                             ...current,
-                            title: title.trim(),
-                            label: label?.trim() || '',
-                            comment: comment?.trim() || '',
+                            title,
+                            label: formatLabels(label),
+                            labels: label,
+                            comment,
                         }
                     }
                 }

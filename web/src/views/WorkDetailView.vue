@@ -18,7 +18,7 @@ import {
     formatDurationMs,
     formatLabels,
     normalizeRecordings,
-    parseLabelInput,
+    normalizeLabels,
     resolveCover,
     type RecordingAsset,
 } from '@/composables/recordingMedia'
@@ -45,6 +45,7 @@ type WorkData = {
 type Recording = RecordingPreview &
     RecordingPlaybackCandidate & {
         label: string
+        labels: string[]
         comment: string
         cover: string
         isDefault: boolean
@@ -99,6 +100,7 @@ async function fetchWork(id: number) {
                 transform: (recording, base) => ({
                     ...base,
                     label: formatLabels(recording.label),
+                    labels: normalizeLabels(recording.label),
                     comment: recording.comment,
                     isDefault: recording.defaultInWork,
                     durationMs: recording.durationMs,
@@ -212,7 +214,7 @@ const openEditRecordingModal = async (recording: Recording) => {
             recording,
             initialForm: {
                 title: recording.title,
-                label: recording.label,
+                label: recording.labels,
                 comment: recording.comment,
                 isDefault: recording.isDefault,
             } satisfies RecordingEditForm,
@@ -221,9 +223,9 @@ const openEditRecordingModal = async (recording: Recording) => {
                 await api.recordingController.updateRecording({
                     id: recording.id,
                     body: {
-                        title: title.trim(),
-                        label: parseLabelInput(label),
-                        comment: comment?.trim() || '',
+                        title,
+                        label,
+                        comment,
                         defaultInWork: isDefault,
                     },
                 })
@@ -235,9 +237,10 @@ const openEditRecordingModal = async (recording: Recording) => {
                     if (current) {
                         recordings.value[index] = {
                             ...current,
-                            title: title.trim(),
-                            label: label?.trim() || '',
-                            comment: comment?.trim() || '',
+                            title,
+                            label: formatLabels(label),
+                            labels: label,
+                            comment,
                             isDefault,
                         }
                     }

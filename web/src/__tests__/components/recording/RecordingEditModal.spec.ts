@@ -8,7 +8,7 @@ import { modalContextKey, type ModalContext } from '@/components/modals/modalCon
 
 const buildForm = (): RecordingEditForm => ({
     title: 'Original Title',
-    label: 'Original Label',
+    label: ['Original Label'],
     comment: 'Original Comment',
     isDefault: false,
 })
@@ -70,9 +70,9 @@ describe('RecordingEditModal', () => {
     it('renders artists and assets', () => {
         const wrapper = mountModal()
 
-        expect(wrapper.text()).toContain('Track ID')
+        expect(wrapper.text()).toContain('曲目 ID')
         expect(wrapper.text()).toContain('#42')
-        expect(wrapper.text()).toContain('Artists')
+        expect(wrapper.text()).toContain('艺术家')
         expect(wrapper.text()).toContain('Artist A')
         expect(wrapper.text()).toContain('file(s) attached')
         expect(wrapper.text()).toContain('audio/file.mp3')
@@ -88,8 +88,10 @@ describe('RecordingEditModal', () => {
         const titleInput = wrapper.find('input[placeholder="Track Title"]')
         await titleInput.setValue('Updated Title')
 
-        const labelInput = wrapper.find('input[placeholder="多个标签用英文逗号分隔"]')
-        await labelInput.setValue('Updated Label')
+        await wrapper.get('button[aria-label="修改标签"]').trigger('click')
+
+        const labelInput = wrapper.find('input[placeholder="唱片公司或厂牌"]')
+        await labelInput.setValue('  Updated Label  ')
 
         const commentInput = wrapper.find('textarea[placeholder="在此添加曲目描述"]')
         await commentInput.setValue('Updated Comment')
@@ -104,7 +106,7 @@ describe('RecordingEditModal', () => {
 
         expect(onSubmit).toHaveBeenCalledWith({
             title: 'Updated Title',
-            label: 'Updated Label',
+            label: ['Updated Label'],
             comment: 'Updated Comment',
             isDefault: false,
         })
@@ -116,10 +118,10 @@ describe('RecordingEditModal', () => {
             showDefaultToggle: false,
         })
 
-        expect(wrapper.text()).not.toContain('默认版本 (Default Version)')
+        expect(wrapper.text()).not.toContain('作品默认曲目')
 
         await wrapper.setProps({ showDefaultToggle: true })
-        expect(wrapper.text()).toContain('默认版本 (Default Version)')
+        expect(wrapper.text()).toContain('作品默认曲目')
     })
 
     it('disables actions while submit is in progress and closes when cancelled', async () => {

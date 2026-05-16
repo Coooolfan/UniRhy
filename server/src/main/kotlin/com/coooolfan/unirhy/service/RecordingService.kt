@@ -26,7 +26,10 @@ class RecordingService(
     }
 
     fun updateRecording(input: Recording) {
-        sql.saveCommand(input, SaveMode.UPDATE_ONLY).execute()
+        val normalized = Recording(input) {
+            label = input.label.toSet().toList()
+        }
+        sql.saveCommand(normalized, SaveMode.UPDATE_ONLY).execute()
     }
 
     @Transactional
