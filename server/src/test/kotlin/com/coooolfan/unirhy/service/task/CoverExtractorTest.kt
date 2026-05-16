@@ -1,13 +1,11 @@
 package com.coooolfan.unirhy.service.task
 
 import com.coooolfan.unirhy.model.storage.FileProviderFileSystem
-import com.coooolfan.unirhy.utils.sha256
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import org.jaudiotagger.tag.images.ArtworkFactory
 import java.nio.file.Files
 import java.nio.file.Path
-import java.security.MessageDigest
 import kotlin.test.assertEquals
 import kotlin.test.assertContentEquals
 import kotlin.test.assertNotNull
@@ -27,7 +25,7 @@ class CoverExtractorTest {
         val audioFile = root.resolve("song.mp3").toFile().apply {
             writeBytes(byteArrayOf(0x00))
         }
-        val sidecarFile = root.resolve("song.jpg").toFile().apply {
+        root.resolve("song.jpg").toFile().apply {
             writeBytes(byteArrayOf(0x01, 0x02, 0x03))
         }
         val embedded = ArtworkFactory.getNew().apply {
@@ -48,7 +46,6 @@ class CoverExtractorTest {
 
         assertNotNull(cover)
         assertEquals("song.jpg", cover.objectKey)
-        assertEquals(sidecarFile.sha256(), cover.sha256)
         assertEquals(provider.parentPath, cover.fsProvider?.parentPath)
     }
 
@@ -81,14 +78,12 @@ class CoverExtractorTest {
             artwork = artwork,
         )
 
-        val expectedSha = sha256Bytes(artworkBytes)
-        val expectedObjectKey = "covers/$expectedSha.png"
+        val expectedObjectKey = "covers/${provider.id}/song.png"
         val expectedFile = writeableRoot.resolve(expectedObjectKey).toFile()
 
         assertNotNull(cover)
         assertEquals(expectedObjectKey, cover.objectKey)
         assertEquals("image/png", cover.mimeType)
-        assertEquals(expectedSha, cover.sha256)
         assertEquals(writeableProvider.parentPath, cover.fsProvider?.parentPath)
         assertTrue(expectedFile.exists())
         assertContentEquals(artworkBytes, expectedFile.readBytes())
@@ -119,9 +114,4 @@ class CoverExtractorTest {
             this.readonly = readonly
         }
     }
-
-    private fun sha256Bytes(bytes: ByteArray): String =
-        MessageDigest.getInstance("SHA-256").digest(bytes)
-            .joinToString("") { "%02x".format(it) }
-
 }

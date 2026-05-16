@@ -138,7 +138,6 @@ class TranscodeTaskService(
         sql.saveCommand(Asset {
             recording = Recording { id = payload.recordingId }
             mediaFile {
-                sha256 = "mocked-sha256"
                 objectKey = dstObjectKey
                 mimeType = "audio/opus"
                 size = outputFile.length()

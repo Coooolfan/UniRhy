@@ -17,8 +17,6 @@ interface MediaFile {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     val id: Long
 
-    val sha256: String
-
     @Key
     val objectKey: String
 

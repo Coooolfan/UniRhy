@@ -32,7 +32,6 @@ CREATE TABLE public.file_provider_file_system
 CREATE TABLE public.media_file
 (
     id              BIGSERIAL PRIMARY KEY,
-    sha256          TEXT   NOT NULL,                                                            -- 文件哈希（校验/去重）
     object_key      TEXT   NOT NULL,                                                            -- 文件在存储空间中的路径/Key
     mime_type       TEXT   NOT NULL,                                                            -- MIME类型（audio/flac, image/jpeg等）
     size            BIGINT NOT NULL,                                                            -- 文件大小（字节）
@@ -53,9 +52,6 @@ CREATE UNIQUE INDEX media_file_oss_key_uniq
 
 CREATE UNIQUE INDEX media_file_fs_key_uniq
     ON public.media_file (fs_provider_id, object_key) WHERE fs_provider_id IS NOT NULL;
-
--- 哈希索引：快速查找重复文件
-CREATE INDEX media_file_sha256_idx ON public.media_file (sha256);
 
 -- ==========================================================
 -- 3. 核心作品与录音模块

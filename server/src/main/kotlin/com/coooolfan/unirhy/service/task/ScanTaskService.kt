@@ -5,7 +5,6 @@ import com.coooolfan.unirhy.model.storage.FileProviderFileSystem
 import com.coooolfan.unirhy.model.storage.FileProviderType
 import com.coooolfan.unirhy.service.SystemConfigService.Companion.SYSTEM_CONFIG_ID
 import com.coooolfan.unirhy.service.task.common.*
-import com.coooolfan.unirhy.utils.sha256
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.babyfish.jimmer.sql.ast.mutation.AssociatedSaveMode
 import org.babyfish.jimmer.sql.ast.mutation.SaveMode
@@ -20,7 +19,6 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.support.TransactionTemplate
 import java.io.File
 import java.nio.file.Files
-import java.security.MessageDigest
 import java.time.LocalDate
 import kotlin.io.path.Path
 
@@ -196,7 +194,7 @@ private fun buildWorkFromAudioFile(
             artists().addBy {
                 displayName = tag?.getFirst(FieldKey.ARTIST).orEmpty()
                 alias = listOf(tag?.getFirst(FieldKey.ARTIST).orEmpty())
-                comment = "load from local file: $objectKey"
+                comment = ""
                 avatar = null
             }
             albumRecordings().addBy {
@@ -205,14 +203,13 @@ private fun buildWorkFromAudioFile(
                     title = tag?.getFirst(FieldKey.ALBUM).orEmpty()
                     kind = "CD"
                     releaseDate = tag?.albumReleaseDate()
-                    comment = "load from local file: $objectKey"
+                    comment = ""
                     cover = audioCover
                 }
             }
             assets().addBy {
-                comment = "load from local file: $objectKey"
+                comment = ""
                 mediaFile {
-                    sha256 = "mocked-sha256"
                     this.objectKey = objectKey
                     mimeType = Files.probeContentType(file.toPath()) ?: "application/octet-stream"
                     size = file.length()
@@ -270,7 +267,6 @@ fun fetchCover(
             continue
         }
         return MediaFile {
-            sha256 = coverFile.sha256()
             objectKey = coverFile.relativeTo(Path(provider.parentPath).toFile()).path
             mimeType = Files.probeContentType(coverFile.toPath())
             size = coverFile.length()
@@ -289,10 +285,9 @@ fun fetchCover(
 
     val mimeType = safeArtwork.mimeType?.trim().takeIf { !it.isNullOrBlank() } ?: "image/jpeg"
     val extension = extensionFromMime(mimeType)
-    val sha256 = sha256Bytes(binaryData)
 
     val targetProvider = if (provider.readonly) writeableProvider else provider
-    val objectKey = "covers/$sha256.$extension"
+    val objectKey = embeddedCoverObjectKey(file, provider, extension)
     val coverFile = File(targetProvider.parentPath, objectKey)
 
     if (!coverFile.exists()) {
@@ -301,7 +296,6 @@ fun fetchCover(
     }
 
     return MediaFile {
-        this.sha256 = sha256
         this.objectKey = objectKey
         this.mimeType = Files.probeContentType(coverFile.toPath()) ?: mimeType
         this.size = binaryData.size.toLong()
@@ -322,6 +316,12 @@ private fun extensionFromMime(mimeType: String): String =
         else -> "jpg"
     }
 
-private fun sha256Bytes(binaryData: ByteArray): String =
-    MessageDigest.getInstance("SHA-256").digest(binaryData)
-        .joinToString("") { "%02x".format(it) }
+private fun embeddedCoverObjectKey(
+    file: File,
+    provider: FileProviderFileSystem,
+    extension: String,
+): String {
+    val sourceObjectKey = file.relativeTo(Path(provider.parentPath).toFile()).path
+    val coverObjectKey = sourceObjectKey.substringBeforeLast('.', sourceObjectKey)
+    return "covers/${provider.id}/$coverObjectKey.$extension"
+}

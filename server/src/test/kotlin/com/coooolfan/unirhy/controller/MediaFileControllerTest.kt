@@ -51,7 +51,6 @@ class MediaFileControllerTest {
                 ResolvedMediaFile(
                     mediaFile = media(
                         id = id,
-                        sha256 = "abc123",
                         objectKey = mediaFile.name,
                         mimeType = "audio/flac",
                         size = mediaFile.length(),
@@ -76,7 +75,7 @@ class MediaFileControllerTest {
             .andExpect(status().isOk)
             .andExpect(header().string(HttpHeaders.ACCEPT_RANGES, "bytes"))
             .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "private, max-age=31536000, immutable"))
-            .andExpect(header().string(HttpHeaders.ETAG, "\"abc123\""))
+            .andExpect(header().doesNotExist(HttpHeaders.ETAG))
             .andExpect(header().string("X-Content-Type-Options", "nosniff"))
             .andReturn()
             .response
@@ -130,23 +129,23 @@ class MediaFileControllerTest {
     }
 
     @Test
-    fun `if none match hit returns 304`() {
+    fun `if none match is ignored without etag support`() {
         mockMvc.perform(
             get("/api/media/183").presigned(183)
                 .header(HttpHeaders.IF_NONE_MATCH, "\"abc123\""),
         )
-            .andExpect(status().isNotModified)
+            .andExpect(status().isOk)
     }
 
     @Test
-    fun `range request with if none match hit returns 304`() {
+    fun `range request with if none match still returns range`() {
         mockMvc.perform(
             get("/api/media/183").presigned(183)
                 .header(HttpHeaders.RANGE, "bytes=0-3")
                 .header(HttpHeaders.IF_NONE_MATCH, "\"abc123\""),
         )
-            .andExpect(status().isNotModified)
-            .andExpect(header().doesNotExist(HttpHeaders.CONTENT_RANGE))
+            .andExpect(status().isPartialContent)
+            .andExpect(header().string(HttpHeaders.CONTENT_RANGE, "bytes 0-3/10"))
     }
 
     @Test
@@ -226,14 +225,12 @@ class MediaFileControllerTest {
 
     private fun media(
         id: Long,
-        sha256: String,
         objectKey: String,
         mimeType: String,
         size: Long,
     ): MediaFile {
         return object : MediaFile {
             override val id: Long = id
-            override val sha256: String = sha256
             override val objectKey: String = objectKey
             override val mimeType: String = mimeType
             override val size: Long = size

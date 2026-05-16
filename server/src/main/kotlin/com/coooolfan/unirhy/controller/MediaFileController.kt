@@ -72,14 +72,13 @@ class MediaFileController(
         val resolved = service.loadLocalFile(id)
         val resource = FileSystemResource(resolved.file)
         val mediaType = parseMediaType(resolved.mediaFile.mimeType)
-        val etag = toStrongEtag(resolved.mediaFile.sha256)
         val lastModified = normalizeToSeconds(resolved.file.lastModified())
 
-        if (isNotModified(headers, etag, lastModified)) {
-            return notModifiedResourceResponse(resolved, etag, lastModified)
+        if (isNotModified(headers, lastModified)) {
+            return notModifiedResourceResponse(resolved, lastModified)
         }
 
-        return fullResponse(resolved, resource, mediaType, etag, lastModified)
+        return fullResponse(resolved, resource, mediaType, lastModified)
     }
 
     @RequestMapping(MediaFileRoutes.MEDIA_FILE_PATH_PATTERN, method = [RequestMethod.HEAD], headers = ["!Range"])
@@ -93,16 +92,15 @@ class MediaFileController(
         authenticateRequest(id, sig, exp)
         val resolved = service.loadLocalFile(id)
         val mediaType = parseMediaType(resolved.mediaFile.mimeType)
-        val etag = toStrongEtag(resolved.mediaFile.sha256)
         val lastModified = normalizeToSeconds(resolved.file.lastModified())
 
-        if (isNotModified(headers, etag, lastModified)) {
+        if (isNotModified(headers, lastModified)) {
             return ResponseEntity.status(HttpStatus.NOT_MODIFIED)
-                .headers(baseHeaders(resolved, etag, lastModified, null))
+                .headers(baseHeaders(resolved, lastModified, null))
                 .build()
         }
 
-        val responseHeaders = baseHeaders(resolved, etag, lastModified, mediaType)
+        val responseHeaders = baseHeaders(resolved, lastModified, mediaType)
         responseHeaders.contentLength = resolved.file.length()
         return ResponseEntity.status(HttpStatus.OK)
             .headers(responseHeaders)
@@ -121,42 +119,41 @@ class MediaFileController(
         val resolved = service.loadLocalFile(id)
         val resource = FileSystemResource(resolved.file)
         val mediaType = parseMediaType(resolved.mediaFile.mimeType)
-        val etag = toStrongEtag(resolved.mediaFile.sha256)
         val lastModified = normalizeToSeconds(resolved.file.lastModified())
         val total = resource.contentLength()
 
-        if (isNotModified(headers, etag, lastModified)) {
-            return notModifiedRangeResponse(resolved, etag, lastModified)
+        if (isNotModified(headers, lastModified)) {
+            return notModifiedRangeResponse(resolved, lastModified)
         }
 
-        if (!ifRangeMatched(headers, etag, lastModified)) {
+        if (!ifRangeMatched(headers, lastModified)) {
             // If-Range 不匹配时必须回退到完整资源响应
-            return fullBytesResponse(resolved, mediaType, etag, lastModified).asRangeResponse()
+            return fullBytesResponse(resolved, mediaType, lastModified).asRangeResponse()
         }
 
         val rawRange = headers.getFirst(HttpHeaders.RANGE)
-            ?: return rangeNotSatisfiable(resolved, total, etag, lastModified)
+            ?: return rangeNotSatisfiable(resolved, total, lastModified)
         val ranges = try {
             HttpRange.parseRanges(rawRange)
         } catch (_: IllegalArgumentException) {
-            return rangeNotSatisfiable(resolved, total, etag, lastModified)
+            return rangeNotSatisfiable(resolved, total, lastModified)
         }
         if (ranges.isEmpty()) {
-            return rangeNotSatisfiable(resolved, total, etag, lastModified)
+            return rangeNotSatisfiable(resolved, total, lastModified)
         }
 
         val regions = try {
             ranges.map { it.toResourceRegion(resource) }
         } catch (_: IllegalArgumentException) {
-            return rangeNotSatisfiable(resolved, total, etag, lastModified)
+            return rangeNotSatisfiable(resolved, total, lastModified)
         }
         if (regions.isEmpty()) {
-            return rangeNotSatisfiable(resolved, total, etag, lastModified)
+            return rangeNotSatisfiable(resolved, total, lastModified)
         }
 
         val contentType = if (regions.size == 1) mediaType else null
         return ResponseEntity.status(HttpStatus.PARTIAL_CONTENT)
-            .headers(baseHeaders(resolved, etag, lastModified, contentType))
+            .headers(baseHeaders(resolved, lastModified, contentType))
             .body(regions)
     }
 
@@ -164,10 +161,9 @@ class MediaFileController(
         resolved: ResolvedMediaFile,
         resource: Resource,
         mediaType: MediaType,
-        etag: String,
         lastModified: Long,
     ): ResponseEntity<Resource> {
-        val responseHeaders = baseHeaders(resolved, etag, lastModified, mediaType)
+        val responseHeaders = baseHeaders(resolved, lastModified, mediaType)
         responseHeaders.contentLength = resource.contentLength()
         return ResponseEntity.status(HttpStatus.OK)
             .headers(responseHeaders)
@@ -177,11 +173,10 @@ class MediaFileController(
     private fun fullBytesResponse(
         resolved: ResolvedMediaFile,
         mediaType: MediaType,
-        etag: String,
         lastModified: Long,
     ): ResponseEntity<ByteArray> {
         val body = resolved.file.readBytes()
-        val responseHeaders = baseHeaders(resolved, etag, lastModified, mediaType)
+        val responseHeaders = baseHeaders(resolved, lastModified, mediaType)
         responseHeaders.contentLength = body.size.toLong()
         return ResponseEntity.status(HttpStatus.OK)
             .headers(responseHeaders)
@@ -190,31 +185,28 @@ class MediaFileController(
 
     private fun notModifiedResourceResponse(
         resolved: ResolvedMediaFile,
-        etag: String,
         lastModified: Long,
     ): ResponseEntity<Resource> {
         return ResponseEntity.status(HttpStatus.NOT_MODIFIED)
-            .headers(baseHeaders(resolved, etag, lastModified, null))
+            .headers(baseHeaders(resolved, lastModified, null))
             .build()
     }
 
     private fun notModifiedRangeResponse(
         resolved: ResolvedMediaFile,
-        etag: String,
         lastModified: Long,
     ): ResponseEntity<List<ResourceRegion>> {
         return ResponseEntity.status(HttpStatus.NOT_MODIFIED)
-            .headers(baseHeaders(resolved, etag, lastModified, null))
+            .headers(baseHeaders(resolved, lastModified, null))
             .build()
     }
 
     private fun rangeNotSatisfiable(
         resolved: ResolvedMediaFile,
         total: Long,
-        etag: String,
         lastModified: Long,
     ): ResponseEntity<List<ResourceRegion>> {
-        val responseHeaders = baseHeaders(resolved, etag, lastModified, null)
+        val responseHeaders = baseHeaders(resolved, lastModified, null)
         responseHeaders[HttpHeaders.CONTENT_RANGE] = "bytes */$total"
         return ResponseEntity.status(HttpStatus.REQUESTED_RANGE_NOT_SATISFIABLE)
             .headers(responseHeaders)
@@ -223,14 +215,12 @@ class MediaFileController(
 
     private fun baseHeaders(
         resolved: ResolvedMediaFile,
-        etag: String,
         lastModified: Long,
         mediaType: MediaType?,
     ): HttpHeaders {
         return HttpHeaders().also { headers ->
             headers.set(HttpHeaders.CACHE_CONTROL, CACHE_CONTROL_VALUE)
             headers.set(HttpHeaders.ACCEPT_RANGES, "bytes")
-            headers.set(HttpHeaders.ETAG, etag)
             headers.lastModified = lastModified
             headers.set(HttpHeaders.CONTENT_DISPOSITION, inlineContentDisposition(resolved.file.name))
             headers.set(X_CONTENT_TYPE_OPTIONS, "nosniff")
@@ -249,15 +239,11 @@ class MediaFileController(
 
     private fun ifRangeMatched(
         headers: HttpHeaders,
-        etag: String,
         lastModified: Long,
     ): Boolean {
         val ifRange = headers.getFirst(HttpHeaders.IF_RANGE)?.trim() ?: return true
-        if (ifRange.startsWith("W/")) {
-            return false
-        }
         if (ifRange.startsWith("\"")) {
-            return ifRange == etag
+            return false
         }
 
         val ifRangeDate = parseHttpDate(ifRange) ?: return false
@@ -266,33 +252,13 @@ class MediaFileController(
 
     private fun isNotModified(
         headers: HttpHeaders,
-        etag: String,
         lastModified: Long,
     ): Boolean {
-        if (headers.ifNoneMatch.isNotEmpty()) {
-            return headers.ifNoneMatch.any { etagMatches(it, etag) }
-        }
-
         val ifModifiedSince = headers.ifModifiedSince
         if (ifModifiedSince < 0) {
             return false
         }
         return normalizeToSeconds(lastModified) <= normalizeToSeconds(ifModifiedSince)
-    }
-
-    private fun etagMatches(headerValue: String, currentEtag: String): Boolean {
-        val normalizedCurrent = normalizeEtag(currentEtag)
-        return headerValue.split(",")
-            .map { it.trim() }
-            .any {
-                it == "*" || normalizeEtag(it) == normalizedCurrent
-            }
-    }
-
-    private fun normalizeEtag(etag: String): String {
-        return etag.removePrefix("W/")
-            .trim()
-            .removeSurrounding("\"")
     }
 
     private fun parseHttpDate(headerValue: String): Long? {
@@ -303,10 +269,6 @@ class MediaFileController(
         } catch (_: RuntimeException) {
             null
         }
-    }
-
-    private fun toStrongEtag(sha256: String): String {
-        return "\"$sha256\""
     }
 
     private fun normalizeToSeconds(value: Long): Long {
