@@ -8,11 +8,6 @@ defineProps<{
   <div class="relative inline-block">
     <Transition name="fade-up" mode="out-in">
       <div :key="isChinese ? 'cn' : 'en'">
-        <img
-          src="/logo.svg"
-          alt=""
-          class="mx-auto mb-4 h-20 w-20 [filter:drop-shadow(0_0_22px_rgba(246,160,6,0.5))]"
-        />
         <div
           :class="
             isChinese

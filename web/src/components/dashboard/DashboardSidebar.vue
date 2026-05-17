@@ -141,7 +141,6 @@ onMounted(() => {
             <div class="flex h-full min-h-0 flex-col md:pl-10 md:pr-6 md:pt-12">
                 <div class="mb-10 flex items-center justify-between md:mb-12">
                     <div class="flex select-none items-center gap-3">
-                        <img src="/logo.svg" alt="" class="h-9 w-9" />
                         <h1 class="text-3xl font-serif tracking-tight text-[#2C2C2C]">UniRhy.</h1>
                     </div>
                     <button
