@@ -17,4 +17,7 @@ interface Artist {
 
     @ManyToOne
     val avatar: MediaFile?
+
+    @IdView("avatar")
+    val avatarId: Long?
 }

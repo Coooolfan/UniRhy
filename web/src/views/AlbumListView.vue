@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
     ChevronLeft,
@@ -9,11 +9,13 @@ import {
     Pause,
     Play,
 } from 'lucide-vue-next'
+import ArtistLibrarySection from '@/components/artist/ArtistLibrarySection.vue'
 import DashboardTopBar from '@/components/dashboard/DashboardTopBar.vue'
 import LibraryEmptyHint from '@/components/dashboard/LibraryEmptyHint.vue'
 import AlbumGridCard from '@/components/media/AlbumGridCard.vue'
 import WorkGridCard from '@/components/media/WorkGridCard.vue'
 import { api, normalizeApiError } from '@/ApiInstance'
+import { type Breakpoint, useBreakpoint } from '@/composables/useBreakpoint'
 import { resolveArtistName, resolveCover } from '@/composables/recordingMedia'
 import {
     peekResolvedPlayableTrack,
@@ -35,15 +37,23 @@ const router = useRouter()
 const route = useRoute()
 const audioStore = useAudioStore()
 const viewMode = ref<'grid' | 'list'>('grid')
-const activeTab = ref<'Albums' | 'Works'>('Albums')
+type LibraryTab = 'Albums' | 'Works' | 'Artists'
+const activeTab = ref<LibraryTab>('Albums')
 const displayItems = ref<DisplayItem[]>([])
 const isLoading = ref(false)
 const errorMessage = ref('')
 const playLoadingItemId = ref<number | null>(null)
 
 const pageIndex = ref(0)
-const pageSize = ref(10)
 const totalPageCount = ref(0)
+
+const PAGE_SIZE_BY_TAB: Record<LibraryTab, Record<Breakpoint, number>> = {
+    Albums: { base: 6, md: 9, lg: 8, xl: 10 },
+    Works: { base: 6, md: 9, lg: 8, xl: 10 },
+    Artists: { base: 6, md: 12, lg: 10, xl: 12 },
+}
+const breakpoint = useBreakpoint()
+const pageSize = computed(() => PAGE_SIZE_BY_TAB[activeTab.value][breakpoint.value])
 
 const fetchAlbums = async () => {
     isLoading.value = true
@@ -109,7 +119,7 @@ const fetchWorks = async () => {
 const fetchData = () => {
     if (activeTab.value === 'Albums') {
         fetchAlbums()
-    } else {
+    } else if (activeTab.value === 'Works') {
         fetchWorks()
     }
 }
@@ -127,7 +137,7 @@ const handlePageChange = (newPage: number) => {
     })
 }
 
-const handleTabChange = (tab: 'Albums' | 'Works') => {
+const handleTabChange = (tab: LibraryTab) => {
     if (activeTab.value === tab) {
         return
     }
@@ -145,7 +155,8 @@ const syncFromRoute = () => {
     const tab = route.query.tab as string
     const page = Number(route.query.page)
 
-    const targetTab = tab === 'Works' || tab === 'Albums' ? tab : 'Albums'
+    const targetTab: LibraryTab =
+        tab === 'Works' || tab === 'Albums' || tab === 'Artists' ? tab : 'Albums'
     const tabChanged = targetTab !== activeTab.value
     activeTab.value = targetTab
 
@@ -153,6 +164,8 @@ const syncFromRoute = () => {
 
     if (tabChanged) {
         displayItems.value = []
+        totalPageCount.value = 0
+        errorMessage.value = ''
     }
 
     fetchData()
@@ -165,6 +178,23 @@ watch(
     },
     { immediate: true },
 )
+
+watch(pageSize, () => {
+    if (activeTab.value !== 'Artists') {
+        fetchData()
+    }
+})
+
+watch(totalPageCount, (total) => {
+    if (total > 0 && pageIndex.value >= total) {
+        router.replace({
+            query: {
+                ...route.query,
+                page: total.toString(),
+            },
+        })
+    }
+})
 
 const navigateToDetail = (id: number) => {
     if (activeTab.value === 'Albums') {
@@ -224,7 +254,10 @@ const playItem = async (item: DisplayItem) => {
                     <p class="text-[#8C857B] font-serif italic">所有旋律归于此处</p>
                 </div>
 
-                <div class="flex items-center justify-between gap-4 sm:justify-start">
+                <div
+                    v-if="activeTab !== 'Artists'"
+                    class="flex items-center justify-between gap-4 sm:justify-start"
+                >
                     <div class="flex bg-[#EFEAE2] p-1 rounded-md">
                         <button
                             class="p-2 rounded-sm transition-all"
@@ -277,11 +310,28 @@ const playItem = async (item: DisplayItem) => {
                 >
                     作品
                 </button>
+                <button
+                    class="text-sm tracking-wide transition-colors relative"
+                    :class="
+                        activeTab === 'Artists'
+                            ? 'text-[#2C2420] font-semibold border-b-2 border-[#C27E46] pb-4 -mb-4'
+                            : 'text-[#8C857B] hover:text-[#5E5950] pb-4 -mb-4'
+                    "
+                    @click="handleTabChange('Artists')"
+                >
+                    艺术家
+                </button>
             </div>
         </div>
 
         <div class="mt-8 px-4 sm:mt-10 sm:px-6 lg:px-8">
-            <div v-if="isLoading && displayItems.length === 0" class="text-[#8C857B] text-sm">
+            <ArtistLibrarySection
+                v-if="activeTab === 'Artists'"
+                :page-index="pageIndex"
+                :page-size="pageSize"
+                @update:total-page-count="(value: number) => (totalPageCount = value)"
+            />
+            <div v-else-if="isLoading && displayItems.length === 0" class="text-[#8C857B] text-sm">
                 加载中...
             </div>
             <div v-else-if="errorMessage" class="text-[#B75D5D] text-sm">

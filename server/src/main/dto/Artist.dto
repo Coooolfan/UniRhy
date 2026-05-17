@@ -1,0 +1,21 @@
+export com.coooolfan.unirhy.model.Artist
+
+input ArtistCreate {
+    displayName
+
+    alias
+
+    comment
+
+    avatarId
+}
+
+input ArtistUpdate {
+    displayName?
+
+    alias?
+
+    comment?
+
+    avatarId
+}

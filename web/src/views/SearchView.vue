@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import ArtistCard from '@/components/artist/ArtistCard.vue'
 import DashboardTopBar from '@/components/dashboard/DashboardTopBar.vue'
 import LibraryEmptyHint from '@/components/dashboard/LibraryEmptyHint.vue'
 import AlbumGridCard from '@/components/media/AlbumGridCard.vue'
@@ -42,20 +43,28 @@ const albums = ref<SearchResultItem[]>([])
 const works = ref<SearchResultItem[]>([])
 const playLoadingItemId = ref<number | string | null>(null)
 
-type SelectedWorkOption = {
+type SelectedMergeOption = {
     id: number
     title: string
     subtitle: string
 }
 
 const selectedWorkIds = ref<Set<number>>(new Set())
-const selectedWorks = ref<Map<number, SelectedWorkOption>>(new Map())
+const selectedWorks = ref<Map<number, SelectedMergeOption>>(new Map())
+const selectedArtistIds = ref<Set<number>>(new Set())
+const selectedArtists = ref<Map<number, SelectedMergeOption>>(new Map())
 
 const selectedWorkOptions = computed(() => Array.from(selectedWorks.value.values()))
 const hasSelectedWorks = computed(() => selectedWorkOptions.value.length > 0)
 
+const selectedArtistOptions = computed(() => Array.from(selectedArtists.value.values()))
+const hasSelectedArtists = computed(() => selectedArtistOptions.value.length > 0)
+
 const isWorkSelected = (item: SearchResultItem) =>
     item.type === 'work' && typeof item.id === 'number' && selectedWorkIds.value.has(item.id)
+
+const isArtistSelected = (item: SearchResultItem) =>
+    item.type === 'artist' && typeof item.id === 'number' && selectedArtistIds.value.has(item.id)
 
 const toggleWorkSelection = (item: SearchResultItem) => {
     if (item.type !== 'work' || typeof item.id !== 'number') {
@@ -79,6 +88,30 @@ const toggleWorkSelection = (item: SearchResultItem) => {
 
     selectedWorkIds.value = nextSelectedIds
     selectedWorks.value = nextSelectedWorks
+}
+
+const toggleArtistSelection = (item: SearchResultItem) => {
+    if (item.type !== 'artist' || typeof item.id !== 'number') {
+        return
+    }
+
+    const nextSelectedIds = new Set(selectedArtistIds.value)
+    const nextSelectedArtists = new Map(selectedArtists.value)
+
+    if (nextSelectedIds.has(item.id)) {
+        nextSelectedIds.delete(item.id)
+        nextSelectedArtists.delete(item.id)
+    } else {
+        nextSelectedIds.add(item.id)
+        nextSelectedArtists.set(item.id, {
+            id: item.id,
+            title: item.title,
+            subtitle: item.subtitle,
+        })
+    }
+
+    selectedArtistIds.value = nextSelectedIds
+    selectedArtists.value = nextSelectedArtists
 }
 
 async function performSearch(query: string) {
@@ -140,7 +173,7 @@ async function performSearch(query: string) {
     }
 }
 
-const openMergeModal = async () => {
+const openMergeWorksModal = async () => {
     if (!hasSelectedWorks.value) {
         return
     }
@@ -170,6 +203,42 @@ const openMergeModal = async () => {
 
                 selectedWorkIds.value = new Set()
                 selectedWorks.value = new Map()
+                await performSearch(searchQuery.value)
+            },
+        },
+    })
+}
+
+const openMergeArtistsModal = async () => {
+    if (!hasSelectedArtists.value) {
+        return
+    }
+
+    await modal.open(MergeSelectModal, {
+        title: '合并艺术家',
+        size: 'md',
+        props: {
+            description: '请选择保留的目标艺术家，其余已选艺术家将合并到该艺术家。',
+            options: selectedArtistOptions.value,
+            missingTargetMessage: '请选择一个目标艺术家。',
+            onConfirm: async (targetId: number) => {
+                const sourceArtistIds = selectedArtistOptions.value
+                    .map((artist) => artist.id)
+                    .filter((id) => id !== targetId)
+
+                if (sourceArtistIds.length === 0) {
+                    throw new Error('请选择至少一个要合并的来源艺术家。')
+                }
+
+                await api.artistController.mergeArtists({
+                    body: {
+                        targetId,
+                        needMergeIds: sourceArtistIds,
+                    },
+                })
+
+                selectedArtistIds.value = new Set()
+                selectedArtists.value = new Map()
                 await performSearch(searchQuery.value)
             },
         },
@@ -308,14 +377,24 @@ const playItem = async (item: SearchResultItem) => {
                         Search results for "{{ searchedQuery }}"
                     </p>
                 </div>
-                <button
-                    v-if="hasSelectedWorks"
-                    type="button"
-                    class="mt-1 w-full border border-[#C27E46] px-4 py-2 text-sm tracking-wide text-[#C27E46] transition-colors hover:bg-[#C27E46] hover:text-white sm:w-auto sm:shrink-0"
-                    @click="openMergeModal"
-                >
-                    合并
-                </button>
+                <div class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+                    <button
+                        v-if="hasSelectedArtists"
+                        type="button"
+                        class="mt-1 w-full border border-[#C27E46] px-4 py-2 text-sm tracking-wide text-[#C27E46] transition-colors hover:bg-[#C27E46] hover:text-white sm:w-auto sm:shrink-0"
+                        @click="openMergeArtistsModal"
+                    >
+                        合并艺术家
+                    </button>
+                    <button
+                        v-if="hasSelectedWorks"
+                        type="button"
+                        class="mt-1 w-full border border-[#C27E46] px-4 py-2 text-sm tracking-wide text-[#C27E46] transition-colors hover:bg-[#C27E46] hover:text-white sm:w-auto sm:shrink-0"
+                        @click="openMergeWorksModal"
+                    >
+                        合并作品
+                    </button>
+                </div>
             </div>
 
             <div
@@ -361,89 +440,16 @@ const playItem = async (item: SearchResultItem) => {
                     <div
                         class="grid grid-cols-2 gap-5 sm:gap-8 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6"
                     >
-                        <div
+                        <ArtistCard
                             v-for="item in filteredResults.artists"
                             :key="item.id"
-                            class="group cursor-pointer text-center"
-                        >
-                            <div
-                                class="relative mx-auto mb-4 flex h-24 w-24 aspect-square items-center justify-center overflow-hidden rounded-full bg-[#EFEAE2] text-6xl shadow-md transition-transform duration-300 group-hover:scale-105 sm:h-32 sm:w-32 md:h-40 md:w-40"
-                            >
-                                <svg
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    viewBox="0 0 400 400"
-                                    class="w-full h-full rounded-sm"
-                                >
-                                    <defs>
-                                        <path
-                                            :id="`vinyl-text-path-${item.id}`"
-                                            d="M 70, 200 A 130,130 0 1,1 330,200 A 130,130 0 1,1 70,200"
-                                        />
-                                    </defs>
-
-                                    <rect width="400" height="400" fill="#EAE7E0" />
-
-                                    <g stroke="#DFDCD6" stroke-width="1.2" fill="none">
-                                        <circle cx="200" cy="200" r="180" />
-                                        <circle cx="200" cy="200" r="155" />
-                                        <circle cx="200" cy="200" r="105" />
-                                        <circle cx="200" cy="200" r="80" />
-                                        <circle cx="200" cy="200" r="55" />
-                                    </g>
-
-                                    <g fill="#D1CECB">
-                                        <circle cx="200" cy="155" r="48" />
-                                        <path
-                                            d="M 80 400 C 80 280, 140 250, 200 250 C 260 250, 320 280, 320 400 Z"
-                                        />
-                                    </g>
-
-                                    <text
-                                        class="select-none pointer-events-none"
-                                        style="user-select: none"
-                                        font-family="ui-sans-serif, system-ui, -apple-system, sans-serif"
-                                        font-size="11"
-                                        font-weight="600"
-                                        fill="#A8A49C"
-                                        letter-spacing="6"
-                                    >
-                                        <textPath
-                                            :href="`#vinyl-text-path-${item.id}`"
-                                            startOffset="10"
-                                        >
-                                            UNKNOWN ARTIST • UNKNOWN ARTIST • UNKNOWN ARTIST •
-                                            UNKNOWN ARTIST • UNKNOWN ARTIST •
-                                        </textPath>
-                                    </text>
-
-                                    <path
-                                        d="M280 100 Q 280 115 295 115 Q 280 115 280 130 Q 280 115 265 115 Q 280 115 280 100 Z"
-                                        fill="#B56E46"
-                                    />
-                                    <circle cx="120" cy="280" r="3.5" fill="#B56E46" />
-
-                                    <rect
-                                        x="12"
-                                        y="12"
-                                        width="376"
-                                        height="376"
-                                        fill="none"
-                                        stroke="#DFDCD6"
-                                        stroke-width="1"
-                                        rx="2"
-                                    />
-                                </svg>
-                            </div>
-
-                            <h3
-                                class="font-serif text-lg leading-tight mb-1 truncate text-[#1A1A1A] group-hover:text-[#C27E46] transition-colors"
-                            >
-                                {{ item.title }}
-                            </h3>
-                            <p class="text-xs text-[#8C857B] uppercase tracking-wider truncate">
-                                {{ item.subtitle }}
-                            </p>
-                        </div>
+                            :id="item.id"
+                            :title="item.title"
+                            :subtitle="item.subtitle"
+                            selectable
+                            :selected="isArtistSelected(item)"
+                            @toggle-select="toggleArtistSelection(item)"
+                        />
                     </div>
                 </div>
 

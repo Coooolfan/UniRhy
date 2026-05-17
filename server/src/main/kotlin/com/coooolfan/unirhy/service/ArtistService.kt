@@ -5,8 +5,8 @@ import com.coooolfan.unirhy.model.alias
 import com.coooolfan.unirhy.model.displayName
 import com.coooolfan.unirhy.model.id
 import com.coooolfan.unirhy.model.dto.ArtistMergeReq
-import com.coooolfan.unirhy.model.dto.ArtistSplitReq
 import com.coooolfan.unirhy.utils.arrayToString
+import org.babyfish.jimmer.Page
 import org.babyfish.jimmer.sql.ast.mutation.SaveMode
 import org.babyfish.jimmer.sql.fetcher.Fetcher
 import org.babyfish.jimmer.sql.kt.KSqlClient
@@ -24,6 +24,13 @@ class ArtistService(
     private val sql: KSqlClient,
     private val jdbc: NamedParameterJdbcTemplate,
 ) {
+    fun listArtist(pageIndex: Int, pageSize: Int, fetcher: Fetcher<Artist>): Page<Artist> {
+        return sql.createQuery(Artist::class) {
+            orderBy(table.id)
+            select(table.fetch(fetcher))
+        }.fetchPage(pageIndex, pageSize)
+    }
+
     fun getArtistByName(name: String, fetcher: Fetcher<Artist>): List<Artist> {
         return sql.createQuery(Artist::class) {
             where(
@@ -115,32 +122,11 @@ class ArtistService(
         }.execute()
     }
 
-    @Transactional
-    fun splitArtist(input: ArtistSplitReq): List<Artist> {
-        sql.findById(Artist::class, input.sourceArtistId) ?: throw ResponseStatusException(
-            HttpStatus.NOT_FOUND,
-            "source artist not found"
-        )
+    fun createArtist(input: Artist, fetcher: Fetcher<Artist>): Artist {
+        return sql.saveCommand(input, SaveMode.INSERT_ONLY).execute(fetcher).modifiedEntity
+    }
 
-        val artists = input.artists.map { create ->
-            val displayName = create.displayName.trim()
-            if (displayName.isBlank()) {
-                throw ResponseStatusException(HttpStatus.BAD_REQUEST, "artist displayName must not be blank")
-            }
-            Artist {
-                this.displayName = displayName
-                alias = create.alias.map(String::trim).filter(String::isNotBlank).distinct()
-                comment = create.comment
-                avatar = null
-            }
-        }
-
-        if (artists.isEmpty()) {
-            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "split artists must not be empty")
-        }
-
-        return artists.map { artist ->
-            sql.saveCommand(artist, SaveMode.INSERT_ONLY).execute().modifiedEntity
-        }
+    fun updateArtist(input: Artist, fetcher: Fetcher<Artist>): Artist {
+        return sql.saveCommand(input, SaveMode.UPDATE_ONLY).execute(fetcher).modifiedEntity
     }
 }
