@@ -140,9 +140,10 @@ onMounted(() => {
         >
             <div class="flex h-full min-h-0 flex-col md:pl-10 md:pr-6 md:pt-12">
                 <div class="mb-10 flex items-center justify-between md:mb-12">
-                    <h1 class="select-none text-3xl font-serif tracking-tight text-[#2C2C2C]">
-                        UniRhy.
-                    </h1>
+                    <div class="flex select-none items-center gap-3">
+                        <img src="/logo.svg" alt="" class="h-9 w-9" />
+                        <h1 class="text-3xl font-serif tracking-tight text-[#2C2C2C]">UniRhy.</h1>
+                    </div>
                     <button
                         type="button"
                         class="inline-flex h-9 w-9 items-center justify-center rounded-full text-[#8A857D] transition-colors hover:bg-white/60 hover:text-[#5E5950] md:hidden"
