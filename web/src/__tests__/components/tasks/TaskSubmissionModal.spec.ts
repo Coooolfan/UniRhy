@@ -44,6 +44,7 @@ const providerOptions: TaskProviderOption[] = [
 
 const submitMetadataParseMock = vi.fn()
 const submitTranscodeMock = vi.fn()
+const submitPluginTaskMock = vi.fn()
 const resolveMock = vi.fn()
 const closeMock = vi.fn()
 
@@ -63,8 +64,10 @@ const mountModal = async (
     const wrapper = mount(TaskSubmissionModal, {
         props: {
             loadProviders: () => Promise.resolve(providerOptions),
+            plugins: [],
             submitMetadataParse: submitMetadataParseMock,
             submitTranscode: submitTranscodeMock,
+            submitPluginTask: submitPluginTaskMock,
             ...overrides,
         },
         global: {
@@ -83,6 +86,7 @@ describe('TaskSubmissionModal', () => {
     beforeEach(() => {
         submitMetadataParseMock.mockReset()
         submitTranscodeMock.mockReset()
+        submitPluginTaskMock.mockReset()
         resolveMock.mockReset()
         closeMock.mockReset()
     })

@@ -2,6 +2,7 @@ import { ref } from 'vue'
 import { api, normalizeApiError } from '@/ApiInstance'
 import { type FileProviderType } from '@/__generated/model/enums/FileProviderType'
 import type { TaskType } from '@/__generated/model/enums/TaskType'
+import type { PluginInfoResponse } from '@/__generated/model/static/PluginInfoResponse'
 import type {
     AsyncTaskLogCountRow,
     ScanTaskRequest,
@@ -16,7 +17,7 @@ export type TaskProviderOption = {
     isSystemNode: boolean
 }
 
-export const TASK_TYPE_LABEL_MAP: Record<TaskType, string> = {
+export const BUILTIN_TASK_TYPE_LABEL_MAP: Partial<Record<TaskType, string>> = {
     METADATA_PARSE: '元数据解析',
     TRANSCODE: '媒体转码',
 }
@@ -24,10 +25,12 @@ export const TASK_TYPE_LABEL_MAP: Record<TaskType, string> = {
 export const useTaskManagement = () => {
     const taskCounts = ref<ReadonlyArray<AsyncTaskLogCountRow>>([])
     const providerOptions = ref<TaskProviderOption[]>([])
+    const pluginList = ref<ReadonlyArray<PluginInfoResponse>>([])
     const hasLoadedProviders = ref(false)
 
     const isLoadingTaskCounts = ref(false)
     const isLoadingProviders = ref(false)
+    const isLoadingPlugins = ref(false)
     const isSubmitting = ref(false)
 
     const taskError = ref('')
@@ -110,9 +113,20 @@ export const useTaskManagement = () => {
             hasLoadedProviders.value = true
         } catch (error) {
             console.error('Failed to fetch providers', error)
-            // Non-critical, just empty list
         } finally {
             isLoadingProviders.value = false
+        }
+    }
+
+    const fetchPlugins = async () => {
+        if (isLoadingPlugins.value) return
+        isLoadingPlugins.value = true
+        try {
+            pluginList.value = await api.pluginController.listPlugins()
+        } catch (error) {
+            console.error('Failed to fetch plugins', error)
+        } finally {
+            isLoadingPlugins.value = false
         }
     }
 
@@ -132,8 +146,21 @@ export const useTaskManagement = () => {
             }),
         )
 
+    const startPluginTask = (taskType: string, params: Record<string, string>) =>
+        executeTask(() => api.pluginController.submitPluginTask({ taskType, body: params }))
+
+    const resolveTaskLabel = (taskType: string): string => {
+        const builtin = (BUILTIN_TASK_TYPE_LABEL_MAP as Record<string, string | undefined>)[
+            taskType
+        ]
+        if (builtin) return builtin
+        const plugin = pluginList.value.find((p) => p.taskType === taskType)
+        return plugin?.name ?? plugin?.id ?? taskType
+    }
+
     const init = () => {
         void fetchTaskCounts()
+        void fetchPlugins()
     }
 
     const clearSubmitError = () => {
@@ -143,15 +170,20 @@ export const useTaskManagement = () => {
     return {
         taskCounts,
         providerOptions,
+        pluginList,
         isLoadingTaskCounts,
         isLoadingProviders,
+        isLoadingPlugins,
         isSubmitting,
         taskError,
         submitError,
         fetchTaskCounts,
         fetchProviders,
+        fetchPlugins,
         startMetadataParseTask,
         startTranscodeTask,
+        startPluginTask,
+        resolveTaskLabel,
         clearSubmitError,
         init,
     }

@@ -6,6 +6,7 @@ export {MediaFileController} from './MediaFileController';
 export {OssStorageController} from './OssStorageController';
 export {PlaybackQueueController} from './PlaybackQueueController';
 export {PlaylistController} from './PlaylistController';
+export {PluginController} from './PluginController';
 export {RecordingController} from './RecordingController';
 export {SystemConfigController} from './SystemConfigController';
 export {TaskController} from './TaskController';

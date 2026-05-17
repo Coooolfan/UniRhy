@@ -36,6 +36,8 @@ export type ApiErrors = {
     }, 
     'playlistController': {
     }, 
+    'pluginController': {
+    }, 
     'recordingController': {
     }, 
     'systemConfigController': {

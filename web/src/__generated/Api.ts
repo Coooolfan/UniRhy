@@ -8,6 +8,7 @@ import {
     OssStorageController, 
     PlaybackQueueController, 
     PlaylistController, 
+    PluginController, 
     RecordingController, 
     SystemConfigController, 
     TaskController, 
@@ -28,6 +29,8 @@ export class Api {
     readonly playbackQueueController: PlaybackQueueController
     
     readonly playlistController: PlaylistController
+    
+    readonly pluginController: PluginController
     
     readonly recordingController: RecordingController
     
@@ -50,6 +53,7 @@ export class Api {
         this.mediaFileController = new MediaFileController(executor);
         this.playbackQueueController = new PlaybackQueueController(executor);
         this.playlistController = new PlaylistController(executor);
+        this.pluginController = new PluginController(executor);
         this.recordingController = new RecordingController(executor);
         this.systemConfigController = new SystemConfigController(executor);
         this.taskController = new TaskController(executor);

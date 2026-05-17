@@ -10,22 +10,25 @@ import {
     HardDrive,
     Loader2,
     Music4,
+    Puzzle,
     Settings,
 } from 'lucide-vue-next'
 import type { CodecType } from '@/__generated/model/enums/CodecType'
 import { type FileProviderType } from '@/__generated/model/enums/FileProviderType'
+import type { PluginInfoResponse } from '@/__generated/model/static/PluginInfoResponse'
 import type { TranscodeTaskRequest } from '@/__generated/model/static'
 import { normalizeApiError } from '@/ApiInstance'
 import { useModalContext } from '@/components/modals/modalContext'
 import type { TaskProviderOption } from '@/composables/useTaskManagement'
 
-type TaskKind = 'METADATA_PARSE' | 'TRANSCODE'
+type BuiltinTaskKind = 'METADATA_PARSE' | 'TRANSCODE'
 
 type TaskDefinition = {
-    id: TaskKind
+    id: string
     name: string
     desc: string
     icon: Component
+    isPlugin: boolean
 }
 
 type TaskAvailability = {
@@ -41,27 +44,26 @@ type ProviderSelectionPayload = {
 
 const props = defineProps<{
     loadProviders: () => Promise<TaskProviderOption[]>
+    plugins: ReadonlyArray<PluginInfoResponse>
     submitMetadataParse: (payload: ProviderSelectionPayload) => Promise<void> | void
     submitTranscode: (payload: TranscodeTaskRequest) => Promise<void> | void
+    submitPluginTask: (taskType: string, params: Record<string, string>) => Promise<void> | void
 }>()
 
-const TASK_ACTION_LABEL_MAP: Record<TaskKind, string> = {
-    METADATA_PARSE: '元数据解析',
-    TRANSCODE: '媒体转码',
-}
-
-const TASK_OPTIONS: TaskDefinition[] = [
+const BUILTIN_TASK_OPTIONS: TaskDefinition[] = [
     {
         id: 'METADATA_PARSE',
-        name: TASK_ACTION_LABEL_MAP.METADATA_PARSE,
+        name: '元数据解析',
         desc: '遍历存储节点，发现媒体文件并补充缺失的元数据解析',
         icon: FolderSearch,
+        isPlugin: false,
     },
     {
         id: 'TRANSCODE',
-        name: TASK_ACTION_LABEL_MAP.TRANSCODE,
+        name: '媒体转码',
         desc: '遍历源存储节点中的所有已导入文件，转码为指定格式并保存到目标存储节点',
         icon: FileAudio,
+        isPlugin: false,
     },
 ]
 
@@ -82,15 +84,51 @@ const PROVIDER_TYPE_ICON_MAP: Record<FileProviderType, Component> = {
 const modal = useModalContext<boolean>()
 const router = useRouter()
 
-const activeTask = ref<TaskKind>('METADATA_PARSE')
+const activeTaskId = ref<string>('METADATA_PARSE')
 const metadataParseProviderValue = ref('')
 const transcodeSourceProviderValue = ref('')
 const transcodeDestinationProviderValue = ref('')
 const targetCodec = ref<CodecType>('OPUS')
+const pluginFormValues = ref<Record<string, string>>({})
 const providerOptions = ref<TaskProviderOption[]>([])
 const isLoadingProviders = ref(true)
 const isSubmitting = ref(false)
 const submitError = ref('')
+
+const pluginTaskOptions = computed<TaskDefinition[]>(() =>
+    props.plugins
+        .filter((p) => p.isAvailable)
+        .map((p) => ({
+            id: p.taskType,
+            name: p.name ?? p.id,
+            desc: `插件 ${p.id} v${p.version}`,
+            icon: Puzzle,
+            isPlugin: true,
+        })),
+)
+
+const allTaskOptions = computed<TaskDefinition[]>(() => [
+    ...BUILTIN_TASK_OPTIONS,
+    ...pluginTaskOptions.value,
+])
+
+const activeTaskOption = computed<TaskDefinition>(
+    () => allTaskOptions.value.find((o) => o.id === activeTaskId.value) ?? BUILTIN_TASK_OPTIONS[0]!,
+)
+
+const activePlugin = computed<PluginInfoResponse | null>(
+    () => props.plugins.find((p) => p.taskType === activeTaskId.value) ?? null,
+)
+
+const initPluginFormValues = () => {
+    const plugin = activePlugin.value
+    if (!plugin) return
+    const values: Record<string, string> = {}
+    for (const field of plugin.form.fields) {
+        values[field.name] = field.default ?? ''
+    }
+    pluginFormValues.value = values
+}
 
 const optionValueOf = (provider: TaskProviderOption) => `${provider.type}:${provider.id}`
 
@@ -105,7 +143,6 @@ const syncSelectionValue = (
     preferredIndex = 0,
 ) => {
     const validValues = new Set(options.map((option) => optionValueOf(option)))
-
     if (!validValues.has(currentValue.value)) {
         currentValue.value = getDefaultProviderValue(options, preferredIndex)
     }
@@ -139,16 +176,13 @@ const syncProviderSelections = () => {
     )
 }
 
-watch(activeTask, () => {
+watch(activeTaskId, () => {
     syncProviderSelections()
+    initPluginFormValues()
 })
 
 const resolveProvider = (options: readonly TaskProviderOption[], value: string) =>
     options.find((provider) => optionValueOf(provider) === value)
-
-const activeTaskOption = computed<TaskDefinition>(
-    () => TASK_OPTIONS.find((option) => option.id === activeTask.value) ?? TASK_OPTIONS[0]!,
-)
 
 const selectedMetadataParseProvider = computed(() =>
     resolveProvider(metadataParseProviderOptions.value, metadataParseProviderValue.value),
@@ -163,25 +197,39 @@ const selectedTranscodeDestinationProvider = computed(() =>
     ),
 )
 
+const pluginFormValid = computed(() => {
+    const plugin = activePlugin.value
+    if (!plugin) return true
+    for (const field of plugin.form.fields) {
+        const raw = pluginFormValues.value[field.name] ?? ''
+        if (field.type === 'integer') {
+            const n = Number(raw)
+            if (!Number.isInteger(n)) return false
+            if (typeof field.min === 'number' && n < field.min) return false
+            if (typeof field.max === 'number' && n > field.max) return false
+        }
+    }
+    return true
+})
+
 const canSubmit = computed(() => {
-    if (isLoadingProviders.value) {
-        return false
-    }
-
-    if (activeTask.value === 'METADATA_PARSE') {
-        return Boolean(selectedMetadataParseProvider.value)
-    }
-
+    if (activePlugin.value) return pluginFormValid.value
+    if (isLoadingProviders.value) return false
+    if (activeTaskId.value === 'METADATA_PARSE') return Boolean(selectedMetadataParseProvider.value)
     return Boolean(
         selectedTranscodeSourceProvider.value && selectedTranscodeDestinationProvider.value,
     )
 })
 
-const submitButtonLabel = computed(() =>
-    activeTask.value === 'METADATA_PARSE' ? '提交元数据解析任务' : '提交转码任务',
-)
+const submitButtonLabel = computed(() => {
+    if (activePlugin.value) return `提交${activeTaskOption.value.name}任务`
+    if (activeTaskId.value === 'METADATA_PARSE') return '提交元数据解析任务'
+    return '提交转码任务'
+})
 
 const activeTaskAvailability = computed<TaskAvailability | null>(() => {
+    if (activePlugin.value) return null
+
     if (providerOptions.value.length === 0) {
         return {
             title: '暂无可用存储节点',
@@ -190,7 +238,10 @@ const activeTaskAvailability = computed<TaskAvailability | null>(() => {
         }
     }
 
-    if (activeTask.value === 'METADATA_PARSE' && metadataParseProviderOptions.value.length === 0) {
+    if (
+        activeTaskId.value === 'METADATA_PARSE' &&
+        metadataParseProviderOptions.value.length === 0
+    ) {
         return {
             title: '暂无可解析节点',
             description: '元数据解析任务目前只支持本地存储节点。',
@@ -198,7 +249,7 @@ const activeTaskAvailability = computed<TaskAvailability | null>(() => {
         }
     }
 
-    if (activeTask.value === 'TRANSCODE' && transcodeSourceProviderOptions.value.length === 0) {
+    if (activeTaskId.value === 'TRANSCODE' && transcodeSourceProviderOptions.value.length === 0) {
         return {
             title: '暂无可转码源节点',
             description: '转码任务目前只支持本地存储节点作为来源。',
@@ -207,7 +258,7 @@ const activeTaskAvailability = computed<TaskAvailability | null>(() => {
     }
 
     if (
-        activeTask.value === 'TRANSCODE' &&
+        activeTaskId.value === 'TRANSCODE' &&
         transcodeDestinationProviderOptions.value.length === 0
     ) {
         return {
@@ -221,10 +272,7 @@ const activeTaskAvailability = computed<TaskAvailability | null>(() => {
 })
 
 const closeModal = () => {
-    if (isSubmitting.value) {
-        return
-    }
-
+    if (isSubmitting.value) return
     modal.close()
 }
 
@@ -236,7 +284,6 @@ const navigateToSettings = async () => {
 const loadProviders = async () => {
     isLoadingProviders.value = true
     submitError.value = ''
-
     try {
         providerOptions.value = await props.loadProviders()
         syncProviderSelections()
@@ -250,20 +297,17 @@ onMounted(() => {
 })
 
 const submit = async () => {
-    if (!canSubmit.value || isSubmitting.value) {
-        return
-    }
+    if (!canSubmit.value || isSubmitting.value) return
 
     isSubmitting.value = true
     submitError.value = ''
 
     try {
-        if (activeTask.value === 'METADATA_PARSE') {
+        if (activePlugin.value) {
+            await props.submitPluginTask(activeTaskId.value, { ...pluginFormValues.value })
+        } else if (activeTaskId.value === 'METADATA_PARSE') {
             const provider = selectedMetadataParseProvider.value
-            if (!provider) {
-                return
-            }
-
+            if (!provider) return
             await props.submitMetadataParse({
                 providerType: provider.type,
                 providerId: provider.id,
@@ -271,10 +315,7 @@ const submit = async () => {
         } else {
             const source = selectedTranscodeSourceProvider.value
             const destination = selectedTranscodeDestinationProvider.value
-            if (!source || !destination) {
-                return
-            }
-
+            if (!source || !destination) return
             await props.submitTranscode({
                 srcProviderType: source.type,
                 srcProviderId: source.id,
@@ -314,24 +355,24 @@ const submit = async () => {
                 </div>
                 <div>
                     <button
-                        v-for="task in TASK_OPTIONS"
+                        v-for="task in allTaskOptions"
                         :key="task.id"
                         :data-test="`task-type-${task.id.toLowerCase()}`"
                         type="button"
                         class="group flex w-full items-center gap-3 px-6 py-4 text-left transition-all duration-200 lg:px-8"
                         :class="
-                            activeTask === task.id
+                            activeTaskId === task.id
                                 ? 'bg-[#F2EFE9] text-[#C27E46]'
                                 : 'border-transparent text-[#6B635B] hover:bg-[#F2EFE9]/80 hover:text-[#2C2C2C]'
                         "
                         :disabled="isSubmitting"
-                        @click="activeTask = task.id"
+                        @click="activeTaskId = task.id"
                     >
                         <component
                             :is="task.icon"
                             class="h-4 w-4 shrink-0"
                             :class="
-                                activeTask === task.id
+                                activeTaskId === task.id
                                     ? 'text-[#C27E46]'
                                     : 'text-[#9C968B] group-hover:text-[#C27E46]'
                             "
@@ -366,7 +407,7 @@ const submit = async () => {
                 </div>
 
                 <div
-                    v-if="isLoadingProviders"
+                    v-if="isLoadingProviders && !activePlugin"
                     class="flex min-h-[280px] items-center justify-center text-sm text-[#6B635B]"
                 >
                     <Loader2 class="mr-2 h-4 w-4 animate-spin text-[#C27E46]" />
@@ -394,7 +435,56 @@ const submit = async () => {
                     </button>
                 </div>
 
-                <div v-else-if="activeTask === 'METADATA_PARSE'" class="space-y-8">
+                <!-- 插件通用表单 -->
+                <div v-else-if="activePlugin" class="space-y-8">
+                    <div class="grid gap-6">
+                        <div
+                            v-for="field in activePlugin.form.fields"
+                            :key="field.name"
+                            class="block"
+                        >
+                            <label>
+                                <span
+                                    class="mb-2 block text-xs uppercase tracking-[0.24em] text-[#8A8A8A]"
+                                >
+                                    {{ field.label }}
+                                </span>
+                                <input
+                                    v-if="field.type === 'integer' || field.type === 'string'"
+                                    v-model="pluginFormValues[field.name]"
+                                    :type="field.type === 'integer' ? 'number' : 'text'"
+                                    :min="field.min"
+                                    :max="field.max"
+                                    class="w-full border-b border-[#D6D1C4] bg-[#F7F5F0] p-3 text-sm text-[#2C2C2C] outline-none transition-colors focus:border-[#C27E46]"
+                                />
+                                <input
+                                    v-else-if="field.type === 'boolean'"
+                                    v-model="pluginFormValues[field.name]"
+                                    type="checkbox"
+                                    true-value="true"
+                                    false-value="false"
+                                    class="mt-1"
+                                />
+                            </label>
+                            <p
+                                v-if="field.description"
+                                class="mt-2 text-xs leading-relaxed text-[#9C968B]"
+                            >
+                                {{ field.description }}
+                            </p>
+                        </div>
+
+                        <div class="flex items-start gap-2 text-sm text-[#6B635B]">
+                            <Puzzle class="mt-0.5 h-4 w-4 shrink-0 text-[#C27E46]" />
+                            <span>
+                                任务提交后，节点将按插件逻辑处理。实际执行需要本节点加载了对应插件。
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 元数据解析 -->
+                <div v-else-if="activeTaskId === 'METADATA_PARSE'" class="space-y-8">
                     <div class="grid gap-6">
                         <label class="block">
                             <span
@@ -460,6 +550,7 @@ const submit = async () => {
                     </div>
                 </div>
 
+                <!-- 转码 -->
                 <div v-else class="space-y-8">
                     <div
                         class="grid gap-10 lg:grid-cols-[minmax(0,1fr)_128px_minmax(0,1fr)] lg:gap-0"

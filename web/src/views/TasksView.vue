@@ -4,9 +4,8 @@ import DashboardTopBar from '@/components/dashboard/DashboardTopBar.vue'
 import { useModal } from '@/composables/useModal'
 import TaskSubmissionModal from '@/components/tasks/TaskSubmissionModal.vue'
 import type { TaskStatus } from '@/__generated/model/enums/TaskStatus'
-import type { TaskType } from '@/__generated/model/enums/TaskType'
 import type { ScanTaskRequest, TranscodeTaskRequest } from '@/__generated/model/static'
-import { TASK_TYPE_LABEL_MAP, useTaskManagement } from '@/composables/useTaskManagement'
+import { BUILTIN_TASK_TYPE_LABEL_MAP, useTaskManagement } from '@/composables/useTaskManagement'
 import {
     AlertCircle,
     ArrowRight,
@@ -22,7 +21,7 @@ type SubmitFeedbackStatus = 'idle' | 'success'
 type SummaryTone = 'idle' | 'working' | 'failed' | 'done'
 
 type TaskSummaryRow = {
-    taskType: TaskType
+    taskType: string
     taskName: string
     pendingCount: number
     runningCount: number
@@ -33,7 +32,6 @@ type TaskSummaryRow = {
     tone: SummaryTone
 }
 
-const TASK_TYPE_ORDER: TaskType[] = ['METADATA_PARSE', 'TRANSCODE']
 const SUBMIT_FEEDBACK_DURATION_MS = 2000
 const TASK_AUTO_REFRESH_INTERVAL_MS = 2000
 
@@ -54,6 +52,7 @@ const summaryToneClassMap: Record<SummaryTone, string> = {
 const {
     taskCounts,
     providerOptions,
+    pluginList,
     isLoadingTaskCounts,
     isLoadingProviders,
     isSubmitting,
@@ -61,8 +60,11 @@ const {
     submitError,
     fetchTaskCounts,
     fetchProviders,
+    fetchPlugins,
     startMetadataParseTask,
     startTranscodeTask,
+    startPluginTask,
+    resolveTaskLabel,
     clearSubmitError,
     init,
 } = useTaskManagement()
@@ -146,86 +148,82 @@ const statusOverviewItems = computed(() => [
     },
 ])
 
-const getTaskCount = (taskType: TaskType, status: TaskStatus) =>
+const getTaskCount = (taskType: string, status: TaskStatus) =>
     taskCounts.value.find((row) => row.taskType === taskType && row.status === status)?.count ?? 0
 
-const taskSummaryRows = computed<TaskSummaryRow[]>(() =>
-    TASK_TYPE_ORDER.map((taskType) => {
-        const pendingCount = getTaskCount(taskType, 'PENDING')
-        const runningCount = getTaskCount(taskType, 'RUNNING')
-        const completedCount = getTaskCount(taskType, 'COMPLETED')
-        const failedCount = getTaskCount(taskType, 'FAILED')
-        const activeCount = pendingCount + runningCount
-        const totalCount = activeCount + completedCount + failedCount
+// 显示 taskCounts 中出现的所有类型，顺序：内置类型优先，其余按首次出现
+const taskSummaryRows = computed<TaskSummaryRow[]>(() => {
+    const seen = new Set<string>()
+    const builtinOrder = ['METADATA_PARSE', 'TRANSCODE']
+    const allTypes = [
+        ...builtinOrder,
+        ...taskCounts.value.map((r) => r.taskType).filter((t) => !builtinOrder.includes(t)),
+    ]
+    return allTypes
+        .filter((t) => {
+            if (seen.has(t)) return false
+            seen.add(t)
+            return true
+        })
+        .map((taskType) => {
+            const pendingCount = getTaskCount(taskType, 'PENDING')
+            const runningCount = getTaskCount(taskType, 'RUNNING')
+            const completedCount = getTaskCount(taskType, 'COMPLETED')
+            const failedCount = getTaskCount(taskType, 'FAILED')
+            const activeCount = pendingCount + runningCount
+            const totalCount = activeCount + completedCount + failedCount
 
-        let tone: SummaryTone = 'idle'
+            let tone: SummaryTone = 'idle'
+            if (failedCount > 0) tone = 'failed'
+            else if (activeCount > 0) tone = 'working'
+            else if (completedCount > 0) tone = 'done'
 
-        if (failedCount > 0) {
-            tone = 'failed'
-        } else if (activeCount > 0) {
-            tone = 'working'
-        } else if (completedCount > 0) {
-            tone = 'done'
-        }
-
-        return {
-            taskType,
-            taskName: TASK_TYPE_LABEL_MAP[taskType],
-            pendingCount,
-            runningCount,
-            completedCount,
-            failedCount,
-            activeCount,
-            totalCount,
-            tone,
-        }
-    }),
-)
+            return {
+                taskType,
+                taskName: resolveTaskLabel(taskType),
+                pendingCount,
+                runningCount,
+                completedCount,
+                failedCount,
+                activeCount,
+                totalCount,
+                tone,
+            }
+        })
+})
 
 const queueSummaryText = computed(() => {
     if (activeTaskCount.value === 0) {
-        return '当前没有待处理任务。发起元数据解析或转码后，这里会显示最新的队列与结果统计。'
+        return '当前没有待处理任务。发起元数据解析、转码或插件任务后，这里会显示最新的队列与结果统计。'
     }
-
     if (pendingTaskCount.value > 0 && runningTaskCount.value > 0) {
         return `当前共有 ${activeTaskCount.value} 个任务待处理或执行中，其中 ${pendingTaskCount.value} 个排队，${runningTaskCount.value} 个正在执行。`
     }
-
     if (pendingTaskCount.value > 0) {
         return `当前共有 ${pendingTaskCount.value} 个任务在队列中等待处理。`
     }
-
     return `当前共有 ${runningTaskCount.value} 个任务正在后台执行。`
 })
 
 const progressWidth = (count: number, total: number) => {
-    if (total <= 0) {
-        return '0%'
-    }
-
+    if (total <= 0) return '0%'
     return `${(count / total) * 100}%`
 }
 
 const clearSubmitFeedbackTimer = () => {
-    if (!submitFeedbackTimer) {
-        return
-    }
+    if (!submitFeedbackTimer) return
     clearTimeout(submitFeedbackTimer)
     submitFeedbackTimer = null
 }
 
 const clearAutoRefreshTimer = () => {
-    if (!autoRefreshTimer) {
-        return
-    }
+    if (!autoRefreshTimer) return
     clearInterval(autoRefreshTimer)
     autoRefreshTimer = null
 }
 
 const refreshTaskCounts = () => {
-    if (isLoadingTaskCounts.value) {
-        return
-    }
+    if (isLoadingTaskCounts.value) return
     void fetchTaskCounts()
 }
 
@@ -234,9 +232,7 @@ const ensureAutoRefresh = () => {
         clearAutoRefreshTimer()
         return
     }
-    if (autoRefreshTimer) {
-        return
-    }
+    if (autoRefreshTimer) return
     autoRefreshTimer = setInterval(() => {
         refreshTaskCounts()
     }, TASK_AUTO_REFRESH_INTERVAL_MS)
@@ -279,18 +275,18 @@ watch(activeTaskCount, () => {
 })
 
 const openTaskModal = async () => {
-    if (isTaskActionButtonDisabled.value) {
-        return
-    }
+    if (isTaskActionButtonDisabled.value) return
     clearSubmitFeedbackTimer()
     submitFeedbackStatus.value = 'idle'
     clearSubmitError()
+    await fetchPlugins()
 
     const submitted = await modal.open<boolean>(TaskSubmissionModal, {
         size: 'xl',
         bodyPadding: false,
         fitContent: false,
         props: {
+            plugins: pluginList.value,
             loadProviders: async () => {
                 await fetchProviders()
                 return providerOptions.value
@@ -300,25 +296,22 @@ const openTaskModal = async () => {
                     payload.providerType,
                     payload.providerId,
                 )
-                if (!submitOk) {
-                    throw new Error(submitError.value || '提交任务失败')
-                }
+                if (!submitOk) throw new Error(submitError.value || '提交任务失败')
             },
             submitTranscode: async (payload: TranscodeTaskRequest) => {
                 const submitOk = await startTranscodeTask(payload)
-                if (!submitOk) {
-                    throw new Error(submitError.value || '提交任务失败')
-                }
+                if (!submitOk) throw new Error(submitError.value || '提交任务失败')
+            },
+            submitPluginTask: async (taskType: string, params: Record<string, string>) => {
+                const submitOk = await startPluginTask(taskType, params)
+                if (!submitOk) throw new Error(submitError.value || '提交任务失败')
             },
         },
     })
 
     clearSubmitError()
     refreshTaskCounts()
-
-    if (submitted) {
-        showSubmitFeedback()
-    }
+    if (submitted) showSubmitFeedback()
 }
 
 const refreshAll = () => {
@@ -349,7 +342,7 @@ const refreshAll = () => {
             </div>
         </div>
 
-        <div class="mx-auto w-full max-w-5xl px-4 mt-10 sm:px-6 lg:px-8">
+        <div class="mx-auto mt-10 w-full max-w-5xl px-4 sm:px-6 lg:px-8">
             <div
                 v-if="taskError"
                 class="mb-6 flex items-center border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700"
@@ -444,7 +437,7 @@ const refreshAll = () => {
                 </div>
 
                 <div v-else class="px-2 py-4 md:px-4 md:py-5">
-                    <div class="grid gap-6 grid-cols-2 md:grid-cols-5">
+                    <div class="grid grid-cols-2 gap-6 md:grid-cols-5">
                         <div
                             v-for="(item, index) in statusOverviewItems"
                             :key="item.key"
@@ -495,7 +488,7 @@ const refreshAll = () => {
                                             {{ row.taskName }}
                                         </h4>
                                     </div>
-                                    <p class="mt-1 text-xs font-serif italic text-[#9A9187]">
+                                    <p class="mt-1 font-serif text-xs italic text-[#9A9187]">
                                         {{ row.taskType }}
                                     </p>
                                 </div>
@@ -503,7 +496,7 @@ const refreshAll = () => {
 
                             <div class="flex items-end gap-3">
                                 <span
-                                    class="text-4xl font-serif text-[#E3D8CB] transition-colors duration-500 group-hover:text-[#2B221B]"
+                                    class="font-serif text-4xl text-[#E3D8CB] transition-colors duration-500 group-hover:text-[#2B221B]"
                                 >
                                     {{ row.totalCount }}
                                 </span>
@@ -522,7 +515,7 @@ const refreshAll = () => {
                                 <div
                                     class="flex items-center justify-between text-xs text-[#83796D]"
                                 >
-                                    <span class="uppercase tracking-[0.24em] text-[10px]">
+                                    <span class="text-[10px] uppercase tracking-[0.24em]">
                                         Completed
                                     </span>
                                     <span class="font-mono text-[11px] text-[#4A4A4A]">
@@ -548,7 +541,7 @@ const refreshAll = () => {
                                 <div
                                     class="flex items-center justify-between text-xs text-[#83796D]"
                                 >
-                                    <span class="uppercase tracking-[0.24em] text-[10px]">
+                                    <span class="text-[10px] uppercase tracking-[0.24em]">
                                         Active
                                     </span>
                                     <span class="font-mono text-[11px] text-[#4A4A4A]">
@@ -577,7 +570,7 @@ const refreshAll = () => {
                                 <div
                                     class="flex items-center justify-between text-xs text-[#83796D]"
                                 >
-                                    <span class="uppercase tracking-[0.24em] text-[10px]">
+                                    <span class="text-[10px] uppercase tracking-[0.24em]">
                                         Failed
                                     </span>
                                     <span class="font-mono text-[11px] text-[#4A4A4A]">
