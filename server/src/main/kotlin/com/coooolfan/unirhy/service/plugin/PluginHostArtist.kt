@@ -24,81 +24,45 @@ private data class SplitArtistReq(
     val names: List<String>,
 )
 
+// (i32, i32) -> i64
+private val II_TO_L = FunctionType.of(listOf(ValType.I32, ValType.I32), listOf(ValType.I64))
+
+// (i32, i32) -> void
+private val II_TO_V = FunctionType.of(listOf(ValType.I32, ValType.I32), emptyList())
+
+private fun readArgsBytes(instanceRef: () -> Instance, args: LongArray): ByteArray =
+    instanceRef().memory().readBytes(args[0].toInt(), args[1].toInt())
+
 fun buildArtistHostFunctions(
     artistService: ArtistService,
     objectMapper: ObjectMapper,
     instanceRef: () -> Instance,
 ): List<HostFunction> {
 
-    val hostListArtistIds = HostFunction(
-        "env",
-        "host_list_artist_ids",
-        FunctionType.of(listOf(ValType.I32, ValType.I32), listOf(ValType.I64)),
-    ) { _: Instance, args: LongArray ->
-        val pageIndex = args[0].toInt()
-        val pageSize = args[1].toInt()
-        val page = artistService.listArtist(pageIndex, pageSize, NORMALIZATION_FETCHER)
-        val ids = page.rows.map { it.id }
-        writeJsonToPlugin(objectMapper, instanceRef(), ids)
+    val hostListArtistIds = HostFunction("env", "host_list_artist_ids", II_TO_L) { _: Instance, args: LongArray ->
+        val page = artistService.listArtist(args[0].toInt(), args[1].toInt(), NORMALIZATION_FETCHER)
+        writeJsonToPlugin(objectMapper, instanceRef(), page.rows.map { it.id })
     }
 
-    val hostGetArtistsByIds = HostFunction(
-        "env",
-        "host_get_artists_by_ids",
-        FunctionType.of(listOf(ValType.I32, ValType.I32), listOf(ValType.I64)),
-    ) { _: Instance, args: LongArray ->
-        val ptr = args[0].toInt()
-        val len = args[1].toInt()
-        val idsJson = instanceRef().memory().readBytes(ptr, len)
-        val ids = objectMapper.readValue(idsJson, LONG_LIST_TYPE)
-        val artists = artistService.getArtistsByIds(ids, NORMALIZATION_FETCHER)
-        writeJsonToPlugin(objectMapper, instanceRef(), artists)
+    val hostGetArtistsByIds = HostFunction("env", "host_get_artists_by_ids", II_TO_L) { _: Instance, args: LongArray ->
+        val ids = objectMapper.readValue(readArgsBytes(instanceRef, args), LONG_LIST_TYPE)
+        writeJsonToPlugin(objectMapper, instanceRef(), artistService.getArtistsByIds(ids, NORMALIZATION_FETCHER))
     }
 
-    val hostMergeArtists = HostFunction(
-        "env",
-        "host_merge_artists",
-        FunctionType.of(listOf(ValType.I32, ValType.I32), emptyList()),
-    ) { _: Instance, args: LongArray ->
-        val ptr = args[0].toInt()
-        val len = args[1].toInt()
-        val json = instanceRef().memory().readBytes(ptr, len)
-        val req = objectMapper.readValue(json, ArtistMergeReq::class.java)
-        artistService.mergeArtists(req)
+    val hostMergeArtists = HostFunction("env", "host_merge_artists", II_TO_V) { _: Instance, args: LongArray ->
+        artistService.mergeArtists(objectMapper.readValue(readArgsBytes(instanceRef, args), ArtistMergeReq::class.java))
         longArrayOf()
     }
 
     // { sourceArtistId, names: [name0, name1, ...] }
     // names[0] → 更新 source artist 的 displayName，清空 alias
     // names[1..] → 各新建艺术家，继承 source 的 work/recording 关联
-    val hostSplitArtist = HostFunction(
-        "env",
-        "host_split_artist",
-        FunctionType.of(listOf(ValType.I32, ValType.I32), emptyList()),
-    ) { _: Instance, args: LongArray ->
-        val ptr = args[0].toInt()
-        val len = args[1].toInt()
-        val json = instanceRef().memory().readBytes(ptr, len)
-        val req = objectMapper.readValue(json, SplitArtistReq::class.java)
+    val hostSplitArtist = HostFunction("env", "host_split_artist", II_TO_V) { _: Instance, args: LongArray ->
+        val req = objectMapper.readValue(readArgsBytes(instanceRef, args), SplitArtistReq::class.java)
         if (req.names.size >= 2) {
-            artistService.updateArtist(
-                Artist {
-                    id = req.sourceArtistId
-                    displayName = req.names[0]
-                    alias = emptyList()
-                },
-                NORMALIZATION_FETCHER,
-            )
+            artistService.updateArtist(Artist { id = req.sourceArtistId; displayName = req.names[0]; alias = emptyList() }, NORMALIZATION_FETCHER)
             for (name in req.names.drop(1)) {
-                artistService.createArtist(
-                    Artist {
-                        displayName = name
-                        alias = emptyList()
-                        comment = ""
-                    },
-                    NORMALIZATION_FETCHER,
-                    copyAssociationsFrom = req.sourceArtistId,
-                )
+                artistService.createArtist(Artist { displayName = name; alias = emptyList(); comment = "" }, NORMALIZATION_FETCHER, req.sourceArtistId)
             }
         }
         longArrayOf()
