@@ -31,6 +31,15 @@ class ArtistService(
         }.fetchPage(pageIndex, pageSize)
     }
 
+    fun getArtistsByIds(ids: List<Long>, fetcher: Fetcher<Artist>): List<Artist> {
+        if (ids.isEmpty()) return emptyList()
+        return sql.createQuery(Artist::class) {
+            where(table.id valueIn ids)
+            orderBy(table.id)
+            select(table.fetch(fetcher))
+        }.execute()
+    }
+
     fun getArtistByName(name: String, fetcher: Fetcher<Artist>): List<Artist> {
         return sql.createQuery(Artist::class) {
             where(
@@ -122,8 +131,29 @@ class ArtistService(
         }.execute()
     }
 
-    fun createArtist(input: Artist, fetcher: Fetcher<Artist>): Artist {
-        return sql.saveCommand(input, SaveMode.INSERT_ONLY).execute(fetcher).modifiedEntity
+    @Transactional
+    fun createArtist(input: Artist, fetcher: Fetcher<Artist>, copyAssociationsFrom: Long? = null): Artist {
+        val created = sql.saveCommand(input, SaveMode.INSERT_ONLY).execute(fetcher).modifiedEntity
+        if (copyAssociationsFrom != null) {
+            val params = mapOf("sourceId" to copyAssociationsFrom, "newId" to created.id)
+            jdbc.update(
+                """
+                INSERT INTO public.work_artist_mapping (work_id, artist_id)
+                SELECT work_id, :newId FROM public.work_artist_mapping WHERE artist_id = :sourceId
+                ON CONFLICT DO NOTHING
+                """.trimIndent(),
+                params,
+            )
+            jdbc.update(
+                """
+                INSERT INTO public.recording_artist_mapping (recording_id, artist_id)
+                SELECT recording_id, :newId FROM public.recording_artist_mapping WHERE artist_id = :sourceId
+                ON CONFLICT DO NOTHING
+                """.trimIndent(),
+                params,
+            )
+        }
+        return created
     }
 
     fun updateArtist(input: Artist, fetcher: Fetcher<Artist>): Artist {

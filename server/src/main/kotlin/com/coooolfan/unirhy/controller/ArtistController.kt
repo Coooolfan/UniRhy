@@ -72,8 +72,11 @@ class ArtistController(private val service: ArtistService) {
      */
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    fun createArtist(@RequestBody input: ArtistCreate): @FetchBy("DEFAULT_ARTIST_FETCHER") Artist {
-        return service.createArtist(input.toEntity(), DEFAULT_ARTIST_FETCHER)
+    fun createArtist(
+        @RequestBody input: ArtistCreate,
+        @RequestParam(required = false) copyAssociationsFrom: Long?,
+    ): @FetchBy("DEFAULT_ARTIST_FETCHER") Artist {
+        return service.createArtist(input.toEntity(), DEFAULT_ARTIST_FETCHER, copyAssociationsFrom)
     }
 
     /**
