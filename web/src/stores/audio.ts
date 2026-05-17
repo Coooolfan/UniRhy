@@ -1,6 +1,6 @@
 import { computed, ref, shallowRef, watch } from 'vue'
 import { defineStore } from 'pinia'
-import { api } from '@/ApiInstance'
+import { api, getAuthToken } from '@/ApiInstance'
 import { useClientPreferencesStore } from '@/stores/clientPreferences'
 import { useUserStore } from '@/stores/user'
 import {
@@ -38,6 +38,8 @@ import {
     readSavedVolume,
 } from '@/stores/audioShared'
 import { useAudioTrackCatalog } from '@/stores/audioTrackCatalog'
+import { getPlatformRuntime } from '@/runtime/platform'
+import { runtimeFetch } from '@/runtime/http'
 import { nowClientMs } from '@/utils/time'
 
 export type {
@@ -667,7 +669,12 @@ export const useAudioStore = defineStore('audio', () => {
         }
 
         const needsCredentials = !track.src.includes('_sig=')
-        const promise = fetch(track.src, needsCredentials ? { credentials: 'include' } : {})
+        const fetchInit: RequestInit = needsCredentials ? { credentials: 'include' } : {}
+        const token = getPlatformRuntime().platform !== 'web' ? getAuthToken() : null
+        if (token && needsCredentials) {
+            fetchInit.headers = { 'unirhy-token': token }
+        }
+        const promise = runtimeFetch(track.src, fetchInit)
             .then(async (response) => {
                 if (!response.ok) {
                     throw new Error(`Failed to fetch audio: ${response.status}`)

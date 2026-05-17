@@ -1115,10 +1115,41 @@ describe('audio store', () => {
         expect(audioStore.duration).toBe(45)
     })
 
-    it('adds proxy auth token to synced audio sources in tauri runtime', async () => {
+    it('adds auth token header to synced audio sources in tauri runtime', async () => {
         window.__UNIRHY_RUNTIME__ = {
             apiBaseUrl: 'http://127.0.0.1:34855',
-            platform: 'web',
+            platform: 'macos',
+        }
+        window.localStorage.setItem('unirhy.auth-token', 'mobile-token')
+        getRecordingMock.mockResolvedValueOnce(buildRecordingMetadata(8))
+        fetchMock.mockResolvedValue(createResponse(45))
+
+        const audioStore = useAudioStore()
+        audioStore.connectPlaybackSync()
+        const client = latestClient()
+
+        client.emitMessage({
+            type: 'ROOM_EVENT_LOAD_AUDIO_SOURCE',
+            payload: {
+                commandId: 'cmd-play-token',
+                currentIndex: 0,
+                recordingId: 8,
+            },
+        } satisfies LoadAudioSourceMessage)
+        await flushPromises(12)
+
+        expect(fetchMock).toHaveBeenCalledWith('http://127.0.0.1:34855/api/media/2008', {
+            credentials: 'include',
+            headers: {
+                'unirhy-token': 'mobile-token',
+            },
+        })
+    })
+
+    it('does not attach auth headers to signed tauri audio sources', async () => {
+        window.__UNIRHY_RUNTIME__ = {
+            apiBaseUrl: 'http://127.0.0.1:34855',
+            platform: 'macos',
         }
         window.localStorage.setItem('unirhy.auth-token', 'mobile-token')
         getRecordingMock.mockResolvedValueOnce(

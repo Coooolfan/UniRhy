@@ -6,7 +6,14 @@ import type {
     ServerPlaybackSyncMessage,
 } from '@/services/playbackSyncProtocol'
 import { getAuthToken } from '@/ApiInstance'
-import { buildWebSocketUrl, getPlatformRuntime } from '@/runtime/platform'
+import { getPlatformRuntime } from '@/runtime/platform'
+import {
+    RUNTIME_WEB_SOCKET_CONNECTING,
+    RUNTIME_WEB_SOCKET_CLOSED,
+    RUNTIME_WEB_SOCKET_OPEN,
+    type RuntimeWebSocket,
+    createRuntimeWebSocket,
+} from '@/runtime/webSocket'
 import { nowClientMs } from '@/utils/time'
 import { average } from '@/utils/math'
 
@@ -210,7 +217,7 @@ export class PlaybackSyncClient {
     private readonly callbacks: PlaybackSyncClientCallbacks
     private readonly deviceId = getOrCreateDeviceId()
 
-    private socket: WebSocket | null = null
+    private socket: RuntimeWebSocket | null = null
     private explicitStop = false
     private reconnectAttempt = 0
     private phase: PlaybackSyncClientPhase = 'stopped'
@@ -273,8 +280,8 @@ export class PlaybackSyncClient {
     connect() {
         if (
             this.socket &&
-            (this.socket.readyState === WebSocket.OPEN ||
-                this.socket.readyState === WebSocket.CONNECTING)
+            (this.socket.readyState === RUNTIME_WEB_SOCKET_OPEN ||
+                this.socket.readyState === RUNTIME_WEB_SOCKET_CONNECTING)
         ) {
             return
         }
@@ -291,7 +298,7 @@ export class PlaybackSyncClient {
 
         this.setPhase(this.reconnectAttempt > 0 ? 'reconnecting' : 'connecting')
 
-        const socket = new WebSocket(buildWebSocketUrl('/ws/playback-sync'))
+        const socket = createRuntimeWebSocket('/ws/playback-sync')
         this.socket = socket
         socket.addEventListener('open', () => {
             if (this.socket !== socket) {
@@ -348,7 +355,7 @@ export class PlaybackSyncClient {
         this.clearReconnectTimer()
         this.clearCalibrationTimers()
         this.clearHeartbeatTimer()
-        if (this.socket && this.socket.readyState !== WebSocket.CLOSED) {
+        if (this.socket && this.socket.readyState !== RUNTIME_WEB_SOCKET_CLOSED) {
             this.updateSocketState('closing')
             this.socket.close()
         }
@@ -578,7 +585,7 @@ export class PlaybackSyncClient {
     }
 
     private sendMessage(message: ClientPlaybackSyncMessage) {
-        if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
+        if (!this.socket || this.socket.readyState !== RUNTIME_WEB_SOCKET_OPEN) {
             return false
         }
 

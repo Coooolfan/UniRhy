@@ -1,21 +1,17 @@
 mod config;
-mod proxy;
 
-use proxy::ProxyServer;
 use serde::Serialize;
+use std::sync::Arc;
 use tauri::Manager;
 use tokio::sync::RwLock;
-use std::sync::Arc;
 
 struct AppState {
     backend_url: Arc<RwLock<String>>,
-    proxy_port: Option<u16>,
-    _proxy: Option<ProxyServer>,
 }
 
 #[derive(Serialize)]
 struct RuntimeConfig {
-    proxy_url: String,
+    backend_url: String,
     platform: String,
 }
 
@@ -35,12 +31,10 @@ fn detect_platform() -> String {
 
 #[tauri::command]
 fn get_runtime_config(state: tauri::State<'_, AppState>) -> RuntimeConfig {
-    let backend_url = tauri::async_runtime::block_on(async { state.backend_url.read().await.clone() });
+    let backend_url =
+        tauri::async_runtime::block_on(async { state.backend_url.read().await.clone() });
     RuntimeConfig {
-        proxy_url: state
-            .proxy_port
-            .map(|port| format!("http://localhost:{port}"))
-            .unwrap_or(backend_url),
+        backend_url,
         platform: detect_platform(),
     }
 }
@@ -67,14 +61,11 @@ async fn set_backend_url(
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_http::init())
+        .plugin(tauri_plugin_websocket::init())
         .setup(|app| {
             let backend_url = Arc::new(RwLock::new(config::load_backend_url(app.handle())));
-            let proxy = Some(tauri::async_runtime::block_on(ProxyServer::start(backend_url.clone())));
-            app.manage(AppState {
-                backend_url,
-                proxy_port: proxy.as_ref().map(ProxyServer::port),
-                _proxy: proxy,
-            });
+            app.manage(AppState { backend_url });
 
             Ok(())
         })

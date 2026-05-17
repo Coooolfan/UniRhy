@@ -37,6 +37,7 @@ describe('ApiInstance', () => {
         fetchMock.mockReset()
         replaceMock.mockReset()
         vi.restoreAllMocks()
+        vi.doUnmock('@tauri-apps/plugin-http')
         vi.stubGlobal('fetch', fetchMock)
         window.localStorage.clear()
         clearTokenCookie()
@@ -50,9 +51,12 @@ describe('ApiInstance', () => {
 
     afterEach(() => {
         vi.unstubAllGlobals()
+        vi.doUnmock('@tauri-apps/plugin-http')
         vi.restoreAllMocks()
         window.localStorage.clear()
         clearTokenCookie()
+        delete window.__UNIRHY_RUNTIME__
+        delete (window as Window & { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__
         if (originalLocationDescriptor) {
             Object.defineProperty(window, 'location', originalLocationDescriptor)
         }
@@ -130,6 +134,71 @@ describe('ApiInstance', () => {
 
         await expect(api.playlistController.listPlaylists()).rejects.toEqual({
             message: '请求参数不正确',
+        })
+    })
+
+    it('uses browser fetch and preserves token headers by default', async () => {
+        window.localStorage.setItem(TOKEN_STORAGE_KEY, 'test-token')
+        fetchMock.mockResolvedValue(createJsonResponse(200, { id: 1 }))
+
+        const { api } = await loadApiInstance()
+
+        await api.accountController.me()
+
+        expect(fetchMock).toHaveBeenCalledWith('/api/accounts/me', {
+            method: 'GET',
+            credentials: 'include',
+            headers: {
+                'unirhy-token': 'test-token',
+                'content-type': 'application/json;charset=UTF-8',
+            },
+        })
+    })
+
+    it('uses the Tauri HTTP plugin fetch inside Tauri runtime', async () => {
+        const pluginFetchMock = vi.fn<typeof fetch>().mockResolvedValue(createJsonResponse(200, {}))
+        vi.doMock('@tauri-apps/plugin-http', () => ({ fetch: pluginFetchMock }))
+        Object.defineProperty(window, '__TAURI_INTERNALS__', {
+            configurable: true,
+            value: {},
+        })
+        window.__UNIRHY_RUNTIME__ = {
+            apiBaseUrl: 'http://localhost:8654',
+            platform: 'macos',
+        }
+
+        const { api } = await loadApiInstance()
+
+        await api.systemConfigController.get()
+
+        expect(fetchMock).not.toHaveBeenCalled()
+        expect(pluginFetchMock).toHaveBeenCalledWith('http://localhost:8654/api/system/config', {
+            method: 'GET',
+            credentials: 'include',
+            headers: {
+                'content-type': 'application/json;charset=UTF-8',
+            },
+        })
+    })
+
+    it('does not set JSON content-type for FormData requests', async () => {
+        const body = new FormData()
+        body.append('file', new Blob(['cover']), 'cover.png')
+        fetchMock.mockResolvedValue(createTextResponse(200, ''))
+
+        const { api } = await loadApiInstance()
+
+        await api.recordingController.updateRecording({
+            id: 1,
+            // @ts-expect-error generated upload endpoints are absent; exercise runtime FormData handling.
+            body,
+        })
+
+        expect(fetchMock).toHaveBeenCalledWith('/api/recordings/1', {
+            method: 'PUT',
+            credentials: 'include',
+            headers: {},
+            body,
         })
     })
 })

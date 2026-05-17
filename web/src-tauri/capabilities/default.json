@@ -2,5 +2,13 @@
   "identifier": "default",
   "description": "Default capabilities for UniRhy desktop",
   "windows": ["main"],
-  "permissions": ["core:default", "core:window:allow-start-dragging"]
+  "permissions": [
+    "core:default",
+    "core:window:allow-start-dragging",
+    {
+      "identifier": "http:default",
+      "allow": [{ "url": "http://*:*" }, { "url": "https://*:*" }]
+    },
+    "websocket:default"
+  ]
 }

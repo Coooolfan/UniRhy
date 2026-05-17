@@ -14,7 +14,10 @@ struct ConfigFile {
 }
 
 fn config_path(app: &AppHandle) -> Option<PathBuf> {
-    app.path().app_data_dir().ok().map(|dir| dir.join(CONFIG_FILE_NAME))
+    app.path()
+        .app_data_dir()
+        .ok()
+        .map(|dir| dir.join(CONFIG_FILE_NAME))
 }
 
 pub fn load_backend_url(app: &AppHandle) -> String {
@@ -43,14 +46,16 @@ pub fn save_backend_url(app: &AppHandle, url: &str) -> Result<(), String> {
     let path = config_path(app).ok_or("Cannot resolve app data directory")?;
 
     if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(|e| format!("Failed to create config directory: {e}"))?;
+        fs::create_dir_all(parent)
+            .map_err(|e| format!("Failed to create config directory: {e}"))?;
     }
 
     let config = ConfigFile {
         backend_url: Some(url.to_string()),
     };
 
-    let json = serde_json::to_string_pretty(&config).map_err(|e| format!("Serialize error: {e}"))?;
+    let json =
+        serde_json::to_string_pretty(&config).map_err(|e| format!("Serialize error: {e}"))?;
     fs::write(&path, json).map_err(|e| format!("Failed to write config: {e}"))?;
 
     Ok(())

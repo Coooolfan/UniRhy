@@ -1287,6 +1287,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@tauri-apps/api@npm:^2.11.0, @tauri-apps/api@npm:^2.8.0":
+  version: 2.11.0
+  resolution: "@tauri-apps/api@npm:2.11.0"
+  checksum: 10c0/70c9f692d14ef7a5f69aa56d474e993f2c25f393e30a26099cca198040ccd33724e4978cefd455c73ecb169b36ca9b7ee010db88b05b0a8bd4a85801caa317d6
+  languageName: node
+  linkType: hard
+
 "@tauri-apps/cli-darwin-arm64@npm:2.10.1":
   version: 2.10.1
   resolution: "@tauri-apps/cli-darwin-arm64@npm:2.10.1"
@@ -1405,6 +1412,24 @@ __metadata:
   bin:
     tauri: tauri.js
   checksum: 10c0/a68f340a752092fc4f417fb7a8d4dc044031fe47c9c458ec3a1d25280d26f54dd7f33c97f797ce006936113b2d5ee54d25cef56bb84d803f1f11f7d3b5f81fd5
+  languageName: node
+  linkType: hard
+
+"@tauri-apps/plugin-http@npm:^2.5.9":
+  version: 2.5.9
+  resolution: "@tauri-apps/plugin-http@npm:2.5.9"
+  dependencies:
+    "@tauri-apps/api": "npm:^2.11.0"
+  checksum: 10c0/2780766439b57c6d2260781f6611d58d475e72c8842735a4bf3ad3ff43505ec7a9fd6fe7f6f49b37eb089c0e02416ea896c3e96a458046a8e26c3812bcd57c46
+  languageName: node
+  linkType: hard
+
+"@tauri-apps/plugin-websocket@npm:^2.4.2":
+  version: 2.4.2
+  resolution: "@tauri-apps/plugin-websocket@npm:2.4.2"
+  dependencies:
+    "@tauri-apps/api": "npm:^2.8.0"
+  checksum: 10c0/70d283ede6183f3046103e16cb3b57a264c077572e9b2a582859c364732b1ab6c30301817dca924e39c7f7a70538eb8417a074cee499d31eb1d30e7b392ca91a
   languageName: node
   linkType: hard
 
@@ -4267,6 +4292,8 @@ __metadata:
     "@tailwindcss/vite": "npm:^4.2.2"
     "@tauri-apps/api": "npm:^2.10.1"
     "@tauri-apps/cli": "npm:^2.10.1"
+    "@tauri-apps/plugin-http": "npm:^2.5.9"
+    "@tauri-apps/plugin-websocket": "npm:^2.4.2"
     "@tsconfig/node24": "npm:^24.0.4"
     "@types/jsdom": "npm:^28.0.1"
     "@types/node": "npm:^24.12.2"

@@ -11,10 +11,10 @@ export async function initPlatformRuntime(): Promise<void> {
     }
 
     const { invoke } = await import('@tauri-apps/api/core')
-    const config = await invoke<{ proxy_url: string; platform: string }>('get_runtime_config')
+    const config = await invoke<{ backend_url: string; platform: string }>('get_runtime_config')
 
     window.__UNIRHY_RUNTIME__ = {
-        apiBaseUrl: config.proxy_url,
+        apiBaseUrl: config.backend_url,
         platform: isPlatformKind(config.platform) ? config.platform : 'web',
     }
 }
