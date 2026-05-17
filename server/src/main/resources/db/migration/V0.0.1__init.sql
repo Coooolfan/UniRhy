@@ -300,3 +300,25 @@ CREATE TABLE public.play_queue
         playback_status IN ('PLAYING', 'PAUSED')
         )
 );
+
+CREATE TABLE public.plugin (
+    id            TEXT        PRIMARY KEY,
+    name          TEXT,
+    version       TEXT        NOT NULL,
+    abi           TEXT        NOT NULL,
+    task_type     TEXT        NOT NULL,
+    extension     TEXT        NOT NULL,
+    network_allow TEXT[]      NOT NULL DEFAULT '{}',
+    form_fields   TEXT        NOT NULL DEFAULT '[]',
+    wasm          BYTEA       NOT NULL,
+    enabled       BOOLEAN     NOT NULL DEFAULT FALSE,
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE UNIQUE INDEX uq_async_task_log_artist_normalization_active
+    ON public.async_task_log (
+        ((params::jsonb ->> 'artistIds'))
+    )
+    WHERE task_type = 'ARTIST_NORMALIZATION'
+        AND status IN ('PENDING', 'RUNNING')
+        AND params::jsonb ? 'artistIds';
