@@ -8,6 +8,7 @@ jimmer = "0.9.120"
 saToken = "1.44.0"
 jAudioTagger = "3.0.1"
 s3 = "2.42.33"
+chicory = "1.7.5"
 
 [libraries]
 
@@ -39,6 +40,9 @@ postgresql-flyway = { module = "org.flywaydb:flyway-database-postgresql" }
 # Other
 jAudioTagger = { group = "net.jthink", name = "jaudiotagger", version.ref = "jAudioTagger" }
 s3 = { group = "software.amazon.awssdk", name = "s3", version.ref = "s3" }
+jackson-dataformat-yaml = { module = "com.fasterxml.jackson.dataformat:jackson-dataformat-yaml" }
+chicory-runtime = { group = "com.dylibso.chicory", name = "runtime", version.ref = "chicory" }
+chicory-wasm = { group = "com.dylibso.chicory", name = "wasm", version.ref = "chicory" }
 
 # Test
 test-spring-boot-starter-webmvc = { module = "org.springframework.boot:spring-boot-starter-webmvc-test" }

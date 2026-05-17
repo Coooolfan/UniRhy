@@ -43,6 +43,9 @@ dependencies {
 
     implementation(libs.jAudioTagger)
     implementation(libs.s3)
+    implementation(libs.jackson.dataformat.yaml)
+    implementation(libs.chicory.runtime)
+    implementation(libs.chicory.wasm)
 
     runtimeOnly(libs.postgresql)
     runtimeOnly(libs.postgresql.flyway)
