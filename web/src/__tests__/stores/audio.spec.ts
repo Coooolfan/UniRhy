@@ -1057,7 +1057,7 @@ describe('audio store', () => {
     it('updates queue strategies through the server current queue API', async () => {
         updateCurrentQueueStrategyMock.mockResolvedValueOnce({
             ...buildQueue([buildTrack(7)], 0),
-            playbackStrategy: 'RADIO',
+            playbackStrategy: 'SHUFFLE',
             stopStrategy: 'TRACK',
         })
 
@@ -1072,16 +1072,16 @@ describe('audio store', () => {
         })
         await flushPromises()
 
-        await audioStore.updateQueueStrategies('RADIO', 'TRACK')
+        await audioStore.updateQueueStrategies('SHUFFLE', 'TRACK')
 
         expect(updateCurrentQueueStrategyMock).toHaveBeenCalledWith({
             body: {
-                playbackStrategy: 'RADIO',
+                playbackStrategy: 'SHUFFLE',
                 stopStrategy: 'TRACK',
                 version: 1,
             },
         })
-        expect(audioStore.playbackStrategy).toBe('RADIO')
+        expect(audioStore.playbackStrategy).toBe('SHUFFLE')
         expect(audioStore.stopStrategy).toBe('TRACK')
     })
 

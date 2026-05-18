@@ -29,7 +29,6 @@ const strategyDisabled = computed(() => {
 const playbackStrategyOptions = [
     { value: 'SEQUENTIAL', label: '顺序' },
     { value: 'SHUFFLE', label: '乱序' },
-    { value: 'RADIO', label: '电台' },
 ] as const
 
 const stopStrategyOptions = [
@@ -87,7 +86,7 @@ const removeQueueEntry = (queueIndex: number) => {
     void audioStore.removeQueueEntry(queueIndex)
 }
 
-const updatePlaybackStrategy = (value: 'SEQUENTIAL' | 'SHUFFLE' | 'RADIO') => {
+const updatePlaybackStrategy = (value: 'SEQUENTIAL' | 'SHUFFLE') => {
     void audioStore.updateQueueStrategies(value, audioStore.stopStrategy)
 }
 
@@ -133,8 +132,7 @@ const updateStopStrategy = (value: 'TRACK' | 'LIST') => {
                                         updatePlaybackStrategy(
                                             ($event.target as HTMLSelectElement).value as
                                                 | 'SEQUENTIAL'
-                                                | 'SHUFFLE'
-                                                | 'RADIO',
+                                                | 'SHUFFLE',
                                         )
                                     "
                                 >

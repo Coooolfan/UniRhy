@@ -9,6 +9,7 @@ import {
     type PlaybackSyncClientPhase,
 } from '@/services/playbackSyncClient'
 import type {
+    CurrentQueueDto,
     DeviceChangePayload,
     CurrentQueueItemDto,
     LoadAudioSourcePayload,
@@ -60,6 +61,15 @@ type BufferLoadState = {
     mediaFileId: number
     promise: Promise<AudioBuffer | null>
 }
+
+type ApiCurrentQueueDto = Omit<CurrentQueueDto, 'playbackStrategy'> & {
+    playbackStrategy: string
+}
+
+const normalizeApiQueueSnapshot = (queue: ApiCurrentQueueDto): CurrentQueueDto => ({
+    ...queue,
+    playbackStrategy: queue.playbackStrategy === 'SHUFFLE' ? 'SHUFFLE' : 'SEQUENTIAL',
+})
 
 export const useAudioStore = defineStore('audio', () => {
     const currentTrack = ref<AudioTrack | null>(null)
@@ -311,6 +321,12 @@ export const useAudioStore = defineStore('audio', () => {
             version: state.version,
             updatedAtMs: state.updatedAtMs,
         }
+    }
+
+    const applyApiQueueSnapshot = (queue: ApiCurrentQueueDto) => {
+        const normalizedQueue = normalizeApiQueueSnapshot(queue)
+        applyQueueSnapshot(normalizedQueue)
+        return normalizedQueue
     }
 
     const getCurrentQueueVersion = () => {
@@ -1403,7 +1419,7 @@ export const useAudioStore = defineStore('audio', () => {
                 const queue = await api.playbackQueueController.setCurrentIndex({
                     body: { currentIndex, version: getCurrentQueueVersion() },
                 })
-                applyQueueSnapshot(queue)
+                applyApiQueueSnapshot(queue)
                 await requestPlay(targetTrack, 0)
                 return
             }
@@ -1434,7 +1450,7 @@ export const useAudioStore = defineStore('audio', () => {
                 version: getCurrentQueueVersion(),
             },
         })
-        applyQueueSnapshot(queue)
+        applyApiQueueSnapshot(queue)
         await requestPlay(targetTrack, 0)
     }
 
@@ -1470,7 +1486,7 @@ export const useAudioStore = defineStore('audio', () => {
                 version: getCurrentQueueVersion(),
             },
         })
-        applyQueueSnapshot(queue)
+        applyApiQueueSnapshot(queue)
     }
 
     async function reorderQueue(recordingIds: number[], currentIndex: number) {
@@ -1498,7 +1514,7 @@ export const useAudioStore = defineStore('audio', () => {
         const queue = await api.playbackQueueController.reorderCurrentQueue({
             body: { recordingIds, currentIndex, version: getCurrentQueueVersion() },
         })
-        applyQueueSnapshot(queue)
+        applyApiQueueSnapshot(queue)
     }
 
     async function playQueueEntry(currentIndex: number) {
@@ -1510,8 +1526,8 @@ export const useAudioStore = defineStore('audio', () => {
         const queue = await api.playbackQueueController.setCurrentIndex({
             body: { currentIndex, version: getCurrentQueueVersion() },
         })
-        applyQueueSnapshot(queue)
-        const currentItem = queue.items[queue.currentIndex]
+        const normalizedQueue = applyApiQueueSnapshot(queue)
+        const currentItem = normalizedQueue.items[normalizedQueue.currentIndex]
         if (!currentItem) {
             return
         }
@@ -1535,7 +1551,7 @@ export const useAudioStore = defineStore('audio', () => {
         const queue = await api.playbackQueueController.playNextInCurrentQueue({
             body: { version: getCurrentQueueVersion() },
         })
-        applyQueueSnapshot(queue)
+        applyApiQueueSnapshot(queue)
     }
 
     localPlaybackEndedActions.playNext = () => {
@@ -1558,7 +1574,7 @@ export const useAudioStore = defineStore('audio', () => {
         const queue = await api.playbackQueueController.playPreviousInCurrentQueue({
             body: { version: getCurrentQueueVersion() },
         })
-        applyQueueSnapshot(queue)
+        applyApiQueueSnapshot(queue)
     }
 
     async function updateQueueStrategies(
@@ -1583,7 +1599,7 @@ export const useAudioStore = defineStore('audio', () => {
                 version: getCurrentQueueVersion(),
             },
         })
-        applyQueueSnapshot(queue)
+        applyApiQueueSnapshot(queue)
     }
 
     async function removeQueueEntry(index: number) {
@@ -1625,7 +1641,7 @@ export const useAudioStore = defineStore('audio', () => {
         const queue = await api.playbackQueueController.removeCurrentQueueEntry({
             body: { index, version: getCurrentQueueVersion() },
         })
-        applyQueueSnapshot(queue)
+        applyApiQueueSnapshot(queue)
     }
 
     async function clearQueue() {
@@ -1638,7 +1654,7 @@ export const useAudioStore = defineStore('audio', () => {
         const queue = await api.playbackQueueController.clearCurrentQueue({
             body: { version: getCurrentQueueVersion() },
         })
-        applyQueueSnapshot(queue)
+        applyApiQueueSnapshot(queue)
     }
 
     function pause() {

@@ -16,8 +16,6 @@ import org.babyfish.jimmer.sql.kt.KSqlClient
 import org.babyfish.jimmer.sql.kt.ast.expression.valueIn
 import org.babyfish.jimmer.sql.kt.fetcher.newFetcher
 import org.springframework.http.HttpStatus
-import org.springframework.jdbc.core.namedparam.MapSqlParameterSource
-import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate
 import org.springframework.stereotype.Component
 import org.springframework.stereotype.Service
 import org.springframework.web.server.ResponseStatusException
@@ -213,7 +211,6 @@ class CurrentQueueService(
             val changed = when (nextState.playbackStrategy) {
                 PlaybackStrategy.SEQUENTIAL -> moveSequentialLocked(nextState, 1)
                 PlaybackStrategy.SHUFFLE -> moveShuffleLocked(nextState, 1)
-                PlaybackStrategy.RADIO -> moveRadioNextLocked(nextState)
             }
             if (!changed) {
                 return@withMutationContext buildNoopChangeResult(currentState)
@@ -239,7 +236,6 @@ class CurrentQueueService(
             val changed = when (nextState.playbackStrategy) {
                 PlaybackStrategy.SEQUENTIAL -> moveSequentialLocked(nextState, -1)
                 PlaybackStrategy.SHUFFLE -> moveShuffleLocked(nextState, -1)
-                PlaybackStrategy.RADIO -> moveSequentialLocked(nextState, -1)
             }
             if (!changed) {
                 return@withMutationContext buildNoopChangeResult(currentState)
@@ -459,33 +455,6 @@ class CurrentQueueService(
             return false
         }
         state.currentIndex = state.shuffleIndices[nextPosition]
-        return true
-    }
-
-    private fun moveRadioNextLocked(state: AccountPlayQueueState): Boolean {
-        val realizedNextIndex = state.currentIndex + 1
-        if (realizedNextIndex in state.recordingIds.indices) {
-            state.currentIndex = realizedNextIndex
-            return true
-        }
-
-        val currentRecordingId = currentRecordingIdOf(state) ?: return false
-        val recentWindowSize = minOf(RADIO_RECENT_WINDOW_MAX, recordingCatalog.countWorks())
-        val recentWorkIds = try {
-            resolveEntriesOrThrow(
-                state.recordingIds.takeLast(recentWindowSize),
-            ).map(CurrentQueueEntry::workId).toSet()
-        } catch (_: ResponseStatusException) {
-            return false
-        }
-
-        val similarRecordingId = recordingCatalog.findFirstSimilarRecordingId(
-            recordingId = currentRecordingId,
-            excludedWorkIds = recentWorkIds,
-        ) ?: return false
-
-        state.recordingIds += similarRecordingId
-        state.currentIndex = state.recordingIds.lastIndex
         return true
     }
 
@@ -770,28 +739,18 @@ class CurrentQueueService(
 
     companion object {
         const val VERSION_CONFLICT_REASON: String = "Queue version conflict"
-
-        private const val RADIO_RECENT_WINDOW_MAX = 16
     }
 }
 
 interface CurrentQueueRecordingCatalog {
     fun getExistingRecordingIds(recordingIds: Set<Long>): Set<Long>
 
-    fun countWorks(): Int
-
     fun loadResolvedRecordings(recordingIds: Set<Long>): List<ResolvedQueueRecording>
-
-    fun findFirstSimilarRecordingId(
-        recordingId: Long,
-        excludedWorkIds: Set<Long>,
-    ): Long?
 }
 
 @Component
 class JimmerCurrentQueueRecordingCatalog(
     private val sql: KSqlClient,
-    private val jdbc: NamedParameterJdbcTemplate,
 ) : CurrentQueueRecordingCatalog {
     override fun getExistingRecordingIds(recordingIds: Set<Long>): Set<Long> {
         if (recordingIds.isEmpty()) {
@@ -801,14 +760,6 @@ class JimmerCurrentQueueRecordingCatalog(
             where(table.id valueIn recordingIds)
             select(table.id)
         }.execute().toSet()
-    }
-
-    override fun countWorks(): Int {
-        return jdbc.queryForObject(
-            "SELECT COUNT(DISTINCT work_id) FROM public.recording",
-            MapSqlParameterSource(),
-            Int::class.java,
-        ) ?: 0
     }
 
     override fun loadResolvedRecordings(
@@ -837,35 +788,6 @@ class JimmerCurrentQueueRecordingCatalog(
                 durationMs = recording.durationMs,
             )
         }
-    }
-
-    override fun findFirstSimilarRecordingId(
-        recordingId: Long,
-        excludedWorkIds: Set<Long>,
-    ): Long? {
-        val exclusionClause = if (excludedWorkIds.isEmpty()) {
-            ""
-        } else {
-            "  AND candidate.work_id NOT IN (:excludedWorkIds)\n"
-        }
-        val sql = """
-            SELECT candidate.id
-            FROM public.recording source
-            JOIN public.recording candidate
-              ON candidate.id != source.id
-             AND candidate.embedding IS NOT NULL
-            WHERE source.id = :recordingId
-              AND source.embedding IS NOT NULL
-            $exclusionClause
-            ORDER BY candidate.embedding <=> source.embedding
-            LIMIT 1
-        """.trimIndent()
-
-        val params = MapSqlParameterSource().addValue("recordingId", recordingId)
-        if (excludedWorkIds.isNotEmpty()) {
-            params.addValue("excludedWorkIds", excludedWorkIds)
-        }
-        return jdbc.query(sql, params) { rs, _ -> rs.getLong("id") }.firstOrNull()
     }
 
     private companion object {

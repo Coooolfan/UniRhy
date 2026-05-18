@@ -120,8 +120,6 @@ class PlaybackSessionServiceTest {
 private class FakePlaybackQueueRecordingCatalog : CurrentQueueRecordingCatalog {
     override fun getExistingRecordingIds(recordingIds: Set<Long>): Set<Long> = recordingIds
 
-    override fun countWorks(): Int = 2
-
     override fun loadResolvedRecordings(recordingIds: Set<Long>): List<ResolvedQueueRecording> {
         return recordingIds.map { recordingId ->
             ResolvedQueueRecording(
@@ -134,9 +132,4 @@ private class FakePlaybackQueueRecordingCatalog : CurrentQueueRecordingCatalog {
             )
         }
     }
-
-    override fun findFirstSimilarRecordingId(
-        recordingId: Long,
-        excludedWorkIds: Set<Long>,
-    ): Long? = null
 }

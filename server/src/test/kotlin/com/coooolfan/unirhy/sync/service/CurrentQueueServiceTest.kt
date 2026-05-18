@@ -106,30 +106,6 @@ class CurrentQueueServiceTest {
     }
 
     @Test
-    fun `radio appends similar recordings`() {
-        val initial = service.replaceQueue(
-            accountId = 42L,
-            recordingIds = listOf(1001L),
-            currentIndex = 0,
-            expectedVersion = 0L,
-        ).queue
-        val radio = service.updateStrategies(
-            accountId = 42L,
-            playbackStrategy = PlaybackStrategy.RADIO,
-            stopStrategy = StopStrategy.LIST,
-            expectedVersion = initial.version,
-        ).queue
-
-        val advanced = service.navigateToNext(
-            accountId = 42L,
-            expectedVersion = radio.version,
-        ).queue
-
-        assertEquals(listOf(1001L, 1002L), advanced.recordingIds)
-        assertEquals(1, advanced.currentIndex)
-    }
-
-    @Test
     fun `stale version returns conflict`() {
         service.replaceQueue(
             accountId = 42L,
@@ -192,21 +168,8 @@ class CurrentQueueServiceTest {
             return recordings.keys.intersect(recordingIds)
         }
 
-        override fun countWorks(): Int = recordings.size
-
         override fun loadResolvedRecordings(recordingIds: Set<Long>): List<ResolvedQueueRecording> {
             return recordingIds.mapNotNull(recordings::get)
-        }
-
-        override fun findFirstSimilarRecordingId(
-            recordingId: Long,
-            excludedWorkIds: Set<Long>,
-        ): Long? {
-            return when (recordingId) {
-                1001L -> 1002L
-                1002L -> 1003L
-                else -> null
-            }?.takeIf { recordings.getValue(it).workId !in excludedWorkIds }
         }
     }
 }

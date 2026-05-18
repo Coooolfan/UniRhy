@@ -3,7 +3,6 @@ package com.coooolfan.unirhy.sync.protocol
 enum class PlaybackStrategy {
     SEQUENTIAL,
     SHUFFLE,
-    RADIO,
 }
 
 enum class StopStrategy {
