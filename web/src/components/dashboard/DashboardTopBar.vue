@@ -6,6 +6,7 @@ import { useModal } from '@/composables/useModal'
 import { useUserStore } from '@/stores/user'
 import avatarPlaceholderUrl from '@/assets/avatar-placeholder.svg'
 import { useDashboardLayout } from '@/composables/useDashboardLayout'
+import { getPlatformRuntime } from '@/runtime/platform'
 import ProfileModal from './ProfileModal.vue'
 
 type Props = {
@@ -23,6 +24,7 @@ const modal = useModal()
 const userStore = useUserStore()
 const { toggleSidebar } = useDashboardLayout()
 const inputValue = ref(props.modelValue ?? '')
+const isWindowsDesktop = getPlatformRuntime().platform === 'windows'
 
 onMounted(() => {
     if (!userStore.user) {
@@ -60,6 +62,21 @@ const openProfileModal = async () => {
         size: 'sm',
     })
 }
+
+const minimizeWindow = async () => {
+    const { getCurrentWindow } = await import('@tauri-apps/api/window')
+    await getCurrentWindow().minimize()
+}
+
+const toggleMaximizeWindow = async () => {
+    const { getCurrentWindow } = await import('@tauri-apps/api/window')
+    await getCurrentWindow().toggleMaximize()
+}
+
+const closeWindow = async () => {
+    const { getCurrentWindow } = await import('@tauri-apps/api/window')
+    await getCurrentWindow().close()
+}
 </script>
 
 <template>
@@ -88,13 +105,45 @@ const openProfileModal = async () => {
                 @keydown.enter="handleSearch"
             />
         </div>
-        <button
-            type="button"
-            class="h-8 w-8 shrink-0 cursor-pointer overflow-hidden rounded-full bg-[#DCD6CC]"
-            aria-label="个人中心"
-            @click="openProfileModal"
+        <div
+            class="flex shrink-0 items-center gap-1"
+            :class="isWindowsDesktop ? 'fixed top-3 right-3 z-50' : ''"
         >
-            <img :src="avatarPlaceholderUrl" alt="avatar" class="h-full w-full object-cover" />
-        </button>
+            <button
+                type="button"
+                class="h-8 w-8 shrink-0 cursor-pointer overflow-hidden rounded-full bg-[#DCD6CC]"
+                aria-label="个人中心"
+                @click="openProfileModal"
+            >
+                <img :src="avatarPlaceholderUrl" alt="avatar" class="h-full w-full object-cover" />
+            </button>
+            <div v-if="isWindowsDesktop" class="flex items-center">
+                <button
+                    type="button"
+                    class="flex h-8 w-9 items-center justify-center text-[#5E5950] transition-colors hover:text-[#161412]"
+                    aria-label="最小化窗口"
+                    @click="minimizeWindow"
+                >
+                    <span class="h-px w-2.5 bg-current"></span>
+                </button>
+                <button
+                    type="button"
+                    class="flex h-8 w-9 items-center justify-center text-[#5E5950] transition-colors hover:text-[#161412]"
+                    aria-label="最大化窗口"
+                    @click="toggleMaximizeWindow"
+                >
+                    <span class="h-2.5 w-2.5 rounded-[2px] border border-current"></span>
+                </button>
+                <button
+                    type="button"
+                    class="relative flex h-8 w-9 items-center justify-center text-[#5E5950] transition-colors hover:text-[#C65143]"
+                    aria-label="关闭窗口"
+                    @click="closeWindow"
+                >
+                    <span class="absolute h-px w-3 rotate-45 bg-current"></span>
+                    <span class="absolute h-px w-3 -rotate-45 bg-current"></span>
+                </button>
+            </div>
+        </div>
     </header>
 </template>

@@ -6,15 +6,16 @@ import AppModalHost from '@/components/modals/AppModalHost.vue'
 import { getPlatformRuntime } from '@/runtime/platform'
 
 const route = useRoute()
-const isMacDesktop = getPlatformRuntime().platform === 'macos'
+const desktopPlatform = getPlatformRuntime().platform
+const usesCustomTitleBar = desktopPlatform === 'macos' || desktopPlatform === 'windows'
 const dragRegionClass = computed(() =>
     route.path.startsWith('/dashboard')
         ? 'fixed left-0 top-0 z-40 h-32 w-64'
         : 'fixed left-0 top-0 z-40 h-16 w-64',
 )
 
-const startMacWindowDrag = async (event: MouseEvent) => {
-    if (!isMacDesktop || event.button !== 0) {
+const startWindowDrag = async (event: MouseEvent) => {
+    if (!usesCustomTitleBar || event.button !== 0) {
         return
     }
 
@@ -25,10 +26,10 @@ const startMacWindowDrag = async (event: MouseEvent) => {
 
 <template>
     <div
-        v-if="isMacDesktop"
+        v-if="usesCustomTitleBar"
         :class="dragRegionClass"
         aria-hidden="true"
-        @mousedown="startMacWindowDrag"
+        @mousedown="startWindowDrag"
     ></div>
     <RouterView />
     <AudioPlayer />
