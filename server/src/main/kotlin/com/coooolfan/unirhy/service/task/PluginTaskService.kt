@@ -1,6 +1,5 @@
 package com.coooolfan.unirhy.service.task
 
-import com.coooolfan.unirhy.model.AsyncTaskLog
 import com.coooolfan.unirhy.model.Plugin
 import com.coooolfan.unirhy.model.enabled
 import com.coooolfan.unirhy.service.ArtistService
@@ -17,7 +16,6 @@ import com.coooolfan.unirhy.service.task.common.TaskStatus
 import com.coooolfan.unirhy.service.task.common.TaskType
 import com.coooolfan.unirhy.service.task.common.failureReason
 import com.fasterxml.jackson.databind.ObjectMapper
-import org.babyfish.jimmer.sql.ast.mutation.SaveMode
 import org.babyfish.jimmer.sql.kt.KSqlClient
 import org.babyfish.jimmer.sql.kt.ast.expression.eq
 import org.slf4j.LoggerFactory
@@ -138,13 +136,10 @@ class PluginTaskService(
 
         try {
             transactionTemplate.executeWithoutResult {
-                sql.saveEntities(
-                    listOf(AsyncTaskLog {
-                        id = claimedTask.id
-                        status = if (reason == "SUCCESS") TaskStatus.COMPLETED else TaskStatus.FAILED
-                        completedReason = reason
-                    }),
-                    SaveMode.UPDATE_ONLY,
+                queueStore.completeTask(
+                    logId = claimedTask.id,
+                    status = if (reason == "SUCCESS") TaskStatus.COMPLETED else TaskStatus.FAILED,
+                    reason = reason,
                 )
             }
         } catch (ex: Throwable) {

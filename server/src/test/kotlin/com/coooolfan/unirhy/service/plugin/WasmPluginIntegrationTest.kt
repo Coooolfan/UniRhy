@@ -19,11 +19,13 @@ class WasmPluginIntegrationTest {
     @Test
     @EnabledIf("mockPluginAvailable")
     fun `plugin run() completes without error against stub host functions`() {
-        val plugin = assertNotNull(WasmPlugin.load(Path.of(MOCK_PLUGIN_DIR)) { manifest, instanceRef ->
-            buildDefaultHostFunctions(manifest, instanceRef) + buildStubArtistHostFunctions(instanceRef)
+        val manifest = assertNotNull(loadPluginManifest(Path.of(MOCK_PLUGIN_DIR, "plugin.yml")))
+        val wasmBytes = Files.readAllBytes(Path.of(MOCK_PLUGIN_DIR, "plugin.wasm"))
+        val plugin = assertNotNull(WasmPlugin.load(manifest, wasmBytes) { m, instanceRef ->
+            buildDefaultHostFunctions(m, instanceRef) + buildStubArtistHostFunctions(instanceRef)
         })
         // stub host functions return empty pages → run() should exit cleanly with 0 merges
-        plugin.run()
+        plugin.run("{}".toByteArray())
     }
 
     @Suppress("unused")

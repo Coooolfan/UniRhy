@@ -27,6 +27,4 @@ interface AsyncTaskLog {
     val completedReason: String?
 
     val status: TaskStatus
-
-    // TODO: 加个字段用于标记现在在哪个节点上被消费
 }

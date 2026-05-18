@@ -56,28 +56,16 @@ class ScanTaskService(
             transactionTemplate.executeWithoutResult {
                 val claimedTasks = queueStore.claim(TaskType.METADATA_PARSE, METADATA_PARSE_CLAIM_LIMIT)
 
-                val completionUpdates = mutableListOf<AsyncTaskLog>()
                 for (claimedTask in claimedTasks) {
-                    try {
+                    val (status, reason) = try {
                         val payload = objectMapper.readValue(claimedTask.params, ScanFileTaskPayload::class.java)
-                        val completionReason = execute(payload)
-                        completionUpdates +=
-                            AsyncTaskLog {
-                                id = claimedTask.id
-                                status = TaskStatus.COMPLETED
-                                completedReason = completionReason
-                            }
+                        TaskStatus.COMPLETED to execute(payload)
                     } catch (ex: Throwable) {
                         logger.error("Scan task failed, logId={}", claimedTask.id, ex)
-                        completionUpdates +=
-                            AsyncTaskLog {
-                                id = claimedTask.id
-                                status = TaskStatus.FAILED
-                                completedReason = failureReason(ex)
-                            }
+                        TaskStatus.FAILED to failureReason(ex)
                     }
+                    queueStore.completeTask(claimedTask.id, status, reason)
                 }
-                sql.saveEntities(completionUpdates, SaveMode.UPDATE_ONLY)
             }
         } catch (ex: Throwable) {
             logger.error("Failed to consume pending scan task", ex)

@@ -68,28 +68,17 @@ class TranscodeTaskService(
                 if (claimedTasks.isEmpty()) {
                     return@executeWithoutResult
                 }
-                val completionUpdates = mutableListOf<AsyncTaskLog>()
                 for (claimedTask in claimedTasks) {
-                    try {
+                    val (status, reason) = try {
                         val payload = objectMapper.readValue(claimedTask.params, TranscodeTaskPayload::class.java)
                         execute(payload)
-                        completionUpdates +=
-                            AsyncTaskLog {
-                                id = claimedTask.id
-                                status = TaskStatus.COMPLETED
-                                completedReason = "SUCCESS"
-                            }
+                        TaskStatus.COMPLETED to "SUCCESS"
                     } catch (ex: Throwable) {
                         logger.error("Transcode task failed, logId={}", claimedTask.id, ex)
-                        completionUpdates +=
-                            AsyncTaskLog {
-                                id = claimedTask.id
-                                status = TaskStatus.FAILED
-                                completedReason = failureReason(ex)
-                            }
+                        TaskStatus.FAILED to failureReason(ex)
                     }
+                    queueStore.completeTask(claimedTask.id, status, reason)
                 }
-                sql.saveEntities(completionUpdates, SaveMode.UPDATE_ONLY)
             }
         } catch (ex: Throwable) {
             logger.error("Failed to consume pending transcode task", ex)
