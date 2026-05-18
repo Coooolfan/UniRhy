@@ -127,7 +127,7 @@ const updateStopStrategy = (value: 'TRACK' | 'LIST') => {
                                 <select
                                     data-test="playback-strategy-select"
                                     :value="audioStore.playbackStrategy"
-                                    class="min-w-[5.5rem] appearance-none border-b border-[#D6D1C4] bg-[#F7F5F0] py-1 pr-6 text-[11px] text-[#2C2C2C] outline-none transition-colors focus:border-[#C27E46]"
+                                    class="min-w-22 appearance-none border-b border-[#D6D1C4] bg-[#F7F5F0] py-1 pr-6 text-[11px] text-[#2C2C2C] outline-none transition-colors focus:border-[#C27E46]"
                                     :disabled="strategyDisabled"
                                     @change="
                                         updatePlaybackStrategy(

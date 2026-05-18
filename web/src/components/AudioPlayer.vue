@@ -116,11 +116,11 @@ const displayedCurrentTime = computed(() => {
 })
 
 const transportDisabled = computed(() => {
-    return audioStore.isPlaying && !audioStore.canSendRealtimeControl
+    return audioStore.isLoading || (audioStore.isPlaying && !audioStore.canSendRealtimeControl)
 })
 
 const seekDisabled = computed(() => {
-    return !audioStore.canSendRealtimeControl || audioStore.duration <= 0
+    return audioStore.isLoading || !audioStore.canSendRealtimeControl || audioStore.duration <= 0
 })
 
 const queueTransportDisabled = computed(() => {
@@ -301,6 +301,7 @@ const syncStatusClass = computed(() => {
                             <div
                                 class="relative flex-1 h-1 bg-[#EFEBE4] rounded-full group"
                                 :class="seekDisabled ? 'cursor-not-allowed' : 'cursor-pointer'"
+                                data-test="seek-progress"
                             >
                                 <input
                                     data-test="seek-input"
@@ -319,6 +320,11 @@ const syncStatusClass = computed(() => {
                                 <div
                                     class="absolute top-0 left-0 h-full bg-[#C17D46] rounded-full pointer-events-none"
                                     :style="{ width: `${progressPercentage}%` }"
+                                ></div>
+                                <div
+                                    v-if="audioStore.isLoading"
+                                    data-test="seek-loading-indicator"
+                                    class="absolute inset-y-0 left-0 w-1/3 animate-[pulse_1s_ease-in-out_infinite] rounded-full bg-[#C17D46]/40 pointer-events-none"
                                 ></div>
                                 <div
                                     class="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 w-2.5 h-2.5 bg-[#C17D46] rounded-full opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-sm"

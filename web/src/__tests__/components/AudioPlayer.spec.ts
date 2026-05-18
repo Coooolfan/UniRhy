@@ -141,6 +141,18 @@ describe('AudioPlayer', () => {
         expect(audioStore.resume).toHaveBeenCalledTimes(1)
     })
 
+    it('disables transport and shows progress loading while audio is loading', () => {
+        audioStore.isPlaying = false
+        audioStore.isLoading = true
+        audioStore.canSendRealtimeControl = true
+
+        const wrapper = mount(AudioPlayer)
+
+        expect(wrapper.get('[data-test="transport-button"]').attributes('disabled')).toBeDefined()
+        expect(wrapper.get('[data-test="seek-input"]').attributes('disabled')).toBeDefined()
+        expect(wrapper.find('[data-test="seek-loading-indicator"]').exists()).toBe(true)
+    })
+
     it('opens the playback sync debug page when the sync badge is clicked', async () => {
         const wrapper = mount(AudioPlayer)
         expect(wrapper.get('[data-test="sync-status"]').classes()).toContain('cursor-pointer')
