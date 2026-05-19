@@ -20,6 +20,7 @@ export default defineConfig({
         },
     },
     server: {
+        port: 8655,
         host: isTauri ? '0.0.0.0' : undefined,
         ...(!isTauri && {
             proxy: {
