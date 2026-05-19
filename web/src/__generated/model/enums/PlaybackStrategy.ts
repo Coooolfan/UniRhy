@@ -1,6 +1,5 @@
 export const PlaybackStrategy_CONSTANTS = [
     'SEQUENTIAL', 
-    'SHUFFLE', 
-    'RADIO'
+    'SHUFFLE'
 ] as const;
 export type PlaybackStrategy = typeof PlaybackStrategy_CONSTANTS[number];

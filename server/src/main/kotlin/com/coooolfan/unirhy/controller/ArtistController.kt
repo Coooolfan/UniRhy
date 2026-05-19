@@ -21,6 +21,11 @@ import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
 
+/**
+ * 艺术家管理接口
+ *
+ * 提供艺术家的分页查询、按名搜索、创建、更新与合并能力
+ */
 @RestController
 @RequestMapping("/api/artists")
 @SaCheckLogin

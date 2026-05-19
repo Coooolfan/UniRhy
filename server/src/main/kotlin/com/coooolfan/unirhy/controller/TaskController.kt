@@ -19,18 +19,54 @@ class TaskController(
     private val asyncTaskLogService: AsyncTaskLogService,
 ) {
 
+    /**
+     * 提交扫描任务
+     *
+     * 此接口用于异步触发媒体库扫描任务
+     * 需要用户登录认证才能访问
+     *
+     * @param request 扫描任务请求参数
+     *
+     * @api POST /api/task/scan
+     * @permission 需要登录认证
+     * @description 调用ScanTaskService.submit()方法提交扫描任务
+     */
     @PostMapping("/scan")
     @ResponseStatus(HttpStatus.ACCEPTED)
     fun executeScanTask(@RequestBody request: ScanTaskRequest) {
         scanTaskService.submit(request)
     }
 
+    /**
+     * 提交转码任务
+     *
+     * 此接口用于异步触发音频转码任务
+     * 需要用户登录认证才能访问
+     *
+     * @param request 转码任务请求参数
+     *
+     * @api POST /api/task/transcode
+     * @permission 需要登录认证
+     * @description 调用TranscodeTaskService.submit()方法提交转码任务
+     */
     @PostMapping("/transcode")
     @ResponseStatus(HttpStatus.ACCEPTED)
     fun executeTranscodeTask(@RequestBody request: TranscodeTaskRequest) {
         transcodeTaskService.submit(request)
     }
 
+    /**
+     * 获取任务日志计数列表
+     *
+     * 此接口用于按任务维度聚合查询异步任务日志计数
+     * 需要用户登录认证才能访问
+     *
+     * @return List<AsyncTaskLogCountRow> 返回任务日志计数列表
+     *
+     * @api GET /api/task/logs
+     * @permission 需要登录认证
+     * @description 调用AsyncTaskLogService.listCounts()方法获取任务日志计数
+     */
     @GetMapping("/logs")
     fun listTaskLogs(): List<AsyncTaskLogCountRow> {
         return asyncTaskLogService.listCounts()

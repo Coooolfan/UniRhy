@@ -7,6 +7,11 @@ import type {
     Page
 } from '../model/static/';
 
+/**
+ * 艺术家管理接口
+ * 
+ * 提供艺术家的分页查询、按名搜索、创建、更新与合并能力
+ */
 export class ArtistController {
     
     constructor(private executor: Executor) {}
@@ -23,6 +28,15 @@ export class ArtistController {
         ArtistDto['ArtistController/DEFAULT_ARTIST_FETCHER']
     > = async(options) => {
         let _uri = '/api/artists';
+        let _separator = _uri.indexOf('?') === -1 ? '?' : '&';
+        let _value: any = undefined;
+        _value = options.copyAssociationsFrom;
+        if (_value !== undefined && _value !== null) {
+            _uri += _separator
+            _uri += 'copyAssociationsFrom='
+            _uri += encodeURIComponent(_value);
+            _separator = '&';
+        }
         return (await this.executor({uri: _uri, method: 'POST', body: options.body})) as Promise<ArtistDto['ArtistController/DEFAULT_ARTIST_FETCHER']>;
     }
     
@@ -135,7 +149,8 @@ export type ArtistControllerOptions = {
         /**
          * 艺术家创建参数
          */
-        readonly body: ArtistCreate
+        readonly body: ArtistCreate, 
+        readonly copyAssociationsFrom?: number | undefined
     }, 
     'updateArtist': {
         /**

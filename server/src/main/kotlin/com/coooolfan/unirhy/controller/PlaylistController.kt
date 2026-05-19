@@ -13,6 +13,11 @@ import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.*
 
 
+/**
+ * 播放列表管理接口
+ *
+ * 提供播放列表的增删改查，以及播放列表内录音的添加、移除与重排能力
+ */
 @SaCheckLogin
 @RestController
 @RequestMapping("/api/playlists")

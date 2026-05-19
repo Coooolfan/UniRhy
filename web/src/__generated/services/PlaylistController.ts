@@ -2,6 +2,11 @@ import type {Executor} from '../';
 import type {PlaylistDto} from '../model/dto/';
 import type {PlaylistCreate, PlaylistUpdate, RecordingReorderReq} from '../model/static/';
 
+/**
+ * 播放列表管理接口
+ * 
+ * 提供播放列表的增删改查，以及播放列表内录音的添加、移除与重排能力
+ */
 export class PlaylistController {
     
     constructor(private executor: Executor) {}

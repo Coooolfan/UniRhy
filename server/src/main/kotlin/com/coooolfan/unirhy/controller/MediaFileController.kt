@@ -81,6 +81,18 @@ class MediaFileController(
         return fullResponse(resolved, resource, mediaType, lastModified)
     }
 
+    /**
+     * 获取媒体文件元信息（HEAD）
+     *
+     * 仅返回响应头（Content-Type/Content-Length/Last-Modified 等），不返回响应体
+     * 用于客户端预检文件大小、MIME 类型与缓存有效性
+     *
+     * @param id MediaFile ID
+     *
+     * @api HEAD /api/media/{id}
+     * @permission 需要登录认证或有效签名
+     * @description 根据媒体文件ID返回对应资源的响应头
+     */
     @RequestMapping(MediaFileRoutes.MEDIA_FILE_PATH_PATTERN, method = [RequestMethod.HEAD], headers = ["!Range"])
     @ApiIgnore
     fun headMedia(
@@ -107,6 +119,19 @@ class MediaFileController(
             .build()
     }
 
+    /**
+     * 获取媒体文件区间内容（Range 请求）
+     *
+     * 处理带 Range 头的 GET 请求，返回 206 Partial Content；
+     * 若 If-Range 不匹配则回退为完整资源响应；
+     * Range 解析失败或越界时返回 416 Requested Range Not Satisfiable
+     *
+     * @param id MediaFile ID
+     *
+     * @api GET /api/media/{id} (Range)
+     * @permission 需要登录认证或有效签名
+     * @description 根据 Range 头返回媒体文件指定字节区间
+     */
     @GetMapping(MediaFileRoutes.MEDIA_FILE_PATH_PATTERN, headers = ["Range"])
     @ApiIgnore
     fun getMediaWithRange(

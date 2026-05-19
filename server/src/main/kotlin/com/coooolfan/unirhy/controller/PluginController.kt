@@ -33,6 +33,11 @@ data class PluginInfoResponse(
     val form: PluginForm,
 )
 
+/**
+ * 插件管理接口
+ *
+ * 提供插件的上传、启停、删除、导出与插件任务提交能力
+ */
 @RestController
 @RequestMapping("/api/plugins")
 @SaCheckLogin
@@ -41,6 +46,18 @@ class PluginController(
     private val pluginTaskService: PluginTaskService,
     private val objectMapper: ObjectMapper,
 ) {
+    /**
+     * 获取插件列表
+     *
+     * 此接口用于获取系统中已安装的全部插件信息，并标记插件是否已加载可用
+     * 需要用户登录认证才能访问
+     *
+     * @return List<PluginInfoResponse> 返回插件信息列表
+     *
+     * @api GET /api/plugins
+     * @permission 需要登录认证
+     * @description 调用PluginService.listPlugins()方法获取插件列表
+     */
     @GetMapping
     fun listPlugins(): List<PluginInfoResponse> {
         val loadedTaskTypes = pluginTaskService.getLoadedTaskTypes()
@@ -59,24 +76,74 @@ class PluginController(
         }
     }
 
+    /**
+     * 上传插件
+     *
+     * 此接口用于上传 `.up` 插件包并完成安装
+     * 需要用户登录认证才能访问
+     *
+     * @param file 插件包文件
+     *
+     * @api POST /api/plugins/upload
+     * @permission 需要登录认证
+     * @description 调用PluginService.upload()方法上传并安装插件
+     */
     @PostMapping("/upload", consumes = ["multipart/form-data"])
     @ResponseStatus(HttpStatus.CREATED)
     fun upload(@RequestParam("file") file: MultipartFile) {
         pluginService.upload(file)
     }
 
+    /**
+     * 启用或禁用插件
+     *
+     * 此接口用于切换指定插件的启用状态
+     * 需要用户登录认证才能访问
+     *
+     * @param id 插件 ID
+     * @param enabled 是否启用
+     *
+     * @api PUT /api/plugins/{id}/enabled
+     * @permission 需要登录认证
+     * @description 调用PluginService.setEnabled()方法切换插件启用状态
+     */
     @PutMapping("/{id}/enabled")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     fun setEnabled(@PathVariable id: String, @RequestParam enabled: Boolean) {
         pluginService.setEnabled(id, enabled)
     }
 
+    /**
+     * 删除插件
+     *
+     * 此接口用于删除指定 ID 的插件
+     * 需要用户登录认证才能访问
+     *
+     * @param id 插件 ID
+     *
+     * @api DELETE /api/plugins/{id}
+     * @permission 需要登录认证
+     * @description 调用PluginService.delete()方法删除插件
+     */
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     fun delete(@PathVariable id: String) {
         pluginService.delete(id)
     }
 
+    /**
+     * 导出（下载）插件包
+     *
+     * 此接口用于将指定插件打包为 `.up` 文件并以附件形式下载
+     * 需要用户登录认证才能访问
+     *
+     * @param id 插件 ID
+     * @param response Servlet 响应对象，用于写入二进制内容
+     *
+     * @api GET /api/plugins/{id}/download
+     * @permission 需要登录认证
+     * @description 调用PluginService.export()方法导出插件包
+     */
     @GetMapping("/{id}/download")
     fun download(@PathVariable id: String, response: HttpServletResponse) {
         val plugin = pluginService.getPlugin(id)
@@ -86,6 +153,19 @@ class PluginController(
         response.outputStream.write(zipBytes)
     }
 
+    /**
+     * 提交插件任务
+     *
+     * 此接口用于按任务类型异步触发插件任务，参数以键值对方式透传给对应插件
+     * 需要用户登录认证才能访问
+     *
+     * @param taskType 任务类型（对应 TaskType 枚举值）
+     * @param params 任务参数键值对
+     *
+     * @api POST /api/plugins/{taskType}/submit
+     * @permission 需要登录认证
+     * @description 调用PluginTaskService.submit()方法提交插件任务
+     */
     @PostMapping("/{taskType}/submit")
     @ResponseStatus(HttpStatus.ACCEPTED)
     fun submitPluginTask(
