@@ -1,6 +1,8 @@
 package com.coooolfan.unirhy.controller
 
 import cn.dev33.satoken.annotation.SaCheckLogin
+import cn.dev33.satoken.annotation.SaCheckRole
+import com.coooolfan.unirhy.config.ROLE_ADMIN
 import com.coooolfan.unirhy.model.Album
 import com.coooolfan.unirhy.model.by
 import com.coooolfan.unirhy.model.dto.AlbumUpdate
@@ -92,6 +94,7 @@ class AlbumController(private val service: AlbumService) {
      * @description 调用AlbumService.updateAlbum()方法更新专辑
      */
     @PutMapping("/{id}")
+    @SaCheckRole(ROLE_ADMIN)
     @ResponseStatus(HttpStatus.OK)
     fun updateAlbum(
         @PathVariable id: Long,
@@ -113,6 +116,7 @@ class AlbumController(private val service: AlbumService) {
      * @permission 需要登录认证
      */
     @PutMapping("/{id}/recordings/reorder")
+    @SaCheckRole(ROLE_ADMIN)
     @ResponseStatus(HttpStatus.NO_CONTENT)
     fun reorderAlbumRecordings(
         @PathVariable id: Long,

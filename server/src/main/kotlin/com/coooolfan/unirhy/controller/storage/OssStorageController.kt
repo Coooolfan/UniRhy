@@ -1,6 +1,8 @@
 package com.coooolfan.unirhy.controller.storage
 
 import cn.dev33.satoken.annotation.SaCheckLogin
+import cn.dev33.satoken.annotation.SaCheckRole
+import com.coooolfan.unirhy.config.ROLE_ADMIN
 import com.coooolfan.unirhy.model.storage.FileProviderOss
 import com.coooolfan.unirhy.model.storage.by
 import com.coooolfan.unirhy.model.storage.dto.FileProviderOssCreate
@@ -79,6 +81,7 @@ class OssStorageController(private val service: OssStorageService) {
      * @description 调用OssStorageService.create()方法创建存储配置
      */
     @PostMapping
+    @SaCheckRole(ROLE_ADMIN)
     @ResponseStatus(HttpStatus.CREATED)
     fun create(@RequestBody create: FileProviderOssCreate): @FetchBy("DEFAULT_OSS_FETCHER") FileProviderOss {
         return service.create(create, DEFAULT_OSS_FETCHER)
@@ -99,6 +102,7 @@ class OssStorageController(private val service: OssStorageService) {
      * @description 调用OssStorageService.update()方法更新存储配置
      */
     @PutMapping("/{id}")
+    @SaCheckRole(ROLE_ADMIN)
     fun update(
         @PathVariable id: Long,
         @RequestBody update: FileProviderOssUpdate,
@@ -119,6 +123,7 @@ class OssStorageController(private val service: OssStorageService) {
      * @description 调用OssStorageService.delete()方法删除存储配置
      */
     @DeleteMapping("/{id}")
+    @SaCheckRole(ROLE_ADMIN)
     @ResponseStatus(HttpStatus.NO_CONTENT)
     fun delete(@PathVariable id: Long) {
         service.delete(id)

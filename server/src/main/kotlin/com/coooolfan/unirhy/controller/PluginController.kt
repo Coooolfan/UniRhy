@@ -1,6 +1,8 @@
 package com.coooolfan.unirhy.controller
 
 import cn.dev33.satoken.annotation.SaCheckLogin
+import cn.dev33.satoken.annotation.SaCheckRole
+import com.coooolfan.unirhy.config.ROLE_ADMIN
 import com.coooolfan.unirhy.service.PluginService
 import com.coooolfan.unirhy.service.plugin.PluginForm
 import com.coooolfan.unirhy.service.plugin.PluginFormField
@@ -89,6 +91,7 @@ class PluginController(
      * @description 调用PluginService.upload()方法上传并安装插件
      */
     @PostMapping("/upload", consumes = ["multipart/form-data"])
+    @SaCheckRole(ROLE_ADMIN)
     @ResponseStatus(HttpStatus.CREATED)
     fun upload(@RequestParam("file") file: MultipartFile) {
         pluginService.upload(file)
@@ -108,6 +111,7 @@ class PluginController(
      * @description 调用PluginService.setEnabled()方法切换插件启用状态
      */
     @PutMapping("/{id}/enabled")
+    @SaCheckRole(ROLE_ADMIN)
     @ResponseStatus(HttpStatus.NO_CONTENT)
     fun setEnabled(@PathVariable id: String, @RequestParam enabled: Boolean) {
         pluginService.setEnabled(id, enabled)
@@ -126,6 +130,7 @@ class PluginController(
      * @description 调用PluginService.delete()方法删除插件
      */
     @DeleteMapping("/{id}")
+    @SaCheckRole(ROLE_ADMIN)
     @ResponseStatus(HttpStatus.NO_CONTENT)
     fun delete(@PathVariable id: String) {
         pluginService.delete(id)
@@ -167,6 +172,7 @@ class PluginController(
      * @description 调用PluginTaskService.submit()方法提交插件任务
      */
     @PostMapping("/{taskType}/submit")
+    @SaCheckRole(ROLE_ADMIN)
     @ResponseStatus(HttpStatus.ACCEPTED)
     fun submitPluginTask(
         @PathVariable taskType: String,

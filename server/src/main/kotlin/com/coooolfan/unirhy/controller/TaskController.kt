@@ -1,6 +1,8 @@
 package com.coooolfan.unirhy.controller
 
 import cn.dev33.satoken.annotation.SaCheckLogin
+import cn.dev33.satoken.annotation.SaCheckRole
+import com.coooolfan.unirhy.config.ROLE_ADMIN
 import com.coooolfan.unirhy.service.task.*
 import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.*
@@ -32,6 +34,7 @@ class TaskController(
      * @description 调用ScanTaskService.submit()方法提交扫描任务
      */
     @PostMapping("/scan")
+    @SaCheckRole(ROLE_ADMIN)
     @ResponseStatus(HttpStatus.ACCEPTED)
     fun executeScanTask(@RequestBody request: ScanTaskRequest) {
         scanTaskService.submit(request)
@@ -50,6 +53,7 @@ class TaskController(
      * @description 调用TranscodeTaskService.submit()方法提交转码任务
      */
     @PostMapping("/transcode")
+    @SaCheckRole(ROLE_ADMIN)
     @ResponseStatus(HttpStatus.ACCEPTED)
     fun executeTranscodeTask(@RequestBody request: TranscodeTaskRequest) {
         transcodeTaskService.submit(request)

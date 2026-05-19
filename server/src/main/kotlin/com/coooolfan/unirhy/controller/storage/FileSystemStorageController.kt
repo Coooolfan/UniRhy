@@ -1,6 +1,8 @@
 package com.coooolfan.unirhy.controller.storage
 
 import cn.dev33.satoken.annotation.SaCheckLogin
+import cn.dev33.satoken.annotation.SaCheckRole
+import com.coooolfan.unirhy.config.ROLE_ADMIN
 import com.coooolfan.unirhy.model.storage.FileProviderFileSystem
 import com.coooolfan.unirhy.model.storage.by
 import com.coooolfan.unirhy.model.storage.dto.FileProviderFileSystemCreate
@@ -71,6 +73,7 @@ class FileSystemStorageController(private val service: FileSystemStorageService)
      * @description 调用FileSystemStorageService.create()方法创建存储配置
      */
     @PostMapping
+    @SaCheckRole(ROLE_ADMIN)
     @ResponseStatus(HttpStatus.CREATED)
     fun create(@RequestBody create: FileProviderFileSystemCreate): @FetchBy("DEFAULT_FILE_SYSTEM_FETCHER") FileProviderFileSystem {
         return service.create(create, DEFAULT_FILE_SYSTEM_FETCHER)
@@ -91,6 +94,7 @@ class FileSystemStorageController(private val service: FileSystemStorageService)
      * @description 调用FileSystemStorageService.update()方法更新存储配置
      */
     @PutMapping("/{id}")
+    @SaCheckRole(ROLE_ADMIN)
     fun update(
         @PathVariable id: Long,
         @RequestBody update: FileProviderFileSystemUpdate,
@@ -111,6 +115,7 @@ class FileSystemStorageController(private val service: FileSystemStorageService)
      * @description 调用FileSystemStorageService.delete()方法删除存储配置
      */
     @DeleteMapping("/{id}")
+    @SaCheckRole(ROLE_ADMIN)
     @ResponseStatus(HttpStatus.NO_CONTENT)
     fun delete(@PathVariable id: Long) {
         service.delete(id)

@@ -1,6 +1,8 @@
 package com.coooolfan.unirhy.controller
 
 import cn.dev33.satoken.annotation.SaCheckLogin
+import cn.dev33.satoken.annotation.SaCheckRole
+import com.coooolfan.unirhy.config.ROLE_ADMIN
 import com.coooolfan.unirhy.error.SystemException
 import com.coooolfan.unirhy.model.SystemConfig
 import com.coooolfan.unirhy.model.by
@@ -88,7 +90,7 @@ class SystemConfigController(private val service: SystemConfigService) {
      * @permission 需要登录认证
      * @description 调用SystemConfigService.update()方法更新系统配置
      */
-    @SaCheckLogin
+    @SaCheckRole(ROLE_ADMIN)
     @PutMapping
     fun update(@RequestBody update: SystemConfigUpdate): @FetchBy("DEFAULT_SYSTEM_CONFIG_FETCHER") SystemConfig {
         return service.update(update, DEFAULT_SYSTEM_CONFIG_FETCHER)

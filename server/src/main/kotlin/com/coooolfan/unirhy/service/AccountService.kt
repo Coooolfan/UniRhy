@@ -1,6 +1,8 @@
 package com.coooolfan.unirhy.service
 
+import cn.dev33.satoken.stp.parameter.SaLoginParameter
 import cn.dev33.satoken.stp.StpUtil
+import com.coooolfan.unirhy.config.ROLE_ADMIN
 import com.coooolfan.unirhy.config.encodePassword
 import com.coooolfan.unirhy.error.CommonException
 import com.coooolfan.unirhy.model.Account
@@ -29,7 +31,7 @@ class AccountService(
             throw CommonException.AuthenticationFailed()
         }
 
-        StpUtil.login(account.id)
+        StpUtil.login(account.id, SaLoginParameter().setExtra(ROLE_ADMIN, account.admin))
     }
 
     fun logout() = try {

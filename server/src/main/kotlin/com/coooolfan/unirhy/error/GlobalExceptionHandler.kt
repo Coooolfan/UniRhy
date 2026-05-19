@@ -1,6 +1,7 @@
 package com.coooolfan.unirhy.error
 
 import cn.dev33.satoken.exception.NotLoginException
+import cn.dev33.satoken.exception.NotRoleException
 import cn.dev33.satoken.stp.StpUtil
 import org.babyfish.jimmer.error.CodeBasedRuntimeException
 import org.springframework.http.ResponseEntity
@@ -38,6 +39,13 @@ class GlobalExceptionHandler {
         return ResponseEntity
             .status(401)
             .body(resultMap(CommonException.AuthenticationFailed()))
+    }
+
+    @ExceptionHandler(NotRoleException::class)
+    fun handleNotRole(): ResponseEntity<Any> {
+        return ResponseEntity
+            .status(403)
+            .body(resultMap(CommonException.Forbidden()))
     }
 
     private fun resultMap(ex: CodeBasedRuntimeException): Map<String, Any> {

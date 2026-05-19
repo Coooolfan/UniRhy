@@ -1,6 +1,8 @@
 package com.coooolfan.unirhy.controller
 
 import cn.dev33.satoken.annotation.SaCheckLogin
+import cn.dev33.satoken.annotation.SaCheckRole
+import com.coooolfan.unirhy.config.ROLE_ADMIN
 import com.coooolfan.unirhy.error.CommonException
 import com.coooolfan.unirhy.model.Account
 import com.coooolfan.unirhy.model.by
@@ -32,7 +34,7 @@ class AccountController(private val service: AccountService) {
      * @permission 需要登录认证
      * @description 调用AccountService.list()方法获取账户列表
      */
-    @SaCheckLogin
+    @SaCheckRole(ROLE_ADMIN)
     @GetMapping
     @Throws(CommonException.Forbidden::class)
     fun list(): List<@FetchBy("DEFAULT_ACCOUNT_FETCHER") Account> {
@@ -69,7 +71,7 @@ class AccountController(private val service: AccountService) {
      * @permission 需要登录认证
      * @description 调用AccountService.delete()方法删除账户
      */
-    @SaCheckLogin
+    @SaCheckRole(ROLE_ADMIN)
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @Throws(CommonException.Forbidden::class)
@@ -90,7 +92,7 @@ class AccountController(private val service: AccountService) {
      * @permission 需要登录认证
      * @description 调用AccountService.create()方法创建账户
      */
-    @SaCheckLogin
+    @SaCheckRole(ROLE_ADMIN)
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     @Throws(CommonException.Forbidden::class)

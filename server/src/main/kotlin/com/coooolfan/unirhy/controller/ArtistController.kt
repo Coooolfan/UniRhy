@@ -1,6 +1,8 @@
 package com.coooolfan.unirhy.controller
 
 import cn.dev33.satoken.annotation.SaCheckLogin
+import cn.dev33.satoken.annotation.SaCheckRole
+import com.coooolfan.unirhy.config.ROLE_ADMIN
 import com.coooolfan.unirhy.model.Artist
 import com.coooolfan.unirhy.model.by
 import com.coooolfan.unirhy.model.dto.ArtistCreate
@@ -76,6 +78,7 @@ class ArtistController(private val service: ArtistService) {
      * @description 调用ArtistService.createArtist()方法创建艺术家
      */
     @PostMapping
+    @SaCheckRole(ROLE_ADMIN)
     @ResponseStatus(HttpStatus.CREATED)
     fun createArtist(
         @RequestBody input: ArtistCreate,
@@ -98,6 +101,7 @@ class ArtistController(private val service: ArtistService) {
      * @description 调用ArtistService.updateArtist()方法更新艺术家
      */
     @PutMapping("/{id}")
+    @SaCheckRole(ROLE_ADMIN)
     @ResponseStatus(HttpStatus.OK)
     fun updateArtist(
         @PathVariable id: Long,
@@ -116,6 +120,7 @@ class ArtistController(private val service: ArtistService) {
      * @description 调用ArtistService.mergeArtists()方法合并艺术家
      */
     @PostMapping("/merge")
+    @SaCheckRole(ROLE_ADMIN)
     @ResponseStatus(HttpStatus.OK)
     fun mergeArtists(@RequestBody input: ArtistMergeReq) {
         service.mergeArtists(input)

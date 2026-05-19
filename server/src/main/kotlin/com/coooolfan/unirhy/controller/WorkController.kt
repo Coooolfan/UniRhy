@@ -1,6 +1,8 @@
 package com.coooolfan.unirhy.controller
 
 import cn.dev33.satoken.annotation.SaCheckLogin
+import cn.dev33.satoken.annotation.SaCheckRole
+import com.coooolfan.unirhy.config.ROLE_ADMIN
 import com.coooolfan.unirhy.error.CommonException
 import com.coooolfan.unirhy.model.Work
 import com.coooolfan.unirhy.model.by
@@ -111,6 +113,7 @@ class WorkController(
      * @description 调用WorkService.deleteWork()方法删除作品
      */
     @DeleteMapping("/{id}")
+    @SaCheckRole(ROLE_ADMIN)
     @ResponseStatus(HttpStatus.NO_CONTENT)
     fun deleteWork(@PathVariable id: Long) {
         service.deleteWork(id)
@@ -128,6 +131,7 @@ class WorkController(
      * @description 调用WorkService.updateWork()方法更新作品
      */
     @PutMapping("/{id}")
+    @SaCheckRole(ROLE_ADMIN)
     @ResponseStatus(HttpStatus.OK)
     fun updateWork(
         @PathVariable id: Long,
@@ -149,6 +153,7 @@ class WorkController(
      * @description 调用WorkService.mergeWork()方法合并作品
      */
     @PostMapping("/merge")
+    @SaCheckRole(ROLE_ADMIN)
     @ResponseStatus(HttpStatus.OK)
     fun mergeWork(@RequestBody input: WorkMergeReq) {
         service.mergeWork(input)
