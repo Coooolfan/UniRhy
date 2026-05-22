@@ -7,16 +7,24 @@ type SubmitStorageNodeForm = (payload: StorageNodeForm) => Promise<string | null
 
 const props = withDefaults(
     defineProps<{
+        initialType?: StorageNodeForm['type']
         initialName?: string
         initialParentPath?: string
         initialReadonly?: boolean
+        initialHost?: string
+        initialBucket?: string
+        initialAccessKey?: string
         submitText?: string
         submit: SubmitStorageNodeForm
     }>(),
     {
+        initialType: 'FILE_SYSTEM',
         initialName: '',
         initialParentPath: '',
         initialReadonly: true,
+        initialHost: '',
+        initialBucket: '',
+        initialAccessKey: '',
         submitText: '创建节点',
     },
 )
@@ -25,9 +33,14 @@ const modal = useModalContext<undefined>()
 const isSubmitting = ref(false)
 const submitError = ref('')
 const form = reactive<StorageNodeForm>({
+    type: props.initialType,
     name: props.initialName,
     parentPath: props.initialParentPath,
     readonly: props.initialReadonly,
+    host: props.initialHost,
+    bucket: props.initialBucket,
+    accessKey: props.initialAccessKey,
+    secretKey: '',
 })
 
 const handleCancel = () => {
@@ -48,9 +61,14 @@ const handleSubmit = async () => {
 
     try {
         const error = await props.submit({
+            type: form.type,
             name: form.name,
             parentPath: form.parentPath,
             readonly: form.readonly,
+            host: form.host,
+            bucket: form.bucket,
+            accessKey: form.accessKey,
+            secretKey: form.secretKey,
         })
 
         if (error) {
@@ -76,6 +94,22 @@ const handleSubmit = async () => {
                 <label
                     class="text-xs uppercase tracking-wider text-[#8A8A8A] font-serif block mb-2"
                 >
+                    节点类型
+                </label>
+                <select
+                    v-model="form.type"
+                    data-testid="storage-node-form-type"
+                    class="w-full bg-[#F7F5F0] border-b border-[#D6D1C4] p-3 text-[#3D3D3D] focus:outline-none focus:border-[#C67C4E] transition-colors font-serif"
+                >
+                    <option value="FILE_SYSTEM">本地文件系统</option>
+                    <option value="OSS">对象存储</option>
+                </select>
+            </div>
+
+            <div>
+                <label
+                    class="text-xs uppercase tracking-wider text-[#8A8A8A] font-serif block mb-2"
+                >
                     节点名称
                 </label>
                 <input
@@ -87,7 +121,7 @@ const handleSubmit = async () => {
                 />
             </div>
 
-            <div>
+            <div v-if="form.type === 'FILE_SYSTEM'">
                 <label
                     class="text-xs uppercase tracking-wider text-[#8A8A8A] font-serif block mb-2"
                 >
@@ -100,6 +134,83 @@ const handleSubmit = async () => {
                     placeholder="/path/to/dir"
                     class="w-full bg-[#F7F5F0] border-b border-[#D6D1C4] p-3 text-[#3D3D3D] focus:outline-none focus:border-[#C67C4E] transition-colors font-serif placeholder:text-[#BDB9AE]"
                 />
+            </div>
+
+            <div v-else class="grid gap-5">
+                <div>
+                    <label
+                        class="text-xs uppercase tracking-wider text-[#8A8A8A] font-serif block mb-2"
+                    >
+                        Endpoint
+                    </label>
+                    <input
+                        v-model="form.host"
+                        data-testid="storage-node-form-host"
+                        type="text"
+                        placeholder="https://s3.example.com"
+                        class="w-full bg-[#F7F5F0] border-b border-[#D6D1C4] p-3 text-[#3D3D3D] focus:outline-none focus:border-[#C67C4E] transition-colors font-serif placeholder:text-[#BDB9AE]"
+                    />
+                </div>
+                <div class="grid gap-5 sm:grid-cols-2">
+                    <div>
+                        <label
+                            class="text-xs uppercase tracking-wider text-[#8A8A8A] font-serif block mb-2"
+                        >
+                            Bucket
+                        </label>
+                        <input
+                            v-model="form.bucket"
+                            data-testid="storage-node-form-bucket"
+                            type="text"
+                            placeholder="music-library"
+                            class="w-full bg-[#F7F5F0] border-b border-[#D6D1C4] p-3 text-[#3D3D3D] focus:outline-none focus:border-[#C67C4E] transition-colors font-serif placeholder:text-[#BDB9AE]"
+                        />
+                    </div>
+                    <div>
+                        <label
+                            class="text-xs uppercase tracking-wider text-[#8A8A8A] font-serif block mb-2"
+                        >
+                            根路径前缀
+                        </label>
+                        <input
+                            v-model="form.parentPath"
+                            data-testid="storage-node-form-parent-path"
+                            type="text"
+                            placeholder="library"
+                            class="w-full bg-[#F7F5F0] border-b border-[#D6D1C4] p-3 text-[#3D3D3D] focus:outline-none focus:border-[#C67C4E] transition-colors font-serif placeholder:text-[#BDB9AE]"
+                        />
+                    </div>
+                </div>
+                <div class="grid gap-5 sm:grid-cols-2">
+                    <div>
+                        <label
+                            class="text-xs uppercase tracking-wider text-[#8A8A8A] font-serif block mb-2"
+                        >
+                            Access Key
+                        </label>
+                        <input
+                            v-model="form.accessKey"
+                            data-testid="storage-node-form-access-key"
+                            type="text"
+                            autocomplete="off"
+                            class="w-full bg-[#F7F5F0] border-b border-[#D6D1C4] p-3 text-[#3D3D3D] focus:outline-none focus:border-[#C67C4E] transition-colors font-serif placeholder:text-[#BDB9AE]"
+                        />
+                    </div>
+                    <div>
+                        <label
+                            class="text-xs uppercase tracking-wider text-[#8A8A8A] font-serif block mb-2"
+                        >
+                            Secret Key
+                        </label>
+                        <input
+                            v-model="form.secretKey"
+                            data-testid="storage-node-form-secret-key"
+                            type="password"
+                            autocomplete="new-password"
+                            class="w-full bg-[#F7F5F0] border-b border-[#D6D1C4] p-3 text-[#3D3D3D] focus:outline-none focus:border-[#C67C4E] transition-colors font-serif placeholder:text-[#BDB9AE]"
+                        />
+                    </div>
+                </div>
             </div>
 
             <div class="flex flex-col gap-1.5">

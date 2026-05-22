@@ -10,7 +10,7 @@ import { usePluginSettings } from '@/composables/usePluginSettings'
 const {
     storageNodes,
     systemConfig,
-    activeFsLabel,
+    activeStorageLabel,
     isSaving,
     isLoadingSystem,
     isLoadingStorage,
@@ -20,6 +20,7 @@ const {
     createStorageNode,
     updateStorageNode,
     deleteStorageNode,
+    setSystemStorageNode,
 } = useStorageSettings()
 
 const {
@@ -35,7 +36,12 @@ const {
 } = usePluginSettings()
 
 const activeNode = computed(
-    () => storageNodes.value.find((node) => node.id === systemConfig.value.fsProviderId) ?? null,
+    () =>
+        storageNodes.value.find(
+            (node) =>
+                (node.type === 'FILE_SYSTEM' && node.id === systemConfig.value.fsProviderId) ||
+                (node.type === 'OSS' && node.id === systemConfig.value.ossProviderId),
+        ) ?? null,
 )
 
 onMounted(() => {
@@ -57,7 +63,7 @@ onMounted(() => {
 
         <div class="mx-auto mt-10 max-w-5xl px-8">
             <SystemStatusSection
-                :active-fs-label="activeFsLabel"
+                :active-storage-label="activeStorageLabel"
                 :system-config="systemConfig"
                 :active-node="activeNode"
                 :is-loading="isLoadingSystem"
@@ -74,6 +80,7 @@ onMounted(() => {
                 :create-storage-node="createStorageNode"
                 :update-storage-node="updateStorageNode"
                 :delete-storage-node="deleteStorageNode"
+                :set-system-storage-node="setSystemStorageNode"
             />
 
             <PluginsSection

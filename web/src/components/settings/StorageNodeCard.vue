@@ -1,18 +1,37 @@
 <script setup lang="ts">
-import { Edit2, FolderOpen, HardDrive, Trash2 } from 'lucide-vue-next'
+import { computed } from 'vue'
+import { Cloud, Edit2, FolderOpen, HardDrive, Star, Trash2 } from 'lucide-vue-next'
 import type { StorageNode } from '@/composables/useStorageSettings'
 
 type Props = {
     node: StorageNode
     activeFsId: number | null
+    activeOssId: number | null
     isSaving: boolean
 }
 
-defineProps<Props>()
+const props = defineProps<Props>()
 const emit = defineEmits<{
     (event: 'edit'): void
     (event: 'delete'): void
+    (event: 'set-system'): void
 }>()
+
+const isActiveNode = computed(
+    () =>
+        (props.node.type === 'FILE_SYSTEM' && props.activeFsId === props.node.id) ||
+        (props.node.type === 'OSS' && props.activeOssId === props.node.id),
+)
+
+const nodeIcon = computed(() => (props.node.type === 'OSS' ? Cloud : HardDrive))
+
+const nodePathLabel = computed(() => {
+    if (props.node.type === 'OSS') {
+        const prefix = props.node.parentPath ? `/${props.node.parentPath}` : ''
+        return `${props.node.host ?? '-'} / ${props.node.bucket ?? '-'}${prefix}`
+    }
+    return props.node.parentPath
+})
 </script>
 
 <template>
@@ -23,7 +42,7 @@ const emit = defineEmits<{
             <div
                 class="relative flex h-20 items-center justify-center overflow-hidden border-b border-[#D6D1C4]/30 bg-[#EAE6D9] text-[#8A8A8A] transition-colors duration-300 group-hover:text-[#C67C4E] sm:h-auto sm:w-24 sm:border-b-0 sm:border-r"
             >
-                <HardDrive :size="32" stroke-width="1.5" />
+                <component :is="nodeIcon" :size="32" stroke-width="1.5" />
             </div>
 
             <div class="min-w-0 flex-1 p-6 flex flex-col">
@@ -36,7 +55,8 @@ const emit = defineEmits<{
                             {{ node.name }}
                         </h3>
                         <div class="text-[10px] text-[#8A8A8A] uppercase tracking-widest mt-1">
-                            ID: {{ node.id }}
+                            {{ node.type === 'OSS' ? '对象存储' : '本地存储' }} / ID:
+                            {{ node.id }}
                         </div>
                     </div>
                     <div
@@ -49,7 +69,7 @@ const emit = defineEmits<{
                             只读节点
                         </span>
                         <span
-                            v-if="activeFsId === node.id"
+                            v-if="isActiveNode"
                             class="px-2 py-0.5 bg-[#C67C4E] text-[10px] text-white uppercase"
                         >
                             系统节点
@@ -61,8 +81,8 @@ const emit = defineEmits<{
                     class="min-w-0 flex items-center gap-2 text-[#7A756D] text-sm font-mono bg-[#EAE6D9]/50 p-2 rounded-sm mt-auto"
                 >
                     <FolderOpen :size="14" class="shrink-0 text-[#C67C4E]" />
-                    <span class="min-w-0 truncate" :title="node.parentPath">
-                        {{ node.parentPath }}
+                    <span class="min-w-0 truncate" :title="nodePathLabel">
+                        {{ nodePathLabel }}
                     </span>
                 </div>
             </div>
@@ -70,6 +90,15 @@ const emit = defineEmits<{
             <div
                 class="absolute right-4 top-4 flex gap-2 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100"
             >
+                <button
+                    v-if="!isActiveNode"
+                    title="设为系统节点"
+                    class="p-2 hover:text-[#C67C4E] transition-colors disabled:opacity-50"
+                    :disabled="isSaving || node.readonly"
+                    @click="emit('set-system')"
+                >
+                    <Star :size="14" />
+                </button>
                 <button
                     title="编辑"
                     class="p-2 hover:text-[#C67C4E] transition-colors disabled:opacity-50"

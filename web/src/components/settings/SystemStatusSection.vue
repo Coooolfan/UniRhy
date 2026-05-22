@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Activity, Folder, HardDrive } from 'lucide-vue-next'
+import { Activity, Cloud, Folder, HardDrive } from 'lucide-vue-next'
 import type { StorageNode, SystemConfig } from '@/composables/useStorageSettings'
 
 type Props = {
-    activeFsLabel: string
+    activeStorageLabel: string
     systemConfig: SystemConfig
     activeNode: StorageNode | null
     isLoading: boolean
@@ -17,22 +17,38 @@ const nodeName = computed(() => {
     if (props.isLoading) {
         return 'Loading...'
     }
-    return props.activeNode?.name || props.activeFsLabel || 'Default'
+    return props.activeNode?.name || props.activeStorageLabel || 'Default'
 })
 
 const nodeId = computed(() => {
     if (props.isLoading) {
         return '-'
     }
-    return props.systemConfig.fsProviderId ?? '-'
+    return props.systemConfig.fsProviderId ?? props.systemConfig.ossProviderId ?? '-'
 })
 
 const nodePath = computed(() => {
     if (props.isLoading) {
         return 'Loading...'
     }
-    return props.activeNode?.parentPath || './data'
+    if (!props.activeNode) {
+        return './data'
+    }
+    if (props.activeNode.type === 'OSS') {
+        const prefix = props.activeNode.parentPath ? `/${props.activeNode.parentPath}` : ''
+        return `${props.activeNode.host ?? '-'} / ${props.activeNode.bucket ?? '-'}${prefix}`
+    }
+    return props.activeNode.parentPath
 })
+
+const nodeTypeLabel = computed(() => {
+    if (props.isLoading) {
+        return 'Loading'
+    }
+    return props.activeNode?.type === 'OSS' ? '对象存储' : '本地存储'
+})
+
+const nodeIcon = computed(() => (props.activeNode?.type === 'OSS' ? Cloud : HardDrive))
 </script>
 
 <template>
@@ -49,7 +65,8 @@ const nodePath = computed(() => {
                 <div
                     class="absolute top-0 left-0 w-full h-full bg-linear-to-b from-white/20 to-transparent"
                 ></div>
-                <HardDrive
+                <component
+                    :is="nodeIcon"
                     class="text-[#8A857B] mb-2 relative z-10"
                     :size="32"
                     stroke-width="1.5"
@@ -79,7 +96,9 @@ const nodePath = computed(() => {
                         <h3 class="font-serif text-2xl tracking-wide text-[#33312E] sm:text-3xl">
                             {{ nodeName }}
                         </h3>
-                        <span class="text-xs text-[#A39E93] font-mono">ID: {{ nodeId }}</span>
+                        <span class="text-xs text-[#A39E93] font-mono">
+                            {{ nodeTypeLabel }} / ID: {{ nodeId }}
+                        </span>
                     </div>
 
                     <div
@@ -104,7 +123,7 @@ const nodePath = computed(() => {
                 <div
                     class="pointer-events-none absolute -bottom-16 -right-15 hidden text-[#f4ecd9] opacity-50 md:block"
                 >
-                    <HardDrive :size="180" stroke-width="0.5" />
+                    <component :is="nodeIcon" :size="180" stroke-width="0.5" />
                 </div>
             </div>
         </div>

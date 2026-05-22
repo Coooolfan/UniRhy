@@ -8,9 +8,10 @@ import type { StorageNodeForm } from '@/composables/useStorageSettings'
 const storageNodes = [
     {
         id: 1,
+        type: 'FILE_SYSTEM' as const,
         name: 'Library',
         parentPath: '/music/library',
-        readonly: true,
+        readonly: false,
     },
 ]
 
@@ -21,7 +22,12 @@ const mountSection = ({
     updateStorageNode = vi
         .fn<(_: number, __: StorageNodeForm) => Promise<string | null>>()
         .mockResolvedValue(null),
-    deleteStorageNode = vi.fn<(_: number) => Promise<string | null>>().mockResolvedValue(null),
+    deleteStorageNode = vi
+        .fn<(_: (typeof storageNodes)[number]) => Promise<string | null>>()
+        .mockResolvedValue(null),
+    setSystemStorageNode = vi
+        .fn<(_: (typeof storageNodes)[number]) => Promise<string | null>>()
+        .mockResolvedValue(null),
 } = {}) => {
     const Wrapper = {
         components: {
@@ -39,6 +45,7 @@ const mountSection = ({
                     :create-storage-node="createStorageNode"
                     :update-storage-node="updateStorageNode"
                     :delete-storage-node="deleteStorageNode"
+                    :set-system-storage-node="setSystemStorageNode"
                 />
                 <AppModalHost />
             </div>
@@ -52,6 +59,7 @@ const mountSection = ({
             createStorageNode,
             updateStorageNode,
             deleteStorageNode,
+            setSystemStorageNode,
         }),
     }
 
@@ -70,6 +78,7 @@ const mountSection = ({
         createStorageNode,
         updateStorageNode,
         deleteStorageNode,
+        setSystemStorageNode,
     }
 }
 
@@ -96,9 +105,14 @@ describe('StorageNodesSection', () => {
         await flushPromises()
 
         expect(createStorageNode).toHaveBeenCalledWith({
+            type: 'FILE_SYSTEM',
             name: 'Archive',
             parentPath: '/music/archive',
             readonly: true,
+            host: '',
+            bucket: '',
+            accessKey: '',
+            secretKey: '',
         })
         expect(wrapper.find('[data-testid="storage-node-form-name"]').exists()).toBe(false)
     })
@@ -156,9 +170,14 @@ describe('StorageNodesSection', () => {
         await flushPromises()
 
         expect(updateStorageNode).toHaveBeenCalledWith(1, {
+            type: 'FILE_SYSTEM',
             name: 'Updated Library',
             parentPath: '/music/updated',
-            readonly: true,
+            readonly: false,
+            host: '',
+            bucket: '',
+            accessKey: '',
+            secretKey: '',
         })
         expect(wrapper.find('[data-testid="storage-node-form-name"]').exists()).toBe(false)
     })
@@ -176,6 +195,22 @@ describe('StorageNodesSection', () => {
         await confirmButton!.trigger('click')
         await flushPromises()
 
-        expect(deleteStorageNode).toHaveBeenCalledWith(1)
+        expect(deleteStorageNode).toHaveBeenCalledWith(storageNodes[0])
+    })
+
+    it('confirms setting a writable node as system node', async () => {
+        const { wrapper, setSystemStorageNode } = mountSection()
+
+        await wrapper.get('button[title="设为系统节点"]').trigger('click')
+        await flushPromises()
+        const confirmButton = wrapper
+            .findAll('button')
+            .find((button) => button.text().includes('设为系统节点'))
+
+        expect(confirmButton).toBeTruthy()
+        await confirmButton!.trigger('click')
+        await flushPromises()
+
+        expect(setSystemStorageNode).toHaveBeenCalledWith(storageNodes[0])
     })
 })

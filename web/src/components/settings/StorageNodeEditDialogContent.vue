@@ -6,9 +6,13 @@ import type { StorageNodeForm } from '@/composables/useStorageSettings'
 type SubmitStorageNodeForm = (payload: StorageNodeForm) => Promise<string | null>
 
 const props = defineProps<{
+    initialType: StorageNodeForm['type']
     initialName: string
     initialParentPath: string
     initialReadonly: boolean
+    initialHost?: string
+    initialBucket?: string
+    initialAccessKey?: string
     submit: SubmitStorageNodeForm
 }>()
 
@@ -16,9 +20,14 @@ const modal = useModalContext<undefined>()
 const isSubmitting = ref(false)
 const submitError = ref('')
 const form = reactive<StorageNodeForm>({
+    type: props.initialType,
     name: props.initialName,
     parentPath: props.initialParentPath,
     readonly: props.initialReadonly,
+    host: props.initialHost ?? '',
+    bucket: props.initialBucket ?? '',
+    accessKey: props.initialAccessKey ?? '',
+    secretKey: '',
 })
 
 const handleCancel = () => {
@@ -39,9 +48,14 @@ const handleSubmit = async () => {
 
     try {
         const error = await props.submit({
+            type: form.type,
             name: form.name,
             parentPath: form.parentPath,
             readonly: form.readonly,
+            host: form.host,
+            bucket: form.bucket,
+            accessKey: form.accessKey,
+            secretKey: form.secretKey,
         })
 
         if (error) {
@@ -67,6 +81,23 @@ const handleSubmit = async () => {
                 <label
                     class="text-xs uppercase tracking-wider text-[#8A8A8A] font-serif block mb-2"
                 >
+                    节点类型
+                </label>
+                <select
+                    v-model="form.type"
+                    data-testid="storage-node-form-type"
+                    disabled
+                    class="w-full bg-[#F7F5F0] border-b border-[#D6D1C4] p-3 text-[#8A8A8A] focus:outline-none font-serif disabled:cursor-not-allowed"
+                >
+                    <option value="FILE_SYSTEM">本地文件系统</option>
+                    <option value="OSS">对象存储</option>
+                </select>
+            </div>
+
+            <div>
+                <label
+                    class="text-xs uppercase tracking-wider text-[#8A8A8A] font-serif block mb-2"
+                >
                     节点名称
                 </label>
                 <input
@@ -78,7 +109,7 @@ const handleSubmit = async () => {
                 />
             </div>
 
-            <div class="space-y-2">
+            <div v-if="form.type === 'FILE_SYSTEM'" class="space-y-2">
                 <div>
                     <label
                         class="text-xs uppercase tracking-wider text-[#8A8A8A] font-serif block mb-2"
@@ -97,6 +128,87 @@ const handleSubmit = async () => {
                     修改存储路径根节点会导致此存储节点下的所有资产被重定向。
                     <br />
                     除非您理解这意味着什么，否则不要更改此项
+                </p>
+            </div>
+
+            <div v-else class="grid gap-5">
+                <div>
+                    <label
+                        class="text-xs uppercase tracking-wider text-[#8A8A8A] font-serif block mb-2"
+                    >
+                        Endpoint
+                    </label>
+                    <input
+                        v-model="form.host"
+                        data-testid="storage-node-form-host"
+                        type="text"
+                        placeholder="https://s3.example.com"
+                        class="w-full bg-[#F7F5F0] border-b border-[#D6D1C4] p-3 text-[#3D3D3D] focus:outline-none focus:border-[#C67C4E] transition-colors font-serif placeholder:text-[#BDB9AE]"
+                    />
+                </div>
+                <div class="grid gap-5 sm:grid-cols-2">
+                    <div>
+                        <label
+                            class="text-xs uppercase tracking-wider text-[#8A8A8A] font-serif block mb-2"
+                        >
+                            Bucket
+                        </label>
+                        <input
+                            v-model="form.bucket"
+                            data-testid="storage-node-form-bucket"
+                            type="text"
+                            placeholder="music-library"
+                            class="w-full bg-[#F7F5F0] border-b border-[#D6D1C4] p-3 text-[#3D3D3D] focus:outline-none focus:border-[#C67C4E] transition-colors font-serif placeholder:text-[#BDB9AE]"
+                        />
+                    </div>
+                    <div>
+                        <label
+                            class="text-xs uppercase tracking-wider text-[#8A8A8A] font-serif block mb-2"
+                        >
+                            根路径前缀
+                        </label>
+                        <input
+                            v-model="form.parentPath"
+                            data-testid="storage-node-form-parent-path"
+                            type="text"
+                            placeholder="library"
+                            class="w-full bg-[#F7F5F0] border-b border-[#D6D1C4] p-3 text-[#3D3D3D] focus:outline-none focus:border-[#C67C4E] transition-colors font-serif placeholder:text-[#BDB9AE]"
+                        />
+                    </div>
+                </div>
+                <div class="grid gap-5 sm:grid-cols-2">
+                    <div>
+                        <label
+                            class="text-xs uppercase tracking-wider text-[#8A8A8A] font-serif block mb-2"
+                        >
+                            Access Key
+                        </label>
+                        <input
+                            v-model="form.accessKey"
+                            data-testid="storage-node-form-access-key"
+                            type="text"
+                            autocomplete="off"
+                            class="w-full bg-[#F7F5F0] border-b border-[#D6D1C4] p-3 text-[#3D3D3D] focus:outline-none focus:border-[#C67C4E] transition-colors font-serif placeholder:text-[#BDB9AE]"
+                        />
+                    </div>
+                    <div>
+                        <label
+                            class="text-xs uppercase tracking-wider text-[#8A8A8A] font-serif block mb-2"
+                        >
+                            Secret Key
+                        </label>
+                        <input
+                            v-model="form.secretKey"
+                            data-testid="storage-node-form-secret-key"
+                            type="password"
+                            autocomplete="new-password"
+                            placeholder="留空则不修改"
+                            class="w-full bg-[#F7F5F0] border-b border-[#D6D1C4] p-3 text-[#3D3D3D] focus:outline-none focus:border-[#C67C4E] transition-colors font-serif placeholder:text-[#BDB9AE]"
+                        />
+                    </div>
+                </div>
+                <p class="text-xs leading-relaxed text-[#B95D5D] font-serif">
+                    修改对象存储 Endpoint、Bucket 或根路径前缀会导致此节点下的所有资产被重定向。
                 </p>
             </div>
 

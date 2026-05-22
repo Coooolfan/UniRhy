@@ -14,7 +14,8 @@ type Props = {
     isSaving: boolean
     createStorageNode: (value: StorageNodeForm) => Promise<string | null>
     updateStorageNode: (id: number, value: StorageNodeForm) => Promise<string | null>
-    deleteStorageNode: (id: number) => Promise<string | null>
+    deleteStorageNode: (node: StorageNode) => Promise<string | null>
+    setSystemStorageNode: (node: StorageNode) => Promise<string | null>
 }
 
 const props = defineProps<Props>()
@@ -32,6 +33,7 @@ const openCreateStorageNodeModal = async () => {
         closeOnBackdrop: false,
         closeOnEscape: false,
         props: {
+            initialType: 'FILE_SYSTEM',
             initialReadonly: true,
             submit: props.createStorageNode,
         },
@@ -50,15 +52,19 @@ const openEditStorageNodeModal = async (node: StorageNode) => {
         closeOnBackdrop: false,
         closeOnEscape: false,
         props: {
+            initialType: node.type,
             initialName: node.name,
             initialParentPath: node.parentPath,
             initialReadonly: node.readonly,
+            initialHost: node.host,
+            initialBucket: node.bucket,
+            initialAccessKey: node.accessKey,
             submit: (form: StorageNodeForm) => props.updateStorageNode(node.id, form),
         },
     })
 }
 
-const confirmDeleteStorageNode = async (nodeId: number) => {
+const confirmDeleteStorageNode = async (node: StorageNode) => {
     if (props.isSaving) {
         return
     }
@@ -75,13 +81,43 @@ const confirmDeleteStorageNode = async (nodeId: number) => {
         return
     }
 
-    const error = await props.deleteStorageNode(nodeId)
+    const error = await props.deleteStorageNode(node)
     if (!error) {
         return
     }
 
     await modal.alert({
         title: '移除失败',
+        content: error,
+        confirmText: '确认',
+        tone: 'danger',
+    })
+}
+
+const confirmSetSystemStorageNode = async (node: StorageNode) => {
+    if (props.isSaving) {
+        return
+    }
+
+    const confirmed = await modal.confirm({
+        title: '设置系统节点',
+        content: `确定要将「${node.name}」设置为系统节点吗？UniRhy 会把后续生成的媒体资源写入此节点。`,
+        confirmText: '设为系统节点',
+        cancelText: '取消',
+        tone: 'default',
+    })
+
+    if (!confirmed) {
+        return
+    }
+
+    const error = await props.setSystemStorageNode(node)
+    if (!error) {
+        return
+    }
+
+    await modal.alert({
+        title: '设置失败',
         content: error,
         confirmText: '确认',
         tone: 'danger',
@@ -109,13 +145,15 @@ const confirmDeleteStorageNode = async (nodeId: number) => {
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
             <!-- 节点列表 -->
-            <div v-for="node in storageNodes" :key="node.id">
+            <div v-for="node in storageNodes" :key="`${node.type}:${node.id}`">
                 <StorageNodeCard
                     :node="node"
                     :active-fs-id="systemConfig.fsProviderId"
+                    :active-oss-id="systemConfig.ossProviderId"
                     :is-saving="isSaving"
                     @edit="openEditStorageNodeModal(node)"
-                    @delete="confirmDeleteStorageNode(node.id)"
+                    @delete="confirmDeleteStorageNode(node)"
+                    @set-system="confirmSetSystemStorageNode(node)"
                 />
             </div>
         </div>
