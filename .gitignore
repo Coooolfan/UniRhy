@@ -4,7 +4,7 @@
 .codex
 *.pyc
 
-node_modules/
+AGENTS.local.md
 
 server/.gradle
 server/build
@@ -15,8 +15,6 @@ server/data/
 server/tmp/
 server/test-output/
 !server/gradle/wrapper/gradle-wrapper.jar
-
-
 
 website/.vscode
 website/node_modules

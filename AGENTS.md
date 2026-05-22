@@ -25,3 +25,8 @@ UniRhy (独一律) 是一个私有化的音乐流媒体平台
   - `./skills/jimmer-orm` Jimmer ORM 开发指南：适用于：(1) 定义或修改 Jimmer 实体（使用 @Entity 注解的 interface）；(2) 编写 Jimmer DSL 查询代码；(3) 配置实体关联关系（@ManyToOne, @OneToMany, @ManyToMany）；(4) 使用动态谓词、动态表连接或隐式子查询；(5) 编辑包含 Jimmer 相关代码的 Java/Kotlin 文件。
 - 所有描述性文字应该始终是面向 开发者/用户 的最终产物，不需要描述中间过程和演变原因。
 - 除非用户主动要求，不需要考虑 API/数据库/模式 的向前兼容。
+
+# 本地开发
+
+如果文件 `./AGENTS.local.md` 存在，则应当优先阅读此文件以获取本地开发的特殊说明。
+
