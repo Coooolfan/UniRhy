@@ -71,6 +71,15 @@ const normalizeApiQueueSnapshot = (queue: ApiCurrentQueueDto): CurrentQueueDto =
     playbackStrategy: queue.playbackStrategy === 'SHUFFLE' ? 'SHUFFLE' : 'SEQUENTIAL',
 })
 
+const isSignedMediaUrl = (url: string) => {
+    try {
+        const params = new URL(url, window.location.href).searchParams
+        return params.has('_sig') || params.has('X-Amz-Signature')
+    } catch {
+        return false
+    }
+}
+
 export const useAudioStore = defineStore('audio', () => {
     const currentTrack = ref<AudioTrack | null>(null)
     const currentQueue = ref(createEmptyQueue())
@@ -684,10 +693,9 @@ export const useAudioStore = defineStore('audio', () => {
             promise: Promise.resolve(null),
         }
 
-        const needsCredentials = !track.src.includes('_sig=')
-        const fetchInit: RequestInit = needsCredentials ? { credentials: 'include' } : {}
+        const fetchInit: RequestInit = {}
         const token = getPlatformRuntime().platform !== 'web' ? getAuthToken() : null
-        if (token && needsCredentials) {
+        if (token && !isSignedMediaUrl(track.src)) {
             fetchInit.headers = { 'unirhy-token': token }
         }
         const promise = runtimeFetch(track.src, fetchInit)

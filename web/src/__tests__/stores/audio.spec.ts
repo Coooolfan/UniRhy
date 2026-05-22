@@ -782,7 +782,7 @@ describe('audio store', () => {
         } satisfies LoadAudioSourceMessage)
         await flushPromises(12)
 
-        expect(fetchMock).toHaveBeenCalledWith('/api/media/2072', { credentials: 'include' })
+        expect(fetchMock).toHaveBeenCalledWith('/api/media/2072', {})
         expect(audioStore.currentTrack?.mediaFileId).toBe(2_072)
         expect(audioStore.playbackSyncDebugSnapshot.currentBuffer?.mediaFileId).toBe(2_072)
     })
@@ -1105,7 +1105,7 @@ describe('audio store', () => {
         client.emitMessage(message)
         await flushPromises(12)
 
-        expect(fetchMock).toHaveBeenCalledWith('/api/media/2007', { credentials: 'include' })
+        expect(fetchMock).toHaveBeenCalledWith('/api/media/2007', {})
         expect(client.sendAudioSourceLoaded).toHaveBeenCalledWith({
             commandId: 'cmd-play-1',
             currentIndex: 0,
@@ -1139,11 +1139,49 @@ describe('audio store', () => {
         await flushPromises(12)
 
         expect(fetchMock).toHaveBeenCalledWith('http://127.0.0.1:34855/api/media/2008', {
-            credentials: 'include',
             headers: {
                 'unirhy-token': 'mobile-token',
             },
         })
+    })
+
+    it('does not attach credentials to cross-host signed audio sources', async () => {
+        const signedAudioUrl =
+            'https://cn-nb1.rains3.com/unirhy/audio.opus?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Signature=abc'
+        getRecordingMock.mockResolvedValueOnce(
+            buildRecordingMetadata(8, {
+                assets: [
+                    {
+                        id: 48_008,
+                        comment: 'Signed Audio 2008',
+                        mediaFile: {
+                            id: 2_008,
+                            objectKey: 'audio/8.opus',
+                            mimeType: 'audio/opus',
+                            size: 4_096,
+                            url: signedAudioUrl,
+                        },
+                    },
+                ],
+            }),
+        )
+        fetchMock.mockResolvedValue(createResponse(45))
+
+        const audioStore = useAudioStore()
+        audioStore.connectPlaybackSync()
+        const client = latestClient()
+
+        client.emitMessage({
+            type: 'ROOM_EVENT_LOAD_AUDIO_SOURCE',
+            payload: {
+                commandId: 'cmd-play-s3',
+                currentIndex: 0,
+                recordingId: 8,
+            },
+        } satisfies LoadAudioSourceMessage)
+        await flushPromises(12)
+
+        expect(fetchMock).toHaveBeenCalledWith(signedAudioUrl, {})
     })
 
     it('does not attach auth headers to signed tauri audio sources', async () => {
