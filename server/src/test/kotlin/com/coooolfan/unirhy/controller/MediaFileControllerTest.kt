@@ -3,12 +3,16 @@ package com.coooolfan.unirhy.controller
 import com.coooolfan.unirhy.model.MediaFile
 import com.coooolfan.unirhy.model.storage.FileProviderFileSystem
 import com.coooolfan.unirhy.model.storage.FileProviderOss
-import com.coooolfan.unirhy.service.MediaFileResolver
+import com.coooolfan.unirhy.controller.support.MediaFileResponseBuilder
+import com.coooolfan.unirhy.service.MediaFileAccessService
 import com.coooolfan.unirhy.service.MediaUrlSigner
 import com.coooolfan.unirhy.service.ResolvedMediaFile
+import com.coooolfan.unirhy.service.storage.StorageNodeObjectService
+import org.babyfish.jimmer.sql.kt.KSqlClient
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.mockito.Mockito.mock
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
 import org.springframework.test.web.servlet.MockMvc
@@ -55,12 +59,18 @@ class MediaFileControllerTest {
                         mimeType = "audio/flac",
                         size = mediaFile.length(),
                     ),
-                    file = mediaFile,
+                    fileName = mediaFile.name,
+                    size = mediaFile.length(),
+                    lastModified = Instant.ofEpochMilli(mediaFile.lastModified()),
+                    readAll = { mediaFile.readBytes() },
+                    readRange = { start, endInclusive ->
+                        mediaBytes.copyOfRange(start.toInt(), endInclusive.toInt() + 1)
+                    },
                 )
             }
         }
 
-        val controller = MediaFileController(resolver, urlSigner)
+        val controller = MediaFileController(resolver, urlSigner, MediaFileResponseBuilder())
         mockMvc = MockMvcBuilders.standaloneSetup(controller).build()
     }
 
@@ -218,9 +228,12 @@ class MediaFileControllerTest {
         return this.param("_sig", sig).param("_exp", exp.toString())
     }
 
-    private class StubMediaFileResolver : MediaFileResolver {
+    private class StubMediaFileResolver : MediaFileAccessService(
+        mock(KSqlClient::class.java),
+        StorageNodeObjectService(mock(KSqlClient::class.java)),
+    ) {
         var handler: (Long) -> ResolvedMediaFile = { error("handler not configured") }
-        override fun loadLocalFile(id: Long): ResolvedMediaFile = handler(id)
+        override fun load(id: Long): ResolvedMediaFile = handler(id)
     }
 
     private fun media(
@@ -238,7 +251,9 @@ class MediaFileControllerTest {
             override val height: Int? = null
             override val url: String = ""
             override val ossProvider: FileProviderOss? = null
+            override val ossProviderId: Long? = null
             override val fsProvider: FileProviderFileSystem? = null
+            override val fsProviderId: Long? = null
         }
     }
 }

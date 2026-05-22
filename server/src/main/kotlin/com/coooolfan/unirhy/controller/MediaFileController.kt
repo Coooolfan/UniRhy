@@ -1,29 +1,14 @@
 package com.coooolfan.unirhy.controller
 
 import cn.dev33.satoken.stp.StpUtil
-import com.coooolfan.unirhy.service.MediaFileResolver
+import com.coooolfan.unirhy.controller.support.MediaFileResponseBuilder
+import com.coooolfan.unirhy.service.MediaFileAccessService
 import com.coooolfan.unirhy.service.MediaUrlSigner
-import com.coooolfan.unirhy.service.ResolvedMediaFile
 import org.babyfish.jimmer.client.ApiIgnore
-import org.springframework.core.io.FileSystemResource
-import org.springframework.core.io.Resource
-import org.springframework.core.io.support.ResourceRegion
-import org.springframework.http.ContentDisposition
 import org.springframework.http.HttpHeaders
-import org.springframework.http.HttpRange
 import org.springframework.http.HttpStatus
-import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
-import org.springframework.web.bind.annotation.GetMapping
-import org.springframework.web.bind.annotation.RequestMethod
-import org.springframework.web.bind.annotation.PathVariable
-import org.springframework.web.bind.annotation.RequestHeader
-import org.springframework.web.bind.annotation.RequestMapping
-import org.springframework.web.bind.annotation.RequestParam
-import org.springframework.web.bind.annotation.RestController
-import java.nio.charset.StandardCharsets
-import java.time.ZonedDateTime
-import java.time.format.DateTimeFormatter
+import org.springframework.web.bind.annotation.*
 
 /**
  * 媒体文件访问接口
@@ -33,8 +18,9 @@ import java.time.format.DateTimeFormatter
 @RestController
 @RequestMapping(MediaFileRoutes.MEDIA_API_BASE_PATH)
 class MediaFileController(
-    private val service: MediaFileResolver,
+    private val service: MediaFileAccessService,
     private val urlSigner: MediaUrlSigner,
+    private val responses: MediaFileResponseBuilder,
 ) {
 
     private fun authenticateRequest(id: Long, sig: String?, exp: Long?) {
@@ -67,18 +53,10 @@ class MediaFileController(
         @RequestHeader headers: HttpHeaders,
         @RequestParam("_sig", required = false) sig: String?,
         @RequestParam("_exp", required = false) exp: Long?,
-    ): ResponseEntity<Resource> {
+    ): ResponseEntity<ByteArray> {
         authenticateRequest(id, sig, exp)
-        val resolved = service.loadLocalFile(id)
-        val resource = FileSystemResource(resolved.file)
-        val mediaType = parseMediaType(resolved.mediaFile.mimeType)
-        val lastModified = normalizeToSeconds(resolved.file.lastModified())
-
-        if (isNotModified(headers, lastModified)) {
-            return notModifiedResourceResponse(resolved, lastModified)
-        }
-
-        return fullResponse(resolved, resource, mediaType, lastModified)
+        val resolved = service.load(id)
+        return responses.full(resolved, headers)
     }
 
     /**
@@ -102,21 +80,8 @@ class MediaFileController(
         @RequestParam("_exp", required = false) exp: Long?,
     ): ResponseEntity<Void> {
         authenticateRequest(id, sig, exp)
-        val resolved = service.loadLocalFile(id)
-        val mediaType = parseMediaType(resolved.mediaFile.mimeType)
-        val lastModified = normalizeToSeconds(resolved.file.lastModified())
-
-        if (isNotModified(headers, lastModified)) {
-            return ResponseEntity.status(HttpStatus.NOT_MODIFIED)
-                .headers(baseHeaders(resolved, lastModified, null))
-                .build()
-        }
-
-        val responseHeaders = baseHeaders(resolved, lastModified, mediaType)
-        responseHeaders.contentLength = resolved.file.length()
-        return ResponseEntity.status(HttpStatus.OK)
-            .headers(responseHeaders)
-            .build()
+        val resolved = service.load(id)
+        return responses.head(resolved, headers)
     }
 
     /**
@@ -139,185 +104,9 @@ class MediaFileController(
         @RequestHeader headers: HttpHeaders,
         @RequestParam("_sig", required = false) sig: String?,
         @RequestParam("_exp", required = false) exp: Long?,
-    ): ResponseEntity<List<ResourceRegion>> {
-        authenticateRequest(id, sig, exp)
-        val resolved = service.loadLocalFile(id)
-        val resource = FileSystemResource(resolved.file)
-        val mediaType = parseMediaType(resolved.mediaFile.mimeType)
-        val lastModified = normalizeToSeconds(resolved.file.lastModified())
-        val total = resource.contentLength()
-
-        if (isNotModified(headers, lastModified)) {
-            return notModifiedRangeResponse(resolved, lastModified)
-        }
-
-        if (!ifRangeMatched(headers, lastModified)) {
-            // If-Range 不匹配时必须回退到完整资源响应
-            return fullBytesResponse(resolved, mediaType, lastModified).asRangeResponse()
-        }
-
-        val rawRange = headers.getFirst(HttpHeaders.RANGE)
-            ?: return rangeNotSatisfiable(resolved, total, lastModified)
-        val ranges = try {
-            HttpRange.parseRanges(rawRange)
-        } catch (_: IllegalArgumentException) {
-            return rangeNotSatisfiable(resolved, total, lastModified)
-        }
-        if (ranges.isEmpty()) {
-            return rangeNotSatisfiable(resolved, total, lastModified)
-        }
-
-        val regions = try {
-            ranges.map { it.toResourceRegion(resource) }
-        } catch (_: IllegalArgumentException) {
-            return rangeNotSatisfiable(resolved, total, lastModified)
-        }
-        if (regions.isEmpty()) {
-            return rangeNotSatisfiable(resolved, total, lastModified)
-        }
-
-        val contentType = if (regions.size == 1) mediaType else null
-        return ResponseEntity.status(HttpStatus.PARTIAL_CONTENT)
-            .headers(baseHeaders(resolved, lastModified, contentType))
-            .body(regions)
-    }
-
-    private fun fullResponse(
-        resolved: ResolvedMediaFile,
-        resource: Resource,
-        mediaType: MediaType,
-        lastModified: Long,
-    ): ResponseEntity<Resource> {
-        val responseHeaders = baseHeaders(resolved, lastModified, mediaType)
-        responseHeaders.contentLength = resource.contentLength()
-        return ResponseEntity.status(HttpStatus.OK)
-            .headers(responseHeaders)
-            .body(resource)
-    }
-
-    private fun fullBytesResponse(
-        resolved: ResolvedMediaFile,
-        mediaType: MediaType,
-        lastModified: Long,
     ): ResponseEntity<ByteArray> {
-        val body = resolved.file.readBytes()
-        val responseHeaders = baseHeaders(resolved, lastModified, mediaType)
-        responseHeaders.contentLength = body.size.toLong()
-        return ResponseEntity.status(HttpStatus.OK)
-            .headers(responseHeaders)
-            .body(body)
-    }
-
-    private fun notModifiedResourceResponse(
-        resolved: ResolvedMediaFile,
-        lastModified: Long,
-    ): ResponseEntity<Resource> {
-        return ResponseEntity.status(HttpStatus.NOT_MODIFIED)
-            .headers(baseHeaders(resolved, lastModified, null))
-            .build()
-    }
-
-    private fun notModifiedRangeResponse(
-        resolved: ResolvedMediaFile,
-        lastModified: Long,
-    ): ResponseEntity<List<ResourceRegion>> {
-        return ResponseEntity.status(HttpStatus.NOT_MODIFIED)
-            .headers(baseHeaders(resolved, lastModified, null))
-            .build()
-    }
-
-    private fun rangeNotSatisfiable(
-        resolved: ResolvedMediaFile,
-        total: Long,
-        lastModified: Long,
-    ): ResponseEntity<List<ResourceRegion>> {
-        val responseHeaders = baseHeaders(resolved, lastModified, null)
-        responseHeaders[HttpHeaders.CONTENT_RANGE] = "bytes */$total"
-        return ResponseEntity.status(HttpStatus.REQUESTED_RANGE_NOT_SATISFIABLE)
-            .headers(responseHeaders)
-            .build()
-    }
-
-    private fun baseHeaders(
-        resolved: ResolvedMediaFile,
-        lastModified: Long,
-        mediaType: MediaType?,
-    ): HttpHeaders {
-        return HttpHeaders().also { headers ->
-            headers.set(HttpHeaders.CACHE_CONTROL, CACHE_CONTROL_VALUE)
-            headers.set(HttpHeaders.ACCEPT_RANGES, "bytes")
-            headers.lastModified = lastModified
-            headers.set(HttpHeaders.CONTENT_DISPOSITION, inlineContentDisposition(resolved.file.name))
-            headers.set(X_CONTENT_TYPE_OPTIONS, "nosniff")
-            if (mediaType != null) {
-                headers.contentType = mediaType
-            }
-        }
-    }
-
-    private fun inlineContentDisposition(fileName: String): String {
-        return ContentDisposition.inline()
-            .filename(fileName, StandardCharsets.UTF_8)
-            .build()
-            .toString()
-    }
-
-    private fun ifRangeMatched(
-        headers: HttpHeaders,
-        lastModified: Long,
-    ): Boolean {
-        val ifRange = headers.getFirst(HttpHeaders.IF_RANGE)?.trim() ?: return true
-        if (ifRange.startsWith("\"")) {
-            return false
-        }
-
-        val ifRangeDate = parseHttpDate(ifRange) ?: return false
-        return normalizeToSeconds(lastModified) <= normalizeToSeconds(ifRangeDate)
-    }
-
-    private fun isNotModified(
-        headers: HttpHeaders,
-        lastModified: Long,
-    ): Boolean {
-        val ifModifiedSince = headers.ifModifiedSince
-        if (ifModifiedSince < 0) {
-            return false
-        }
-        return normalizeToSeconds(lastModified) <= normalizeToSeconds(ifModifiedSince)
-    }
-
-    private fun parseHttpDate(headerValue: String): Long? {
-        return try {
-            ZonedDateTime.parse(headerValue, DateTimeFormatter.RFC_1123_DATE_TIME)
-                .toInstant()
-                .toEpochMilli()
-        } catch (_: RuntimeException) {
-            null
-        }
-    }
-
-    private fun normalizeToSeconds(value: Long): Long {
-        if (value < 0) {
-            return 0
-        }
-        return value / 1000 * 1000
-    }
-
-    @Suppress("UNCHECKED_CAST")
-    private fun ResponseEntity<*>.asRangeResponse(): ResponseEntity<List<ResourceRegion>> {
-        return this as ResponseEntity<List<ResourceRegion>>
-    }
-
-    private fun parseMediaType(mimeType: String): MediaType {
-        return try {
-            MediaType.parseMediaType(mimeType)
-        } catch (_: IllegalArgumentException) {
-            MediaType.APPLICATION_OCTET_STREAM
-        }
-    }
-
-    companion object {
-        private const val CACHE_CONTROL_VALUE = "private, max-age=31536000, immutable"
-        private const val X_CONTENT_TYPE_OPTIONS = "X-Content-Type-Options"
+        authenticateRequest(id, sig, exp)
+        val resolved = service.load(id)
+        return responses.range(resolved, headers)
     }
 }

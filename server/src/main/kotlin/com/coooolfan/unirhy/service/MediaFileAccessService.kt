@@ -3,6 +3,9 @@ package com.coooolfan.unirhy.service
 import com.coooolfan.unirhy.model.MediaFile
 import com.coooolfan.unirhy.model.by
 import com.coooolfan.unirhy.model.id
+import com.coooolfan.unirhy.model.storage.FileProviderType
+import com.coooolfan.unirhy.service.storage.StorageNode
+import com.coooolfan.unirhy.service.storage.StorageNodeObjectService
 import org.babyfish.jimmer.sql.fetcher.Fetcher
 import org.babyfish.jimmer.sql.kt.KSqlClient
 import org.babyfish.jimmer.sql.kt.ast.expression.eq
@@ -10,32 +13,38 @@ import org.babyfish.jimmer.sql.kt.fetcher.newFetcher
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.web.server.ResponseStatusException
-import java.io.File
-import java.nio.file.Files
-import java.nio.file.Paths
 
 @Service
-class MediaFileAccessService(private val sql: KSqlClient) : MediaFileResolver {
+class MediaFileAccessService(
+    private val sql: KSqlClient,
+    private val storageObjects: StorageNodeObjectService,
+) {
 
-    override fun loadLocalFile(id: Long): ResolvedMediaFile {
+    fun load(id: Long): ResolvedMediaFile {
         val mediaFile = findMediaFile(id)
             ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Media file not found")
 
-        val provider = mediaFile.fsProvider
-            ?: throw ResponseStatusException(HttpStatus.NOT_IMPLEMENTED, "Only file system provider is supported")
-
-        val rootPath = Paths.get(provider.parentPath).toAbsolutePath().normalize()
-        val targetPath = rootPath.resolve(mediaFile.objectKey).normalize()
-
-        if (!targetPath.startsWith(rootPath)) {
-            throw ResponseStatusException(HttpStatus.FORBIDDEN, "Invalid object key")
+        val node = try {
+            resolveStorageNode(mediaFile)
+        } catch (_: IllegalStateException) {
+            throw ResponseStatusException(HttpStatus.FORBIDDEN, "Invalid storage provider")
         }
-
-        if (!Files.exists(targetPath) || !Files.isRegularFile(targetPath)) {
+        val stat = try {
+            storageObjects.stat(node, mediaFile.objectKey)
+        } catch (_: RuntimeException) {
             throw ResponseStatusException(HttpStatus.NOT_FOUND, "File not found")
         }
 
-        return ResolvedMediaFile(mediaFile, targetPath.toFile())
+        return ResolvedMediaFile(
+            mediaFile = mediaFile,
+            fileName = stat.fileName,
+            size = stat.size,
+            lastModified = stat.lastModified,
+            readAll = { storageObjects.readAll(node, mediaFile.objectKey) },
+            readRange = { start, endInclusive ->
+                storageObjects.readRange(node, mediaFile.objectKey, start, endInclusive)
+            },
+        )
     }
 
     private fun findMediaFile(id: Long): MediaFile? {
@@ -45,21 +54,25 @@ class MediaFileAccessService(private val sql: KSqlClient) : MediaFileResolver {
         }.firstOrNull()
     }
 
+    private fun resolveStorageNode(mediaFile: MediaFile): StorageNode {
+        mediaFile.fsProvider?.let {
+            return storageObjects.resolve(FileProviderType.FILE_SYSTEM, it.id)
+        }
+        mediaFile.ossProvider?.let {
+            return storageObjects.resolve(FileProviderType.OSS, it.id)
+        }
+        error("Media file has no storage provider")
+    }
+
     companion object {
         private val MEDIA_FILE_FETCHER: Fetcher<MediaFile> = newFetcher(MediaFile::class).by {
             allScalarFields()
+            ossProvider {
+                allScalarFields()
+            }
             fsProvider {
                 allScalarFields()
             }
         }
     }
-}
-
-data class ResolvedMediaFile(
-    val mediaFile: MediaFile,
-    val file: File,
-)
-
-interface MediaFileResolver {
-    fun loadLocalFile(id: Long): ResolvedMediaFile
 }

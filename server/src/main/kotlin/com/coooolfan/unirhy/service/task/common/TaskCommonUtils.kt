@@ -1,11 +1,10 @@
 package com.coooolfan.unirhy.service.task.common
 
+import com.coooolfan.unirhy.service.isAudioObjectKey
 import org.slf4j.LoggerFactory
 import java.io.File
 
 private val logger = LoggerFactory.getLogger("TaskCommonUtils")
-
-private val ACCEPT_FILE_EXTENSIONS = setOf("mp3", "wav", "ogg", "flac", "wma", "m4a")
 
 fun findAudioFilesRecursively(rootDir: File): Sequence<File> {
     if (!rootDir.exists() || !rootDir.isDirectory) {
@@ -15,7 +14,7 @@ fun findAudioFilesRecursively(rootDir: File): Sequence<File> {
 
     return rootDir.walk()
         .filter { it.isFile }
-        .filter { file -> file.extension.lowercase() in ACCEPT_FILE_EXTENSIONS }
+        .filter { file -> isAudioObjectKey(file.name) }
 }
 
 fun failureReason(ex: Throwable): String {
