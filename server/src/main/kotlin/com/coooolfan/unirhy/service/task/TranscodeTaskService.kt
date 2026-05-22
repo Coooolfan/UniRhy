@@ -1,8 +1,11 @@
 package com.coooolfan.unirhy.service.task
 
 import com.coooolfan.unirhy.model.*
-import com.coooolfan.unirhy.model.storage.FileProviderFileSystem
 import com.coooolfan.unirhy.model.storage.FileProviderType
+import com.coooolfan.unirhy.service.storage.FileSystemStorageNode
+import com.coooolfan.unirhy.service.storage.OssStorageNode
+import com.coooolfan.unirhy.service.storage.StorageNode
+import com.coooolfan.unirhy.service.storage.StorageNodeObjectService
 import com.coooolfan.unirhy.service.task.common.AsyncTaskQueueStore
 import com.coooolfan.unirhy.service.task.common.TaskStatus
 import com.coooolfan.unirhy.service.task.common.TaskType
@@ -25,6 +28,7 @@ class TranscodeTaskService(
     private val objectMapper: ObjectMapper,
     private val queueStore: AsyncTaskQueueStore,
     private val transactionTemplate: TransactionTemplate,
+    private val storageObjects: StorageNodeObjectService,
 ) {
 
     private val logger = LoggerFactory.getLogger(TranscodeTaskService::class.java)
@@ -33,9 +37,12 @@ class TranscodeTaskService(
     fun isConsumerEnabled(): Boolean = consumerEnabled
 
     fun submit(request: TranscodeTaskRequest) {
-        val (srcProvider, _) = resolveAndValidateProviders(request)
+        val (srcProvider, dstProvider) = resolveAndValidateProviders(request)
         val audioFiles = sql.createQuery(Asset::class) {
-            where(table.mediaFile.fsProviderId eq srcProvider.id)
+            when (srcProvider.providerType) {
+                FileProviderType.FILE_SYSTEM -> where(table.mediaFile.fsProviderId eq srcProvider.providerId)
+                FileProviderType.OSS -> where(table.mediaFile.ossProviderId eq srcProvider.providerId)
+            }
             orderBy(table.recordingId, table.mediaFile.objectKey, table.id)
             select(table.recordingId, table.mediaFile.objectKey)
         }.execute()
@@ -49,7 +56,9 @@ class TranscodeTaskService(
             TranscodeTaskPayload(
                 recordingId = entry.key,
                 srcObjectKey = entry.value,
-                srcProviderId = srcProvider.id,
+                srcProviderType = srcProvider.providerType,
+                srcProviderId = srcProvider.providerId,
+                dstProviderType = dstProvider.providerType,
                 dstProviderId = request.dstProviderId,
                 targetCodec = request.targetCodec,
             )
@@ -111,55 +120,63 @@ class TranscodeTaskService(
         if (payload.targetCodec != CodecType.OPUS) {
             error("Unsupported target codec: ${payload.targetCodec}")
         }
-        val (srcProvider, dstProvider) = resolveProviders(payload.srcProviderId, payload.dstProviderId)
-        val srcRoot = File(srcProvider.parentPath)
-        val dstRoot = ensureDestinationRoot(dstProvider)
-        val srcFile = File(srcRoot, payload.srcObjectKey)
-        val dstObjectKey = "${UUID.randomUUID()}.opus"
-        val outputFile = File(dstRoot, dstObjectKey)
-
-        executeFfmpegCommand(
-            command = buildFfmpegCommand(srcFile, outputFile),
-            srcFile = srcFile,
-            outputFile = outputFile,
+        val (srcProvider, dstProvider) = resolveProviders(
+            payload.srcProviderType,
+            payload.srcProviderId,
+            payload.dstProviderType,
+            payload.dstProviderId,
         )
+        val dstObjectKey = "${UUID.randomUUID()}.opus"
+        val outputFile = createOutputFile()
 
-        sql.saveCommand(Asset {
-            recording = Recording { id = payload.recordingId }
-            mediaFile {
-                objectKey = dstObjectKey
-                mimeType = "audio/opus"
-                size = outputFile.length()
-                width = null
-                height = null
-                ossProvider = null
-                fsProvider = dstProvider
+        try {
+            storageObjects.materializeTempFile(srcProvider, payload.srcObjectKey).use { srcTempFile ->
+                executeFfmpegCommand(
+                    command = buildFfmpegCommand(srcTempFile.file, outputFile),
+                    srcFile = srcTempFile.file,
+                    outputFile = outputFile,
+                )
             }
-            comment = "transcoded from ${payload.srcObjectKey} at ${srcProvider.name}"
-        }) {
-            setMode(SaveMode.INSERT_ONLY)
-            setAssociatedMode(Asset::recording, AssociatedSaveMode.APPEND_IF_ABSENT)
-            setAssociatedMode(MediaFile::fsProvider, AssociatedSaveMode.APPEND_IF_ABSENT)
-        }.execute()
+
+            storageObjects.writeFile(dstProvider, dstObjectKey, outputFile, "audio/opus")
+
+            sql.saveCommand(Asset {
+                recording = Recording { id = payload.recordingId }
+                mediaFile {
+                    objectKey = dstObjectKey
+                    mimeType = "audio/opus"
+                    size = outputFile.length()
+                    width = null
+                    height = null
+                    bindProvider(dstProvider)
+                }
+                comment = "transcoded from ${payload.srcObjectKey} at ${srcProvider.name}"
+            }) {
+                setMode(SaveMode.INSERT_ONLY)
+                setAssociatedMode(Asset::recording, AssociatedSaveMode.APPEND_IF_ABSENT)
+                setAssociatedMode(MediaFile::fsProvider, AssociatedSaveMode.APPEND_IF_ABSENT)
+                setAssociatedMode(MediaFile::ossProvider, AssociatedSaveMode.APPEND_IF_ABSENT)
+            }.execute()
+        } finally {
+            deleteOutputFileQuietly(outputFile)
+        }
     }
 
-    private fun resolveAndValidateProviders(request: TranscodeTaskRequest): Pair<FileProviderFileSystem, FileProviderFileSystem> {
+    private fun createOutputFile(): File {
+        val outputFile = File.createTempFile("unirhy-transcode-", ".opus")
+        if (!outputFile.delete()) {
+            error("Failed to prepare transcode output file: ${outputFile.absolutePath}")
+        }
+        return outputFile
+    }
+
+    private fun resolveAndValidateProviders(request: TranscodeTaskRequest): Pair<StorageNode, StorageNode> {
         if (request.targetCodec != CodecType.OPUS) {
             error("Unsupported target codec: ${request.targetCodec}")
         }
-        if (request.srcProviderType != FileProviderType.FILE_SYSTEM) {
-            error("Unsupported source provider type: ${request.srcProviderType}")
-        }
-        if (request.dstProviderType != FileProviderType.FILE_SYSTEM) {
-            error("Unsupported destination provider type: ${request.dstProviderType}")
-        }
 
-        // 这里写俩条 sql 的话代码会简单点。但还是省一次 IO 吧
-        val srcDstProviders =
-            sql.findByIds(FileProviderFileSystem::class, listOf(request.srcProviderId, request.dstProviderId))
-        val srcProvider = srcDstProviders.find { it.id == request.srcProviderId } ?: error("Source provider not found")
-        val dstProvider =
-            srcDstProviders.find { it.id == request.dstProviderId } ?: error("Destination provider not found")
+        val srcProvider = storageObjects.resolve(request.srcProviderType, request.srcProviderId)
+        val dstProvider = storageObjects.resolve(request.dstProviderType, request.dstProviderId)
 
         if (dstProvider.readonly) {
             error("Destination provider is readonly")
@@ -168,30 +185,17 @@ class TranscodeTaskService(
     }
 
     private fun resolveProviders(
+        srcProviderType: FileProviderType,
         srcProviderId: Long,
+        dstProviderType: FileProviderType,
         dstProviderId: Long,
-    ): Pair<FileProviderFileSystem, FileProviderFileSystem> {
-        val srcDstProviders = sql.findByIds(FileProviderFileSystem::class, listOf(srcProviderId, dstProviderId))
-        val srcProvider = srcDstProviders.find { it.id == srcProviderId } ?: error("Source provider not found")
-        val dstProvider = srcDstProviders.find { it.id == dstProviderId } ?: error("Destination provider not found")
+    ): Pair<StorageNode, StorageNode> {
+        val srcProvider = storageObjects.resolve(srcProviderType, srcProviderId)
+        val dstProvider = storageObjects.resolve(dstProviderType, dstProviderId)
         if (dstProvider.readonly) {
             error("Destination provider is readonly")
         }
         return Pair(srcProvider, dstProvider)
-    }
-
-    private fun ensureDestinationRoot(provider: FileProviderFileSystem): File {
-        val dstRoot = File(provider.parentPath)
-        if (dstRoot.exists() && !dstRoot.isDirectory) {
-            error("Destination path is not a directory: ${dstRoot.absolutePath}")
-        }
-        if (!dstRoot.exists() && !dstRoot.mkdirs()) {
-            error("Failed to create destination directory: ${dstRoot.absolutePath}")
-        }
-        if (!dstRoot.canWrite()) {
-            error("Destination directory is not writable: ${dstRoot.absolutePath}")
-        }
-        return dstRoot
     }
 
     private fun buildFfmpegCommand(
@@ -238,11 +242,24 @@ class TranscodeTaskService(
                 ex,
             )
         }
-        if (result.first == 0) {
+        if (result.first == 0 && outputFile.isFile && outputFile.length() > 0) {
             return
         }
 
         deleteOutputFileQuietly(outputFile)
+        if (result.first == 0) {
+            logger.error(
+                "ffmpeg produced empty output, src={}, dst={}, output={}",
+                srcFile.absolutePath,
+                outputFile.absolutePath,
+                result.second.ifBlank { "<empty>" },
+            )
+            error(
+                "Failed to transcode src=${srcFile.absolutePath} dst=${outputFile.absolutePath} " +
+                        "error=ffmpeg produced empty output"
+            )
+        }
+
         logger.error(
             "ffmpeg command failed, src={}, dst={}, exitCode={}, output={}",
             srcFile.absolutePath,
@@ -303,11 +320,27 @@ data class TranscodeTaskRequest(
 data class TranscodeTaskPayload(
     val recordingId: Long,
     val srcObjectKey: String,
+    val srcProviderType: FileProviderType = FileProviderType.FILE_SYSTEM,
     val srcProviderId: Long,
+    val dstProviderType: FileProviderType = FileProviderType.FILE_SYSTEM,
     val dstProviderId: Long,
     val targetCodec: CodecType = CodecType.OPUS,
 )
 
 enum class CodecType {
     MP3, OPUS, AAC,
+}
+
+private fun MediaFileDraft.bindProvider(provider: StorageNode) {
+    when (provider) {
+        is FileSystemStorageNode -> {
+            ossProvider = null
+            fsProvider = provider.provider
+        }
+
+        is OssStorageNode -> {
+            ossProvider = provider.provider
+            fsProvider = null
+        }
+    }
 }

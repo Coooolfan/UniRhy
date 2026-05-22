@@ -4,12 +4,17 @@ import com.coooolfan.unirhy.model.*
 import com.coooolfan.unirhy.model.storage.FileProviderFileSystem
 import com.coooolfan.unirhy.model.storage.FileProviderType
 import com.coooolfan.unirhy.service.SystemConfigService.Companion.SYSTEM_CONFIG_ID
+import com.coooolfan.unirhy.service.storage.FileSystemStorageNode
+import com.coooolfan.unirhy.service.storage.OssStorageNode
+import com.coooolfan.unirhy.service.storage.StorageNode
+import com.coooolfan.unirhy.service.storage.StorageNodeObjectService
 import com.coooolfan.unirhy.service.task.common.*
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.babyfish.jimmer.sql.ast.mutation.AssociatedSaveMode
 import org.babyfish.jimmer.sql.ast.mutation.SaveMode
 import org.babyfish.jimmer.sql.kt.KSqlClient
 import org.babyfish.jimmer.sql.kt.ast.expression.eq
+import org.babyfish.jimmer.sql.kt.fetcher.newFetcher
 import org.jaudiotagger.audio.AudioFileIO
 import org.jaudiotagger.tag.FieldKey
 import org.jaudiotagger.tag.Tag
@@ -28,6 +33,7 @@ class ScanTaskService(
     private val objectMapper: ObjectMapper,
     private val queueStore: AsyncTaskQueueStore,
     private val transactionTemplate: TransactionTemplate,
+    private val storageObjects: StorageNodeObjectService,
 ) {
 
     private val logger = LoggerFactory.getLogger(ScanTaskService::class.java)
@@ -37,11 +43,7 @@ class ScanTaskService(
 
         // 分批插入
         val paramsJsonBatch = mutableListOf<String>()
-        for (payload in discoverScanFileTaskPayloads(
-            rootDir = File(provider.parentPath),
-            providerType = request.providerType,
-            providerId = request.providerId,
-        )) {
+        for (payload in discoverScanFileTaskPayloads(storageObjects, provider)) {
             paramsJsonBatch += objectMapper.writeValueAsString(payload)
             if (paramsJsonBatch.size >= SCAN_ENQUEUE_BATCH_SIZE) {
                 queueStore.enqueueIgnoringConflicts(TaskType.METADATA_PARSE, paramsJsonBatch)
@@ -72,11 +74,8 @@ class ScanTaskService(
         }
     }
 
-    private fun validateRequest(request: ScanTaskRequest): FileProviderFileSystem {
-        if (request.providerType != FileProviderType.FILE_SYSTEM) {
-            error("Unsupported provider type: ${request.providerType}")
-        }
-        return sql.findOneById(FileProviderFileSystem::class, request.providerId)
+    private fun validateRequest(request: ScanTaskRequest): StorageNode {
+        return storageObjects.resolve(request.providerType, request.providerId)
     }
 
     private fun execute(payload: ScanFileTaskPayload): String {
@@ -86,32 +85,37 @@ class ScanTaskService(
                 providerId = payload.providerId,
             )
         )
-        val writeableProvider = sql.executeQuery(SystemConfig::class) {
-            where(table.id eq SYSTEM_CONFIG_ID)
-            select(table.fsProvider)
-        }.first()
+        val writeableProvider = sql.findOneById(SYSTEM_CONFIG_FETCHER, SYSTEM_CONFIG_ID)
+            .let { config ->
+                config.fsProvider?.let { storageObjects.resolve(FileProviderType.FILE_SYSTEM, it.id) }
+                    ?: config.ossProvider?.let { storageObjects.resolve(FileProviderType.OSS, it.id) }
+                    ?: error("System storage provider is not configured")
+            }
 
-        val rootDir = File(provider.parentPath)
-        val file = File(rootDir, payload.objectKey)
-        if (!file.exists() || !file.isFile) {
+        val stat = runCatching { storageObjects.stat(provider, payload.objectKey) }.getOrNull()
+        if (stat == null) {
             logger.info(
                 "Skip scan task because source file is missing, providerId={}, objectKey={}",
-                provider.id,
+                provider.providerId,
                 payload.objectKey
             )
             return "SKIPPED: source file missing"
         }
 
-        if (audioMediaFileExists(provider.id, payload.objectKey)) {
+        if (audioMediaFileExists(provider.providerType, provider.providerId, payload.objectKey)) {
             return "SKIPPED: media file already scanned"
         }
 
-        val scannedRecording = buildRecordingFromAudioFile(
-            file = file,
-            objectKey = payload.objectKey,
-            provider = provider,
-            writeableProvider = writeableProvider,
-        )
+        val scannedRecording = storageObjects.materializeTempFile(provider, payload.objectKey).use { tempFile ->
+            buildRecordingFromAudioFile(
+                file = tempFile.file,
+                objectKey = payload.objectKey,
+                provider = provider,
+                writeableProvider = writeableProvider,
+                storageObjects = storageObjects,
+                size = stat.size,
+            )
+        }
 
         sql.saveEntities(listOf(scannedRecording)) {
             setMode(SaveMode.INSERT_ONLY)
@@ -119,6 +123,7 @@ class ScanTaskService(
             setAssociatedMode(Recording::work, AssociatedSaveMode.APPEND_IF_ABSENT)
             setAssociatedMode(Asset::mediaFile, AssociatedSaveMode.APPEND_IF_ABSENT)
             setAssociatedMode(MediaFile::fsProvider, AssociatedSaveMode.APPEND_IF_ABSENT)
+            setAssociatedMode(MediaFile::ossProvider, AssociatedSaveMode.APPEND_IF_ABSENT)
             setAssociatedMode(Album::cover, AssociatedSaveMode.APPEND_IF_ABSENT)
             setAssociatedMode(Recording::cover, AssociatedSaveMode.APPEND_IF_ABSENT)
             setAssociatedMode(Recording::artists, AssociatedSaveMode.APPEND_IF_ABSENT)
@@ -128,10 +133,13 @@ class ScanTaskService(
         return "SUCCESS"
     }
 
-    private fun audioMediaFileExists(providerId: Long, objectKey: String): Boolean {
+    private fun audioMediaFileExists(providerType: FileProviderType, providerId: Long, objectKey: String): Boolean {
         return sql.createQuery(MediaFile::class) {
             where(table.objectKey eq objectKey)
-            where(table.fsProviderId eq providerId)
+            when (providerType) {
+                FileProviderType.FILE_SYSTEM -> where(table.fsProviderId eq providerId)
+                FileProviderType.OSS -> where(table.ossProviderId eq providerId)
+            }
             selectCount()
         }.execute().first() > 0
     }
@@ -155,18 +163,34 @@ data class ScanFileTaskPayload(
 )
 
 fun discoverScanFileTaskPayloads(
+    storageObjects: StorageNodeObjectService,
+    provider: StorageNode,
+): Sequence<ScanFileTaskPayload> {
+    return sequence {
+        for (objectKey in storageObjects.listAudioObjectKeys(provider)) {
+            yield(
+                ScanFileTaskPayload(
+                    providerType = provider.providerType,
+                    providerId = provider.providerId,
+                    objectKey = objectKey,
+                )
+            )
+        }
+    }
+}
+
+fun discoverScanFileTaskPayloads(
     rootDir: File,
     providerType: FileProviderType,
     providerId: Long,
 ): Sequence<ScanFileTaskPayload> {
     return sequence {
         for (file in findAudioFilesRecursively(rootDir)) {
-            val objectKey = file.relativeTo(rootDir).path
             yield(
                 ScanFileTaskPayload(
                     providerType = providerType,
                     providerId = providerId,
-                    objectKey = objectKey,
+                    objectKey = file.relativeTo(rootDir).path,
                 )
             )
         }
@@ -176,12 +200,14 @@ fun discoverScanFileTaskPayloads(
 private fun buildRecordingFromAudioFile(
     file: File,
     objectKey: String,
-    provider: FileProviderFileSystem,
-    writeableProvider: FileProviderFileSystem,
+    provider: StorageNode,
+    writeableProvider: StorageNode,
+    storageObjects: StorageNodeObjectService,
+    size: Long,
 ): Recording {
     val audioTag = AudioFileIO.read(file)
     val tag = audioTag.tag
-    val audioCover = fetchCover(file, provider, writeableProvider, tag?.firstArtwork)
+    val audioCover = fetchCover(objectKey, provider, writeableProvider, storageObjects, tag?.firstArtwork)
     val recordingTitle = tag?.getFirst(FieldKey.TITLE).orEmpty()
     val parsedTitle = parseRecordingTitleMetadata(recordingTitle)
     val labels = (tag?.getFirst(FieldKey.RECORD_LABEL).singleTagValueList() + parsedTitle.labels).distinct()
@@ -216,11 +242,10 @@ private fun buildRecordingFromAudioFile(
             mediaFile {
                 this.objectKey = objectKey
                 mimeType = Files.probeContentType(file.toPath()) ?: "application/octet-stream"
-                size = file.length()
+                this.size = size
                 width = null
                 height = null
-                ossProvider = null
-                fsProvider = provider
+                bindProvider(provider)
             }
         }
     }
@@ -301,10 +326,59 @@ private fun String?.singleTagValueList(): List<String> {
 }
 
 fun fetchCover(
+    sourceObjectKey: String,
+    provider: StorageNode,
+    writeableProvider: StorageNode,
+    storageObjects: StorageNodeObjectService,
+    artwork: Artwork?,
+): MediaFile? {
+    val sourceBaseName = sourceObjectKey.substringBeforeLast('.', sourceObjectKey)
+    for (ext in COVER_EXTENSIONS) {
+        val coverObjectKey = "$sourceBaseName.$ext"
+        val stat = runCatching { storageObjects.stat(provider, coverObjectKey) }
+            .recoverCatching { storageObjects.stat(provider, "$sourceBaseName.${ext.uppercase()}") }
+            .getOrNull() ?: continue
+        return MediaFile {
+            objectKey = stat.objectKey
+            mimeType = mimeFromExtension(ext)
+            size = stat.size
+            width = null
+            height = null
+            bindProvider(provider)
+        }
+    }
+
+    val safeArtwork = artwork ?: return null
+    val binaryData = safeArtwork.binaryData ?: return null
+    if (binaryData.isEmpty()) {
+        return null
+    }
+
+    val mimeType = safeArtwork.mimeType?.trim().takeIf { !it.isNullOrBlank() } ?: "image/jpeg"
+    val extension = extensionFromMime(mimeType)
+
+    val targetProvider = if (provider.readonly) writeableProvider else provider
+    val objectKey = embeddedCoverObjectKey(sourceObjectKey, provider, extension)
+
+    if (runCatching { storageObjects.stat(targetProvider, objectKey) }.isFailure) {
+        storageObjects.write(targetProvider, objectKey, binaryData, mimeType)
+    }
+
+    return MediaFile {
+        this.objectKey = objectKey
+        this.mimeType = mimeType
+        this.size = binaryData.size.toLong()
+        this.width = safeArtwork.width.takeIf { it > 0 }
+        this.height = safeArtwork.height.takeIf { it > 0 }
+        bindProvider(targetProvider)
+    }
+}
+
+fun fetchCover(
     file: File,
     provider: FileProviderFileSystem,
     writeableProvider: FileProviderFileSystem,
-    artwork: Artwork?
+    artwork: Artwork?,
 ): MediaFile? {
     for (ext in COVER_EXTENSIONS) {
         var coverFile = File(file.parentFile, "${file.nameWithoutExtension}.$ext")
@@ -335,7 +409,7 @@ fun fetchCover(
     val extension = extensionFromMime(mimeType)
 
     val targetProvider = if (provider.readonly) writeableProvider else provider
-    val objectKey = embeddedCoverObjectKey(file, provider, extension)
+    val objectKey = oldEmbeddedCoverObjectKey(file, provider, extension)
     val coverFile = File(targetProvider.parentPath, objectKey)
 
     if (!coverFile.exists()) {
@@ -365,6 +439,15 @@ private fun extensionFromMime(mimeType: String): String =
     }
 
 private fun embeddedCoverObjectKey(
+    sourceObjectKey: String,
+    provider: StorageNode,
+    extension: String,
+): String {
+    val coverObjectKey = sourceObjectKey.substringBeforeLast('.', sourceObjectKey)
+    return "covers/${provider.providerType.name.lowercase()}-${provider.providerId}/$coverObjectKey.$extension"
+}
+
+private fun oldEmbeddedCoverObjectKey(
     file: File,
     provider: FileProviderFileSystem,
     extension: String,
@@ -372,4 +455,35 @@ private fun embeddedCoverObjectKey(
     val sourceObjectKey = file.relativeTo(Path(provider.parentPath).toFile()).path
     val coverObjectKey = sourceObjectKey.substringBeforeLast('.', sourceObjectKey)
     return "covers/${provider.id}/$coverObjectKey.$extension"
+}
+
+private fun MediaFileDraft.bindProvider(provider: StorageNode) {
+    when (provider) {
+        is FileSystemStorageNode -> {
+            ossProvider = null
+            fsProvider = provider.provider
+        }
+
+        is OssStorageNode -> {
+            ossProvider = provider.provider
+            fsProvider = null
+        }
+    }
+}
+
+private fun mimeFromExtension(extension: String): String =
+    when (extension.lowercase()) {
+        "jpg", "jpeg" -> "image/jpeg"
+        "png" -> "image/png"
+        "gif" -> "image/gif"
+        else -> "application/octet-stream"
+    }
+
+private val SYSTEM_CONFIG_FETCHER = newFetcher(SystemConfig::class).by {
+    ossProvider {
+        allScalarFields()
+    }
+    fsProvider {
+        allScalarFields()
+    }
 }
