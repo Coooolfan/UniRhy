@@ -17,7 +17,7 @@ class GlobalExceptionHandler {
             SystemErrorCode.SYSTEM_ALREADY_INITIALIZED.name,
             SystemErrorCode.SYSTEM_STORAGE_PROVIDER_CANNOT_BE_DELETED.name,
             SystemErrorCode.SYSTEM_STORAGE_PROVIDER_CANNOT_BE_READONLY.name,
-            SystemErrorCode.SYSTEM_STORAGE_PROVIDER_CANNOT_BE_REMOTE.name,
+            SystemErrorCode.SYSTEM_STORAGE_PROVIDER_MUST_BE_SINGLE.name,
             -> 409
             CommonErrorCode.NOT_FOUND.name -> 404
             CommonErrorCode.AUTHENTICATION_FAILED.name -> 401

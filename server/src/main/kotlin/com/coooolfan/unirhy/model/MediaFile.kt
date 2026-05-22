@@ -7,6 +7,7 @@ import org.babyfish.jimmer.sql.Entity
 import org.babyfish.jimmer.sql.GeneratedValue
 import org.babyfish.jimmer.sql.GenerationType
 import org.babyfish.jimmer.sql.Id
+import org.babyfish.jimmer.sql.IdView
 import org.babyfish.jimmer.sql.Key
 import org.babyfish.jimmer.sql.ManyToOne
 import org.babyfish.jimmer.sql.Transient
@@ -33,9 +34,15 @@ interface MediaFile {
     @Key
     val ossProvider: FileProviderOss?
 
+    @IdView("ossProvider")
+    val ossProviderId: Long?
+
     @ManyToOne
     @Key
     val fsProvider: FileProviderFileSystem?
+
+    @IdView("fsProvider")
+    val fsProviderId: Long?
 
     @Transient(MediaFileUrlResolver::class)
     val url: String

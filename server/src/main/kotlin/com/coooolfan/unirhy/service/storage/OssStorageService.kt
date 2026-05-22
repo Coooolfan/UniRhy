@@ -1,7 +1,10 @@
 package com.coooolfan.unirhy.service.storage
 
+import com.coooolfan.unirhy.error.SystemException
+import com.coooolfan.unirhy.model.SystemConfig
 import com.coooolfan.unirhy.model.storage.FileProviderOss
 import com.coooolfan.unirhy.model.storage.dto.FileProviderOssCreate
+import com.coooolfan.unirhy.service.SystemConfigService.Companion.SYSTEM_CONFIG_ID
 import org.babyfish.jimmer.sql.ast.mutation.SaveMode
 import org.babyfish.jimmer.sql.fetcher.Fetcher
 import org.babyfish.jimmer.sql.kt.KSqlClient
@@ -28,6 +31,9 @@ class OssStorageService(private val sql: KSqlClient) {
     }
 
     fun delete(id: Long) {
+        if (id == sql.findOneById(SystemConfig::class, SYSTEM_CONFIG_ID).ossProviderId)
+            throw SystemException.SystemStorageProviderCannotBeDeleted()
+
         sql.deleteById(FileProviderOss::class, id)
     }
 }

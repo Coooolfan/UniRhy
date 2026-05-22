@@ -8,6 +8,7 @@ import com.coooolfan.unirhy.model.admin
 import com.coooolfan.unirhy.model.dto.SystemConfigUpdate
 import com.coooolfan.unirhy.model.dto.SystemInitReq
 import com.coooolfan.unirhy.model.storage.FileProviderFileSystem
+import com.coooolfan.unirhy.model.storage.FileProviderOss
 import org.babyfish.jimmer.sql.ast.mutation.SaveMode
 import org.babyfish.jimmer.sql.fetcher.Fetcher
 import org.babyfish.jimmer.sql.kt.KSqlClient
@@ -57,10 +58,16 @@ class SystemConfigService(
     }
 
     fun update(update: SystemConfigUpdate, fetcher: Fetcher<SystemConfig>): SystemConfig {
-        if(update.fsProviderId == null)
-            throw SystemException.SystemStorageProviderCannotBeRemote()
+        val fsProviderId = update.fsProviderId
+        val ossProviderId = update.ossProviderId
+        if ((fsProviderId != null) == (ossProviderId != null)) {
+            throw SystemException.SystemStorageProviderMustBeSingle()
+        }
 
-        if(sql.findOneById(FileProviderFileSystem::class,update.fsProviderId).readonly)
+        if(fsProviderId != null && sql.findOneById(FileProviderFileSystem::class, fsProviderId).readonly)
+            throw SystemException.SystemStorageProviderCannotBeReadonly()
+
+        if(ossProviderId != null && sql.findOneById(FileProviderOss::class, ossProviderId).readonly)
             throw SystemException.SystemStorageProviderCannotBeReadonly()
 
         val entity = update.toEntity { id = SYSTEM_CONFIG_ID }

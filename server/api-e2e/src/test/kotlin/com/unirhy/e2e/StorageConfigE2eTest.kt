@@ -378,12 +378,21 @@ class StorageConfigE2eTest {
                     "ossProviderId" to ossId,
                 ),
             )
+            E2eAssert.status(bindRemoteResponse, 200, "[linkage] bind writable oss provider should succeed")
+            E2eAssert.jsonAt(
+                bindRemoteResponse.body(),
+                "/ossProviderId",
+                ossId,
+                "[linkage] system config oss provider should be writable provider",
+            )
+
+            val deleteBoundOssProviderResponse = state.api.delete("/api/storage/oss/$ossId")
             E2eAssert.apiError(
-                bindRemoteResponse,
+                deleteBoundOssProviderResponse,
                 family = "SYSTEM",
-                code = "SYSTEM_STORAGE_PROVIDER_CANNOT_BE_REMOTE",
+                code = "SYSTEM_STORAGE_PROVIDER_CANNOT_BE_DELETED",
                 expectedStatus = 409,
-                step = "[linkage] remote provider is not yet supported as system storage",
+                step = "[linkage] deleting system oss provider should fail",
             )
 
             val restoreResponse = state.api.put(
