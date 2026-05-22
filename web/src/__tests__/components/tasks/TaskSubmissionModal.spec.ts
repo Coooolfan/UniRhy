@@ -156,7 +156,7 @@ describe('TaskSubmissionModal', () => {
         expect(sourceOptions).toEqual(['[本地] Archive B'])
     })
 
-    it('limits transcode targets to writable local providers and emits an OPUS payload', async () => {
+    it('limits transcode targets to writable providers and emits an OPUS payload', async () => {
         const wrapper = await mountModal()
 
         await wrapper.get('[data-test="task-type-transcode"]').trigger('click')
@@ -167,8 +167,8 @@ describe('TaskSubmissionModal', () => {
             '[data-test="transcode-destination-select"]',
         )
 
-        expect(sourceOptions).toEqual(['[本地] Library A', '[本地] Archive B'])
-        expect(destinationOptions).toEqual(['[本地] Library A'])
+        expect(sourceOptions).toEqual(['[本地] Library A', '[本地] Archive B', '[OSS] Bucket C'])
+        expect(destinationOptions).toEqual(['[本地] Library A', '[OSS] Bucket C'])
 
         await wrapper.get('[data-test="transcode-source-select"]').setValue('FILE_SYSTEM:2')
         await wrapper.get('[data-test="task-submit-button"]').trigger('click')
@@ -176,10 +176,38 @@ describe('TaskSubmissionModal', () => {
         expect(submitTranscodeMock).toHaveBeenCalledWith({
             srcProviderType: 'FILE_SYSTEM',
             srcProviderId: 2,
-            dstProviderType: 'FILE_SYSTEM',
-            dstProviderId: 1,
+            dstProviderType: 'OSS',
+            dstProviderId: 3,
             targetCodec: 'OPUS',
         })
         expect(resolveMock).toHaveBeenCalledWith(true)
+    })
+
+    it('submits OSS providers for metadata parse and transcode', async () => {
+        const wrapper = await mountModal()
+
+        await wrapper.get('[data-test="metadata-parse-provider-select"]').setValue('OSS:3')
+        await wrapper.get('[data-test="task-submit-button"]').trigger('click')
+
+        expect(submitMetadataParseMock).toHaveBeenCalledWith({
+            providerType: 'OSS',
+            providerId: 3,
+        })
+
+        submitMetadataParseMock.mockReset()
+        resolveMock.mockReset()
+
+        await wrapper.get('[data-test="task-type-transcode"]').trigger('click')
+        await wrapper.get('[data-test="transcode-source-select"]').setValue('OSS:3')
+        await wrapper.get('[data-test="transcode-destination-select"]').setValue('OSS:3')
+        await wrapper.get('[data-test="task-submit-button"]').trigger('click')
+
+        expect(submitTranscodeMock).toHaveBeenCalledWith({
+            srcProviderType: 'OSS',
+            srcProviderId: 3,
+            dstProviderType: 'OSS',
+            dstProviderId: 3,
+            targetCodec: 'OPUS',
+        })
     })
 })

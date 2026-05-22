@@ -149,21 +149,15 @@ const syncSelectionValue = (
 }
 
 const metadataParseProviderOptions = computed(() =>
-    providerOptions.value.filter(
-        (provider) => provider.type === 'FILE_SYSTEM' && !provider.isSystemNode,
-    ),
+    providerOptions.value.filter((provider) => !provider.isSystemNode),
 )
 
 const transcodeSourceProviderOptions = computed(() =>
-    providerOptions.value.filter(
-        (provider) => provider.type === 'FILE_SYSTEM' && !provider.isSystemNode,
-    ),
+    providerOptions.value.filter((provider) => !provider.isSystemNode),
 )
 
 const transcodeDestinationProviderOptions = computed(() =>
-    providerOptions.value.filter(
-        (provider) => provider.type === 'FILE_SYSTEM' && !provider.readonly,
-    ),
+    providerOptions.value.filter((provider) => !provider.readonly),
 )
 
 const syncProviderSelections = () => {
@@ -233,7 +227,7 @@ const activeTaskAvailability = computed<TaskAvailability | null>(() => {
     if (providerOptions.value.length === 0) {
         return {
             title: '暂无可用存储节点',
-            description: '请先在系统设置中配置本地存储节点，再回来发起元数据解析或转码任务。',
+            description: '请先在系统设置中配置存储节点，再回来发起元数据解析或转码任务。',
             icon: HardDrive,
         }
     }
@@ -244,7 +238,7 @@ const activeTaskAvailability = computed<TaskAvailability | null>(() => {
     ) {
         return {
             title: '暂无可解析节点',
-            description: '元数据解析任务目前只支持本地存储节点。',
+            description: '需要至少一个非系统存储节点作为解析来源。',
             icon: FolderSearch,
         }
     }
@@ -252,7 +246,7 @@ const activeTaskAvailability = computed<TaskAvailability | null>(() => {
     if (activeTaskId.value === 'TRANSCODE' && transcodeSourceProviderOptions.value.length === 0) {
         return {
             title: '暂无可转码源节点',
-            description: '转码任务目前只支持本地存储节点作为来源。',
+            description: '需要至少一个非系统存储节点作为转码来源。',
             icon: FileAudio,
         }
     }
@@ -263,7 +257,7 @@ const activeTaskAvailability = computed<TaskAvailability | null>(() => {
     ) {
         return {
             title: '暂无可写目标节点',
-            description: '需要至少一个可写的本地存储节点作为转码输出。',
+            description: '需要至少一个可写存储节点作为转码输出。',
             icon: HardDrive,
         }
     }
