@@ -58,11 +58,11 @@ const handleDownload = async (plugin: PluginInfoResponse) => {
 </script>
 
 <template>
-    <section class="mb-16 animate-in fade-in duration-500">
-        <h2 class="mb-2 font-serif text-2xl text-[#2C2A28]">插件</h2>
-        <div class="mb-6 h-px w-full bg-[#E8E4D9]"></div>
-
-        <div class="mb-6 flex items-center gap-4">
+    <section class="mb-16 animate-in fade-in duration-500 font-serif">
+        <div
+            class="mb-6 flex flex-col gap-4 border-b border-[#E8E4D9] pb-3 sm:flex-row sm:items-center sm:justify-between sm:pb-2"
+        >
+            <h2 class="font-serif text-2xl text-[#2C2A28]">插件</h2>
             <input
                 ref="fileInputRef"
                 type="file"
@@ -72,13 +72,13 @@ const handleDownload = async (plugin: PluginInfoResponse) => {
             />
             <button
                 type="button"
-                class="flex items-center gap-2 border border-[#C27E46] px-4 py-2 text-sm text-[#C27E46] transition-colors hover:bg-[#C27E46] hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                class="group flex w-full items-center justify-center gap-2 bg-[#C67C4E] px-6 py-2 text-[#F7F5F0] transition-all duration-300 shadow-md hover:bg-[#A6633C] hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto sm:justify-start"
                 :disabled="isUploading"
                 @click="fileInputRef?.click()"
             >
                 <Loader2 v-if="isUploading" class="h-4 w-4 animate-spin" />
                 <Upload v-else class="h-4 w-4" />
-                <span>{{ isUploading ? '上传中...' : '上传插件 (.up)' }}</span>
+                <span>{{ isUploading ? '上传中...' : '上传插件' }}</span>
             </button>
         </div>
 
@@ -88,6 +88,11 @@ const handleDownload = async (plugin: PluginInfoResponse) => {
         >
             {{ error }}
         </div>
+
+        <p class="mb-4 text-xs italic text-[#8A8A8A]">
+            插件允许您扩展 UniRhy 的功能，上传 .up
+            文件后即可在此管理（此功能仍处于早期阶段，相关能力正在完善）
+        </p>
 
         <div v-if="isLoading" class="flex items-center justify-center py-10 text-sm text-[#6B635B]">
             <Loader2 class="mr-2 h-4 w-4 animate-spin text-[#C27E46]" />

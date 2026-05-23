@@ -57,7 +57,7 @@ onMounted(() => {
         <div class="mx-auto max-w-5xl px-4 pt-4 sm:px-6 sm:pt-6 lg:px-8">
             <header class="mb-10 sm:mb-12">
                 <h1 class="mb-2 font-serif text-3xl tracking-tight text-[#2B221B]">系统设置</h1>
-                <p class="font-serif text-sm italic text-[#8A8A8A]">管理实例级配置与存储节点</p>
+                <p class="font-serif text-sm italic text-[#8A8A8A]">管理实例级配置、存储节点与插件</p>
             </header>
         </div>
 

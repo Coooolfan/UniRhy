@@ -35,8 +35,9 @@ const nodePath = computed(() => {
         return './data'
     }
     if (props.activeNode.type === 'OSS') {
+        const host = (props.activeNode.host ?? '-').replace(/^https?:\/\//, '')
         const prefix = props.activeNode.parentPath ? `/${props.activeNode.parentPath}` : ''
-        return `${props.activeNode.host ?? '-'} / ${props.activeNode.bucket ?? '-'}${prefix}`
+        return `${host}/${props.activeNode.bucket ?? '-'}${prefix}`
     }
     return props.activeNode.parentPath
 })
