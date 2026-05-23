@@ -35,6 +35,18 @@ object ApiCoverageRegistry {
         "com.unirhy.e2e.AccountPlaylistContentE2eTest#content endpoints should support search update recording update and merge flow"
     private const val ALBUM_UPDATE_CASE =
         "com.unirhy.e2e.AccountPlaylistContentE2eTest#album update should modify scalar fields and return updated detail"
+    private const val ALBUM_REORDER_CASE =
+        "com.unirhy.e2e.AccountPlaylistContentE2eTest#album reorder should update sort order and validate input"
+    private const val PLAYLIST_REORDER_CASE =
+        "com.unirhy.e2e.AccountPlaylistContentE2eTest#playlist reorder should update sort order and validate input"
+    private const val ARTIST_FLOW_CASE =
+        "com.unirhy.e2e.AccountPlaylistContentE2eTest#artists should support list search create update and merge flow"
+    private const val PLUGIN_AUTH_REQUIRED_CASE =
+        "com.unirhy.e2e.PluginE2eTest#plugin endpoints should reject unauthenticated access"
+    private const val PLUGIN_LIFECYCLE_CASE =
+        "com.unirhy.e2e.PluginE2eTest#plugin lifecycle should support upload list download enable submit disable and delete"
+    private const val PLUGIN_UPLOAD_INVALID_CASE =
+        "com.unirhy.e2e.PluginE2eTest#plugin upload should reject invalid archives"
     private const val PLAYBACK_QUEUE_AUTH_REQUIRED_CASE =
         "com.unirhy.e2e.PlaybackQueueE2eTest#all playback queue endpoints should reject unauthenticated access"
     private const val PLAYBACK_QUEUE_FLOW_CASE =
@@ -76,6 +88,42 @@ object ApiCoverageRegistry {
             "/api/albums/search",
             testRef = CONTENT_SEARCH_UPDATE_MERGE_CASE,
             note = "auth: $ACCOUNT_PLAYLIST_CONTENT_AUTH_REQUIRED_CASE; validation: unknown keyword returns empty array",
+        ),
+        full(
+            "PUT",
+            "/api/albums/{id}/recordings/reorder",
+            testRef = ALBUM_REORDER_CASE,
+            note = "auth: $ACCOUNT_PLAYLIST_CONTENT_AUTH_REQUIRED_CASE; validation: duplicate missing extra recording ids and unknown album fail",
+        ),
+        full(
+            "GET",
+            "/api/artists",
+            testRef = ARTIST_FLOW_CASE,
+            note = "validation: malformed page index returns 400",
+        ),
+        full(
+            "GET",
+            "/api/artists/search",
+            testRef = ARTIST_FLOW_CASE,
+            note = "validation: unknown keyword returns empty array",
+        ),
+        full(
+            "POST",
+            "/api/artists",
+            testRef = ARTIST_FLOW_CASE,
+            note = "validation: missing display name returns 400",
+        ),
+        full(
+            "PUT",
+            "/api/artists/{id}",
+            testRef = ARTIST_FLOW_CASE,
+            note = "validation: malformed id returns 400",
+        ),
+        full(
+            "POST",
+            "/api/artists/merge",
+            testRef = ARTIST_FLOW_CASE,
+            note = "error: unknown target returns 404",
         ),
         full(
             "GET",
@@ -168,6 +216,12 @@ object ApiCoverageRegistry {
             note = "auth: $ACCOUNT_PLAYLIST_CONTENT_AUTH_REQUIRED_CASE; ownership: non-owner returns 404",
         ),
         full(
+            "PUT",
+            "/api/playlists/{id}/recordings/reorder",
+            testRef = PLAYLIST_REORDER_CASE,
+            note = "auth: $ACCOUNT_PLAYLIST_CONTENT_AUTH_REQUIRED_CASE; ownership and validation branches covered",
+        ),
+        full(
             "DELETE",
             "/api/playlists/{id}/recordings/{recordingId}",
             testRef = PLAYLIST_OWNER_SCOPE_CASE,
@@ -190,6 +244,48 @@ object ApiCoverageRegistry {
             "/api/recordings/{id}",
             testRef = CONTENT_SEARCH_UPDATE_MERGE_CASE,
             note = "auth: $ACCOUNT_PLAYLIST_CONTENT_AUTH_REQUIRED_CASE",
+        ),
+        full(
+            "PUT",
+            "/api/recordings/merge",
+            testRef = CONTENT_SEARCH_UPDATE_MERGE_CASE,
+            note = "auth: $ACCOUNT_PLAYLIST_CONTENT_AUTH_REQUIRED_CASE; merge: source recording removed and relations moved to target",
+        ),
+        full(
+            "GET",
+            "/api/plugins",
+            testRef = PLUGIN_LIFECYCLE_CASE,
+            note = "error: invalid stored form metadata returns 500",
+        ),
+        full(
+            "POST",
+            "/api/plugins/upload",
+            testRef = PLUGIN_LIFECYCLE_CASE,
+            note = "validation: $PLUGIN_UPLOAD_INVALID_CASE",
+        ),
+        full(
+            "PUT",
+            "/api/plugins/{id}/enabled",
+            testRef = PLUGIN_LIFECYCLE_CASE,
+            note = "error: missing plugin returns 404",
+        ),
+        full(
+            "DELETE",
+            "/api/plugins/{id}",
+            testRef = PLUGIN_LIFECYCLE_CASE,
+            note = "error: missing plugin returns 404",
+        ),
+        full(
+            "GET",
+            "/api/plugins/{id}/download",
+            testRef = PLUGIN_LIFECYCLE_CASE,
+            note = "error: deleted plugin returns 404",
+        ),
+        full(
+            "POST",
+            "/api/plugins/{taskType}/submit",
+            testRef = PLUGIN_LIFECYCLE_CASE,
+            note = "validation: unknown task type returns 400; error: disabled plugin task returns 400",
         ),
         full(
             "GET",
@@ -367,8 +463,14 @@ object ApiCoverageRegistry {
     ): CoverageEntry {
         return CoverageEntry(
             key = ApiEndpointKey(method = method, path = path, condition = condition),
-            mark = CoverageMark(level = CoverageLevel.FULL, testRef = testRef, note = note),
+            mark = CoverageMark(level = CoverageLevel.FULL, testRef = testRef, note = businessNote(note)),
         )
+    }
+
+    private fun businessNote(note: String): String {
+        return note
+            .replace(Regex("^auth: [^;]+;\\s*"), "")
+            .replace(Regex("^auth: [^;]+$"), "")
     }
 }
 

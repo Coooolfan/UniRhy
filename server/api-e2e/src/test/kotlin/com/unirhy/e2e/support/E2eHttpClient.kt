@@ -1,6 +1,7 @@
 package com.unirhy.e2e.support
 
 import java.lang.reflect.Array as ReflectArray
+import java.io.ByteArrayOutputStream
 import java.net.URI
 import java.net.URLDecoder
 import java.net.URLEncoder
@@ -9,6 +10,7 @@ import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.nio.charset.StandardCharsets
 import java.time.Duration
+import java.util.UUID
 
 class E2eHttpClient(private val baseUrl: String) {
     private val httpClient = HttpClient.newBuilder()
@@ -108,6 +110,38 @@ class E2eHttpClient(private val baseUrl: String) {
         )
     }
 
+    fun postMultipartFile(
+        path: String,
+        fieldName: String,
+        fileName: String,
+        fileBytes: ByteArray,
+        contentType: String = "application/octet-stream",
+        query: Map<String, Any?> = emptyMap(),
+        headers: Map<String, String> = emptyMap(),
+    ): HttpResponse<String> {
+        val boundary = "unirhy-e2e-${UUID.randomUUID()}"
+        val body = ByteArrayOutputStream()
+        fun write(value: String) {
+            body.write(value.toByteArray(StandardCharsets.UTF_8))
+        }
+
+        write("--$boundary\r\n")
+        write("Content-Disposition: form-data; name=\"$fieldName\"; filename=\"$fileName\"\r\n")
+        write("Content-Type: $contentType\r\n\r\n")
+        body.write(fileBytes)
+        write("\r\n--$boundary--\r\n")
+
+        return requestText(
+            E2eRequest(
+                method = HttpMethod.POST,
+                path = path,
+                query = query,
+                headers = headers + ("Content-Type" to "multipart/form-data; boundary=$boundary"),
+                bytes = body.toByteArray(),
+            ),
+        )
+    }
+
     fun put(
         path: String,
         query: Map<String, Any?> = emptyMap(),
@@ -155,8 +189,9 @@ class E2eHttpClient(private val baseUrl: String) {
     }
 
     private fun buildHttpRequest(request: E2eRequest): HttpRequest {
-        require(!(request.json != null && request.form != null)) {
-            "json and form cannot be provided at the same time"
+        val providedBodies = listOf(request.json, request.bytes, request.form).count { it != null }
+        require(providedBodies <= 1) {
+            "json, bytes, and form cannot be provided at the same time"
         }
 
         val headers = linkedMapOf<String, String>()
@@ -171,6 +206,8 @@ class E2eHttpClient(private val baseUrl: String) {
                 headers["Content-Type"] = CONTENT_TYPE_FORM
                 HttpRequest.BodyPublishers.ofString(encodeParams(request.form))
             }
+
+            request.bytes != null -> HttpRequest.BodyPublishers.ofByteArray(request.bytes)
 
             else -> HttpRequest.BodyPublishers.noBody()
         }
@@ -255,6 +292,7 @@ data class E2eRequest(
     val query: Map<String, Any?> = emptyMap(),
     val headers: Map<String, String> = emptyMap(),
     val json: Any? = null,
+    val bytes: ByteArray? = null,
     // null means no form body; non-null means send form body (empty map sends empty payload with form content type).
     val form: Map<String, Any?>? = null,
 )

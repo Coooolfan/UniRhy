@@ -135,10 +135,60 @@ class AccountPlaylistContentE2eTest {
             api.delete("/api/playlists/1/recordings/1"),
             "[auth] remove recording from playlist should require login",
         )
+        assertAuthenticationFailed(
+            api.put(
+                path = "/api/playlists/1/recordings/reorder",
+                json = mapOf("recordingIds" to listOf(1L, 2L)),
+            ),
+            "[auth] reorder playlist recordings should require login",
+        )
 
         assertAuthenticationFailed(
             api.get(path = "/api/albums/search", query = mapOf("name" to "blocked")),
             "[auth] search albums should require login",
+        )
+        assertAuthenticationFailed(
+            api.put(
+                path = "/api/albums/1/recordings/reorder",
+                json = mapOf("recordingIds" to listOf(1L, 2L)),
+            ),
+            "[auth] reorder album recordings should require login",
+        )
+        assertAuthenticationFailed(
+            api.get("/api/artists"),
+            "[auth] list artists should require login",
+        )
+        assertAuthenticationFailed(
+            api.get(path = "/api/artists/search", query = mapOf("name" to "blocked")),
+            "[auth] search artists should require login",
+        )
+        assertAuthenticationFailed(
+            api.post(
+                path = "/api/artists",
+                json = artistCreatePayload(
+                    displayName = "blocked-artist",
+                    alias = listOf("blocked-alias"),
+                    comment = "blocked-comment",
+                ),
+            ),
+            "[auth] create artist should require login",
+        )
+        assertAuthenticationFailed(
+            api.put(
+                path = "/api/artists/1",
+                json = mapOf("displayName" to "blocked-artist-updated"),
+            ),
+            "[auth] update artist should require login",
+        )
+        assertAuthenticationFailed(
+            api.post(
+                path = "/api/artists/merge",
+                json = mapOf(
+                    "targetId" to 1L,
+                    "needMergeIds" to listOf(1L, 2L),
+                ),
+            ),
+            "[auth] merge artists should require login",
         )
         assertAuthenticationFailed(
             api.get(path = "/api/works/search", query = mapOf("name" to "blocked")),
@@ -187,6 +237,16 @@ class AccountPlaylistContentE2eTest {
                 ),
             ),
             "[auth] update recording should require login",
+        )
+        assertAuthenticationFailed(
+            api.put(
+                path = "/api/recordings/merge",
+                json = mapOf(
+                    "targetId" to 1L,
+                    "needMergeIds" to listOf(1L, 2L),
+                ),
+            ),
+            "[auth] merge recordings should require login",
         )
     }
 
@@ -1191,6 +1251,135 @@ class AccountPlaylistContentE2eTest {
         E2eAssert.jsonAt(detailResponse.body(), "/title", "album-updated-$suffix", "[album-update] detail title should persist")
     }
 
+    @Test
+    @Order(11)
+    fun `artists should support list search create update and merge flow`() {
+        val state = bootstrapAdminSession(baseUrl())
+        val suffix = suffix()
+
+        val targetResponse = state.api.post(
+            path = "/api/artists",
+            json = artistCreatePayload(
+                displayName = "artist-target-$suffix",
+                alias = listOf("artist-target-alias-$suffix"),
+                comment = "artist-target-comment-$suffix",
+            ),
+        )
+        E2eAssert.status(targetResponse, 201, "[artists] create target should succeed")
+        val targetId = readIdFromObject(targetResponse.body(), "/id", "[artists] target id should exist")
+        E2eAssert.jsonAt(targetResponse.body(), "/displayName", "artist-target-$suffix", "[artists] target display name should match")
+
+        val sourceResponse = state.api.post(
+            path = "/api/artists",
+            json = artistCreatePayload(
+                displayName = "artist-source-$suffix",
+                alias = listOf("artist-source-alias-$suffix"),
+                comment = "artist-source-comment-$suffix",
+            ),
+        )
+        E2eAssert.status(sourceResponse, 201, "[artists] create source should succeed")
+        val sourceId = readIdFromObject(sourceResponse.body(), "/id", "[artists] source id should exist")
+
+        val listResponse = state.api.get(
+            path = "/api/artists",
+            query = mapOf("pageIndex" to 0, "pageSize" to 200),
+        )
+        E2eAssert.status(listResponse, 200, "[artists] list should succeed")
+        assertTrue(pageContainsId(listResponse.body(), targetId), "[artists] list should contain target")
+        assertTrue(pageContainsId(listResponse.body(), sourceId), "[artists] list should contain source")
+
+        E2eAssert.status(
+            state.api.get(
+                path = "/api/artists",
+                query = mapOf("pageIndex" to "not-a-number", "pageSize" to 10),
+            ),
+            400,
+            "[artists] list should reject malformed page index",
+        )
+
+        val searchResponse = state.api.get(
+            path = "/api/artists/search",
+            query = mapOf("name" to "artist-source-$suffix"),
+        )
+        E2eAssert.status(searchResponse, 200, "[artists] search should succeed")
+        E2eAssert.jsonArrayContainsId(searchResponse.body(), sourceId, "[artists] search should contain source")
+
+        val emptySearchResponse = state.api.get(
+            path = "/api/artists/search",
+            query = mapOf("name" to "artist-missing-$suffix"),
+        )
+        E2eAssert.status(emptySearchResponse, 200, "[artists] missing search should succeed")
+        assertTrue(
+            E2eJson.mapper.readTree(emptySearchResponse.body()).isEmpty,
+            "[artists] missing search should return empty array",
+        )
+
+        val updateResponse = state.api.put(
+            path = "/api/artists/$targetId",
+            json = mapOf(
+                "displayName" to "artist-target-updated-$suffix",
+                "alias" to listOf("artist-target-updated-alias-$suffix"),
+                "comment" to "artist-target-updated-comment-$suffix",
+            ),
+        )
+        E2eAssert.status(updateResponse, 200, "[artists] update should succeed")
+        E2eAssert.jsonAt(updateResponse.body(), "/displayName", "artist-target-updated-$suffix", "[artists] updated name should match")
+
+        E2eAssert.status(
+            state.api.put(path = "/api/artists/not-a-number", json = mapOf("displayName" to "bad-id")),
+            400,
+            "[artists] update should reject malformed id",
+        )
+        E2eAssert.status(
+            state.api.post(
+                path = "/api/artists",
+                json = mapOf(
+                    "alias" to listOf("artist-invalid-alias-$suffix"),
+                    "comment" to "artist-invalid-comment-$suffix",
+                ),
+            ),
+            400,
+            "[artists] create should reject missing display name",
+        )
+
+        val mergeResponse = state.api.post(
+            path = "/api/artists/merge",
+            json = mapOf(
+                "targetId" to targetId,
+                "needMergeIds" to listOf(targetId, sourceId),
+            ),
+        )
+        E2eAssert.status(mergeResponse, 200, "[artists] merge should succeed")
+
+        val searchAfterMergeResponse = state.api.get(
+            path = "/api/artists/search",
+            query = mapOf("name" to "artist-source-$suffix"),
+        )
+        E2eAssert.status(searchAfterMergeResponse, 200, "[artists] search after merge should succeed")
+        E2eAssert.jsonArrayContainsId(
+            searchAfterMergeResponse.body(),
+            targetId,
+            "[artists] merged target should inherit source display name as alias",
+        )
+        E2eAssert.jsonArrayNotContainsId(
+            searchAfterMergeResponse.body(),
+            sourceId,
+            "[artists] merged source should be deleted",
+        )
+
+        E2eAssert.status(
+            state.api.post(
+                path = "/api/artists/merge",
+                json = mapOf(
+                    "targetId" to Long.MAX_VALUE,
+                    "needMergeIds" to listOf(Long.MAX_VALUE, targetId),
+                ),
+            ),
+            404,
+            "[artists] merging missing target should fail",
+        )
+    }
+
     private fun createAccountByAdmin(
         state: E2eAdminSession,
         name: String,
@@ -1729,6 +1918,14 @@ class AccountPlaylistContentE2eTest {
             "name" to name,
             "email" to email,
             "password" to password,
+        )
+    }
+
+    private fun artistCreatePayload(displayName: String, alias: List<String>, comment: String): Map<String, Any> {
+        return mapOf(
+            "displayName" to displayName,
+            "alias" to alias,
+            "comment" to comment,
         )
     }
 
