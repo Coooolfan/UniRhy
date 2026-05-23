@@ -49,25 +49,14 @@ watch(
 </template>
 
 <style>
-.no-scrollbar {
-    scrollbar-color: #d6d1c4 transparent;
-    scrollbar-gutter: stable;
-}
-
+/* Hide scrollbar for Chrome, Safari and Opera */
 .no-scrollbar::-webkit-scrollbar {
-    width: 6px;
+    display: none;
 }
 
-.no-scrollbar::-webkit-scrollbar-track {
-    background: transparent;
-}
-
-.no-scrollbar::-webkit-scrollbar-thumb {
-    background-color: #d6d1c4;
-    border-radius: 3px;
-}
-
-.no-scrollbar::-webkit-scrollbar-thumb:hover {
-    background-color: #c0bab0;
+/* Hide scrollbar for IE, Edge and Firefox */
+.no-scrollbar {
+    -ms-overflow-style: none; /* IE and Edge */
+    scrollbar-width: none; /* Firefox */
 }
 </style>
