@@ -321,8 +321,8 @@ watch(
             </div>
 
             <MediaListPanel
-                title="Tracks"
-                :summary="`${recordings.length} Tracks`"
+                title="曲目"
+                :summary="`${recordings.length} 首曲目`"
                 :items="recordings"
                 :playing-id="playingId"
                 enable-reorder
@@ -337,7 +337,7 @@ watch(
                         {{ isReorderingRecordings ? '正在保存顺序' : '' }}
                     </span>
                 </template>
-                <template #empty> 前往 Work 或者 Album 详情页添加曲目到您的歌单 </template>
+                <template #empty> 前往作品或专辑详情页，将曲目添加到歌单 </template>
 
                 <template #item="{ item }">
                     <MediaListItem

@@ -393,8 +393,10 @@ const playItem = async (item: DisplayItem) => {
                         class="mb-2 hidden grid-cols-12 border-b border-[#D6D1C7] px-4 pb-2 text-xs uppercase tracking-wider text-[#8C857B] md:grid"
                     >
                         <div class="col-span-1">#</div>
-                        <div class="col-span-5">Title</div>
-                        <div class="col-span-4">Subtitle</div>
+                        <div class="col-span-5">
+                            {{ activeTab === 'Albums' ? '专辑名' : '作品名' }}
+                        </div>
+                        <div class="col-span-4">艺术家</div>
                     </div>
                     <div
                         v-for="(item, idx) in displayItems"
@@ -466,7 +468,7 @@ const playItem = async (item: DisplayItem) => {
                     <ChevronLeft :size="20" />
                 </button>
                 <span class="font-serif text-sm text-[#5E5950]">
-                    Page {{ pageIndex + 1 }} of {{ totalPageCount }}
+                    第 {{ pageIndex + 1 }} / {{ totalPageCount }} 页
                 </span>
                 <button
                     :disabled="pageIndex >= totalPageCount - 1 || isLoading"

@@ -57,9 +57,8 @@ export const useAudioTrackCatalog = (options: UseAudioTrackCatalogOptions) => {
         }
 
         const cover = item.coverUrl ? buildApiUrl(item.coverUrl) : ''
-        const title =
-            item.title || cached?.title || current?.title || `Recording #${item.recordingId}`
-        const artist = item.artistLabel || cached?.artist || current?.artist || 'Unknown Artist'
+        const title = item.title || cached?.title || current?.title || `曲目 #${item.recordingId}`
+        const artist = item.artistLabel || cached?.artist || current?.artist || '未知艺术家'
 
         return {
             id: item.recordingId,
@@ -123,10 +122,10 @@ export const useAudioTrackCatalog = (options: UseAudioTrackCatalogOptions) => {
                 metadata.comment,
                 metadata.work?.title,
                 track.title,
-            ) ?? `Recording #${track.id}`
+            ) ?? `曲目 #${track.id}`
         const artist =
             pickFirstNonBlank(resolveMetadataArtistLabel(metadata.artists), track.artist) ??
-            'Unknown Artist'
+            '未知艺术家'
         const cover = metadata.cover?.url ? resolveCover(metadata.cover) : (track.cover ?? '')
         let workId = track.workId
         if (metadata.work?.id !== undefined) {
@@ -239,8 +238,8 @@ export const useAudioTrackCatalog = (options: UseAudioTrackCatalogOptions) => {
         const base = current ?? cached
         const track: AudioTrack = {
             id: recordingId,
-            title: base?.title ?? `Recording #${recordingId}`,
-            artist: base?.artist ?? 'Unknown Artist',
+            title: base?.title ?? `曲目 #${recordingId}`,
+            artist: base?.artist ?? '未知艺术家',
             cover: base?.cover ?? '',
             src: base?.src,
             mediaFileId: base?.mediaFileId,

@@ -136,7 +136,7 @@ const handleSubmit = async () => {
                     <label
                         class="text-xs uppercase tracking-wider text-[#8A8A8A] font-serif block mb-2"
                     >
-                        Endpoint
+                        服务端点
                     </label>
                     <input
                         v-model="form.host"
@@ -151,7 +151,7 @@ const handleSubmit = async () => {
                         <label
                             class="text-xs uppercase tracking-wider text-[#8A8A8A] font-serif block mb-2"
                         >
-                            Bucket
+                            存储桶
                         </label>
                         <input
                             v-model="form.bucket"
@@ -181,7 +181,7 @@ const handleSubmit = async () => {
                         <label
                             class="text-xs uppercase tracking-wider text-[#8A8A8A] font-serif block mb-2"
                         >
-                            Access Key
+                            访问密钥
                         </label>
                         <input
                             v-model="form.accessKey"
@@ -195,7 +195,7 @@ const handleSubmit = async () => {
                         <label
                             class="text-xs uppercase tracking-wider text-[#8A8A8A] font-serif block mb-2"
                         >
-                            Secret Key
+                            私有密钥
                         </label>
                         <input
                             v-model="form.secretKey"
@@ -209,6 +209,7 @@ const handleSubmit = async () => {
                 </div>
                 <p class="text-xs leading-relaxed text-[#B95D5D] font-serif">
                     修改对象存储 Endpoint、Bucket 或根路径前缀会导致此节点下的所有资产被重定向。
+                    <br />除非您理解这意味着什么，否则不要更改此项
                 </p>
             </div>
 

@@ -316,8 +316,8 @@ watch(
             />
 
             <MediaListPanel
-                title="Tracks"
-                :summary="`${recordings.length} Tracks`"
+                title="曲目"
+                :summary="`${recordings.length} 首曲目`"
                 :items="recordings"
                 :playing-id="playingId"
                 enable-reorder

@@ -101,8 +101,8 @@ const titleClass = computed(() => (props.tone === 'danger' ? 'text-[#2B221B]' : 
 
 const bodyClass = computed(() =>
     props.bodyPadding
-        ? 'min-h-0 flex-1 overflow-y-auto px-8 py-8'
-        : 'min-h-0 flex-1 overflow-y-auto',
+        ? 'modal-body min-h-0 flex-1 overflow-y-auto px-8 py-8'
+        : 'modal-body min-h-0 flex-1 overflow-y-auto',
 )
 
 const rootStyle = computed(() => ({
@@ -444,5 +444,27 @@ onUnmounted(() => {
 .app-modal-leave-to .app-modal-panel {
     opacity: 0;
     transform: translateY(1rem);
+}
+
+.modal-body {
+    scrollbar-color: #d6d1c4 transparent;
+    scrollbar-gutter: stable;
+}
+
+.modal-body::-webkit-scrollbar {
+    width: 6px;
+}
+
+.modal-body::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.modal-body::-webkit-scrollbar-thumb {
+    background-color: #d6d1c4;
+    border-radius: 3px;
+}
+
+.modal-body::-webkit-scrollbar-thumb:hover {
+    background-color: #c0bab0;
 }
 </style>

@@ -369,7 +369,7 @@ watch(
             />
 
             <MediaListPanel
-                title="Tracks"
+                title="曲目"
                 :items="recordings"
                 :playing-id="playingId"
                 enable-multi-select
