@@ -61,25 +61,25 @@ class CurrentQueueService(
 
     fun getQueue(accountId: Long): CurrentQueueDto {
         return lockManager.withAccountLock(accountId) {
-            buildQueueDto(getOrLoadStateLocked(accountId))
+            buildQueueDto(loadActiveStateLocked(accountId))
         }
     }
 
     fun getPlaybackState(accountId: Long): AccountPlaybackState {
         return lockManager.withAccountLock(accountId) {
-            getOrLoadStateLocked(accountId).toPlaybackState()
+            loadActiveStateLocked(accountId).toPlaybackState()
         }
     }
 
     fun getCurrentEntry(accountId: Long): CurrentQueueEntry? {
         return lockManager.withAccountLock(accountId) {
-            currentRecordingIdOf(getOrLoadStateLocked(accountId))?.let(::resolveCurrentEntry)
+            currentRecordingIdOf(loadActiveStateLocked(accountId))?.let(::resolveCurrentEntry)
         }
     }
 
     fun getCurrentRecordingId(accountId: Long): Long? {
         return lockManager.withAccountLock(accountId) {
-            currentRecordingIdOf(getOrLoadStateLocked(accountId))
+            currentRecordingIdOf(loadActiveStateLocked(accountId))
         }
     }
 
@@ -386,7 +386,7 @@ class CurrentQueueService(
         nowMs: Long,
     ): AccountPlaybackState {
         return lockManager.withAccountLock(accountId) {
-            val state = getOrLoadStateLocked(accountId)
+            val state = loadActiveStateLocked(accountId)
             val positionMs = if (state.playbackStatus == PlaybackStatus.PLAYING) {
                 recoverPositionMs(state, nowMs)
             } else {
@@ -401,7 +401,7 @@ class CurrentQueueService(
 
     fun getQueueVersion(accountId: Long): Long {
         return lockManager.withAccountLock(accountId) {
-            getOrLoadStateLocked(accountId).version
+            loadActiveStateLocked(accountId).version
         }
     }
 
@@ -580,13 +580,66 @@ class CurrentQueueService(
         return loaded
     }
 
+    /**
+     * 加载状态并剔除已不存在的录音（如被合并或删除导致的悬空引用）。
+     *
+     * 录音可能在仍处于某账户队列时被删除，而 [recording_ids] 数组列没有外键约束兜底。
+     * 此处在读取与变更前统一自愈：移除悬空 ID、重算当前索引与随机顺序并持久化，
+     * 使队列始终可解析为一致的 [CurrentQueueDto]。
+     */
+    private fun loadActiveStateLocked(accountId: Long): AccountPlayQueueState {
+        val state = getOrLoadStateLocked(accountId)
+        if (state.recordingIds.isEmpty()) {
+            return state
+        }
+        val existingRecordingIds = recordingCatalog.getExistingRecordingIds(state.recordingIds.toSet())
+        if (state.recordingIds.all { it in existingRecordingIds }) {
+            return state
+        }
+        return sanitizeQueueLocked(state, existingRecordingIds, timeProvider.nowMs())
+    }
+
+    private fun sanitizeQueueLocked(
+        state: AccountPlayQueueState,
+        existingRecordingIds: Set<Long>,
+        nowMs: Long,
+    ): AccountPlayQueueState {
+        val sanitized = state.deepCopy()
+        val previousRecordingIds = sanitized.recordingIds.toList()
+        val previousIndex = sanitized.currentIndex
+
+        sanitized.recordingIds.clear()
+        sanitized.recordingIds += previousRecordingIds.filter { it in existingRecordingIds }
+
+        if (sanitized.recordingIds.isEmpty()) {
+            forceEmptyStateLocked(sanitized)
+        } else {
+            val retainedBeforeCurrent = (0 until previousIndex.coerceIn(0, previousRecordingIds.size))
+                .count { previousRecordingIds[it] in existingRecordingIds }
+            val currentRetained = previousIndex in previousRecordingIds.indices &&
+                previousRecordingIds[previousIndex] in existingRecordingIds
+            if (currentRetained) {
+                sanitized.currentIndex = retainedBeforeCurrent
+            } else {
+                sanitized.currentIndex = retainedBeforeCurrent.coerceAtMost(sanitized.recordingIds.lastIndex)
+                clearPlaybackProgress(sanitized)
+            }
+            sanitized.shuffleIndices.clear()
+            rebuildShuffleOrderLocked(sanitized, anchorIndex = currentIndexOrNull(sanitized))
+        }
+
+        touchState(sanitized, nowMs)
+        persistAndCacheState(state.version, sanitized)
+        return sanitized
+    }
+
     private inline fun <T> withMutationContext(
         accountId: Long,
         expectedVersion: Long? = null,
         crossinline block: (MutationContext) -> T,
     ): T {
         return lockManager.withAccountLock(accountId) {
-            val currentState = getOrLoadStateLocked(accountId)
+            val currentState = loadActiveStateLocked(accountId)
             if (expectedVersion != null) {
                 requireExpectedVersion(currentState, expectedVersion)
             }

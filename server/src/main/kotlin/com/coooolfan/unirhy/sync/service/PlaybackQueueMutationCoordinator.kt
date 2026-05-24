@@ -86,7 +86,7 @@ class PlaybackQueueMutationCoordinator(
     ) {
         val playbackState = playbackSessionService.getOrCreateState(accountId)
         val removedWasPlaying =
-            playbackState.currentIndex != null && playbackState.currentIndex == change.removedIndex
+            change.removedIndex != null && change.removedIndex == change.previousCurrentIndex
 
         val currentIndex = change.currentIndex
         val currentRecordingId = change.currentRecordingId

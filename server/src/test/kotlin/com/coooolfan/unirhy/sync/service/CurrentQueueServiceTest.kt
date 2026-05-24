@@ -157,6 +157,104 @@ class CurrentQueueServiceTest {
         assertEquals(0, advanced.queue.currentIndex)
     }
 
+    @Test
+    fun `getQueue drops recordings removed before current and recomputes index`() {
+        val mutableCatalog = MutableCatalog()
+        val svc = CurrentQueueService(
+            lockManager = PlaybackAccountLockManager(),
+            recordingCatalog = mutableCatalog,
+            timeProvider = timeProvider,
+            urlSigner = MediaUrlSigner("test-signing-key", 3600),
+            stateStore = stateStore,
+        )
+        val initial = svc.replaceQueue(
+            accountId = 7L,
+            recordingIds = listOf(1001L, 1002L, 1003L),
+            currentIndex = 2,
+            expectedVersion = 0L,
+        ).queue
+
+        mutableCatalog.remove(1001L)
+        val queue = svc.getQueue(7L)
+
+        assertEquals(listOf(1002L, 1003L), queue.recordingIds)
+        assertEquals(1, queue.currentIndex)
+        assertEquals(listOf(1002L, 1003L), queue.items.map { it.recordingId })
+        assertTrue(queue.version > initial.version)
+    }
+
+    @Test
+    fun `getQueue drops the current recording and clears progress`() {
+        val mutableCatalog = MutableCatalog()
+        val svc = CurrentQueueService(
+            lockManager = PlaybackAccountLockManager(),
+            recordingCatalog = mutableCatalog,
+            timeProvider = timeProvider,
+            urlSigner = MediaUrlSigner("test-signing-key", 3600),
+            stateStore = stateStore,
+        )
+        svc.replaceQueue(
+            accountId = 8L,
+            recordingIds = listOf(1001L, 1002L, 1003L),
+            currentIndex = 1,
+            expectedVersion = 0L,
+        )
+
+        mutableCatalog.remove(1002L)
+        val queue = svc.getQueue(8L)
+
+        assertEquals(listOf(1001L, 1003L), queue.recordingIds)
+        assertEquals(1, queue.currentIndex)
+        assertEquals(PlaybackStatus.PAUSED, queue.playbackStatus)
+        assertEquals(0L, queue.positionMs)
+    }
+
+    @Test
+    fun `getQueue empties the queue when every recording is gone`() {
+        val mutableCatalog = MutableCatalog()
+        val svc = CurrentQueueService(
+            lockManager = PlaybackAccountLockManager(),
+            recordingCatalog = mutableCatalog,
+            timeProvider = timeProvider,
+            urlSigner = MediaUrlSigner("test-signing-key", 3600),
+            stateStore = stateStore,
+        )
+        svc.replaceQueue(
+            accountId = 9L,
+            recordingIds = listOf(1001L, 1002L),
+            currentIndex = 1,
+            expectedVersion = 0L,
+        )
+
+        mutableCatalog.remove(1001L)
+        mutableCatalog.remove(1002L)
+        val queue = svc.getQueue(9L)
+
+        assertTrue(queue.recordingIds.isEmpty())
+        assertEquals(0, queue.currentIndex)
+        assertEquals(PlaybackStatus.PAUSED, queue.playbackStatus)
+    }
+
+    private class MutableCatalog : CurrentQueueRecordingCatalog {
+        private val recordings = linkedMapOf(
+            1001L to ResolvedQueueRecording(1001L, 3001L, "Track 1", "Artist 1", null, 180_000),
+            1002L to ResolvedQueueRecording(1002L, 3002L, "Track 2", "Artist 2", null, 210_000),
+            1003L to ResolvedQueueRecording(1003L, 3003L, "Track 3", "Artist 3", null, 240_000),
+        )
+
+        fun remove(recordingId: Long) {
+            recordings.remove(recordingId)
+        }
+
+        override fun getExistingRecordingIds(recordingIds: Set<Long>): Set<Long> {
+            return recordings.keys.intersect(recordingIds)
+        }
+
+        override fun loadResolvedRecordings(recordingIds: Set<Long>): List<ResolvedQueueRecording> {
+            return recordingIds.mapNotNull(recordings::get)
+        }
+    }
+
     private class FakeCatalog : CurrentQueueRecordingCatalog {
         private val recordings = mapOf(
             1001L to ResolvedQueueRecording(1001L, 3001L, "Track 1", "Artist 1", null, 180_000),

@@ -155,6 +155,7 @@ class PlaybackSyncWebSocketHandlerTest {
         )
         val scheduledActionDispatcher = PlaybackSyncScheduledActionDispatcher(
             messageSender = messageSender,
+            deviceRuntimeService = deviceRuntimeService,
             logWriter = com.coooolfan.unirhy.sync.log.PlaybackSyncLogWriter(),
         )
         val autoAdvanceService = PlaybackAutoAdvanceService(
