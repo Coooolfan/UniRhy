@@ -28,11 +28,11 @@ const strategyDisabled = computed(() => {
 
 const playbackStrategyOptions = [
     { value: 'SEQUENTIAL', label: '顺序' },
-    { value: 'SHUFFLE', label: '乱序' },
+    { value: 'SHUFFLE', label: '随机' },
 ] as const
 
 const stopStrategyOptions = [
-    { value: 'TRACK', label: '曲目' },
+    { value: 'TRACK', label: '单曲' },
     { value: 'LIST', label: '列表' },
 ] as const
 
@@ -109,97 +109,94 @@ const updateStopStrategy = (value: 'TRACK' | 'LIST') => {
             data-test="queue-sidebar"
             class="fixed bottom-[calc(max(6.25rem,env(safe-area-inset-bottom)+5rem))] right-4 top-24 z-[55] flex w-[23rem] flex-col border border-[#EAE6DE] bg-[#fffcf5] p-3 shadow-[0_8px_30px_rgba(0,0,0,0.12)] backdrop-blur max-md:left-3 max-md:right-3 max-md:top-auto max-md:max-h-[55vh] max-md:w-auto"
         >
-            <div
-                class="mb-3 flex items-start justify-between gap-3 border-b border-[#EAE6DE] px-1 pb-3"
-            >
-                <div>
-                    <div class="text-[11px] uppercase tracking-[0.22em] text-[#8C857B]">
-                        Current Queue
+            <div class="mb-3 border-b border-[#EAE6DE] px-1 pb-3">
+                <div class="flex items-start justify-between gap-3">
+                    <div>
+                        <div class="text-[11px] uppercase tracking-[0.22em] text-[#8C857B]">
+                            播放队列
+                        </div>
+                        <div class="mt-1 text-sm font-medium text-[#3E322B]">
+                            {{ audioStore.queueEntries.length }} 首曲目
+                        </div>
                     </div>
-                    <div class="mt-1 text-sm font-medium text-[#3E322B]">
-                        {{ audioStore.queueEntries.length }} tracks
-                    </div>
-                    <div class="mt-3 flex items-center gap-3 text-[11px] text-[#7C7367]">
-                        <label class="flex min-w-0 items-center gap-2">
-                            <span class="shrink-0 text-[#9A9287]">播放</span>
-                            <div class="relative min-w-0">
-                                <select
-                                    data-test="playback-strategy-select"
-                                    :value="audioStore.playbackStrategy"
-                                    class="min-w-22 appearance-none border-b border-[#D6D1C4] bg-[#F7F5F0] py-1 pr-6 text-[11px] text-[#2C2C2C] outline-none transition-colors focus:border-[#C27E46]"
-                                    :disabled="strategyDisabled"
-                                    @change="
-                                        updatePlaybackStrategy(
-                                            ($event.target as HTMLSelectElement).value as
-                                                | 'SEQUENTIAL'
-                                                | 'SHUFFLE',
-                                        )
-                                    "
-                                >
-                                    <option
-                                        v-for="option in playbackStrategyOptions"
-                                        :key="option.value"
-                                        :value="option.value"
-                                    >
-                                        {{ option.label }}
-                                    </option>
-                                </select>
-                                <ChevronDown
-                                    :size="12"
-                                    class="pointer-events-none absolute right-0.5 top-1/2 -translate-y-1/2 text-[#8C857B]"
-                                />
-                            </div>
-                        </label>
-
-                        <label class="flex min-w-0 items-center gap-2">
-                            <span class="shrink-0 text-[#9A9287]">停止</span>
-                            <div class="relative min-w-0">
-                                <select
-                                    data-test="stop-strategy-select"
-                                    :value="audioStore.stopStrategy"
-                                    class="min-w-[4.5rem] appearance-none border-b border-[#D6D1C4] bg-[#F7F5F0] py-1 pr-6 text-[11px] text-[#2C2C2C] outline-none transition-colors focus:border-[#C27E46]"
-                                    :disabled="strategyDisabled"
-                                    @change="
-                                        updateStopStrategy(
-                                            ($event.target as HTMLSelectElement).value as
-                                                | 'TRACK'
-                                                | 'LIST',
-                                        )
-                                    "
-                                >
-                                    <option
-                                        v-for="option in stopStrategyOptions"
-                                        :key="option.value"
-                                        :value="option.value"
-                                    >
-                                        {{ option.label }}
-                                    </option>
-                                </select>
-                                <ChevronDown
-                                    :size="12"
-                                    class="pointer-events-none absolute right-0.5 top-1/2 -translate-y-1/2 text-[#8C857B]"
-                                />
-                            </div>
-                        </label>
-                    </div>
-                </div>
-
-                <div class="flex items-center gap-1">
-                    <button
-                        type="button"
-                        data-test="clear-queue-button"
-                        class="px-2.5 py-1 text-xs text-[#8C857B] transition-colors hover:text-[#B55B4A]"
-                        :disabled="!audioStore.canSendRealtimeControl"
-                        @click="clearQueue"
-                    >
-                        清空
-                    </button>
                     <button
                         type="button"
                         class="p-1.5 text-[#8C857B] transition-colors hover:text-[#B56C35]"
                         @click="close"
                     >
                         <ChevronRight :size="14" />
+                    </button>
+                </div>
+                <div class="mt-3 flex items-center gap-3 text-[11px] text-[#7C7367]">
+                    <label class="flex flex-1 min-w-0 items-center gap-2">
+                        <span class="shrink-0 text-[#9A9287]">播放策略</span>
+                        <div class="relative min-w-0 flex-1">
+                            <select
+                                data-test="playback-strategy-select"
+                                :value="audioStore.playbackStrategy"
+                                class="w-full appearance-none border-b border-[#D6D1C4] bg-[#F7F5F0] px-1.5 py-1 pr-6 text-[11px] text-[#2C2C2C] outline-none transition-colors focus:border-[#C27E46]"
+                                :disabled="strategyDisabled"
+                                @change="
+                                    updatePlaybackStrategy(
+                                        ($event.target as HTMLSelectElement).value as
+                                            | 'SEQUENTIAL'
+                                            | 'SHUFFLE',
+                                    )
+                                "
+                            >
+                                <option
+                                    v-for="option in playbackStrategyOptions"
+                                    :key="option.value"
+                                    :value="option.value"
+                                >
+                                    {{ option.label }}
+                                </option>
+                            </select>
+                            <ChevronDown
+                                :size="12"
+                                class="pointer-events-none absolute right-0.5 top-1/2 -translate-y-1/2 text-[#8C857B]"
+                            />
+                        </div>
+                    </label>
+
+                    <label class="flex flex-1 min-w-0 items-center gap-2">
+                        <span class="shrink-0 text-[#9A9287]">停止策略</span>
+                        <div class="relative min-w-0 flex-1">
+                            <select
+                                data-test="stop-strategy-select"
+                                :value="audioStore.stopStrategy"
+                                class="w-full appearance-none border-b border-[#D6D1C4] bg-[#F7F5F0] px-1.5 py-1 pr-6 text-[11px] text-[#2C2C2C] outline-none transition-colors focus:border-[#C27E46]"
+                                :disabled="strategyDisabled"
+                                @change="
+                                    updateStopStrategy(
+                                        ($event.target as HTMLSelectElement).value as
+                                            | 'TRACK'
+                                            | 'LIST',
+                                    )
+                                "
+                            >
+                                <option
+                                    v-for="option in stopStrategyOptions"
+                                    :key="option.value"
+                                    :value="option.value"
+                                >
+                                    {{ option.label }}
+                                </option>
+                            </select>
+                            <ChevronDown
+                                :size="12"
+                                class="pointer-events-none absolute right-0.5 top-1/2 -translate-y-1/2 text-[#8C857B]"
+                            />
+                        </div>
+                    </label>
+                    <button
+                        type="button"
+                        data-test="clear-queue-button"
+                        class="ml-auto shrink-0 px-1.5 py-0.5 text-[11px] text-[#8C857B] transition-colors hover:text-[#B55B4A]"
+                        :disabled="!audioStore.canSendRealtimeControl"
+                        @click="clearQueue"
+                    >
+                        清空队列
                     </button>
                 </div>
             </div>

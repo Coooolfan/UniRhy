@@ -123,9 +123,8 @@ const seekDisabled = computed(() => {
     return audioStore.isLoading || !audioStore.canSendRealtimeControl || audioStore.duration <= 0
 })
 
-const queueTransportDisabled = computed(() => {
-    return !audioStore.canNavigateQueue
-})
+const previousDisabled = computed(() => !audioStore.canPlayPrevious)
+const nextDisabled = computed(() => !audioStore.canPlayNext)
 
 const handlePlayPrevious = () => {
     void audioStore.playPrevious()
@@ -219,7 +218,7 @@ const syncStatusClass = computed(() => {
                                 type="button"
                                 data-test="previous-button-mobile"
                                 class="text-[#8C857B] transition-colors hover:text-[#C17D46]"
-                                :disabled="queueTransportDisabled"
+                                :disabled="previousDisabled"
                                 @click="handlePlayPrevious"
                             >
                                 <SkipBack :size="18" />
@@ -246,7 +245,7 @@ const syncStatusClass = computed(() => {
                                 type="button"
                                 data-test="next-button-mobile"
                                 class="text-[#8C857B] transition-colors hover:text-[#C17D46]"
-                                :disabled="queueTransportDisabled"
+                                :disabled="nextDisabled"
                                 @click="handlePlayNext"
                             >
                                 <SkipForward :size="18" />
@@ -259,7 +258,7 @@ const syncStatusClass = computed(() => {
                             <button
                                 data-test="previous-button"
                                 class="text-[#8C857B] hover:text-[#C17D46] transition-colors"
-                                :disabled="queueTransportDisabled"
+                                :disabled="previousDisabled"
                                 @click="handlePlayPrevious"
                             >
                                 <SkipBack :size="20" />
@@ -285,7 +284,7 @@ const syncStatusClass = computed(() => {
                             <button
                                 data-test="next-button"
                                 class="text-[#8C857B] hover:text-[#C17D46] transition-colors"
-                                :disabled="queueTransportDisabled"
+                                :disabled="nextDisabled"
                                 @click="handlePlayNext"
                             >
                                 <SkipForward :size="20" />

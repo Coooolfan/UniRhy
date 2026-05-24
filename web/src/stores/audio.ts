@@ -118,6 +118,10 @@ export const useAudioStore = defineStore('audio', () => {
     const lastLoadAudioSource = shallowRef<TimestampedPayload<LoadAudioSourcePayload> | null>(null)
     const lastDeviceChange = shallowRef<TimestampedPayload<DeviceChangePayload> | null>(null)
     const lastLocalExecution = shallowRef<PlaybackSyncLocalExecutionSnapshot | null>(null)
+    const preloadedTrackForCommand = shallowRef<{
+        commandId: string
+        track: AudioTrack
+    } | null>(null)
 
     const liveSourceNodes = new Set<AudioBufferSourceNode>()
     const ignoredEndedNodes = new WeakSet<AudioBufferSourceNode>()
@@ -240,6 +244,16 @@ export const useAudioStore = defineStore('audio', () => {
 
     const canNavigateQueue = computed(() => {
         return currentQueue.value.items.length > 0 && canSendRealtimeControl.value
+    })
+
+    const canPlayPrevious = computed(() => {
+        return canNavigateQueue.value && currentQueueIndex.value > 0
+    })
+
+    const canPlayNext = computed(() => {
+        return (
+            canNavigateQueue.value && currentQueueIndex.value < currentQueue.value.items.length - 1
+        )
     })
 
     const playbackStrategy = computed(() => currentQueue.value.playbackStrategy)
@@ -931,10 +945,9 @@ export const useAudioStore = defineStore('audio', () => {
         }
 
         const estimatedServerNowMs = getEstimatedServerNowMs()
-        const lateSeconds = Math.max(
-            0,
-            (estimatedServerNowMs - payload.serverTimeToExecuteMs) / 1_000,
-        )
+        const lateSeconds = payload.skipLateCompensation
+            ? 0
+            : Math.max(0, (estimatedServerNowMs - payload.serverTimeToExecuteMs) / 1_000)
         const scheduledOffset = clampTime(
             payload.scheduledAction.positionSeconds + lateSeconds,
             buffer.duration,
@@ -995,6 +1008,8 @@ export const useAudioStore = defineStore('audio', () => {
             return
         }
 
+        preloadedTrackForCommand.value = null
+
         const shellTrack = createTrackShell(payload.recordingId)
         currentTrack.value = cloneTrack(shellTrack)
         cacheTrack(shellTrack)
@@ -1013,6 +1028,8 @@ export const useAudioStore = defineStore('audio', () => {
         if (!buffer || track.mediaFileId === undefined) {
             return
         }
+
+        preloadedTrackForCommand.value = { commandId: payload.commandId, track }
 
         playbackSyncClient.value.sendAudioSourceLoaded({
             commandId: payload.commandId,
@@ -1096,12 +1113,20 @@ export const useAudioStore = defineStore('audio', () => {
         const actionToken = scheduledAction.version
         const scheduledRecordingId =
             getQueueRecordingId(scheduledAction.currentIndex) ?? scheduledAction.currentIndex
+
+        const cached = preloadedTrackForCommand.value
         const shellTrack =
             scheduledRecordingId === null ? null : createTrackShell(scheduledRecordingId)
-        if (shellTrack) {
-            void hydrateTrackMetadata(shellTrack)
+        let track: AudioTrack | null
+        if (cached && cached.commandId === payload.commandId) {
+            track = cached.track
+            preloadedTrackForCommand.value = null
+        } else {
+            if (shellTrack) {
+                void hydrateTrackMetadata(shellTrack)
+            }
+            track = shellTrack ? await resolveTrackForPlayback(shellTrack) : null
         }
-        const track = shellTrack ? await resolveTrackForPlayback(shellTrack) : null
 
         if (scheduledAction.action === 'PAUSE') {
             schedulePauseState(
@@ -1868,6 +1893,8 @@ export const useAudioStore = defineStore('audio', () => {
         syncStatusText,
         canSendRealtimeControl,
         canNavigateQueue,
+        canPlayPrevious,
+        canPlayNext,
         playbackStrategy,
         stopStrategy,
         play,

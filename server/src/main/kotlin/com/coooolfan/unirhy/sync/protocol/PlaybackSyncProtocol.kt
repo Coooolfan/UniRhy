@@ -115,6 +115,7 @@ data class ScheduledActionPayload(
     val commandId: String,
     val serverTimeToExecuteMs: Long,
     val scheduledAction: ScheduledPlaybackAction,
+    val skipLateCompensation: Boolean = false,
 )
 
 data class PlaybackSyncDevice(

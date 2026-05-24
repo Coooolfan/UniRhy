@@ -122,6 +122,7 @@ export type ScheduledActionPayload = {
     commandId: string
     serverTimeToExecuteMs: number
     scheduledAction: ScheduledPlaybackAction
+    skipLateCompensation?: boolean
 }
 
 export type DeviceChangePayload = {
