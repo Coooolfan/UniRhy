@@ -98,9 +98,11 @@ export const useRecordingPlayback = <T extends PlayableRecording>(
     )
 
     const isCurrentRecordingPlaying = computed(() => {
-        return (
-            audioStore.isPlaying && audioStore.currentTrack?.id === options.currentRecordingId.value
-        )
+        if (!audioStore.isPlaying) {
+            return false
+        }
+        const recordingIds = new Set(options.recordings.value.map((r) => r.id))
+        return audioStore.queueEntries.every((entry) => recordingIds.has(entry.recordingId))
     })
 
     const playingId = computed(() => {
