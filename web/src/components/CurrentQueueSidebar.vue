@@ -2,15 +2,7 @@
 import { computed } from 'vue'
 import { formatDurationMs } from '@/composables/recordingMedia'
 import { useAudioStore } from '@/stores/audio'
-import {
-    ArrowDown,
-    ArrowUp,
-    LoaderCircle,
-    Play,
-    Trash2,
-    ChevronRight,
-    ChevronDown,
-} from 'lucide-vue-next'
+import { ArrowDown, ArrowUp, LoaderCircle, Play, Trash2, ChevronDown } from 'lucide-vue-next'
 
 const props = defineProps<{
     expanded: boolean
@@ -100,16 +92,16 @@ const updateStopStrategy = (value: 'TRACK' | 'LIST' | 'NEVER') => {
 <template>
     <Transition
         enter-active-class="transition-all duration-220 ease-out"
-        enter-from-class="translate-x-6 opacity-0"
-        enter-to-class="translate-x-0 opacity-100"
+        enter-from-class="translate-y-6 opacity-0"
+        enter-to-class="translate-y-0 opacity-100"
         leave-active-class="transition-all duration-180 ease-in"
-        leave-from-class="translate-x-0 opacity-100"
-        leave-to-class="translate-x-6 opacity-0"
+        leave-from-class="translate-y-0 opacity-100"
+        leave-to-class="translate-y-6 opacity-0"
     >
         <aside
             v-if="isVisible"
             data-test="queue-sidebar"
-            class="fixed bottom-[calc(max(6.25rem,env(safe-area-inset-bottom)+5rem))] right-4 top-24 z-[55] flex w-[23rem] flex-col border border-[#EAE6DE] bg-[#fffcf5] p-3 shadow-[0_8px_30px_rgba(0,0,0,0.12)] backdrop-blur max-md:left-3 max-md:right-3 max-md:top-auto max-md:max-h-[55vh] max-md:w-auto"
+            class="fixed bottom-[calc(max(6.25rem,env(safe-area-inset-bottom)+5rem))] right-4 top-24 z-[55] flex w-[23rem] flex-col border border-[#EAE6DE] bg-[#fffcf5] p-3 shadow-[0_8px_30px_rgba(0,0,0,0.12)] backdrop-blur max-md:bottom-[calc(max(8.5rem,env(safe-area-inset-bottom)+7.25rem))] max-md:left-3 max-md:right-3 max-md:top-auto max-md:max-h-[66vh] max-md:w-auto"
         >
             <div class="mb-3 border-b border-[#EAE6DE] px-1 pb-3">
                 <div class="flex items-start justify-between gap-3">
@@ -126,7 +118,7 @@ const updateStopStrategy = (value: 'TRACK' | 'LIST' | 'NEVER') => {
                         class="p-1.5 text-[#8C857B] transition-colors hover:text-[#B56C35]"
                         @click="close"
                     >
-                        <ChevronRight :size="14" />
+                        <ChevronDown :size="14" />
                     </button>
                 </div>
                 <div class="mt-3 flex items-center gap-3 text-[11px] text-[#7C7367]">
