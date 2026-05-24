@@ -222,7 +222,7 @@ const updateStopStrategy = (value: 'TRACK' | 'LIST' | 'NEVER') => {
                         @click="playQueueEntry(entry.queueIndex)"
                     >
                         <div
-                            class="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[#E8DED0]"
+                            class="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-sm bg-[#E8DED0]"
                         >
                             <img
                                 v-if="entry.cover"
