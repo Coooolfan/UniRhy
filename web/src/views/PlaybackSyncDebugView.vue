@@ -63,16 +63,8 @@ const clockFormatter = new Intl.DateTimeFormat('zh-CN', {
 const audioStore = useAudioStore()
 const nowMs = ref(nowClientMs())
 const pipelineHistory = ref<PipelinePoint[]>([])
-const {
-    viewportRef: ntpChartViewport,
-    initOptions: ntpChartInitOptions,
-    isReady: ntpChartReady,
-} = useChartContainer()
-const {
-    viewportRef: pipelineChartViewport,
-    initOptions: pipelineChartInitOptions,
-    isReady: pipelineChartReady,
-} = useChartContainer()
+const { viewportRef: ntpChartViewport, isReady: ntpChartReady } = useChartContainer()
+const { viewportRef: pipelineChartViewport, isReady: pipelineChartReady } = useChartContainer()
 
 let tickTimer: number | null = null
 
@@ -644,7 +636,7 @@ onBeforeUnmount(() => {
             </section>
 
             <section class="mt-10 grid gap-px border border-[#DCD9D0] bg-[#DCD9D0] xl:grid-cols-2">
-                <article class="bg-dashboard-main p-4 sm:p-6 md:p-8">
+                <article class="min-w-0 bg-dashboard-main p-4 sm:p-6 md:p-8">
                     <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                         <div>
                             <div
@@ -706,7 +698,6 @@ onBeforeUnmount(() => {
                                 v-if="ntpChartReady"
                                 class="h-full w-full"
                                 :option="ntpChartOption"
-                                :init-options="ntpChartInitOptions"
                                 autoresize
                             />
                         </div>
@@ -749,7 +740,7 @@ onBeforeUnmount(() => {
                     </div>
                 </article>
 
-                <article class="bg-dashboard-main p-4 sm:p-6 md:p-8">
+                <article class="min-w-0 bg-dashboard-main p-4 sm:p-6 md:p-8">
                     <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                         <div>
                             <div
@@ -800,7 +791,6 @@ onBeforeUnmount(() => {
                                 v-if="pipelineChartReady"
                                 class="h-full w-full"
                                 :option="pipelineChartOption"
-                                :init-options="pipelineChartInitOptions"
                                 autoresize
                             />
                         </div>
