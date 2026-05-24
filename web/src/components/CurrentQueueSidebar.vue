@@ -29,11 +29,13 @@ const strategyDisabled = computed(() => {
 const playbackStrategyOptions = [
     { value: 'SEQUENTIAL', label: '顺序' },
     { value: 'SHUFFLE', label: '随机' },
+    { value: 'SINGLE', label: '单曲' },
 ] as const
 
 const stopStrategyOptions = [
     { value: 'TRACK', label: '单曲' },
     { value: 'LIST', label: '列表' },
+    { value: 'NEVER', label: '永不' },
 ] as const
 
 const isVisible = computed(
@@ -86,11 +88,11 @@ const removeQueueEntry = (queueIndex: number) => {
     void audioStore.removeQueueEntry(queueIndex)
 }
 
-const updatePlaybackStrategy = (value: 'SEQUENTIAL' | 'SHUFFLE') => {
+const updatePlaybackStrategy = (value: 'SEQUENTIAL' | 'SHUFFLE' | 'SINGLE') => {
     void audioStore.updateQueueStrategies(value, audioStore.stopStrategy)
 }
 
-const updateStopStrategy = (value: 'TRACK' | 'LIST') => {
+const updateStopStrategy = (value: 'TRACK' | 'LIST' | 'NEVER') => {
     void audioStore.updateQueueStrategies(audioStore.playbackStrategy, value)
 }
 </script>
@@ -140,7 +142,8 @@ const updateStopStrategy = (value: 'TRACK' | 'LIST') => {
                                     updatePlaybackStrategy(
                                         ($event.target as HTMLSelectElement).value as
                                             | 'SEQUENTIAL'
-                                            | 'SHUFFLE',
+                                            | 'SHUFFLE'
+                                            | 'SINGLE',
                                     )
                                 "
                             >
@@ -171,7 +174,8 @@ const updateStopStrategy = (value: 'TRACK' | 'LIST') => {
                                     updateStopStrategy(
                                         ($event.target as HTMLSelectElement).value as
                                             | 'TRACK'
-                                            | 'LIST',
+                                            | 'LIST'
+                                            | 'NEVER',
                                     )
                                 "
                             >

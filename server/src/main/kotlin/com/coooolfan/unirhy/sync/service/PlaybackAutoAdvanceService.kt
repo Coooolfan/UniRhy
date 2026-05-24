@@ -1,6 +1,7 @@
 package com.coooolfan.unirhy.sync.service
 
 import com.coooolfan.unirhy.sync.protocol.PlaybackStatus
+import com.coooolfan.unirhy.sync.protocol.PlaybackStrategy
 import com.coooolfan.unirhy.sync.protocol.ScheduledActionPayload
 import com.coooolfan.unirhy.sync.protocol.StopStrategy
 import org.springframework.beans.factory.annotation.Qualifier
@@ -72,26 +73,55 @@ class PlaybackAutoAdvanceService(
         if (queue.recordingIds.isEmpty()) {
             return
         }
+
+        if (queue.playbackStrategy == PlaybackStrategy.SINGLE) {
+            replayCurrentEntry(accountId, nowMs)
+            return
+        }
+
         if (queue.stopStrategy == StopStrategy.TRACK) {
             stopAtCurrentEntry(accountId, nowMs)
             return
         }
 
-        val queueChange = currentQueueService.navigateToNext(accountId = accountId, nowMs = nowMs)
+        var queueChange = currentQueueService.navigateToNext(accountId = accountId, nowMs = nowMs)
         if (!queueChange.changed) {
-            stopAtCurrentEntry(accountId, nowMs)
-            return
+            if (queue.stopStrategy == StopStrategy.NEVER) {
+                queueChange = currentQueueService.wrapAround(accountId = accountId, nowMs = nowMs)
+            }
+            if (!queueChange.changed) {
+                stopAtCurrentEntry(accountId, nowMs)
+                return
+            }
         }
         messageSender.broadcastQueueChange(accountId, queueChange.queue)
 
         val nextIndex = queueChange.currentIndex ?: return
         val nextRecordingId = queueChange.currentRecordingId ?: return
+        issueLoadAndPlay(accountId, "auto-next-$nowMs", nextIndex, nextRecordingId, nowMs)
+    }
+
+    private fun replayCurrentEntry(accountId: Long, nowMs: Long) {
+        val currentState = playbackSessionService.getOrCreateState(accountId)
+        val currentIndex = currentState.currentIndex ?: return
+        val currentEntry = currentQueueService.getCurrentEntry(accountId) ?: return
+
+        issueLoadAndPlay(accountId, "auto-repeat-$nowMs", currentIndex, currentEntry.recordingId, nowMs)
+    }
+
+    private fun issueLoadAndPlay(
+        accountId: Long,
+        commandId: String,
+        currentIndex: Int,
+        recordingId: Long,
+        nowMs: Long,
+    ) {
         playbackSessionService.createPendingPlay(
             accountId = accountId,
-            commandId = "auto-next-$nowMs",
+            commandId = commandId,
             initiatorDeviceId = null,
-            currentIndex = nextIndex,
-            recordingId = nextRecordingId,
+            currentIndex = currentIndex,
+            recordingId = recordingId,
             positionSeconds = 0.0,
             nowMs = nowMs,
             timeoutAtMs = nowMs + PlaybackSchedulerService.PENDING_PLAY_TIMEOUT_MS,
@@ -100,9 +130,9 @@ class PlaybackAutoAdvanceService(
         messageSender.broadcastLoadAudioSource(
             accountId = accountId,
             payload = com.coooolfan.unirhy.sync.protocol.LoadAudioSourcePayload(
-                commandId = "auto-next-$nowMs",
-                currentIndex = nextIndex,
-                recordingId = nextRecordingId,
+                commandId = commandId,
+                currentIndex = currentIndex,
+                recordingId = recordingId,
             ),
         )
 
@@ -110,7 +140,7 @@ class PlaybackAutoAdvanceService(
             val timeoutNowMs = timeProvider.nowMs()
             val scheduledAction = playbackSessionService.completePendingPlay(
                 accountId = accountId,
-                commandId = "auto-next-$nowMs",
+                commandId = commandId,
                 nowMs = timeoutNowMs,
                 executeAtMs = playbackSchedulerService.calculateExecuteAtMs(accountId, timeoutNowMs),
             ) ?: return@schedulePendingPlayTimeout

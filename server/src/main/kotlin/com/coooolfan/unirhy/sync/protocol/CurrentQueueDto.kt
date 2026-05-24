@@ -3,11 +3,13 @@ package com.coooolfan.unirhy.sync.protocol
 enum class PlaybackStrategy {
     SEQUENTIAL,
     SHUFFLE,
+    SINGLE,
 }
 
 enum class StopStrategy {
     TRACK,
     LIST,
+    NEVER,
 }
 
 data class CurrentQueueItemDto(

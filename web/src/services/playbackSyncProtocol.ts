@@ -16,8 +16,8 @@ export type PlaybackSyncMessageType =
 
 export type PlaybackStatus = 'PLAYING' | 'PAUSED'
 export type ScheduledActionType = 'PLAY' | 'PAUSE' | 'SEEK'
-export type PlaybackStrategy = 'SEQUENTIAL' | 'SHUFFLE'
-export type StopStrategy = 'TRACK' | 'LIST'
+export type PlaybackStrategy = 'SEQUENTIAL' | 'SHUFFLE' | 'SINGLE'
+export type StopStrategy = 'TRACK' | 'LIST' | 'NEVER'
 export type PlaybackSyncErrorCode =
     | 'INVALID_MESSAGE'
     | 'UNSUPPORTED_MESSAGE'

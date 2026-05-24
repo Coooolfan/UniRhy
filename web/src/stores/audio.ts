@@ -564,7 +564,12 @@ export const useAudioStore = defineStore('audio', () => {
         updatePausedTime(endedAt)
         updateLocalQueuePlaybackState('PAUSED', endedAt)
 
-        if (currentQueue.value.stopStrategy === 'LIST' && currentQueue.value.items.length > 1) {
+        if (currentQueue.value.playbackStrategy === 'SINGLE') {
+            localPlaybackEndedActions.playNext?.()
+        } else if (
+            currentQueue.value.stopStrategy !== 'TRACK' &&
+            currentQueue.value.items.length > 1
+        ) {
             localPlaybackEndedActions.playNext?.()
         }
     }
@@ -1353,6 +1358,10 @@ export const useAudioStore = defineStore('audio', () => {
         }
         if (items.length === 1) {
             return 0
+        }
+
+        if (currentPlaybackStrategy === 'SINGLE') {
+            return currentIndex
         }
 
         if (direction > 0 && currentPlaybackStrategy === 'SHUFFLE') {

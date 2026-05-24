@@ -209,7 +209,7 @@ class CurrentQueueService(
 
             val nextState = context.nextState
             val changed = when (nextState.playbackStrategy) {
-                PlaybackStrategy.SEQUENTIAL -> moveSequentialLocked(nextState, 1)
+                PlaybackStrategy.SEQUENTIAL, PlaybackStrategy.SINGLE -> moveSequentialLocked(nextState, 1)
                 PlaybackStrategy.SHUFFLE -> moveShuffleLocked(nextState, 1)
             }
             if (!changed) {
@@ -234,11 +234,34 @@ class CurrentQueueService(
 
             val nextState = context.nextState
             val changed = when (nextState.playbackStrategy) {
-                PlaybackStrategy.SEQUENTIAL -> moveSequentialLocked(nextState, -1)
+                PlaybackStrategy.SEQUENTIAL, PlaybackStrategy.SINGLE -> moveSequentialLocked(nextState, -1)
                 PlaybackStrategy.SHUFFLE -> moveShuffleLocked(nextState, -1)
             }
             if (!changed) {
                 return@withMutationContext buildNoopChangeResult(currentState)
+            }
+
+            clearPlaybackProgress(nextState)
+            buildPersistedChangeResult(context, nowMs)
+        }
+    }
+
+    fun wrapAround(
+        accountId: Long,
+        nowMs: Long = timeProvider.nowMs(),
+    ): CurrentQueueChangeResult {
+        return withMutationContext(accountId) { context ->
+            val nextState = context.nextState
+            if (nextState.recordingIds.isEmpty()) {
+                return@withMutationContext buildNoopChangeResult(context.currentState)
+            }
+
+            nextState.currentIndex = when (nextState.playbackStrategy) {
+                PlaybackStrategy.SEQUENTIAL, PlaybackStrategy.SINGLE -> 0
+                PlaybackStrategy.SHUFFLE -> {
+                    rebuildShuffleOrderLocked(nextState, anchorIndex = null)
+                    nextState.shuffleIndices.firstOrNull() ?: 0
+                }
             }
 
             clearPlaybackProgress(nextState)
