@@ -1,41 +1,46 @@
 # <img src="README/logo.svg" alt="UniRhy Logo" width="32" valign="middle" /> UniRhy
 
-UniRhy（独一律）是一个私有化的音乐流媒体平台，采用 monorepo 组织前后端与官网工程。项目目标是提供可自部署、可扩展的音乐库管理、播放与同步能力。
+UniRhy is a self-hosted music streaming platform organized as a monorepo with separated backend, frontend, and website projects. It aims to provide deployable and extensible music library management, playback, and synchronization capabilities.
 
-## 功能特性
+English | [简体中文](README/README.zh-CN.md)
 
-- 私有化部署，无外部依赖
-- 音乐资源管理
-- 全平台客户端（Web、MacOS、Android、iOS、Windows）
-- 播放状态同步
-- 插件化扩展
+> [!NOTE]
+> This project is still in a very early stage. Feedback and contributions of all kinds are welcome, and existing features may still change significantly.
 
-## 项目结构
+## Features
 
-- `server/`：后端服务，基于 Spring Boot、Kotlin、Gradle 与 Jimmer ORM。
-- `web/`：主前端客户端，基于 Vue、TypeScript、Vite、Pinia 与 Tailwind CSS，并包含 Tauri 2 桌面端配置。
-- `website/`：项目官网，基于 Vue、TypeScript 与 Vite。
-- `docker/`：容器化部署相关文件。
-- `README/`：项目级补充文档。
-- `skills/`：开发辅助技能与领域约定文档。
+- Self-hosted deployment with no external service dependency.
+- Music resource management.
+- Cross-platform clients for Web, macOS, Android, iOS, and Windows.
+- Playback state synchronization.
+- Plugin-based extension support.
 
-## 环境要求
+## Project Structure
+
+- `server/`: Backend service based on Spring Boot, Kotlin, Gradle, and Jimmer ORM.
+- `web/`: Main frontend client based on Vue, TypeScript, Vite, Pinia, and Tailwind CSS, including Tauri 2 desktop configuration.
+- `website/`: Project website based on Vue, TypeScript, and Vite.
+- `docker/`: Containerization files.
+- `README/`: Project-level supplementary documentation.
+- `skills/`: Development helper skills and domain-specific conventions.
+
+## Requirements
 
 - JDK 25
 - Node.js 24
 - Yarn 4.12+
 - PostgreSQL
 
-## 快速开始
+## Quick Start
 
-### 后端
+### Backend
 
 ```sh
 cd server
 ./gradlew bootRun
 ```
 
-### 前端客户端
+### Frontend Client
 
 ```sh
 cd web
@@ -43,7 +48,7 @@ yarn
 yarn dev
 ```
 
-### 官网
+### Website
 
 ```sh
 cd website
@@ -51,16 +56,16 @@ yarn
 yarn dev
 ```
 
-## 文档索引
+## Documentation
 
-- [术语规范词典（中英双语）](README/TERMINOLOGY.md)
-- [后端测试约定](server/README/TESTING.md)
-- [播放同步协议](server/README/PLAYBACK_SYNC_PROTOCOL.md)
-- [播放同步计划](server/README/PLAYBACK_SYNC_PLAN.md)
-- [播放同步日志](server/README/PLAYBACK_SYNC_LOGGING.md)
-- [后端依赖说明](server/README/DEPENDENCIES.md)
-- [前端依赖说明](web/README/DEPENDENCIES.md)
+- [Terminology Dictionary](README/TERMINOLOGY.md)
+- [Backend Testing Guide](server/README/TESTING.md)
+- [Playback Sync Protocol](server/README/PLAYBACK_SYNC_PROTOCOL.md)
+- [Playback Sync Plan](server/README/PLAYBACK_SYNC_PLAN.md)
+- [Playback Sync Logging](server/README/PLAYBACK_SYNC_LOGGING.md)
+- [Backend Dependencies](server/README/DEPENDENCIES.md)
+- [Frontend Dependencies](web/README/DEPENDENCIES.md)
 
-## 许可证
+## License
 
-本项目许可证见 [LICENSE](LICENSE)。
+See [LICENSE](LICENSE).
