@@ -371,7 +371,8 @@ const syncStatusClass = computed(() => {
                             <button
                                 type="button"
                                 data-test="queue-toggle-button"
-                                class="inline-flex items-center gap-1 px-3 py-1.5 text-xs text-[#7C7367] transition-colors hover:text-[#B56C35]"
+                                class="inline-flex items-center gap-1 px-3 py-1.5 text-xs transition-colors hover:text-[#B56C35]"
+                                :class="isQueueExpanded ? 'text-[#B56C35]' : 'text-[#7C7367]'"
                                 :disabled="audioStore.queueEntries.length === 0"
                                 @click="toggleQueue"
                             >

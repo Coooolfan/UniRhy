@@ -103,6 +103,9 @@ class CurrentQueueService(
                 forceEmptyStateLocked(nextState)
             } else {
                 resetStrategiesLocked(nextState)
+                if (nextState.playbackStrategy == PlaybackStrategy.SHUFFLE) {
+                    rebuildShuffleOrderLocked(nextState, anchorIndex = currentIndex)
+                }
             }
             buildPersistedChangeResult(context, nowMs)
         }
@@ -482,9 +485,15 @@ class CurrentQueueService(
     }
 
     private fun resetStrategiesLocked(state: AccountPlayQueueState) {
-        state.playbackStrategy = PlaybackStrategy.SEQUENTIAL
-        state.stopStrategy = StopStrategy.LIST
-        state.shuffleIndices.clear()
+        if (state.playbackStrategy == PlaybackStrategy.SINGLE) {
+            state.playbackStrategy = PlaybackStrategy.SEQUENTIAL
+        }
+        if (state.stopStrategy == StopStrategy.TRACK) {
+            state.stopStrategy = StopStrategy.LIST
+        }
+        if (state.playbackStrategy != PlaybackStrategy.SHUFFLE) {
+            state.shuffleIndices.clear()
+        }
     }
 
     private fun forceEmptyStateLocked(state: AccountPlayQueueState) {
