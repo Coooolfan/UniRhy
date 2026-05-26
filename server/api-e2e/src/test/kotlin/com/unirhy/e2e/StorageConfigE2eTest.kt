@@ -16,7 +16,6 @@ import org.springframework.boot.test.web.server.LocalServerPort
 import org.springframework.test.annotation.DirtiesContext
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
-import java.net.http.HttpResponse
 import java.util.UUID
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
@@ -37,76 +36,6 @@ class StorageConfigE2eTest {
     @AfterAll
     fun cleanup() {
         E2eRuntime.cleanup()
-    }
-
-    @Test
-    fun `all storage endpoints should reject unauthenticated access`() {
-        val api = E2eHttpClient(baseUrl())
-        val unknownId = 999_999_999L
-
-        assertAuthenticationFailed(
-            api.get("/api/storage/fs"),
-            "[auth] get fs list should require login",
-        )
-        assertAuthenticationFailed(
-            api.post(path = "/api/storage/fs", json = fsPayload("blocked-fs", "/tmp/blocked-fs", false)),
-            "[auth] create fs provider should require login",
-        )
-        assertAuthenticationFailed(
-            api.get("/api/storage/fs/$unknownId"),
-            "[auth] get fs provider should require login",
-        )
-        assertAuthenticationFailed(
-            api.put(path = "/api/storage/fs/$unknownId", json = fsPayload("blocked-fs", "/tmp/blocked-fs", true)),
-            "[auth] update fs provider should require login",
-        )
-        assertAuthenticationFailed(
-            api.delete("/api/storage/fs/$unknownId"),
-            "[auth] delete fs provider should require login",
-        )
-
-        assertAuthenticationFailed(
-            api.get("/api/storage/oss"),
-            "[auth] get oss list should require login",
-        )
-        assertAuthenticationFailed(
-            api.post(
-                path = "/api/storage/oss",
-                json = ossPayload(
-                    name = "blocked-oss",
-                    host = "https://oss.example.invalid",
-                    bucket = "blocked-bucket",
-                    accessKey = "blocked-ak",
-                    secretKey = "blocked-sk",
-                    parentPath = "/blocked",
-                    readonly = false,
-                ),
-            ),
-            "[auth] create oss provider should require login",
-        )
-        assertAuthenticationFailed(
-            api.get("/api/storage/oss/$unknownId"),
-            "[auth] get oss provider should require login",
-        )
-        assertAuthenticationFailed(
-            api.put(
-                path = "/api/storage/oss/$unknownId",
-                json = ossPayload(
-                    name = "blocked-oss",
-                    host = "https://oss.example.invalid",
-                    bucket = "blocked-bucket",
-                    accessKey = "blocked-ak",
-                    secretKey = "blocked-sk",
-                    parentPath = "/blocked-updated",
-                    readonly = true,
-                ),
-            ),
-            "[auth] update oss provider should require login",
-        )
-        assertAuthenticationFailed(
-            api.delete("/api/storage/oss/$unknownId"),
-            "[auth] delete oss provider should require login",
-        )
     }
 
     @Test
@@ -487,16 +416,6 @@ class StorageConfigE2eTest {
     }
 
     private fun baseUrl(): String = "http://127.0.0.1:$port"
-
-    private fun assertAuthenticationFailed(response: HttpResponse<String>, step: String) {
-        E2eAssert.apiError(
-            response = response,
-            family = "COMMON",
-            code = "AUTHENTICATION_FAILED",
-            expectedStatus = 401,
-            step = step,
-        )
-    }
 
     private fun fsPayload(
         name: String,

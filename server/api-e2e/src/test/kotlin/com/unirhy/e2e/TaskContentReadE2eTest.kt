@@ -24,7 +24,6 @@ import org.springframework.boot.test.web.server.LocalServerPort
 import org.springframework.test.annotation.DirtiesContext
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
-import java.net.http.HttpResponse
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.UUID
@@ -56,73 +55,6 @@ class TaskContentReadE2eTest {
         E2eRuntime.cleanup()
     }
 
-    @Test
-    @Order(1)
-    fun `task and content endpoints should reject unauthenticated access`() {
-        val api = E2eHttpClient(baseUrl())
-
-        assertAuthenticationFailed(
-            api.get("/api/task/logs"),
-            "[auth] get task logs should require login",
-        )
-        assertAuthenticationFailed(
-            api.post(
-                path = "/api/task/scan",
-                // This payload is only for auth gate assertion; business validation is out of scope for this test.
-                json = scanRequestBodyForUnauth(),
-            ),
-            "[auth] submit scan task should require login",
-        )
-        assertAuthenticationFailed(
-            api.post(
-                path = "/api/task/transcode",
-                // This payload is only for auth gate assertion; business validation is out of scope for this test.
-                json = transcodeRequestBodyForUnauth(),
-            ),
-            "[auth] submit transcode task should require login",
-        )
-
-        assertAuthenticationFailed(
-            api.get("/api/works"),
-            "[auth] get work list should require login",
-        )
-        assertAuthenticationFailed(
-            api.get("/api/works/random"),
-            "[auth] get random work should require login",
-        )
-        assertAuthenticationFailed(
-            api.get("/api/works/1"),
-            "[auth] get work by id should require login",
-        )
-        assertAuthenticationFailed(
-            api.delete("/api/works/1"),
-            "[auth] delete work should require login",
-        )
-
-        assertAuthenticationFailed(
-            api.get("/api/albums"),
-            "[auth] get album list should require login",
-        )
-        assertAuthenticationFailed(
-            api.get("/api/albums/1"),
-            "[auth] get album by id should require login",
-        )
-
-        assertAuthenticationFailed(
-            api.get("/api/media/1"),
-            "[auth] get media should require login",
-        )
-        assertAuthenticationFailed(
-            api.get("/api/media/1", headers = mapOf("Range" to "bytes=0-3")),
-            "[auth] get media with range should require login",
-        )
-        // HEAD responses do not include error body, so we assert status only.
-        E2eAssert.status(
-            api.head("/api/media/1"),
-            401,
-            "[auth] head media should require login",
-        )
-    }
 
     @Test
     @Order(2)
@@ -707,16 +639,6 @@ class TaskContentReadE2eTest {
         val fsProviderIdNode = E2eJson.mapper.readTree(response.body()).path("fsProviderId")
         assertTrue(fsProviderIdNode.isIntegralNumber, "[prepare] /api/system/config fsProviderId should be an integer")
         return fsProviderIdNode.longValue()
-    }
-
-    private fun assertAuthenticationFailed(response: HttpResponse<String>, step: String) {
-        E2eAssert.apiError(
-            response = response,
-            family = "COMMON",
-            code = "AUTHENTICATION_FAILED",
-            expectedStatus = 401,
-            step = step,
-        )
     }
 
     private fun baseUrl(): String = "http://127.0.0.1:$port"

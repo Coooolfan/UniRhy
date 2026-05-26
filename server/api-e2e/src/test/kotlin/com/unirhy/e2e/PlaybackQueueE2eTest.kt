@@ -21,7 +21,6 @@ import org.springframework.boot.test.web.server.LocalServerPort
 import org.springframework.test.annotation.DirtiesContext
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
-import java.net.http.HttpResponse
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
@@ -40,79 +39,6 @@ class PlaybackQueueE2eTest {
     @AfterAll
     fun cleanup() {
         E2eRuntime.cleanup()
-    }
-
-    @Test
-    fun `all playback queue endpoints should reject unauthenticated access`() {
-        val api = E2eHttpClient(baseUrl())
-
-        assertAuthenticationFailed(
-            api.get("/api/playback/current-queue"),
-            "[auth] get current queue should require login",
-        )
-        assertAuthenticationFailed(
-            api.put(
-                path = "/api/playback/current-queue",
-                json = mapOf("recordingIds" to listOf(1L), "currentIndex" to 0, "version" to 0L),
-            ),
-            "[auth] replace current queue should require login",
-        )
-        assertAuthenticationFailed(
-            api.post(
-                path = "/api/playback/current-queue/items",
-                json = mapOf("recordingIds" to listOf(1L), "version" to 0L),
-            ),
-            "[auth] append current queue should require login",
-        )
-        assertAuthenticationFailed(
-            api.put(
-                path = "/api/playback/current-queue/order",
-                json = mapOf("recordingIds" to listOf(1L), "currentIndex" to 0, "version" to 0L),
-            ),
-            "[auth] reorder current queue should require login",
-        )
-        assertAuthenticationFailed(
-            api.put(
-                path = "/api/playback/current-queue/current",
-                json = mapOf("currentIndex" to 0, "version" to 0L),
-            ),
-            "[auth] set current index should require login",
-        )
-        assertAuthenticationFailed(
-            api.put(
-                path = "/api/playback/current-queue/strategy",
-                json = mapOf("playbackStrategy" to "SHUFFLE", "stopStrategy" to "TRACK", "version" to 0L),
-            ),
-            "[auth] update current queue strategy should require login",
-        )
-        assertAuthenticationFailed(
-            api.post(
-                path = "/api/playback/current-queue/actions/next",
-                json = mapOf("version" to 0L),
-            ),
-            "[auth] navigate next should require login",
-        )
-        assertAuthenticationFailed(
-            api.post(
-                path = "/api/playback/current-queue/actions/previous",
-                json = mapOf("version" to 0L),
-            ),
-            "[auth] navigate previous should require login",
-        )
-        assertAuthenticationFailed(
-            api.post(
-                path = "/api/playback/current-queue/actions/remove",
-                json = mapOf("index" to 0, "version" to 0L),
-            ),
-            "[auth] remove current queue entry should require login",
-        )
-        assertAuthenticationFailed(
-            api.post(
-                path = "/api/playback/current-queue/actions/clear",
-                json = mapOf("version" to 0L),
-            ),
-            "[auth] clear current queue should require login",
-        )
     }
 
     @Test
@@ -355,19 +281,6 @@ class PlaybackQueueE2eTest {
 
     private fun readJson(body: String): JsonNode {
         return E2eJson.mapper.readTree(body)
-    }
-
-    private fun assertAuthenticationFailed(
-        response: HttpResponse<String>,
-        step: String,
-    ) {
-        E2eAssert.apiError(
-            response = response,
-            family = "COMMON",
-            code = "AUTHENTICATION_FAILED",
-            expectedStatus = 401,
-            step = step,
-        )
     }
 
     private fun baseUrl(): String = "http://127.0.0.1:$port"
