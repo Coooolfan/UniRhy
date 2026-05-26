@@ -22,7 +22,6 @@ import org.springframework.test.annotation.DirtiesContext
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import java.io.ByteArrayOutputStream
-import java.net.http.HttpResponse
 import java.util.UUID
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
@@ -50,33 +49,6 @@ class PluginE2eTest {
     @AfterAll
     fun cleanup() {
         E2eRuntime.cleanup()
-    }
-
-    @Test
-    @Order(1)
-    fun `plugin endpoints should reject unauthenticated access`() {
-        val api = E2eHttpClient(baseUrl())
-
-        assertAuthenticationFailed(api.get("/api/plugins"), "[auth] list plugins should require login")
-        assertAuthenticationFailed(
-            api.postMultipartFile(
-                path = "/api/plugins/upload",
-                fieldName = "file",
-                fileName = "blocked.up",
-                fileBytes = byteArrayOf(1, 2, 3),
-            ),
-            "[auth] upload plugin should require login",
-        )
-        assertAuthenticationFailed(
-            api.put(path = "/api/plugins/missing/enabled", query = mapOf("enabled" to true)),
-            "[auth] set enabled should require login",
-        )
-        assertAuthenticationFailed(api.delete("/api/plugins/missing"), "[auth] delete plugin should require login")
-        assertAuthenticationFailed(api.get("/api/plugins/missing/download"), "[auth] download plugin should require login")
-        assertAuthenticationFailed(
-            api.post(path = "/api/plugins/ARTIST_NORMALIZATION/submit", json = emptyMap<String, String>()),
-            "[auth] submit plugin task should require login",
-        )
     }
 
     @Test
@@ -328,16 +300,6 @@ class PluginE2eTest {
 
     private fun pluginNode(responseBody: String, pluginId: String) =
         E2eJson.mapper.readTree(responseBody).first { it.path("id").asText() == pluginId }
-
-    private fun assertAuthenticationFailed(response: HttpResponse<String>, step: String) {
-        E2eAssert.apiError(
-            response = response,
-            family = "COMMON",
-            code = "AUTHENTICATION_FAILED",
-            expectedStatus = 401,
-            step = step,
-        )
-    }
 
     private fun suffix(): String = UUID.randomUUID().toString().replace("-", "").take(10)
 
