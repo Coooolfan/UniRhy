@@ -28,6 +28,7 @@ kotlin-reflect = { module = "org.jetbrains.kotlin:kotlin-reflect" }
 # Jimmer
 jimmer-spring-boot-starter = { group = "org.babyfish.jimmer", name = "jimmer-spring-boot-starter", version.ref = "jimmer" }
 jimmer-ksp = { group = "org.babyfish.jimmer", name = "jimmer-ksp", version.ref = "jimmer" }
+jimmer-client-scalar = { group = "org.babyfish.jimmer", name = "jimmer-client-scalar", version.ref = "jimmer" }
 
 # Sa-Token
 sa-token-starter = { group = "cn.dev33", name = "sa-token-spring-boot3-starter", version.ref = "saToken" }

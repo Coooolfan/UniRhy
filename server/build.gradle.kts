@@ -35,6 +35,7 @@ dependencies {
     implementation(libs.kotlin.reflect)
 
     implementation(libs.jimmer.spring.boot.starter)
+    implementation(libs.jimmer.client.scalar)
     ksp(libs.jimmer.ksp)
 
     implementation(libs.sa.token.starter) {
