@@ -3,7 +3,7 @@ package com.unirhy.e2e
 import com.coooolfan.unirhy.UnirhyApplication
 import com.coooolfan.unirhy.sync.protocol.PlaybackStrategy
 import com.coooolfan.unirhy.sync.protocol.StopStrategy
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import com.unirhy.e2e.support.E2eAdminSession
 import com.unirhy.e2e.support.E2eAssert
 import com.unirhy.e2e.support.E2eHttpClient
@@ -254,9 +254,9 @@ class PlaybackQueueE2eTest {
     ) {
         assertEquals(expectedRecordingIds, recordingIdsOf(queue), "[queue] recording ids should match")
         assertEquals(expectedCurrentIndex, readCurrentIndex(queue), "[queue] current index should match")
-        assertEquals(expectedPlaybackStrategy.name, queue.path("playbackStrategy").asText(), "[queue] playback strategy should match")
-        assertEquals(expectedStopStrategy.name, queue.path("stopStrategy").asText(), "[queue] stop strategy should match")
-        assertEquals("PAUSED", queue.path("playbackStatus").asText(), "[queue] playback status should stay paused")
+        assertEquals(expectedPlaybackStrategy.name, queue.path("playbackStrategy").asString(), "[queue] playback strategy should match")
+        assertEquals(expectedStopStrategy.name, queue.path("stopStrategy").asString(), "[queue] stop strategy should match")
+        assertEquals("PAUSED", queue.path("playbackStatus").asString(), "[queue] playback status should stay paused")
     }
 
     private fun assertVersionAdvanced(
@@ -268,7 +268,7 @@ class PlaybackQueueE2eTest {
     }
 
     private fun recordingIdsOf(queue: JsonNode): List<Long> {
-        return queue.path("recordingIds").map(JsonNode::longValue)
+        return queue.path("recordingIds").values().map { it.longValue() }
     }
 
     private fun readCurrentIndex(queue: JsonNode): Int {

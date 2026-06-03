@@ -4,7 +4,7 @@ import com.coooolfan.unirhy.sync.log.*
 import com.coooolfan.unirhy.sync.model.toProtocolState
 import com.coooolfan.unirhy.sync.protocol.*
 import com.coooolfan.unirhy.sync.service.*
-import com.fasterxml.jackson.databind.ObjectMapper
+import tools.jackson.databind.ObjectMapper
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Component

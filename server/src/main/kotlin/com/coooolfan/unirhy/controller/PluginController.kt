@@ -10,7 +10,7 @@ import com.coooolfan.unirhy.service.task.PluginTaskService
 import com.coooolfan.unirhy.service.task.common.TaskType
 import jakarta.servlet.http.HttpServletResponse
 import org.springframework.http.HttpStatus
-import com.fasterxml.jackson.databind.ObjectMapper
+import tools.jackson.databind.ObjectMapper
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable

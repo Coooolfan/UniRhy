@@ -15,7 +15,7 @@ import com.coooolfan.unirhy.sync.protocol.ScheduledActionPayload
 import com.coooolfan.unirhy.sync.protocol.ServerPlaybackSyncMessage
 import com.coooolfan.unirhy.sync.protocol.SnapshotMessage
 import com.coooolfan.unirhy.sync.protocol.SnapshotPayload
-import com.fasterxml.jackson.databind.ObjectMapper
+import tools.jackson.databind.ObjectMapper
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.web.socket.TextMessage

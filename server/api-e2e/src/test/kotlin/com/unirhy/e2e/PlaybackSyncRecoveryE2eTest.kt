@@ -2,7 +2,7 @@ package com.unirhy.e2e
 
 import com.coooolfan.unirhy.UnirhyApplication
 import com.coooolfan.unirhy.sync.protocol.PlaybackSyncMessageType
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import com.unirhy.e2e.support.E2eAdminSession
 import com.unirhy.e2e.support.E2eAssert
 import com.unirhy.e2e.support.E2eJson
@@ -56,7 +56,7 @@ class PlaybackSyncRecoveryE2eTest {
                 mapOf("deviceId" to "web-sync"),
             )
             val notReadyError = client.awaitMessage(PlaybackSyncMessageType.ERROR)
-            assertEquals("SYNC_NOT_READY", notReadyError.payload.path("code").asText(), "[sync] sync should require ntp first")
+            assertEquals("SYNC_NOT_READY", notReadyError.payload.path("code").asString(), "[sync] sync should require ntp first")
 
             sendNtp(client)
             client.send(
@@ -64,7 +64,7 @@ class PlaybackSyncRecoveryE2eTest {
                 mapOf("deviceId" to "web-sync"),
             )
             val scheduled = client.awaitMessage(PlaybackSyncMessageType.SCHEDULED_ACTION)
-            assertEquals("PAUSE", scheduled.payload.path("scheduledAction").path("action").asText(), "[sync] paused recovery should emit pause action")
+            assertEquals("PAUSE", scheduled.payload.path("scheduledAction").path("action").asString(), "[sync] paused recovery should emit pause action")
         }
     }
 
@@ -94,7 +94,7 @@ class PlaybackSyncRecoveryE2eTest {
 
             val scheduled = client.awaitMessage(PlaybackSyncMessageType.SCHEDULED_ACTION)
             val persistedQueue = fetchQueue(state)
-            assertEquals("PAUSE", scheduled.payload.path("scheduledAction").path("action").asText(), "[paused] paused queue mutation should emit pause")
+            assertEquals("PAUSE", scheduled.payload.path("scheduledAction").path("action").asString(), "[paused] paused queue mutation should emit pause")
             assertEquals(1, scheduled.payload.path("scheduledAction").path("currentIndex").intValue(), "[paused] scheduled pause should target current index")
             assertEquals(
                 persistedQueue.path("version").longValue(),
@@ -129,7 +129,7 @@ class PlaybackSyncRecoveryE2eTest {
             val initialLoad = client.awaitMessage(PlaybackSyncMessageType.ROOM_EVENT_LOAD_AUDIO_SOURCE)
             assertEquals(0, initialLoad.payload.path("currentIndex").intValue(), "[playing] initial play should load first track")
             val initialScheduled = client.awaitMessage(PlaybackSyncMessageType.SCHEDULED_ACTION)
-            assertEquals("PLAY", initialScheduled.payload.path("scheduledAction").path("action").asText(), "[playing] initial play should schedule playback")
+            assertEquals("PLAY", initialScheduled.payload.path("scheduledAction").path("action").asString(), "[playing] initial play should schedule playback")
 
             val currentAfterPlay = fetchQueue(state)
             val nextResponse = state.api.post(
@@ -146,14 +146,14 @@ class PlaybackSyncRecoveryE2eTest {
             client.send(
                 PlaybackSyncMessageType.AUDIO_SOURCE_LOADED,
                 mapOf(
-                    "commandId" to nextLoad.payload.path("commandId").asText(),
+                    "commandId" to nextLoad.payload.path("commandId").asString(),
                     "deviceId" to "web-playing",
                     "currentIndex" to 1,
                     "recordingId" to prepared.recordingIds[1],
                 ),
             )
             val nextScheduled = client.awaitMessage(PlaybackSyncMessageType.SCHEDULED_ACTION)
-            assertEquals("PLAY", nextScheduled.payload.path("scheduledAction").path("action").asText(), "[playing] next should schedule play after load")
+            assertEquals("PLAY", nextScheduled.payload.path("scheduledAction").path("action").asString(), "[playing] next should schedule play after load")
             val persistedAfterNext = fetchQueue(state)
 
             val removeResponse = state.api.post(
@@ -172,14 +172,14 @@ class PlaybackSyncRecoveryE2eTest {
             client.send(
                 PlaybackSyncMessageType.AUDIO_SOURCE_LOADED,
                 mapOf(
-                    "commandId" to removeLoad.payload.path("commandId").asText(),
+                    "commandId" to removeLoad.payload.path("commandId").asString(),
                     "deviceId" to "web-playing",
                     "currentIndex" to removeLoad.payload.path("currentIndex").intValue(),
                     "recordingId" to newCurrentRecordingId,
                 ),
             )
             val removeScheduled = client.awaitMessage(PlaybackSyncMessageType.SCHEDULED_ACTION)
-            assertEquals("PLAY", removeScheduled.payload.path("scheduledAction").path("action").asText(), "[playing] remove current should schedule replacement play")
+            assertEquals("PLAY", removeScheduled.payload.path("scheduledAction").path("action").asString(), "[playing] remove current should schedule replacement play")
         }
     }
 
@@ -208,7 +208,7 @@ class PlaybackSyncRecoveryE2eTest {
             )
             client.awaitMessage(PlaybackSyncMessageType.ROOM_EVENT_LOAD_AUDIO_SOURCE)
             val scheduled = client.awaitMessage(PlaybackSyncMessageType.SCHEDULED_ACTION)
-            assertEquals("PLAY", scheduled.payload.path("scheduledAction").path("action").asText(), "[disconnect] initial play should schedule play")
+            assertEquals("PLAY", scheduled.payload.path("scheduledAction").path("action").asString(), "[disconnect] initial play should schedule play")
         } finally {
             client.close()
             client.awaitClose()
@@ -217,7 +217,7 @@ class PlaybackSyncRecoveryE2eTest {
         E2eWebSocketClient.connect(baseUrl(), state.api.authToken()).use { reconnect ->
             hello(reconnect, "web-after-disconnect")
             val snapshot = reconnect.awaitMessage(PlaybackSyncMessageType.SNAPSHOT)
-            assertEquals("PAUSED", snapshot.payload.path("state").path("status").asText(), "[disconnect] reconnect snapshot should show auto paused state")
+            assertEquals("PAUSED", snapshot.payload.path("state").path("status").asString(), "[disconnect] reconnect snapshot should show auto paused state")
         }
     }
 

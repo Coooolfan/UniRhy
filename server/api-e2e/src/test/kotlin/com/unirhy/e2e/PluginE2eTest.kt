@@ -69,8 +69,8 @@ class PluginE2eTest {
         val listAfterUploadResponse = state.api.get("/api/plugins")
         E2eAssert.status(listAfterUploadResponse, 200, "[plugins] list after upload should succeed")
         val uploaded = pluginNode(listAfterUploadResponse.body(), pluginId)
-        assertEquals(pluginId, uploaded.path("id").asText(), "[plugins] list should contain uploaded plugin")
-        assertEquals("0.0.1", uploaded.path("version").asText(), "[plugins] version should match manifest")
+        assertEquals(pluginId, uploaded.path("id").asString(), "[plugins] list should contain uploaded plugin")
+        assertEquals("0.0.1", uploaded.path("version").asString(), "[plugins] version should match manifest")
         assertFalse(uploaded.path("enabled").asBoolean(), "[plugins] uploaded plugin should start disabled")
         assertFalse(uploaded.path("isAvailable").asBoolean(), "[plugins] disabled plugin should not be loaded")
 
@@ -121,7 +121,7 @@ class PluginE2eTest {
         val listAfterDeleteResponse = state.api.get("/api/plugins")
         E2eAssert.status(listAfterDeleteResponse, 200, "[plugins] list after delete should succeed")
         assertFalse(
-            E2eJson.mapper.readTree(listAfterDeleteResponse.body()).any { it.path("id").asText() == pluginId },
+            E2eJson.mapper.readTree(listAfterDeleteResponse.body()).any { it.path("id").asString() == pluginId },
             "[plugins] deleted plugin should not remain in list",
         )
 
@@ -299,7 +299,7 @@ class PluginE2eTest {
     }
 
     private fun pluginNode(responseBody: String, pluginId: String) =
-        E2eJson.mapper.readTree(responseBody).first { it.path("id").asText() == pluginId }
+        E2eJson.mapper.readTree(responseBody).first { it.path("id").asString() == pluginId }
 
     private fun suffix(): String = UUID.randomUUID().toString().replace("-", "").take(10)
 

@@ -1,6 +1,6 @@
 package com.unirhy.e2e.support
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.UUID
@@ -46,7 +46,7 @@ private fun recoverPreparedPlaybackData(
     val albums = pageRows(albumsResponse.body(), "[prepare] playback albums recovery")
     val album = albums.firstOrNull() ?: return null
     val albumId = album.path("id").takeIf(JsonNode::isIntegralNumber)?.longValue() ?: return null
-    val albumTitle = album.path("title").asText().takeIf(String::isNotBlank) ?: return null
+    val albumTitle = album.path("title").asString().takeIf(String::isNotBlank) ?: return null
 
     return PreparedPlaybackData(
         recordingIds = recordingIds.take(minRecordingCount),
@@ -152,7 +152,7 @@ private fun taskCount(
     status: String,
 ): Long {
     return rows.firstOrNull { row ->
-        row.path("taskType").asText() == taskType && row.path("status").asText() == status
+        row.path("taskType").asString() == taskType && row.path("status").asString() == status
     }?.path("count")?.longValue() ?: 0L
 }
 

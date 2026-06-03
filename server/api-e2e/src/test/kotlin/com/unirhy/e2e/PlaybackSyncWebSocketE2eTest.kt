@@ -50,13 +50,13 @@ class PlaybackSyncWebSocketE2eTest {
             hello(client, "web-hello")
 
             val snapshot = client.awaitMessage(PlaybackSyncMessageType.SNAPSHOT)
-            assertEquals("PAUSED", snapshot.payload.path("state").path("status").asText(), "[hello] snapshot should start paused")
+            assertEquals("PAUSED", snapshot.payload.path("state").path("status").asString(), "[hello] snapshot should start paused")
             assertTrue(snapshot.payload.path("queue").path("recordingIds").isArray, "[hello] snapshot should include queue")
 
             val deviceChange = client.awaitMessage(PlaybackSyncMessageType.ROOM_EVENT_DEVICE_CHANGE)
             val devices = deviceChange.payload.path("devices")
             assertEquals(1, devices.size(), "[hello] device change should include one active device")
-            assertEquals("web-hello", devices.first().path("deviceId").asText(), "[hello] device change should include connected device")
+            assertEquals("web-hello", devices.first().path("deviceId").asString(), "[hello] device change should include connected device")
         }
     }
 
@@ -92,7 +92,7 @@ class PlaybackSyncWebSocketE2eTest {
             hello(client, "web-dup")
 
             val error = client.awaitMessage(PlaybackSyncMessageType.ERROR)
-            assertEquals("INVALID_MESSAGE", error.payload.path("code").asText(), "[hello] duplicate hello should return invalid message")
+            assertEquals("INVALID_MESSAGE", error.payload.path("code").asString(), "[hello] duplicate hello should return invalid message")
         }
     }
 
@@ -118,7 +118,7 @@ class PlaybackSyncWebSocketE2eTest {
                 first.awaitClose()
 
                 val snapshot = second.awaitMessage(PlaybackSyncMessageType.SNAPSHOT)
-                assertEquals("PAUSED", snapshot.payload.path("state").path("status").asText(), "[replace] new connection should still receive snapshot")
+                assertEquals("PAUSED", snapshot.payload.path("state").path("status").asString(), "[replace] new connection should still receive snapshot")
                 val deviceChange = second.awaitMessage(PlaybackSyncMessageType.ROOM_EVENT_DEVICE_CHANGE)
                 assertEquals(1, deviceChange.payload.path("devices").size(), "[replace] only replacement device should stay online")
             }
@@ -165,8 +165,8 @@ class PlaybackSyncWebSocketE2eTest {
 
                 val loadA = deviceA.awaitMessage(PlaybackSyncMessageType.ROOM_EVENT_LOAD_AUDIO_SOURCE)
                 val loadB = deviceB.awaitMessage(PlaybackSyncMessageType.ROOM_EVENT_LOAD_AUDIO_SOURCE)
-                assertEquals("cmd-play-dual", loadA.payload.path("commandId").asText(), "[play] device A should receive load command")
-                assertEquals("cmd-play-dual", loadB.payload.path("commandId").asText(), "[play] device B should receive load command")
+                assertEquals("cmd-play-dual", loadA.payload.path("commandId").asString(), "[play] device A should receive load command")
+                assertEquals("cmd-play-dual", loadB.payload.path("commandId").asString(), "[play] device B should receive load command")
 
                 deviceB.send(
                     PlaybackSyncMessageType.AUDIO_SOURCE_LOADED,
@@ -180,8 +180,8 @@ class PlaybackSyncWebSocketE2eTest {
 
                 val scheduledA = deviceA.awaitMessage(PlaybackSyncMessageType.SCHEDULED_ACTION)
                 val scheduledB = deviceB.awaitMessage(PlaybackSyncMessageType.SCHEDULED_ACTION)
-                assertEquals("PLAY", scheduledA.payload.path("scheduledAction").path("action").asText(), "[play] device A should receive play action")
-                assertEquals("PLAY", scheduledB.payload.path("scheduledAction").path("action").asText(), "[play] device B should receive play action")
+                assertEquals("PLAY", scheduledA.payload.path("scheduledAction").path("action").asString(), "[play] device A should receive play action")
+                assertEquals("PLAY", scheduledB.payload.path("scheduledAction").path("action").asString(), "[play] device B should receive play action")
                 assertEquals(1, scheduledA.payload.path("scheduledAction").path("currentIndex").intValue(), "[play] scheduled action should target switched index")
                 assertEquals(1, scheduledB.payload.path("scheduledAction").path("currentIndex").intValue(), "[play] scheduled action should target switched index on device B")
                 assertEquals(12.5, scheduledA.payload.path("scheduledAction").path("positionSeconds").doubleValue(), "[play] scheduled action should preserve position")
@@ -198,7 +198,7 @@ class PlaybackSyncWebSocketE2eTest {
                 )
 
                 val staleError = deviceA.awaitMessage(PlaybackSyncMessageType.ERROR)
-                assertEquals("VERSION_CONFLICT", staleError.payload.path("code").asText(), "[play] stale queue version should return websocket version conflict")
+                assertEquals("VERSION_CONFLICT", staleError.payload.path("code").asString(), "[play] stale queue version should return websocket version conflict")
             }
         }
     }

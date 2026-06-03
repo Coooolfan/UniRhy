@@ -157,7 +157,9 @@ class AuthGuardE2eTest {
             ProtectedEndpoint("DELETE", "/api/storage/oss-nodes/1"),
             // plugins
             ProtectedEndpoint("GET", "/api/plugins"),
-            ProtectedEndpoint("POST", "/api/plugins"),
+            // 该接口仅消费 multipart/form-data，Spring 7 在 HandlerMapping 阶段就会校验 Content-Type，
+            // 不带该 header 时会直接返回 415，鉴权拦截器不会执行。
+            ProtectedEndpoint("POST", "/api/plugins", headers = mapOf("Content-Type" to "multipart/form-data; boundary=test")),
             ProtectedEndpoint("PUT", "/api/plugins/1/enabled-state"),
             ProtectedEndpoint("DELETE", "/api/plugins/1"),
             ProtectedEndpoint("GET", "/api/plugins/1/package"),

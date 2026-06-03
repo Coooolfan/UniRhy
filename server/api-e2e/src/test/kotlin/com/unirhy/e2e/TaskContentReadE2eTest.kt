@@ -1,7 +1,7 @@
 package com.unirhy.e2e
 
 import com.coooolfan.unirhy.UnirhyApplication
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import com.unirhy.e2e.support.AudioFixtureMetadata
 import com.unirhy.e2e.support.E2eAdminSession
 import com.unirhy.e2e.support.E2eAssert
@@ -338,7 +338,7 @@ class TaskContentReadE2eTest {
             logger.warn("[prepare] skip recover: first album id is not integral")
             return null
         }
-        val albumTitle = firstAlbum.path("title").asText()
+        val albumTitle = firstAlbum.path("title").asString()
         if (albumTitle.isBlank()) {
             logger.warn("[prepare] skip recover: first album title is blank")
             return null
@@ -514,14 +514,14 @@ class TaskContentReadE2eTest {
 
     private fun taskCount(rows: List<JsonNode>, taskType: String, status: String): Long {
         return rows.firstOrNull { row ->
-            row.path("taskType").asText() == taskType && row.path("status").asText() == status
+            row.path("taskType").asString() == taskType && row.path("status").asString() == status
         }?.path("count")?.longValue() ?: 0L
     }
 
     private fun taskStatsBody(rows: List<JsonNode>): String {
         return rows.joinToString(prefix = "[", postfix = "]") { row ->
-            val taskType = row.path("taskType").asText("<missing>")
-            val status = row.path("status").asText("<missing>")
+            val taskType = row.path("taskType").asString("<missing>")
+            val status = row.path("status").asString("<missing>")
             val count = row.path("count").asLong(-1L)
             """{"taskType":"$taskType","status":"$status","count":$count}"""
         }

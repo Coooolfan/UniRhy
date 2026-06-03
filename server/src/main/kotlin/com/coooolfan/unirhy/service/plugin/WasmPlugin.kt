@@ -20,8 +20,8 @@ class WasmPlugin private constructor(
     fun plan(paramsJson: ByteArray): List<String> {
         val result = callJson("plan", paramsJson)
         return try {
-            val node = com.fasterxml.jackson.databind.ObjectMapper().readTree(result)
-            node.map { it.toString() }
+            val node = tools.jackson.databind.json.JsonMapper().readTree(result)
+            node.values().map { it.toString() }
         } catch (ex: Exception) {
             throw WasmPluginException("failed to parse plan() result: ${ex.message}", ex)
         }

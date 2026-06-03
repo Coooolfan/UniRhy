@@ -10,7 +10,7 @@ import com.coooolfan.unirhy.service.task.common.AsyncTaskQueueStore
 import com.coooolfan.unirhy.service.task.common.TaskStatus
 import com.coooolfan.unirhy.service.task.common.TaskType
 import com.coooolfan.unirhy.service.task.common.failureReason
-import com.fasterxml.jackson.databind.ObjectMapper
+import tools.jackson.databind.ObjectMapper
 import org.babyfish.jimmer.sql.ast.mutation.AssociatedSaveMode
 import org.babyfish.jimmer.sql.ast.mutation.SaveMode
 import org.babyfish.jimmer.sql.kt.KSqlClient

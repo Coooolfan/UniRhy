@@ -1,7 +1,7 @@
 package com.unirhy.e2e
 
 import com.coooolfan.unirhy.UnirhyApplication
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import com.unirhy.e2e.support.AudioFixtureMetadata
 import com.unirhy.e2e.support.E2eAdminSession
 import com.unirhy.e2e.support.E2eAssert
@@ -698,12 +698,12 @@ class AccountPlaylistContentE2eTest {
         )
         assertEquals(
             recordingUpdatePayload["title"],
-            sourceRecordingNode.path("title").asText(),
+            sourceRecordingNode.path("title").asString(),
             "[content] updated recording title should match",
         )
         assertEquals(
             recordingUpdatePayload["comment"],
-            sourceRecordingNode.path("comment").asText(),
+            sourceRecordingNode.path("comment").asString(),
             "[content] updated recording comment should match",
         )
         assertEquals(
@@ -1225,7 +1225,7 @@ class AccountPlaylistContentE2eTest {
             ),
         )
         E2eAssert.status(loginResponse, 200, "[accounts] account login should succeed")
-        val token = E2eJson.mapper.readTree(loginResponse.body()).path("token").asText()
+        val token = E2eJson.mapper.readTree(loginResponse.body()).path("token").asString()
         api.setAuthToken(token)
         return api
     }
@@ -1291,7 +1291,7 @@ class AccountPlaylistContentE2eTest {
             return null
         }
 
-        val firstAlbumTitle = albums.first().path("title").asText()
+        val firstAlbumTitle = albums.first().path("title").asString()
         if (firstAlbumTitle.isBlank()) {
             return null
         }
@@ -1553,7 +1553,7 @@ class AccountPlaylistContentE2eTest {
 
     private fun taskCount(rows: List<JsonNode>, taskType: String, status: String): Long {
         return rows.firstOrNull { row ->
-            row.path("taskType").asText() == taskType && row.path("status").asText() == status
+            row.path("taskType").asString() == taskType && row.path("status").asString() == status
         }?.path("count")?.longValue() ?: 0L
     }
 
@@ -1697,7 +1697,7 @@ class AccountPlaylistContentE2eTest {
     private fun findWorkNodeByTitle(responseBody: String, expectedTitle: String, step: String): JsonNode {
         val root = E2eJson.mapper.readTree(responseBody)
         assertTrue(root.isArray, "$step expected array response")
-        return root.firstOrNull { node -> node.path("title").asText() == expectedTitle }
+        return root.firstOrNull { node -> node.path("title").asString() == expectedTitle }
             ?: fail("$step expected work title=$expectedTitle")
     }
 

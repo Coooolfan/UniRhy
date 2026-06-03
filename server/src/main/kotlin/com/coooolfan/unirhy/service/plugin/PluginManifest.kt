@@ -2,9 +2,9 @@ package com.coooolfan.unirhy.service.plugin
 
 import com.coooolfan.unirhy.service.task.common.TaskType
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.dataformat.yaml.YAMLFactory
-import com.fasterxml.jackson.module.kotlin.registerKotlinModule
+import tools.jackson.databind.ObjectMapper
+import tools.jackson.dataformat.yaml.YAMLMapper
+import tools.jackson.module.kotlin.kotlinModule
 import org.slf4j.LoggerFactory
 import java.nio.file.Files
 import java.nio.file.Path
@@ -66,7 +66,7 @@ data class PluginNetworkPermission(
 )
 
 private val logger = LoggerFactory.getLogger(PluginManifest::class.java)
-private val yamlMapper: ObjectMapper = ObjectMapper(YAMLFactory()).registerKotlinModule()
+private val yamlMapper: ObjectMapper = YAMLMapper.builder().addModule(kotlinModule()).build()
 
 fun loadPluginManifest(path: Path): PluginManifest? {
     if (!Files.isRegularFile(path)) return null

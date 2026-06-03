@@ -24,7 +24,7 @@ import com.coooolfan.unirhy.sync.service.ResolvedQueueRecording
 import com.coooolfan.unirhy.sync.support.InMemoryCurrentQueueStateStore
 import com.coooolfan.unirhy.sync.support.TestPlaybackSyncTimeProvider
 import com.coooolfan.unirhy.sync.support.TestWebSocketSession
-import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import tools.jackson.module.kotlin.jacksonObjectMapper
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test

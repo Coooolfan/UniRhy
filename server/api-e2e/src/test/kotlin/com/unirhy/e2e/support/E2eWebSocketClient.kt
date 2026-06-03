@@ -1,7 +1,7 @@
 package com.unirhy.e2e.support
 
 import com.coooolfan.unirhy.sync.protocol.PlaybackSyncMessageType
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.WebSocket
@@ -185,7 +185,7 @@ class E2eWebSocketClient private constructor(
                     val raw = E2eJson.mapper.readTree(textBuffer.toString())
                     textBuffer.setLength(0)
                     messages += E2eWebSocketMessage(
-                        type = PlaybackSyncMessageType.valueOf(raw.path("type").asText()),
+                        type = PlaybackSyncMessageType.valueOf(raw.path("type").asString()),
                         payload = raw.path("payload"),
                         raw = raw,
                     )

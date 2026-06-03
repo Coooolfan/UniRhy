@@ -9,7 +9,7 @@ import com.coooolfan.unirhy.service.storage.OssStorageNode
 import com.coooolfan.unirhy.service.storage.StorageNode
 import com.coooolfan.unirhy.service.storage.StorageNodeObjectService
 import com.coooolfan.unirhy.service.task.common.*
-import com.fasterxml.jackson.databind.ObjectMapper
+import tools.jackson.databind.ObjectMapper
 import org.babyfish.jimmer.sql.ast.mutation.AssociatedSaveMode
 import org.babyfish.jimmer.sql.ast.mutation.SaveMode
 import org.babyfish.jimmer.sql.kt.KSqlClient

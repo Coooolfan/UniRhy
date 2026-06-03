@@ -8,10 +8,10 @@ import com.coooolfan.unirhy.service.plugin.PluginManifest
 import com.coooolfan.unirhy.service.plugin.UNIRHY_WASM_ABI_V1
 import com.coooolfan.unirhy.service.task.PluginTaskService
 import com.coooolfan.unirhy.service.task.common.TaskType
-import com.fasterxml.jackson.core.type.TypeReference
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.dataformat.yaml.YAMLFactory
-import com.fasterxml.jackson.module.kotlin.registerKotlinModule
+import tools.jackson.core.type.TypeReference
+import tools.jackson.databind.ObjectMapper
+import tools.jackson.dataformat.yaml.YAMLMapper
+import tools.jackson.module.kotlin.kotlinModule
 import org.babyfish.jimmer.sql.ast.mutation.SaveMode
 import org.babyfish.jimmer.sql.kt.KSqlClient
 import org.slf4j.LoggerFactory
@@ -37,7 +37,7 @@ class PluginService(
     private val pluginTaskService: PluginTaskService,
 ) {
     private val logger = LoggerFactory.getLogger(PluginService::class.java)
-    private val yamlMapper = ObjectMapper(YAMLFactory()).registerKotlinModule()
+    private val yamlMapper: ObjectMapper = YAMLMapper.builder().addModule(kotlinModule()).build()
     private val formFieldsType = object : TypeReference<List<PluginFormField>>() {}
 
     fun listPlugins(): List<Plugin> =

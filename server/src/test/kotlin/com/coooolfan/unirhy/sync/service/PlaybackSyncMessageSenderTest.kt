@@ -3,8 +3,8 @@ package com.coooolfan.unirhy.sync.service
 import com.coooolfan.unirhy.sync.protocol.ServerPlaybackSyncMessage
 import com.coooolfan.unirhy.sync.support.TestPlaybackSyncTimeProvider
 import com.coooolfan.unirhy.sync.support.TestWebSocketSession
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import tools.jackson.databind.json.JsonMapper
+import tools.jackson.module.kotlin.jacksonObjectMapper
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.web.socket.handler.ConcurrentWebSocketSessionDecorator
@@ -66,7 +66,7 @@ class PlaybackSyncMessageSenderTest {
     }
 }
 
-private class CountingObjectMapper : ObjectMapper() {
+private class CountingObjectMapper : JsonMapper() {
     private val delegate = jacksonObjectMapper()
     var writeCount: Int = 0
         private set

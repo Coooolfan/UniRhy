@@ -1,6 +1,6 @@
 package com.unirhy.e2e.support
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import java.net.http.HttpResponse
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
