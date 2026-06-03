@@ -13,14 +13,14 @@ export async function initPlatformRuntime(): Promise<void> {
     const { invoke } = await import('@tauri-apps/api/core')
     const config = await invoke<{ backend_url: string; platform: string }>('get_runtime_config')
 
-    window.__UNIRHY_RUNTIME__ = {
+    Reflect.set(window, '__UNIRHY_RUNTIME__', {
         apiBaseUrl: config.backend_url,
         platform: isPlatformKind(config.platform) ? config.platform : 'web',
-    }
+    })
 }
 
 export function getPlatformRuntime(): PlatformRuntime {
-    const injected = window.__UNIRHY_RUNTIME__
+    const injected = Reflect.get(window, '__UNIRHY_RUNTIME__')
     return {
         apiBaseUrl: injected?.apiBaseUrl ?? '',
         platform: injected?.platform ?? 'web',
@@ -38,7 +38,7 @@ export function buildWebSocketUrl(path: string): string {
             return ''
         }
         const { origin } = window.location
-        return `${origin.replace(/^http/i, 'ws')}${path}`
+        return `${origin.replace(/^http/iu, 'ws')}${path}`
     }
-    return `${apiBaseUrl.replace(/^http/i, 'ws')}${path}`
+    return `${apiBaseUrl.replace(/^http/iu, 'ws')}${path}`
 }

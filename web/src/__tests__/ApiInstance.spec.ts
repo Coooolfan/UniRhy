@@ -55,8 +55,8 @@ describe('ApiInstance', () => {
         vi.restoreAllMocks()
         window.localStorage.clear()
         clearTokenCookie()
-        delete window.__UNIRHY_RUNTIME__
-        delete (window as Window & { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__
+        Reflect.deleteProperty(window, '__UNIRHY_RUNTIME__')
+        Reflect.deleteProperty(window, '__TAURI_INTERNALS__')
         if (originalLocationDescriptor) {
             Object.defineProperty(window, 'location', originalLocationDescriptor)
         }
@@ -162,10 +162,10 @@ describe('ApiInstance', () => {
             configurable: true,
             value: {},
         })
-        window.__UNIRHY_RUNTIME__ = {
+        Reflect.set(window, '__UNIRHY_RUNTIME__', {
             apiBaseUrl: 'http://localhost:8654',
             platform: 'macos',
-        }
+        })
 
         const { api } = await loadApiInstance()
 

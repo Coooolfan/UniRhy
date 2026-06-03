@@ -33,21 +33,21 @@ class TauriRuntimeWebSocket implements RuntimeWebSocket {
     private removePluginListener: (() => void) | null = null
     private state = RUNTIME_WEB_SOCKET_CONNECTING
 
-    constructor(url: string) {
+    public constructor(url: string) {
         void this.connect(url)
     }
 
-    get readyState() {
+    public get readyState() {
         return this.state
     }
 
-    addEventListener(type: RuntimeWebSocketEventType, listener: RuntimeWebSocketListener) {
+    public addEventListener(type: RuntimeWebSocketEventType, listener: RuntimeWebSocketListener) {
         const listeners = this.listeners.get(type) ?? new Set<RuntimeWebSocketListener>()
         listeners.add(listener)
         this.listeners.set(type, listeners)
     }
 
-    send(data: string) {
+    public send(data: string) {
         if (this.state !== RUNTIME_WEB_SOCKET_OPEN || !this.pluginSocket) {
             return
         }
@@ -57,7 +57,7 @@ class TauriRuntimeWebSocket implements RuntimeWebSocket {
         })
     }
 
-    close() {
+    public close() {
         if (this.state === RUNTIME_WEB_SOCKET_CLOSED || this.state === RUNTIME_WEB_SOCKET_CLOSING) {
             return
         }

@@ -26,6 +26,31 @@ type UseAudioTrackCatalogOptions = {
     duration: Ref<number>
 }
 
+const applyRecordingMetadata = (
+    track: AudioTrack,
+    metadata: PlaybackRecordingMetadata,
+): AudioTrack => {
+    const title =
+        pickFirstNonBlank(metadata.title, metadata.comment, metadata.work?.title, track.title) ??
+        `曲目 #${track.id}`
+    const artist =
+        pickFirstNonBlank(resolveMetadataArtistLabel(metadata.artists), track.artist) ??
+        '未知艺术家'
+    const cover = metadata.cover?.url ? resolveCover(metadata.cover) : (track.cover ?? '')
+    let workId = track.workId
+    if (metadata.work?.id !== undefined) {
+        workId = metadata.work.id
+    }
+
+    return {
+        ...track,
+        title,
+        artist,
+        cover,
+        ...(workId === undefined ? {} : { workId }),
+    }
+}
+
 export const useAudioTrackCatalog = (options: UseAudioTrackCatalogOptions) => {
     const knownTracks = new Map<number, AudioTrack>()
     const hydratedTrackIds = new Set<number>()
@@ -110,35 +135,6 @@ export const useAudioTrackCatalog = (options: UseAudioTrackCatalogOptions) => {
     const rememberHydratedTrack = (track: AudioTrack) => {
         cacheTrack(track)
         hydratedTrackIds.add(track.id)
-    }
-
-    const applyRecordingMetadata = (
-        track: AudioTrack,
-        metadata: PlaybackRecordingMetadata,
-    ): AudioTrack => {
-        const title =
-            pickFirstNonBlank(
-                metadata.title,
-                metadata.comment,
-                metadata.work?.title,
-                track.title,
-            ) ?? `曲目 #${track.id}`
-        const artist =
-            pickFirstNonBlank(resolveMetadataArtistLabel(metadata.artists), track.artist) ??
-            '未知艺术家'
-        const cover = metadata.cover?.url ? resolveCover(metadata.cover) : (track.cover ?? '')
-        let workId = track.workId
-        if (metadata.work?.id !== undefined) {
-            workId = metadata.work.id
-        }
-
-        return {
-            ...track,
-            title,
-            artist,
-            cover,
-            ...(workId !== undefined ? { workId } : {}),
-        }
     }
 
     const buildTrackWithResolvedSource = async (
@@ -243,7 +239,7 @@ export const useAudioTrackCatalog = (options: UseAudioTrackCatalogOptions) => {
             cover: base?.cover ?? '',
             src: base?.src,
             mediaFileId: base?.mediaFileId,
-            ...(base?.workId !== undefined ? { workId: base.workId } : {}),
+            ...(base?.workId === undefined ? {} : { workId: base.workId }),
         }
         cacheTrack(track)
         return track

@@ -27,7 +27,7 @@ const nodeIcon = computed(() => (props.node.type === 'OSS' ? Cloud : HardDrive))
 
 const nodePathLabel = computed(() => {
     if (props.node.type === 'OSS') {
-        const host = (props.node.host ?? '-').replace(/^https?:\/\//, '')
+        const host = (props.node.host ?? '-').replace(/^https?:\/\//u, '')
         const prefix = props.node.parentPath ? ` / ${props.node.parentPath}` : ''
         return `${host} / ${props.node.bucket ?? '-'}${prefix}`
     }

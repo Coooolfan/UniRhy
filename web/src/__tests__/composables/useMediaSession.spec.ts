@@ -9,12 +9,12 @@ type TestTrack = {
 } | null
 
 class MockMediaMetadata {
-    album = ''
-    title?: string
-    artist?: string
-    artwork?: MediaImage[]
+    public album = ''
+    public title?: string
+    public artist?: string
+    public artwork?: MediaImage[]
 
-    constructor(init?: MediaMetadataInit) {
+    public constructor(init?: MediaMetadataInit) {
         this.title = init?.title
         this.artist = init?.artist
         this.artwork = init?.artwork

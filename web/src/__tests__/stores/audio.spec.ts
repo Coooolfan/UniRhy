@@ -412,20 +412,20 @@ const createMockSourceNode = (): MockAudioBufferSourceNode => {
 }
 
 class MockAudioContext {
-    static instances: MockAudioContext[] = []
-    static defaultState: 'running' | 'suspended' = 'running'
+    public static instances: MockAudioContext[] = []
+    public static defaultState: 'running' | 'suspended' = 'running'
 
-    readonly destination = {}
-    readonly gain = createMockGainNode()
-    readonly sourceNodes: MockAudioBufferSourceNode[] = []
-    currentTime = 0
-    state: 'running' | 'suspended' | 'closed' = MockAudioContext.defaultState
+    public readonly destination = {}
+    public readonly gain = createMockGainNode()
+    public readonly sourceNodes: MockAudioBufferSourceNode[] = []
+    public currentTime = 0
+    public state: 'running' | 'suspended' | 'closed' = MockAudioContext.defaultState
 
-    constructor() {
+    public constructor() {
         MockAudioContext.instances.push(this)
     }
 
-    readonly resume = vi.fn(() => {
+    public readonly resume = vi.fn(() => {
         if (resumeError) {
             return Promise.reject(new Error(resumeError.message))
         }
@@ -433,22 +433,22 @@ class MockAudioContext {
         return Promise.resolve()
     })
 
-    readonly close = vi.fn(() => {
+    public readonly close = vi.fn(() => {
         this.state = 'closed'
         return Promise.resolve()
     })
 
-    readonly createGain = vi.fn(() => {
+    public readonly createGain = vi.fn(() => {
         return this.gain
     })
 
-    readonly createBufferSource = vi.fn(() => {
+    public readonly createBufferSource = vi.fn(() => {
         const source = createMockSourceNode()
         this.sourceNodes.push(source)
         return source
     })
 
-    readonly decodeAudioData = vi.fn((arrayBuffer: ArrayBuffer) => {
+    public readonly decodeAudioData = vi.fn((arrayBuffer: ArrayBuffer) => {
         const view = new Uint8Array(arrayBuffer)
         return Promise.resolve(createMockAudioBuffer(view[0] ?? 0))
     })
@@ -588,7 +588,7 @@ describe('audio store', () => {
         setActivePinia(createPinia())
         resetRecordingPlaybackResolverCaches()
         window.localStorage.clear()
-        delete window.__UNIRHY_RUNTIME__
+        Reflect.deleteProperty(window, '__UNIRHY_RUNTIME__')
         setPreferredAssetFormat('audio/opus')
         playbackSyncMockState.clients.length = 0
         nextAnimationFrameId = 1
@@ -1116,10 +1116,10 @@ describe('audio store', () => {
     })
 
     it('adds auth token header to synced audio sources in tauri runtime', async () => {
-        window.__UNIRHY_RUNTIME__ = {
+        Reflect.set(window, '__UNIRHY_RUNTIME__', {
             apiBaseUrl: 'http://127.0.0.1:34855',
             platform: 'macos',
-        }
+        })
         window.localStorage.setItem('unirhy.auth-token', 'mobile-token')
         getRecordingMock.mockResolvedValueOnce(buildRecordingMetadata(8))
         fetchMock.mockResolvedValue(createResponse(45))
@@ -1185,10 +1185,10 @@ describe('audio store', () => {
     })
 
     it('does not attach auth headers to signed tauri audio sources', async () => {
-        window.__UNIRHY_RUNTIME__ = {
+        Reflect.set(window, '__UNIRHY_RUNTIME__', {
             apiBaseUrl: 'http://127.0.0.1:34855',
             platform: 'macos',
-        }
+        })
         window.localStorage.setItem('unirhy.auth-token', 'mobile-token')
         getRecordingMock.mockResolvedValueOnce(
             buildRecordingMetadata(8, {

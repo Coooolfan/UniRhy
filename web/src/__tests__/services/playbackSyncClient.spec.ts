@@ -4,52 +4,52 @@ import { PlaybackSyncClient } from '@/services/playbackSyncClient'
 type MockListener = (event: unknown) => void
 
 class MockWebSocket {
-    static readonly CONNECTING = 0
-    static readonly OPEN = 1
-    static readonly CLOSING = 2
-    static readonly CLOSED = 3
-    static instances: MockWebSocket[] = []
+    public static readonly CONNECTING = 0
+    public static readonly OPEN = 1
+    public static readonly CLOSING = 2
+    public static readonly CLOSED = 3
+    public static instances: MockWebSocket[] = []
 
-    readonly url: string
-    readyState = MockWebSocket.CONNECTING
-    sentMessages: string[] = []
+    public readonly url: string
+    public readyState = MockWebSocket.CONNECTING
+    public sentMessages: string[] = []
     private readonly listeners = new Map<string, MockListener[]>()
 
-    constructor(url: string) {
+    public constructor(url: string) {
         this.url = url
         MockWebSocket.instances.push(this)
     }
 
-    addEventListener(type: string, listener: MockListener) {
+    public addEventListener(type: string, listener: MockListener) {
         const current = this.listeners.get(type) ?? []
         current.push(listener)
         this.listeners.set(type, current)
     }
 
-    close() {
+    public close() {
         this.readyState = MockWebSocket.CLOSED
         this.emit('close', new Event('close'))
     }
 
-    send(data: string) {
+    public send(data: string) {
         this.sentMessages.push(data)
     }
 
-    emitOpen() {
+    public emitOpen() {
         this.readyState = MockWebSocket.OPEN
         this.emit('open', new Event('open'))
     }
 
-    emitMessage(data: string) {
+    public emitMessage(data: string) {
         this.emit('message', { data })
     }
 
-    emitClose() {
+    public emitClose() {
         this.readyState = MockWebSocket.CLOSED
         this.emit('close', new Event('close'))
     }
 
-    emitError() {
+    public emitError() {
         this.emit('error', new Event('error'))
     }
 
@@ -117,7 +117,7 @@ describe('playbackSyncClient', () => {
     beforeEach(() => {
         MockWebSocket.instances = []
         window.localStorage.clear()
-        delete window.__UNIRHY_RUNTIME__
+        Reflect.deleteProperty(window, '__UNIRHY_RUNTIME__')
         vi.useFakeTimers()
         vi.setSystemTime(new Date('2026-03-07T00:00:00Z'))
         vi.stubGlobal('WebSocket', MockWebSocket)
@@ -149,7 +149,7 @@ describe('playbackSyncClient', () => {
 
         const firstHello = JSON.parse(firstSocket?.sentMessages[0] ?? 'null')
         expect(firstHello.type).toBe('HELLO')
-        expect(firstHello.payload.deviceId).toMatch(/^web-/)
+        expect(firstHello.payload.deviceId).toMatch(/^web-/u)
         expect(firstClient.getDiagnosticsSnapshot().lastOutboundEvent?.type).toBe('HELLO')
 
         firstClient.disconnect()
@@ -164,10 +164,10 @@ describe('playbackSyncClient', () => {
     })
 
     it('uses tauri-darwin prefix for macOS tauri runtime device ids', () => {
-        window.__UNIRHY_RUNTIME__ = {
+        Reflect.set(window, '__UNIRHY_RUNTIME__', {
             apiBaseUrl: 'http://localhost:4000',
             platform: 'macos',
-        }
+        })
 
         const client = new PlaybackSyncClient()
         client.connect()
@@ -177,14 +177,14 @@ describe('playbackSyncClient', () => {
 
         const hello = JSON.parse(socket?.sentMessages[0] ?? 'null')
         expect(hello.type).toBe('HELLO')
-        expect(hello.payload.deviceId).toMatch(/^tauri-darwin-/)
+        expect(hello.payload.deviceId).toMatch(/^tauri-darwin-/u)
     })
 
     it('uses tauri-android prefix for Android tauri runtime device ids', () => {
-        window.__UNIRHY_RUNTIME__ = {
+        Reflect.set(window, '__UNIRHY_RUNTIME__', {
             apiBaseUrl: 'http://localhost:4000',
             platform: 'android',
-        }
+        })
 
         const client = new PlaybackSyncClient()
         client.connect()
@@ -194,14 +194,14 @@ describe('playbackSyncClient', () => {
 
         const hello = JSON.parse(socket?.sentMessages[0] ?? 'null')
         expect(hello.type).toBe('HELLO')
-        expect(hello.payload.deviceId).toMatch(/^tauri-android-/)
+        expect(hello.payload.deviceId).toMatch(/^tauri-android-/u)
     })
 
     it('uses tauri-ios prefix for iOS tauri runtime device ids', () => {
-        window.__UNIRHY_RUNTIME__ = {
+        Reflect.set(window, '__UNIRHY_RUNTIME__', {
             apiBaseUrl: 'http://localhost:4000',
             platform: 'ios',
-        }
+        })
 
         const client = new PlaybackSyncClient()
         client.connect()
@@ -211,14 +211,14 @@ describe('playbackSyncClient', () => {
 
         const hello = JSON.parse(socket?.sentMessages[0] ?? 'null')
         expect(hello.type).toBe('HELLO')
-        expect(hello.payload.deviceId).toMatch(/^tauri-ios-/)
+        expect(hello.payload.deviceId).toMatch(/^tauri-ios-/u)
     })
 
     it('migrates persisted web device ids to tauri-darwin on macOS tauri runtime', () => {
-        window.__UNIRHY_RUNTIME__ = {
+        Reflect.set(window, '__UNIRHY_RUNTIME__', {
             apiBaseUrl: 'http://localhost:4000',
             platform: 'macos',
-        }
+        })
         window.localStorage.setItem('unirhy.playback-sync.device-id', 'web-legacy01')
 
         const client = new PlaybackSyncClient()
@@ -229,7 +229,7 @@ describe('playbackSyncClient', () => {
 
         const hello = JSON.parse(socket?.sentMessages[0] ?? 'null')
         expect(hello.type).toBe('HELLO')
-        expect(hello.payload.deviceId).toMatch(/^tauri-darwin-/)
+        expect(hello.payload.deviceId).toMatch(/^tauri-darwin-/u)
         expect(hello.payload.deviceId).not.toBe('web-legacy01')
         expect(window.localStorage.getItem('unirhy.playback-sync.device-id')).toBe(
             hello.payload.deviceId,

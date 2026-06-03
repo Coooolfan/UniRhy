@@ -112,7 +112,7 @@ export const useStorageSettings = () => {
             return '未选择'
         }
         const activeType: FileProviderType =
-            systemConfig.value.fsProviderId !== null ? 'FILE_SYSTEM' : 'OSS'
+            systemConfig.value.fsProviderId === null ? 'OSS' : 'FILE_SYSTEM'
         const node = storageNodes.value.find(
             (item) => item.id === activeId && item.type === activeType,
         )

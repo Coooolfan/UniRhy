@@ -90,14 +90,12 @@ router.beforeEach(async (to) => {
         const status = await getInitializationStatus()
         const isAuthenticated = hasPersistedAuthToken()
 
-        if (!status.initialized) {
-            if (to.path !== '/init') {
-                return '/init'
-            }
-        } else {
+        if (status.initialized) {
             if (to.path === '/init') {
                 return isAuthenticated ? '/' : '/login'
             }
+        } else if (to.path !== '/init') {
+            return '/init'
         }
 
         if (isAuthenticated && to.path === '/login') {

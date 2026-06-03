@@ -240,11 +240,11 @@ export class PlaybackSyncClient {
     private initialSettleTimer: number | null = null
     private heartbeatTimer: number | null = null
 
-    constructor(callbacks: PlaybackSyncClientCallbacks = {}) {
+    public constructor(callbacks: PlaybackSyncClientCallbacks = {}) {
         this.callbacks = callbacks
     }
 
-    getState(): PlaybackSyncClientState {
+    public getState(): PlaybackSyncClientState {
         return {
             deviceId: this.deviceId,
             phase: this.phase,
@@ -253,7 +253,7 @@ export class PlaybackSyncClient {
         }
     }
 
-    getDiagnosticsSnapshot(): PlaybackSyncClientDiagnosticsSnapshot {
+    public getDiagnosticsSnapshot(): PlaybackSyncClientDiagnosticsSnapshot {
         return {
             deviceId: this.deviceId,
             phase: this.phase,
@@ -277,7 +277,7 @@ export class PlaybackSyncClient {
         }
     }
 
-    connect() {
+    public connect() {
         if (
             this.socket &&
             (this.socket.readyState === RUNTIME_WEB_SOCKET_OPEN ||
@@ -349,7 +349,7 @@ export class PlaybackSyncClient {
         })
     }
 
-    disconnect() {
+    public disconnect() {
         this.explicitStop = true
         this.reconnectAttempt = 0
         this.clearReconnectTimer()
@@ -364,7 +364,7 @@ export class PlaybackSyncClient {
         this.setPhase('stopped')
     }
 
-    requestSync() {
+    public requestSync() {
         return this.sendMessage({
             type: 'SYNC',
             payload: {
@@ -373,7 +373,7 @@ export class PlaybackSyncClient {
         })
     }
 
-    sendPlay(payload: Omit<PlaybackControlPayload, 'deviceId'>) {
+    public sendPlay(payload: Omit<PlaybackControlPayload, 'deviceId'>) {
         return this.sendMessage({
             type: 'PLAY',
             payload: {
@@ -383,7 +383,7 @@ export class PlaybackSyncClient {
         })
     }
 
-    sendPause(payload: Omit<PlaybackControlPayload, 'deviceId'>) {
+    public sendPause(payload: Omit<PlaybackControlPayload, 'deviceId'>) {
         return this.sendMessage({
             type: 'PAUSE',
             payload: {
@@ -393,7 +393,7 @@ export class PlaybackSyncClient {
         })
     }
 
-    sendSeek(payload: Omit<PlaybackControlPayload, 'deviceId'>) {
+    public sendSeek(payload: Omit<PlaybackControlPayload, 'deviceId'>) {
         return this.sendMessage({
             type: 'SEEK',
             payload: {
@@ -403,7 +403,7 @@ export class PlaybackSyncClient {
         })
     }
 
-    sendAudioSourceLoaded(payload: Omit<AudioSourceLoadedMessage['payload'], 'deviceId'>) {
+    public sendAudioSourceLoaded(payload: Omit<AudioSourceLoadedMessage['payload'], 'deviceId'>) {
         return this.sendMessage({
             type: 'AUDIO_SOURCE_LOADED',
             payload: {

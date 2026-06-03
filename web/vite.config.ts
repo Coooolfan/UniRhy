@@ -8,7 +8,7 @@ import tailwindcss from '@tailwindcss/vite'
 const isTauri = !!process.env.TAURI_ENV_PLATFORM
 
 const devServer = 'http://localhost:8654'
-const devWebSocketServer = devServer.replace(/^http/i, 'ws')
+const devWebSocketServer = devServer.replace(/^http/iu, 'ws')
 
 // https://vite.dev/config/
 export default defineConfig({

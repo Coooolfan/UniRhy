@@ -713,7 +713,7 @@ export const useAudioStore = defineStore('audio', () => {
         }
 
         const fetchInit: RequestInit = {}
-        const token = getPlatformRuntime().platform !== 'web' ? getAuthToken() : null
+        const token = getPlatformRuntime().platform === 'web' ? null : getAuthToken()
         if (token && !isSignedMediaUrl(track.src)) {
             fetchInit.headers = { 'unirhy-token': token }
         }

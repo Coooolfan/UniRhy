@@ -70,7 +70,7 @@ export function normalizeApiError(
 
 // 导出全局变量`api`
 export const api = new Api(async ({ uri, method, headers, body }) => {
-    const tenant = window.__tenant
+    const tenant = Reflect.get(window, '__tenant')
     const isFormData = body instanceof FormData
     const fetchHeaders: HeadersInit = {
         ...headers,
@@ -92,7 +92,7 @@ export const api = new Api(async ({ uri, method, headers, body }) => {
         method,
         credentials: 'include',
         headers: fetchHeaders,
-        ...(method !== 'GET' ? { body: isFormData ? body : JSON.stringify(body) } : {}),
+        ...(method === 'GET' ? {} : { body: isFormData ? body : JSON.stringify(body) }),
     })
 
     // 401处理：排除登录接口，避免循环

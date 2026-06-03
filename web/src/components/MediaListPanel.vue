@@ -38,9 +38,9 @@ const emit = defineEmits<{
 }>()
 
 defineSlots<{
-    item(props: { item: T; index: number; isPlaying: boolean }): unknown
-    empty(): unknown
-    actions(): unknown
+    item: (props: { item: T; index: number; isPlaying: boolean }) => unknown
+    empty: () => unknown
+    actions: () => unknown
 }>()
 
 const isItemPlaying = (itemId: number) => {

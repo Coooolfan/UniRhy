@@ -4,7 +4,7 @@ import * as recordingMedia from '@/composables/recordingMedia'
 describe('recordingMedia', () => {
     beforeEach(() => {
         window.localStorage.clear()
-        delete window.__UNIRHY_RUNTIME__
+        Reflect.deleteProperty(window, '__UNIRHY_RUNTIME__')
     })
 
     it('normalizes shared recording display fields', () => {
@@ -91,10 +91,10 @@ describe('recordingMedia', () => {
     })
 
     it('uses presigned url from cover and mediaFile in tauri runtime', () => {
-        window.__UNIRHY_RUNTIME__ = {
+        Reflect.set(window, '__UNIRHY_RUNTIME__', {
             apiBaseUrl: 'http://127.0.0.1:34855',
             platform: 'web',
-        }
+        })
 
         expect(
             recordingMedia.resolveCover({
