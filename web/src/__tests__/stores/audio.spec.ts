@@ -516,7 +516,7 @@ const buildRecordingMetadata = (
                     objectKey: `audio/${id}.opus`,
                     mimeType: 'audio/opus',
                     size: 4_096,
-                    url: `/api/media/${id + 2_000}`,
+                    url: `/api/media-files/${id + 2_000}`,
                 },
             },
         ],
@@ -528,7 +528,7 @@ const buildRecordingMetadata = (
                       objectKey: `cover/${id}`,
                       mimeType: 'image/jpeg',
                       size: 1_024,
-                      url: `/api/media/${id + 30_000}`,
+                      url: `/api/media-files/${id + 30_000}`,
                   },
               }),
     }
@@ -749,7 +749,7 @@ describe('audio store', () => {
                             objectKey: 'audio/7.mp3',
                             mimeType: 'audio/mpeg',
                             size: 2_048,
-                            url: '/api/media/2071',
+                            url: '/api/media-files/2071',
                         },
                     },
                     {
@@ -760,7 +760,7 @@ describe('audio store', () => {
                             objectKey: 'audio/7.flac',
                             mimeType: 'audio/flac',
                             size: 4_096,
-                            url: '/api/media/2072',
+                            url: '/api/media-files/2072',
                         },
                     },
                 ],
@@ -782,7 +782,7 @@ describe('audio store', () => {
         } satisfies LoadAudioSourceMessage)
         await flushPromises(12)
 
-        expect(fetchMock).toHaveBeenCalledWith('/api/media/2072', {})
+        expect(fetchMock).toHaveBeenCalledWith('/api/media-files/2072', {})
         expect(audioStore.currentTrack?.mediaFileId).toBe(2_072)
         expect(audioStore.playbackSyncDebugSnapshot.currentBuffer?.mediaFileId).toBe(2_072)
     })
@@ -800,7 +800,7 @@ describe('audio store', () => {
                             objectKey: 'audio/7.mp3',
                             mimeType: 'audio/mpeg',
                             size: 2_048,
-                            url: '/api/media/2071',
+                            url: '/api/media-files/2071',
                         },
                     },
                     {
@@ -811,7 +811,7 @@ describe('audio store', () => {
                             objectKey: 'audio/7.flac',
                             mimeType: 'audio/flac',
                             size: 4_096,
-                            url: '/api/media/2072',
+                            url: '/api/media-files/2072',
                         },
                     },
                 ],
@@ -874,7 +874,7 @@ describe('audio store', () => {
                         objectKey: 'audio/8.mp3',
                         mimeType: 'audio/mpeg',
                         size: 2_048,
-                        url: '/api/media/2081',
+                        url: '/api/media-files/2081',
                     },
                 },
                 {
@@ -885,7 +885,7 @@ describe('audio store', () => {
                         objectKey: 'audio/8.flac',
                         mimeType: 'audio/flac',
                         size: 4_096,
-                        url: '/api/media/2082',
+                        url: '/api/media-files/2082',
                     },
                 },
             ],
@@ -921,7 +921,7 @@ describe('audio store', () => {
         })
 
         await audioStore.replaceQueueAndPlay(
-            [buildTrack(7, '/api/media/2071'), buildTrack(8, '/api/media/2081')],
+            [buildTrack(7, '/api/media-files/2071'), buildTrack(8, '/api/media-files/2081')],
             0,
         )
         await flushPromises(12)
@@ -950,7 +950,7 @@ describe('audio store', () => {
 
         expect(audioStore.currentTrack?.id).toBe(8)
         expect(audioStore.currentTrack?.mediaFileId).toBe(2_082)
-        expect(audioStore.currentTrack?.src).toBe('/api/media/2082')
+        expect(audioStore.currentTrack?.src).toBe('/api/media-files/2082')
     })
 
     it('queues only the latest play intent until sync becomes ready', async () => {
@@ -1105,7 +1105,7 @@ describe('audio store', () => {
         client.emitMessage(message)
         await flushPromises(12)
 
-        expect(fetchMock).toHaveBeenCalledWith('/api/media/2007', {})
+        expect(fetchMock).toHaveBeenCalledWith('/api/media-files/2007', {})
         expect(client.sendAudioSourceLoaded).toHaveBeenCalledWith({
             commandId: 'cmd-play-1',
             currentIndex: 0,
@@ -1138,7 +1138,7 @@ describe('audio store', () => {
         } satisfies LoadAudioSourceMessage)
         await flushPromises(12)
 
-        expect(fetchMock).toHaveBeenCalledWith('http://127.0.0.1:34855/api/media/2008', {
+        expect(fetchMock).toHaveBeenCalledWith('http://127.0.0.1:34855/api/media-files/2008', {
             headers: {
                 'unirhy-token': 'mobile-token',
             },
@@ -1201,7 +1201,7 @@ describe('audio store', () => {
                             objectKey: 'audio/8.opus',
                             mimeType: 'audio/opus',
                             size: 4_096,
-                            url: '/api/media/2008?_sig=abc&_exp=9999999999',
+                            url: '/api/media-files/2008?_sig=abc&_exp=9999999999',
                         },
                     },
                 ],
@@ -1224,7 +1224,7 @@ describe('audio store', () => {
         await flushPromises(12)
 
         expect(fetchMock).toHaveBeenCalledWith(
-            'http://127.0.0.1:34855/api/media/2008?_sig=abc&_exp=9999999999',
+            'http://127.0.0.1:34855/api/media-files/2008?_sig=abc&_exp=9999999999',
             {},
         )
         expect(client.sendAudioSourceLoaded).toHaveBeenCalledWith({
@@ -1730,7 +1730,7 @@ describe('audio store', () => {
                 id: 7,
                 title: 'Hydrated Track 7',
                 artist: 'Hydrated Artist 7',
-                cover: '/api/media/30007',
+                cover: '/api/media-files/30007',
                 workId: 10007,
             }),
         )
@@ -1792,7 +1792,7 @@ describe('audio store', () => {
                 id: 12,
                 title: 'Hydrated Track 12',
                 artist: 'Hydrated Artist 12',
-                cover: '/api/media/30012',
+                cover: '/api/media-files/30012',
             }),
         )
     })
@@ -1845,7 +1845,7 @@ describe('audio store', () => {
                 title: 'Hydrated Track 14',
                 artist: 'Hydrated Artist 14',
                 cover: '/cover/14.jpg',
-                src: '/api/media/2014',
+                src: '/api/media-files/2014',
                 mediaFileId: 2_014,
                 workId: 10014,
             }),
@@ -1916,7 +1916,7 @@ describe('audio store', () => {
                 id: 22,
                 title: 'Hydrated Track 22',
                 artist: 'Hydrated Artist 22',
-                cover: '/api/media/30022',
+                cover: '/api/media-files/30022',
             }),
         )
     })

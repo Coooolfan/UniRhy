@@ -175,10 +175,10 @@ class PlaylistController(private val service: PlaylistService) {
      * @param id 播放列表 ID
      * @param input 新顺序下的录音 id 列表
      *
-     * @api PUT /api/playlists/{id}/recordings/reorder
+     * @api PUT /api/playlists/{id}/recording-order
      * @permission 需要登录认证
      */
-    @PutMapping("/{id}/recordings/reorder")
+    @PutMapping("/{id}/recording-order")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     fun reorderPlaylistRecordings(
         @PathVariable id: Long,

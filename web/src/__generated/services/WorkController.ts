@@ -53,7 +53,7 @@ export class WorkController {
     readonly getWorkByName: (options: WorkControllerOptions['getWorkByName']) => Promise<
         ReadonlyArray<WorkDto['WorkController/DEFAULT_WORK_FETCHER']>
     > = async(options) => {
-        let _uri = '/api/works/search';
+        let _uri = '/api/works/search-results';
         let _separator = _uri.indexOf('?') === -1 ? '?' : '&';
         let _value: any = undefined;
         _value = options.name;
@@ -106,7 +106,7 @@ export class WorkController {
     readonly mergeWork: (options: WorkControllerOptions['mergeWork']) => Promise<
         void
     > = async(options) => {
-        let _uri = '/api/works/merge';
+        let _uri = '/api/works/merge-requests';
         return (await this.executor({uri: _uri, method: 'POST', body: options.body})) as Promise<void>;
     }
     
@@ -126,7 +126,7 @@ export class WorkController {
     readonly randomWork: (options: WorkControllerOptions['randomWork']) => Promise<
         WorkDto['WorkController/DEFAULT_WORK_FETCHER']
     > = async(options) => {
-        let _uri = '/api/works/random';
+        let _uri = '/api/works/random-selection';
         let _separator = _uri.indexOf('?') === -1 ? '?' : '&';
         let _value: any = undefined;
         _value = options.timestamp;

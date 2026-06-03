@@ -23,7 +23,7 @@ data class E2eAdminSession(
 )
 
 fun ensureSystemInitialized(state: E2eAdminSession) {
-    val statusResponse = state.api.get("/api/system/config/status")
+    val statusResponse = state.api.get("/api/system-config/status")
     E2eAssert.status(statusResponse, 200, "[prepare] status endpoint should be reachable")
     val initialized = E2eJson.mapper.readTree(statusResponse.body()).path("initialized").asBoolean(false)
     if (initialized) {
@@ -31,7 +31,7 @@ fun ensureSystemInitialized(state: E2eAdminSession) {
     }
 
     val initResponse = state.api.post(
-        path = "/api/system/config",
+        path = "/api/system-config",
         json = systemInitRequest(state),
     )
     E2eAssert.status(initResponse, 201, "[prepare] system initialization should succeed")

@@ -25,7 +25,7 @@ export class OssStorageController {
     readonly create: (options: OssStorageControllerOptions['create']) => Promise<
         FileProviderOssDto['OssStorageController/DEFAULT_OSS_FETCHER']
     > = async(options) => {
-        let _uri = '/api/storage/oss';
+        let _uri = '/api/storage/oss-nodes';
         return (await this.executor({uri: _uri, method: 'POST', body: options.body})) as Promise<FileProviderOssDto['OssStorageController/DEFAULT_OSS_FETCHER']>;
     }
     
@@ -42,7 +42,7 @@ export class OssStorageController {
     readonly delete: (options: OssStorageControllerOptions['delete']) => Promise<
         void
     > = async(options) => {
-        let _uri = '/api/storage/oss/';
+        let _uri = '/api/storage/oss-nodes/';
         _uri += encodeURIComponent(options.id);
         return (await this.executor({uri: _uri, method: 'DELETE'})) as Promise<void>;
     }
@@ -61,7 +61,7 @@ export class OssStorageController {
     readonly get: (options: OssStorageControllerOptions['get']) => Promise<
         FileProviderOssDto['OssStorageController/DEFAULT_OSS_FETCHER']
     > = async(options) => {
-        let _uri = '/api/storage/oss/';
+        let _uri = '/api/storage/oss-nodes/';
         _uri += encodeURIComponent(options.id);
         return (await this.executor({uri: _uri, method: 'GET'})) as Promise<FileProviderOssDto['OssStorageController/DEFAULT_OSS_FETCHER']>;
     }
@@ -78,7 +78,7 @@ export class OssStorageController {
     readonly list: () => Promise<
         ReadonlyArray<FileProviderOssDto['OssStorageController/DEFAULT_OSS_FETCHER']>
     > = async() => {
-        let _uri = '/api/storage/oss';
+        let _uri = '/api/storage/oss-nodes';
         return (await this.executor({uri: _uri, method: 'GET'})) as Promise<ReadonlyArray<FileProviderOssDto['OssStorageController/DEFAULT_OSS_FETCHER']>>;
     }
     
@@ -97,7 +97,7 @@ export class OssStorageController {
     readonly update: (options: OssStorageControllerOptions['update']) => Promise<
         FileProviderOssDto['OssStorageController/DEFAULT_OSS_FETCHER']
     > = async(options) => {
-        let _uri = '/api/storage/oss/';
+        let _uri = '/api/storage/oss-nodes/';
         _uri += encodeURIComponent(options.id);
         return (await this.executor({uri: _uri, method: 'PUT', body: options.body})) as Promise<FileProviderOssDto['OssStorageController/DEFAULT_OSS_FETCHER']>;
     }

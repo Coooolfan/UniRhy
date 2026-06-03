@@ -58,7 +58,7 @@ const buildPlayableWork = () => ({
                         mimeType: 'audio/mpeg',
                         size: 123,
                         objectKey: 'track-a.mp3',
-                        url: '/api/media/41?_sig=a&_exp=9999999999',
+                        url: '/api/media-files/41?_sig=a&_exp=9999999999',
                     },
                 },
             ],
@@ -68,7 +68,7 @@ const buildPlayableWork = () => ({
                 objectKey: 'cover-a.jpg',
                 mimeType: 'image/jpeg',
                 size: 345,
-                url: '/api/media/61?_sig=b&_exp=9999999999',
+                url: '/api/media-files/61?_sig=b&_exp=9999999999',
             },
         },
     ],
@@ -107,7 +107,7 @@ const buildUnplayableWork = () => ({
                         mimeType: 'image/png',
                         size: 222,
                         objectKey: 'cover-b.png',
-                        url: '/api/media/42?_sig=c&_exp=9999999999',
+                        url: '/api/media-files/42?_sig=c&_exp=9999999999',
                     },
                 },
             ],
@@ -117,7 +117,7 @@ const buildUnplayableWork = () => ({
                 objectKey: 'cover-b.jpg',
                 mimeType: 'image/jpeg',
                 size: 456,
-                url: '/api/media/62?_sig=d&_exp=9999999999',
+                url: '/api/media-files/62?_sig=d&_exp=9999999999',
             },
         },
     ],
@@ -220,7 +220,7 @@ describe('DashboardHero', () => {
                                 mimeType: 'audio/mpeg',
                                 size: 123,
                                 objectKey: 'track-a.mp3',
-                                url: '/api/media/41?_sig=a&_exp=9999999999',
+                                url: '/api/media-files/41?_sig=a&_exp=9999999999',
                             },
                         },
                         {
@@ -231,7 +231,7 @@ describe('DashboardHero', () => {
                                 mimeType: 'audio/flac',
                                 size: 456,
                                 objectKey: 'track-a.flac',
-                                url: '/api/media/42?_sig=b&_exp=9999999999',
+                                url: '/api/media-files/42?_sig=b&_exp=9999999999',
                             },
                         },
                     ],
@@ -253,6 +253,6 @@ describe('DashboardHero', () => {
             expect(audioStore.currentTrack?.mediaFileId).toBe(42)
         })
 
-        expect(audioStore.currentTrack?.src).toBe('/api/media/42?_sig=b&_exp=9999999999')
+        expect(audioStore.currentTrack?.src).toBe('/api/media-files/42?_sig=b&_exp=9999999999')
     })
 })

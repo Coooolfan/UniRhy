@@ -21,7 +21,7 @@ import org.springframework.web.bind.annotation.*
  */
 @SaCheckLogin
 @RestController
-@RequestMapping("/api/storage/fs")
+@RequestMapping("/api/storage/file-system-nodes")
 class FileSystemStorageController(private val service: FileSystemStorageService) {
 
     /**
@@ -32,7 +32,7 @@ class FileSystemStorageController(private val service: FileSystemStorageService)
      *
      * @return List<FileProviderFileSystem> 返回文件系统存储列表（默认 fetcher）
      *
-     * @api GET /api/storage/fs
+     * @api GET /api/storage/file-system-nodes
      * @permission 需要登录认证
      * @description 调用FileSystemStorageService.list()方法获取存储列表
      */
@@ -50,7 +50,7 @@ class FileSystemStorageController(private val service: FileSystemStorageService)
      * @param id 存储配置 ID
      * @return FileProviderFileSystem 返回文件系统存储配置（默认 fetcher）
      *
-     * @api GET /api/storage/fs/{id}
+     * @api GET /api/storage/file-system-nodes/{id}
      * @permission 需要登录认证
      * @description 调用FileSystemStorageService.get()方法获取存储配置
      */
@@ -68,7 +68,7 @@ class FileSystemStorageController(private val service: FileSystemStorageService)
      * @param create 创建参数
      * @return FileProviderFileSystem 返回创建后的文件系统存储配置（默认 fetcher）
      *
-     * @api POST /api/storage/fs
+     * @api POST /api/storage/file-system-nodes
      * @permission 需要登录认证
      * @description 调用FileSystemStorageService.create()方法创建存储配置
      */
@@ -89,7 +89,7 @@ class FileSystemStorageController(private val service: FileSystemStorageService)
      * @param update 更新参数
      * @return FileProviderFileSystem 返回更新后的文件系统存储配置（默认 fetcher）
      *
-     * @api PUT /api/storage/fs/{id}
+     * @api PUT /api/storage/file-system-nodes/{id}
      * @permission 需要登录认证
      * @description 调用FileSystemStorageService.update()方法更新存储配置
      */
@@ -110,7 +110,7 @@ class FileSystemStorageController(private val service: FileSystemStorageService)
      *
      * @param id 存储配置 ID
      *
-     * @api DELETE /api/storage/fs/{id}
+     * @api DELETE /api/storage/file-system-nodes/{id}
      * @permission 需要登录认证
      * @description 调用FileSystemStorageService.delete()方法删除存储配置
      */

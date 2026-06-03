@@ -194,7 +194,7 @@ describe('AudioPlayer', () => {
             title: 'Recording #7',
             artist: 'Unknown Artist',
             cover: '',
-            src: '/api/media/2007',
+            src: '/api/media-files/2007',
             mediaFileId: 2_007,
         }
 
@@ -208,13 +208,13 @@ describe('AudioPlayer', () => {
             ...audioStore.currentTrack,
             title: 'Hydrated Track 7',
             artist: 'Hydrated Artist 7',
-            cover: '/api/media/30007',
+            cover: '/api/media-files/30007',
         }
         await wrapper.vm.$nextTick()
 
         expect(wrapper.text()).toContain('Hydrated Track 7')
         expect(wrapper.text()).toContain('Hydrated Artist 7')
-        expect(wrapper.get('img[alt="Cover"]').attributes('src')).toBe('/api/media/30007')
+        expect(wrapper.get('img[alt="Cover"]').attributes('src')).toBe('/api/media-files/30007')
     })
 
     it('uses queue navigation controls when realtime control is available', async () => {

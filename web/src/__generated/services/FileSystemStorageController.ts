@@ -25,7 +25,7 @@ export class FileSystemStorageController {
     readonly create: (options: FileSystemStorageControllerOptions['create']) => Promise<
         FileProviderFileSystemDto['FileSystemStorageController/DEFAULT_FILE_SYSTEM_FETCHER']
     > = async(options) => {
-        let _uri = '/api/storage/fs';
+        let _uri = '/api/storage/file-system-nodes';
         return (await this.executor({uri: _uri, method: 'POST', body: options.body})) as Promise<FileProviderFileSystemDto['FileSystemStorageController/DEFAULT_FILE_SYSTEM_FETCHER']>;
     }
     
@@ -42,7 +42,7 @@ export class FileSystemStorageController {
     readonly delete: (options: FileSystemStorageControllerOptions['delete']) => Promise<
         void
     > = async(options) => {
-        let _uri = '/api/storage/fs/';
+        let _uri = '/api/storage/file-system-nodes/';
         _uri += encodeURIComponent(options.id);
         return (await this.executor({uri: _uri, method: 'DELETE'})) as Promise<void>;
     }
@@ -61,7 +61,7 @@ export class FileSystemStorageController {
     readonly get: (options: FileSystemStorageControllerOptions['get']) => Promise<
         FileProviderFileSystemDto['FileSystemStorageController/DEFAULT_FILE_SYSTEM_FETCHER']
     > = async(options) => {
-        let _uri = '/api/storage/fs/';
+        let _uri = '/api/storage/file-system-nodes/';
         _uri += encodeURIComponent(options.id);
         return (await this.executor({uri: _uri, method: 'GET'})) as Promise<FileProviderFileSystemDto['FileSystemStorageController/DEFAULT_FILE_SYSTEM_FETCHER']>;
     }
@@ -78,7 +78,7 @@ export class FileSystemStorageController {
     readonly list: () => Promise<
         ReadonlyArray<FileProviderFileSystemDto['FileSystemStorageController/DEFAULT_FILE_SYSTEM_FETCHER']>
     > = async() => {
-        let _uri = '/api/storage/fs';
+        let _uri = '/api/storage/file-system-nodes';
         return (await this.executor({uri: _uri, method: 'GET'})) as Promise<ReadonlyArray<FileProviderFileSystemDto['FileSystemStorageController/DEFAULT_FILE_SYSTEM_FETCHER']>>;
     }
     
@@ -97,7 +97,7 @@ export class FileSystemStorageController {
     readonly update: (options: FileSystemStorageControllerOptions['update']) => Promise<
         FileProviderFileSystemDto['FileSystemStorageController/DEFAULT_FILE_SYSTEM_FETCHER']
     > = async(options) => {
-        let _uri = '/api/storage/fs/';
+        let _uri = '/api/storage/file-system-nodes/';
         _uri += encodeURIComponent(options.id);
         return (await this.executor({uri: _uri, method: 'PUT', body: options.body})) as Promise<FileProviderFileSystemDto['FileSystemStorageController/DEFAULT_FILE_SYSTEM_FETCHER']>;
     }

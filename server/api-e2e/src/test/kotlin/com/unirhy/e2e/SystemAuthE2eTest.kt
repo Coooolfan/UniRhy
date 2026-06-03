@@ -45,7 +45,7 @@ class SystemAuthE2eTest {
     fun `status and protected endpoints require authentication`() {
         val state = prepareState()
 
-        val statusResponse = state.api.get("/api/system/config/status")
+        val statusResponse = state.api.get("/api/system-config/status")
         E2eAssert.status(statusResponse, 200, "[status] status endpoint should be reachable")
         E2eAssert.jsonAt(
             statusResponse.body(),
@@ -54,14 +54,14 @@ class SystemAuthE2eTest {
             "[status] new temporary db should not be initialized",
         )
 
-        val getConfigResponse = state.api.get("/api/system/config")
+        val getConfigResponse = state.api.get("/api/system-config")
         assertAuthenticationFailed(
             getConfigResponse,
             "[auth] get config should require login",
         )
 
         val updateConfigResponse = state.api.put(
-            path = "/api/system/config",
+            path = "/api/system-config",
             json = mapOf("fsProviderId" to 0L),
         )
         assertAuthenticationFailed(
@@ -79,12 +79,12 @@ class SystemAuthE2eTest {
         val state = prepareState()
 
         val initResponse = state.api.post(
-            path = "/api/system/config",
+            path = "/api/system-config",
             json = systemInitRequest(state),
         )
         E2eAssert.status(initResponse, 201, "[flow] system initialization should succeed")
 
-        val statusAfterInitResponse = state.api.get("/api/system/config/status")
+        val statusAfterInitResponse = state.api.get("/api/system-config/status")
         E2eAssert.status(statusAfterInitResponse, 200, "[flow] status endpoint should remain reachable")
         E2eAssert.jsonAt(
             statusAfterInitResponse.body(),
@@ -95,14 +95,14 @@ class SystemAuthE2eTest {
 
         loginAsAdmin(state)
 
-        val getConfigResponse = state.api.get("/api/system/config")
+        val getConfigResponse = state.api.get("/api/system-config")
         E2eAssert.status(getConfigResponse, 200, "[flow] get system config should succeed after login")
         E2eAssert.jsonAt(getConfigResponse.body(), "/id", 0, "[flow] system config id should be singleton id")
         E2eAssert.jsonAt(getConfigResponse.body(), "/fsProviderId", 0, "[flow] system config fs provider id should be 0")
         E2eAssert.jsonAt(getConfigResponse.body(), "/ossProviderId", null, "[flow] system config oss provider should be null")
 
         val updateConfigResponse = state.api.put(
-            path = "/api/system/config",
+            path = "/api/system-config",
             json = mapOf("fsProviderId" to 0L),
         )
         E2eAssert.status(updateConfigResponse, 200, "[flow] update system config should succeed")
@@ -114,7 +114,7 @@ class SystemAuthE2eTest {
         E2eAssert.status(logoutResponse, 204, "[flow] logout should succeed")
         state.api.setAuthToken(null)
 
-        val getAfterLogoutResponse = state.api.get("/api/system/config")
+        val getAfterLogoutResponse = state.api.get("/api/system-config")
         assertAuthenticationFailed(
             getAfterLogoutResponse,
             "[flow] get system config after logout should require login",
@@ -128,7 +128,7 @@ class SystemAuthE2eTest {
         ensureSystemInitialized(state)
 
         val duplicateInitResponse = state.api.post(
-            path = "/api/system/config",
+            path = "/api/system-config",
             json = systemInitRequest(state),
         )
         E2eAssert.apiError(
@@ -160,13 +160,13 @@ class SystemAuthE2eTest {
     fun `uppercase API prefix should not bypass authentication`() {
         val state = prepareState()
 
-        val lowercaseProtectedResponse = state.api.get("/api/system/config")
+        val lowercaseProtectedResponse = state.api.get("/api/system-config")
         assertAuthenticationFailed(
             lowercaseProtectedResponse,
             "[case] lowercase protected endpoint should require login",
         )
 
-        val uppercasePrefixResponse = state.api.get("/API/system/config")
+        val uppercasePrefixResponse = state.api.get("/API/system-config")
         E2eAssert.status(
             uppercasePrefixResponse,
             404,

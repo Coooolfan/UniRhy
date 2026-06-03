@@ -29,13 +29,13 @@ describe('router auth persistence', () => {
         window.history.replaceState({}, '', '/')
     })
 
-    it('redirects root to dashboard when a persisted token exists', async () => {
+    it('keeps authenticated users on the app home route', async () => {
         getAuthTokenMock.mockReturnValue('persisted-token')
         const router = await loadRouter()
 
         await router.push('/')
 
-        expect(router.currentRoute.value.fullPath).toBe('/dashboard')
+        expect(router.currentRoute.value.fullPath).toBe('/')
     })
 
     it('blocks the login page when a persisted token exists', async () => {
@@ -44,13 +44,30 @@ describe('router auth persistence', () => {
 
         await router.push('/login')
 
-        expect(router.currentRoute.value.fullPath).toBe('/dashboard')
+        expect(router.currentRoute.value.fullPath).toBe('/')
     })
 
-    it('redirects dashboard routes to login when no token exists', async () => {
+    it('redirects protected app routes to login when no token exists', async () => {
         const router = await loadRouter()
 
-        await router.push('/dashboard')
+        await router.push('/albums')
+
+        expect(router.currentRoute.value.fullPath).toBe('/login')
+    })
+
+    it('redirects unknown routes to home for authenticated users', async () => {
+        getAuthTokenMock.mockReturnValue('persisted-token')
+        const router = await loadRouter()
+
+        await router.push('/missing-route')
+
+        expect(router.currentRoute.value.fullPath).toBe('/')
+    })
+
+    it('redirects unknown routes to login when no token exists', async () => {
+        const router = await loadRouter()
+
+        await router.push('/missing-route')
 
         expect(router.currentRoute.value.fullPath).toBe('/login')
     })
@@ -70,9 +87,23 @@ describe('router auth persistence', () => {
         const router = await loadRouter()
 
         await router.push('/')
-        await router.push('/dashboard/albums')
-        await router.push('/dashboard/settings')
+        await router.push('/albums')
+        await router.push('/settings')
 
         expect(isInitializedMock).toHaveBeenCalledTimes(1)
+    })
+
+    it('resolves detail routes under plural collections', async () => {
+        const router = await loadRouter()
+
+        expect(router.resolve({ name: 'album-detail', params: { id: '12' } }).fullPath).toBe(
+            '/albums/12',
+        )
+        expect(router.resolve({ name: 'playlist-detail', params: { id: '34' } }).fullPath).toBe(
+            '/playlists/34',
+        )
+        expect(router.resolve({ name: 'work-detail', params: { id: '56' } }).fullPath).toBe(
+            '/works/56',
+        )
     })
 })

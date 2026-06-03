@@ -29,7 +29,7 @@ import org.springframework.web.bind.annotation.RestController
  */
 @SaCheckLogin
 @RestController
-@RequestMapping("/api/storage/oss")
+@RequestMapping("/api/storage/oss-nodes")
 class OssStorageController(private val service: OssStorageService) {
 
     /**
@@ -40,7 +40,7 @@ class OssStorageController(private val service: OssStorageService) {
      *
      * @return List<FileProviderOss> 返回OSS存储列表（默认 fetcher）
      *
-     * @api GET /api/storage/oss
+     * @api GET /api/storage/oss-nodes
      * @permission 需要登录认证
      * @description 调用OssStorageService.list()方法获取存储列表
      */
@@ -58,7 +58,7 @@ class OssStorageController(private val service: OssStorageService) {
      * @param id 存储配置 ID
      * @return FileProviderOss 返回OSS存储配置（默认 fetcher）
      *
-     * @api GET /api/storage/oss/{id}
+     * @api GET /api/storage/oss-nodes/{id}
      * @permission 需要登录认证
      * @description 调用OssStorageService.get()方法获取存储配置
      */
@@ -76,7 +76,7 @@ class OssStorageController(private val service: OssStorageService) {
      * @param create 创建参数
      * @return FileProviderOss 返回创建后的OSS存储配置（默认 fetcher）
      *
-     * @api POST /api/storage/oss
+     * @api POST /api/storage/oss-nodes
      * @permission 需要登录认证
      * @description 调用OssStorageService.create()方法创建存储配置
      */
@@ -97,7 +97,7 @@ class OssStorageController(private val service: OssStorageService) {
      * @param update 更新参数
      * @return FileProviderOss 返回更新后的OSS存储配置（默认 fetcher）
      *
-     * @api PUT /api/storage/oss/{id}
+     * @api PUT /api/storage/oss-nodes/{id}
      * @permission 需要登录认证
      * @description 调用OssStorageService.update()方法更新存储配置
      */
@@ -118,7 +118,7 @@ class OssStorageController(private val service: OssStorageService) {
      *
      * @param id 存储配置 ID
      *
-     * @api DELETE /api/storage/oss/{id}
+     * @api DELETE /api/storage/oss-nodes/{id}
      * @permission 需要登录认证
      * @description 调用OssStorageService.delete()方法删除存储配置
      */

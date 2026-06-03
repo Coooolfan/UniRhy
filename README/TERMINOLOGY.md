@@ -84,7 +84,7 @@
 | `frontend.view`       | 页面视图   | View              | 页面       | Page（在 Vue 文件命名中） | 统一为 `View`       | 路由级页面组件。                   | UI / 文档 | 中：歌单详情是一个 View。<br>EN: Playlist detail is a View.                             |
 | `frontend.component`  | 组件       | Component         | UI 组件    | Widget（作统一术语时）    | 统一为 `Component`  | 可复用界面单元。                   | UI / 文档 | 中：播放器是全局组件。<br>EN: Audio player is a global component.                       |
 | `frontend.store`      | 状态存储   | Store             | 状态仓库   | State Manager（冗余表述） | 统一为 `Store`      | Pinia 管理的共享状态模块。         | UI / 文档 | 中：歌单列表由 Store 管理。<br>EN: Playlist list is managed by Store.                   |
-| `frontend.route`      | 路由       | Route             | 路由项     | URL（指代路由对象时）     | 统一为 `Route`      | 页面导航规则与路径定义。           | UI / 文档 | 中：歌单详情路由是 `playlist/:id`。<br>EN: Playlist route is `playlist/:id`.            |
+| `frontend.route`      | 路由       | Route             | 路由项     | URL（指代路由对象时）     | 统一为 `Route`      | 页面导航规则与路径定义。           | UI / 文档 | 中：歌单详情路由是 `playlists/:id`。<br>EN: Playlist route is `playlists/:id`.          |
 | `frontend.composable` | 组合式函数 | Composable        | 组合函数   | Hook（本项目 Vue 场景）   | 统一为 `Composable` | Vue Composition API 复用逻辑模块。 | UI / 文档 | 中：存储管理逻辑在 Composable 中。<br>EN: Storage logic is implemented in a Composable. |
 
 ### 数据模型词汇

@@ -60,7 +60,7 @@ class PlaybackQueueE2eTest {
         val recordingC = prepared.recordingIds[2]
 
         val replaceResponse = state.api.put(
-            path = "/api/playback/current-queue",
+            path = "/api/playback-queues/current",
             json = mapOf(
                 "recordingIds" to listOf(recordingA, recordingB),
                 "currentIndex" to 0,
@@ -89,7 +89,7 @@ class PlaybackQueueE2eTest {
         )
 
         val appendResponse = state.api.post(
-            path = "/api/playback/current-queue/items",
+            path = "/api/playback-queues/current/items",
             json = mapOf(
                 "recordingIds" to listOf(recordingC),
                 "version" to readVersion(persistedAfterReplace),
@@ -102,7 +102,7 @@ class PlaybackQueueE2eTest {
         val persistedAfterAppend = fetchQueue(state.api)
 
         val reorderResponse = state.api.put(
-            path = "/api/playback/current-queue/order",
+            path = "/api/playback-queues/current/item-order",
             json = mapOf(
                 "recordingIds" to listOf(recordingC, recordingA, recordingB),
                 "currentIndex" to 1,
@@ -117,7 +117,7 @@ class PlaybackQueueE2eTest {
         val persistedAfterReorder = fetchQueue(state.api)
 
         val setCurrentResponse = state.api.put(
-            path = "/api/playback/current-queue/current",
+            path = "/api/playback-queues/current/current-index",
             json = mapOf(
                 "currentIndex" to 2,
                 "version" to readVersion(persistedAfterReorder),
@@ -130,7 +130,7 @@ class PlaybackQueueE2eTest {
         val persistedAfterSetCurrent = fetchQueue(state.api)
 
         val strategyResponse = state.api.put(
-            path = "/api/playback/current-queue/strategy",
+            path = "/api/playback-queues/current/strategies",
             json = mapOf(
                 "playbackStrategy" to PlaybackStrategy.SHUFFLE.name,
                 "stopStrategy" to StopStrategy.TRACK.name,
@@ -150,7 +150,7 @@ class PlaybackQueueE2eTest {
         val persistedAfterStrategy = fetchQueue(state.api)
 
         val nextResponse = state.api.post(
-            path = "/api/playback/current-queue/actions/next",
+            path = "/api/playback-queues/current/next-navigation-requests",
             json = mapOf("version" to readVersion(persistedAfterStrategy)),
         )
         E2eAssert.status(nextResponse, 200, "[flow] navigate next should succeed")
@@ -163,7 +163,7 @@ class PlaybackQueueE2eTest {
         val persistedAfterNext = fetchQueue(state.api)
 
         val previousResponse = state.api.post(
-            path = "/api/playback/current-queue/actions/previous",
+            path = "/api/playback-queues/current/previous-navigation-requests",
             json = mapOf("version" to readVersion(persistedAfterNext)),
         )
         E2eAssert.status(previousResponse, 200, "[flow] navigate previous should succeed")
@@ -177,7 +177,7 @@ class PlaybackQueueE2eTest {
         val persistedAfterPrevious = fetchQueue(state.api)
 
         val removeResponse = state.api.post(
-            path = "/api/playback/current-queue/actions/remove",
+            path = "/api/playback-queues/current/item-removals",
             json = mapOf(
                 "index" to readCurrentIndex(persistedAfterPrevious),
                 "version" to readVersion(persistedAfterPrevious),
@@ -191,7 +191,7 @@ class PlaybackQueueE2eTest {
         val persistedAfterRemove = fetchQueue(state.api)
 
         val clearResponse = state.api.post(
-            path = "/api/playback/current-queue/actions/clear",
+            path = "/api/playback-queues/current/clear-requests",
             json = mapOf("version" to readVersion(persistedAfterRemove)),
         )
         E2eAssert.status(clearResponse, 200, "[flow] clear current queue should succeed")
@@ -207,7 +207,7 @@ class PlaybackQueueE2eTest {
         val persistedAfterClear = fetchQueue(state.api)
 
         val staleVersionResponse = state.api.post(
-            path = "/api/playback/current-queue/items",
+            path = "/api/playback-queues/current/items",
             json = mapOf(
                 "recordingIds" to listOf(recordingA),
                 "version" to readVersion(persistedAfterClear) - 1,
@@ -216,7 +216,7 @@ class PlaybackQueueE2eTest {
         E2eAssert.status(staleVersionResponse, 409, "[error] stale queue version should return conflict")
 
         val invalidRecordingResponse = state.api.put(
-            path = "/api/playback/current-queue",
+            path = "/api/playback-queues/current",
             json = mapOf(
                 "recordingIds" to listOf(Long.MAX_VALUE),
                 "currentIndex" to 0,
@@ -232,7 +232,7 @@ class PlaybackQueueE2eTest {
             return queue
         }
         val response = state.api.post(
-            path = "/api/playback/current-queue/actions/clear",
+            path = "/api/playback-queues/current/clear-requests",
             json = mapOf("version" to readVersion(queue)),
         )
         E2eAssert.status(response, 200, "[prepare] clearing playback queue should succeed")
@@ -240,7 +240,7 @@ class PlaybackQueueE2eTest {
     }
 
     private fun fetchQueue(api: E2eHttpClient): JsonNode {
-        val response = api.get("/api/playback/current-queue")
+        val response = api.get("/api/playback-queues/current")
         E2eAssert.status(response, 200, "[queue] get current queue should succeed")
         return readJson(response.body())
     }

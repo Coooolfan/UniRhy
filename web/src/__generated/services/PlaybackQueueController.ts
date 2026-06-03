@@ -34,7 +34,7 @@ export class PlaybackQueueController {
     readonly appendToCurrentQueue: (options: PlaybackQueueControllerOptions['appendToCurrentQueue']) => Promise<
         CurrentQueueDto
     > = async(options) => {
-        let _uri = '/api/playback/current-queue/items';
+        let _uri = '/api/playback-queues/current/items';
         return (await this.executor({uri: _uri, method: 'POST', body: options.body})) as Promise<CurrentQueueDto>;
     }
     
@@ -52,7 +52,7 @@ export class PlaybackQueueController {
     readonly clearCurrentQueue: (options: PlaybackQueueControllerOptions['clearCurrentQueue']) => Promise<
         CurrentQueueDto
     > = async(options) => {
-        let _uri = '/api/playback/current-queue/actions/clear';
+        let _uri = '/api/playback-queues/current/clear-requests';
         return (await this.executor({uri: _uri, method: 'POST', body: options.body})) as Promise<CurrentQueueDto>;
     }
     
@@ -68,7 +68,7 @@ export class PlaybackQueueController {
     readonly getCurrentQueue: () => Promise<
         CurrentQueueDto
     > = async() => {
-        let _uri = '/api/playback/current-queue';
+        let _uri = '/api/playback-queues/current';
         return (await this.executor({uri: _uri, method: 'GET'})) as Promise<CurrentQueueDto>;
     }
     
@@ -86,7 +86,7 @@ export class PlaybackQueueController {
     readonly playNextInCurrentQueue: (options: PlaybackQueueControllerOptions['playNextInCurrentQueue']) => Promise<
         CurrentQueueDto
     > = async(options) => {
-        let _uri = '/api/playback/current-queue/actions/next';
+        let _uri = '/api/playback-queues/current/next-navigation-requests';
         return (await this.executor({uri: _uri, method: 'POST', body: options.body})) as Promise<CurrentQueueDto>;
     }
     
@@ -104,7 +104,7 @@ export class PlaybackQueueController {
     readonly playPreviousInCurrentQueue: (options: PlaybackQueueControllerOptions['playPreviousInCurrentQueue']) => Promise<
         CurrentQueueDto
     > = async(options) => {
-        let _uri = '/api/playback/current-queue/actions/previous';
+        let _uri = '/api/playback-queues/current/previous-navigation-requests';
         return (await this.executor({uri: _uri, method: 'POST', body: options.body})) as Promise<CurrentQueueDto>;
     }
     
@@ -122,7 +122,7 @@ export class PlaybackQueueController {
     readonly removeCurrentQueueEntry: (options: PlaybackQueueControllerOptions['removeCurrentQueueEntry']) => Promise<
         CurrentQueueDto
     > = async(options) => {
-        let _uri = '/api/playback/current-queue/actions/remove';
+        let _uri = '/api/playback-queues/current/item-removals';
         return (await this.executor({uri: _uri, method: 'POST', body: options.body})) as Promise<CurrentQueueDto>;
     }
     
@@ -140,7 +140,7 @@ export class PlaybackQueueController {
     readonly reorderCurrentQueue: (options: PlaybackQueueControllerOptions['reorderCurrentQueue']) => Promise<
         CurrentQueueDto
     > = async(options) => {
-        let _uri = '/api/playback/current-queue/order';
+        let _uri = '/api/playback-queues/current/item-order';
         return (await this.executor({uri: _uri, method: 'PUT', body: options.body})) as Promise<CurrentQueueDto>;
     }
     
@@ -159,7 +159,7 @@ export class PlaybackQueueController {
     readonly replaceCurrentQueue: (options: PlaybackQueueControllerOptions['replaceCurrentQueue']) => Promise<
         CurrentQueueDto
     > = async(options) => {
-        let _uri = '/api/playback/current-queue';
+        let _uri = '/api/playback-queues/current';
         return (await this.executor({uri: _uri, method: 'PUT', body: options.body})) as Promise<CurrentQueueDto>;
     }
     
@@ -177,7 +177,7 @@ export class PlaybackQueueController {
     readonly setCurrentIndex: (options: PlaybackQueueControllerOptions['setCurrentIndex']) => Promise<
         CurrentQueueDto
     > = async(options) => {
-        let _uri = '/api/playback/current-queue/current';
+        let _uri = '/api/playback-queues/current/current-index';
         return (await this.executor({uri: _uri, method: 'PUT', body: options.body})) as Promise<CurrentQueueDto>;
     }
     
@@ -195,7 +195,7 @@ export class PlaybackQueueController {
     readonly updateCurrentQueueStrategy: (options: PlaybackQueueControllerOptions['updateCurrentQueueStrategy']) => Promise<
         CurrentQueueDto
     > = async(options) => {
-        let _uri = '/api/playback/current-queue/strategy';
+        let _uri = '/api/playback-queues/current/strategies';
         return (await this.executor({uri: _uri, method: 'PUT', body: options.body})) as Promise<CurrentQueueDto>;
     }
 }

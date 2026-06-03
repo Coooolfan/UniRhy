@@ -51,7 +51,7 @@ export class ArtistController {
     readonly getArtistByName: (options: ArtistControllerOptions['getArtistByName']) => Promise<
         ReadonlyArray<ArtistDto['ArtistController/DEFAULT_ARTIST_FETCHER']>
     > = async(options) => {
-        let _uri = '/api/artists/search';
+        let _uri = '/api/artists/search-results';
         let _separator = _uri.indexOf('?') === -1 ? '?' : '&';
         let _value: any = undefined;
         _value = options.name;
@@ -104,7 +104,7 @@ export class ArtistController {
     readonly mergeArtists: (options: ArtistControllerOptions['mergeArtists']) => Promise<
         void
     > = async(options) => {
-        let _uri = '/api/artists/merge';
+        let _uri = '/api/artists/merge-requests';
         return (await this.executor({uri: _uri, method: 'POST', body: options.body})) as Promise<void>;
     }
     

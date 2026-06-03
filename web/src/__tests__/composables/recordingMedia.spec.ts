@@ -14,14 +14,14 @@ describe('recordingMedia', () => {
                 title: '',
                 comment: 'Fallback Title',
                 artists: [{ displayName: 'Artist A' }],
-                cover: { id: 11, url: '/api/media/11?_sig=abc&_exp=9999999999' },
+                cover: { id: 11, url: '/api/media-files/11?_sig=abc&_exp=9999999999' },
                 assets: [
                     {
                         mediaFile: {
                             id: 21,
                             mimeType: 'audio/mpeg',
                             objectKey: 'track-a.mp3',
-                            url: '/api/media/21?_sig=def&_exp=9999999999',
+                            url: '/api/media-files/21?_sig=def&_exp=9999999999',
                         },
                     },
                 ],
@@ -33,7 +33,7 @@ describe('recordingMedia', () => {
                 id: 1,
                 title: 'Fallback Title',
                 artist: 'Artist A',
-                cover: '/api/media/11?_sig=abc&_exp=9999999999',
+                cover: '/api/media-files/11?_sig=abc&_exp=9999999999',
             },
         ])
     })
@@ -51,7 +51,7 @@ describe('recordingMedia', () => {
                                     id: 21,
                                     mimeType: 'audio/mpeg',
                                     objectKey: 'track-a.mp3',
-                                    url: '/api/media/21',
+                                    url: '/api/media-files/21',
                                 },
                             },
                         ],
@@ -73,7 +73,7 @@ describe('recordingMedia', () => {
                                     id: 21,
                                     mimeType: 'audio/mpeg',
                                     objectKey: 'track-a.mp3',
-                                    url: '/api/media/21',
+                                    url: '/api/media-files/21',
                                 },
                             },
                         ],
@@ -98,9 +98,9 @@ describe('recordingMedia', () => {
 
         expect(
             recordingMedia.resolveCover({
-                url: '/api/media/11?_sig=abc&_exp=9999999999',
+                url: '/api/media-files/11?_sig=abc&_exp=9999999999',
             }),
-        ).toBe('http://127.0.0.1:34855/api/media/11?_sig=abc&_exp=9999999999')
+        ).toBe('http://127.0.0.1:34855/api/media-files/11?_sig=abc&_exp=9999999999')
 
         expect(
             recordingMedia.resolvePlayableAudio([
@@ -109,12 +109,12 @@ describe('recordingMedia', () => {
                         id: 21,
                         mimeType: 'audio/mpeg',
                         objectKey: 'track-a.mp3',
-                        url: '/api/media/21?_sig=def&_exp=9999999999',
+                        url: '/api/media-files/21?_sig=def&_exp=9999999999',
                     },
                 },
             ]),
         ).toEqual({
-            src: 'http://127.0.0.1:34855/api/media/21?_sig=def&_exp=9999999999',
+            src: 'http://127.0.0.1:34855/api/media-files/21?_sig=def&_exp=9999999999',
             mediaFileId: 21,
         })
     })
@@ -148,7 +148,7 @@ describe('recordingMedia', () => {
                             id: 21,
                             mimeType: 'audio/mpeg',
                             objectKey: 'track-a.mp3',
-                            url: '/api/media/21',
+                            url: '/api/media-files/21',
                         },
                     },
                     {
@@ -156,14 +156,14 @@ describe('recordingMedia', () => {
                             id: 22,
                             mimeType: 'audio/flac',
                             objectKey: 'track-a.flac',
-                            url: '/api/media/22',
+                            url: '/api/media-files/22',
                         },
                     },
                 ],
                 'audio/flac',
             ),
         ).toEqual({
-            src: '/api/media/22',
+            src: '/api/media-files/22',
             mediaFileId: 22,
         })
     })
@@ -177,7 +177,7 @@ describe('recordingMedia', () => {
                             id: 21,
                             mimeType: 'audio/mpeg',
                             objectKey: 'track-a.mp3',
-                            url: '/api/media/21',
+                            url: '/api/media-files/21',
                         },
                     },
                     {
@@ -185,14 +185,14 @@ describe('recordingMedia', () => {
                             id: 22,
                             mimeType: 'audio/flac',
                             objectKey: 'track-a.flac',
-                            url: '/api/media/22',
+                            url: '/api/media-files/22',
                         },
                     },
                 ],
                 'audio/opus',
             ),
         ).toEqual({
-            src: '/api/media/21',
+            src: '/api/media-files/21',
             mediaFileId: 21,
         })
     })
@@ -206,7 +206,7 @@ describe('recordingMedia', () => {
                             id: 21,
                             mimeType: 'audio/mpeg',
                             objectKey: 'track-a.mp3',
-                            url: '/api/media/21',
+                            url: '/api/media-files/21',
                         },
                     },
                     {
@@ -214,14 +214,14 @@ describe('recordingMedia', () => {
                             id: 22,
                             mimeType: ' Audio/FLAC ',
                             objectKey: 'track-a.flac',
-                            url: '/api/media/22',
+                            url: '/api/media-files/22',
                         },
                     },
                 ],
                 '  audio/flac  ',
             ),
         ).toEqual({
-            src: '/api/media/22',
+            src: '/api/media-files/22',
             mediaFileId: 22,
         })
     })

@@ -43,8 +43,8 @@ export class RecordingController {
     readonly mergeRecording: (options: RecordingControllerOptions['mergeRecording']) => Promise<
         void
     > = async(options) => {
-        let _uri = '/api/recordings/merge';
-        return (await this.executor({uri: _uri, method: 'PUT', body: options.body})) as Promise<void>;
+        let _uri = '/api/recordings/merge-requests';
+        return (await this.executor({uri: _uri, method: 'POST', body: options.body})) as Promise<void>;
     }
     
     /**

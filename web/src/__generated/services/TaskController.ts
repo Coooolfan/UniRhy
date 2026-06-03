@@ -23,7 +23,7 @@ export class TaskController {
     readonly executeScanTask: (options: TaskControllerOptions['executeScanTask']) => Promise<
         void
     > = async(options) => {
-        let _uri = '/api/task/scan';
+        let _uri = '/api/tasks/scans';
         return (await this.executor({uri: _uri, method: 'POST', body: options.body})) as Promise<void>;
     }
     
@@ -40,7 +40,7 @@ export class TaskController {
     readonly executeTranscodeTask: (options: TaskControllerOptions['executeTranscodeTask']) => Promise<
         void
     > = async(options) => {
-        let _uri = '/api/task/transcode';
+        let _uri = '/api/tasks/transcodes';
         return (await this.executor({uri: _uri, method: 'POST', body: options.body})) as Promise<void>;
     }
     
@@ -56,7 +56,7 @@ export class TaskController {
     readonly listTaskLogs: () => Promise<
         ReadonlyArray<AsyncTaskLogCountRow>
     > = async() => {
-        let _uri = '/api/task/logs';
+        let _uri = '/api/tasks/log-counts';
         return (await this.executor({uri: _uri, method: 'GET'})) as Promise<ReadonlyArray<AsyncTaskLogCountRow>>;
     }
 }

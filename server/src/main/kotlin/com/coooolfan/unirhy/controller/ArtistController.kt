@@ -58,11 +58,11 @@ class ArtistController(private val service: ArtistService) {
      * @param name 艺术家名称
      * @return List<@FetchBy("DEFAULT_ARTIST_FETCHER") Artist> 返回艺术家列表
      *
-     * @api GET /api/artists/search
+     * @api GET /api/artists/search-results
      * @permission 需要登录认证
      * @description 调用ArtistService.getArtistByName()方法搜索艺术家
      */
-    @GetMapping("/search")
+    @GetMapping("/search-results")
     fun getArtistByName(@RequestParam name: String): List<@FetchBy("DEFAULT_ARTIST_FETCHER") Artist> {
         return service.getArtistByName(name, DEFAULT_ARTIST_FETCHER)
     }
@@ -115,11 +115,11 @@ class ArtistController(private val service: ArtistService) {
      *
      * @param input 合并请求体
      *
-     * @api POST /api/artists/merge
+     * @api POST /api/artists/merge-requests
      * @permission 需要登录认证
      * @description 调用ArtistService.mergeArtists()方法合并艺术家
      */
-    @PostMapping("/merge")
+    @PostMapping("/merge-requests")
     @SaCheckRole(ROLE_ADMIN)
     @ResponseStatus(HttpStatus.OK)
     fun mergeArtists(@RequestBody input: ArtistMergeReq) {

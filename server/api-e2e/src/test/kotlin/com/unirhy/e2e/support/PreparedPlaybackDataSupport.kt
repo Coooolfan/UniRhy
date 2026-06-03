@@ -70,7 +70,7 @@ private fun executeScanAndPreparePlaybackData(
     )
 
     val submitResponse = state.api.post(
-        path = "/api/task/scan",
+        path = "/api/tasks/scans",
         json = mapOf(
             "providerType" to "FILE_SYSTEM",
             "providerId" to resolveSystemFsProviderId(state),
@@ -93,7 +93,7 @@ private fun executeScanAndPreparePlaybackData(
     )
 
     val albumSearchResponse = state.api.get(
-        path = "/api/albums/search",
+        path = "/api/albums/search-results",
         query = mapOf("name" to fixture.albumTitle),
     )
     E2eAssert.status(albumSearchResponse, 200, "[prepare] playback album search should succeed")
@@ -139,7 +139,7 @@ private fun fetchTaskStats(
     state: E2eAdminSession,
     step: String,
 ): List<JsonNode> {
-    val response = state.api.get("/api/task/logs")
+    val response = state.api.get("/api/tasks/log-counts")
     E2eAssert.status(response, 200, "$step should succeed")
     val root = E2eJson.mapper.readTree(response.body())
     assertTrue(root.isArray, "$step expected root array")
@@ -211,7 +211,7 @@ private fun preparePlaybackFixture(
 }
 
 private fun resolveSystemFsProviderId(state: E2eAdminSession): Long {
-    val response = state.api.get("/api/system/config")
+    val response = state.api.get("/api/system-config")
     E2eAssert.status(response, 200, "[prepare] get system config for playback should succeed")
     val fsProviderIdNode = E2eJson.mapper.readTree(response.body()).path("fsProviderId")
     assertTrue(fsProviderIdNode.isIntegralNumber, "[prepare] playback fsProviderId should be integral")

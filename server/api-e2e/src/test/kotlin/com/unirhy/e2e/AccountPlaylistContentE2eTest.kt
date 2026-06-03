@@ -400,8 +400,8 @@ class AccountPlaylistContentE2eTest {
             step = "[recording-merge] playlist should initially contain source recording only",
         )
 
-        val mergeResponse = state.api.put(
-            path = "/api/recordings/merge",
+        val mergeResponse = state.api.post(
+            path = "/api/recordings/merge-requests",
             json = mapOf(
                 "targetId" to mergeData.targetRecordingId,
                 "needMergeIds" to listOf(mergeData.targetRecordingId, mergeData.sourceRecordingId),
@@ -473,8 +473,8 @@ class AccountPlaylistContentE2eTest {
             step = "[recording-merge-tail] add source recording to playlist",
         )
 
-        val mergeResponse = state.api.put(
-            path = "/api/recordings/merge",
+        val mergeResponse = state.api.post(
+            path = "/api/recordings/merge-requests",
             json = mapOf(
                 "targetId" to targetRecordingId,
                 "needMergeIds" to listOf(targetRecordingId, sourceRecordingId),
@@ -538,8 +538,8 @@ class AccountPlaylistContentE2eTest {
             step = "[recording-merge-dedupe] add source recording to playlist",
         )
 
-        val mergeResponse = state.api.put(
-            path = "/api/recordings/merge",
+        val mergeResponse = state.api.post(
+            path = "/api/recordings/merge-requests",
             json = mapOf(
                 "targetId" to targetRecordingId,
                 "needMergeIds" to listOf(targetRecordingId, sourceRecordingId),
@@ -596,7 +596,7 @@ class AccountPlaylistContentE2eTest {
         E2eAssert.jsonAt(updateWorkResponse.body(), "/title", updatedWorkTitle, "[content] updated work title should match")
 
         val workSearchResponse = state.api.get(
-            path = "/api/works/search",
+            path = "/api/works/search-results",
             query = mapOf("name" to updatedWorkTitle),
         )
         E2eAssert.status(workSearchResponse, 200, "[content] work search should succeed")
@@ -607,7 +607,7 @@ class AccountPlaylistContentE2eTest {
         )
 
         val workSearchUnknownResponse = state.api.get(
-            path = "/api/works/search",
+            path = "/api/works/search-results",
             query = mapOf("name" to "work-unknown-${UUID.randomUUID()}"),
         )
         E2eAssert.status(workSearchUnknownResponse, 200, "[content] unknown work search should succeed")
@@ -620,7 +620,7 @@ class AccountPlaylistContentE2eTest {
         val targetAlbumTitle = data.albumTitle
 
         val albumSearchResponse = state.api.get(
-            path = "/api/albums/search",
+            path = "/api/albums/search-results",
             query = mapOf("name" to targetAlbumTitle),
         )
         E2eAssert.status(albumSearchResponse, 200, "[content] album search should succeed")
@@ -631,7 +631,7 @@ class AccountPlaylistContentE2eTest {
         )
 
         val albumSearchUnknownResponse = state.api.get(
-            path = "/api/albums/search",
+            path = "/api/albums/search-results",
             query = mapOf("name" to "album-unknown-${UUID.randomUUID()}"),
         )
         E2eAssert.status(albumSearchUnknownResponse, 200, "[content] unknown album search should succeed")
@@ -713,7 +713,7 @@ class AccountPlaylistContentE2eTest {
         )
 
         val mergeResponse = state.api.post(
-            path = "/api/works/merge",
+            path = "/api/works/merge-requests",
             json = mapOf(
                 "targetId" to targetWorkId,
                 "needMergeIds" to listOf(targetWorkId, sourceWorkId),
@@ -786,7 +786,7 @@ class AccountPlaylistContentE2eTest {
         )
 
         val reorderResponse = state.api.put(
-            path = "/api/albums/$albumId/recordings/reorder",
+            path = "/api/albums/$albumId/recording-order",
             json = mapOf(
                 "recordingIds" to listOf(thirdRecordingId, firstRecordingId, secondRecordingId),
             ),
@@ -803,7 +803,7 @@ class AccountPlaylistContentE2eTest {
 
         E2eAssert.status(
             state.api.put(
-                path = "/api/albums/$albumId/recordings/reorder",
+                path = "/api/albums/$albumId/recording-order",
                 json = mapOf(
                     "recordingIds" to listOf(thirdRecordingId, firstRecordingId, secondRecordingId),
                 ),
@@ -814,7 +814,7 @@ class AccountPlaylistContentE2eTest {
 
         E2eAssert.status(
             state.api.put(
-                path = "/api/albums/${Long.MAX_VALUE}/recordings/reorder",
+                path = "/api/albums/${Long.MAX_VALUE}/recording-order",
                 json = mapOf("recordingIds" to listOf(firstRecordingId)),
             ),
             404,
@@ -823,7 +823,7 @@ class AccountPlaylistContentE2eTest {
 
         E2eAssert.status(
             state.api.put(
-                path = "/api/albums/$albumId/recordings/reorder",
+                path = "/api/albums/$albumId/recording-order",
                 json = mapOf(
                     "recordingIds" to listOf(firstRecordingId, firstRecordingId, secondRecordingId),
                 ),
@@ -834,7 +834,7 @@ class AccountPlaylistContentE2eTest {
 
         E2eAssert.status(
             state.api.put(
-                path = "/api/albums/$albumId/recordings/reorder",
+                path = "/api/albums/$albumId/recording-order",
                 json = mapOf(
                     "recordingIds" to listOf(firstRecordingId, secondRecordingId),
                 ),
@@ -845,7 +845,7 @@ class AccountPlaylistContentE2eTest {
 
         E2eAssert.status(
             state.api.put(
-                path = "/api/albums/$albumId/recordings/reorder",
+                path = "/api/albums/$albumId/recording-order",
                 json = mapOf(
                     "recordingIds" to listOf(
                         firstRecordingId,
@@ -921,7 +921,7 @@ class AccountPlaylistContentE2eTest {
         )
 
         val reorderResponse = ownerApi.put(
-            path = "/api/playlists/$playlistId/recordings/reorder",
+            path = "/api/playlists/$playlistId/recording-order",
             json = mapOf(
                 "recordingIds" to listOf(
                     playlistOrderData.secondRecordingId,
@@ -944,7 +944,7 @@ class AccountPlaylistContentE2eTest {
 
         E2eAssert.status(
             ownerApi.put(
-                path = "/api/playlists/$playlistId/recordings/reorder",
+                path = "/api/playlists/$playlistId/recording-order",
                 json = mapOf(
                     "recordingIds" to listOf(
                         playlistOrderData.secondRecordingId,
@@ -958,7 +958,7 @@ class AccountPlaylistContentE2eTest {
 
         E2eAssert.status(
             visitorApi.put(
-                path = "/api/playlists/$playlistId/recordings/reorder",
+                path = "/api/playlists/$playlistId/recording-order",
                 json = mapOf(
                     "recordingIds" to listOf(
                         playlistOrderData.firstRecordingId,
@@ -983,7 +983,7 @@ class AccountPlaylistContentE2eTest {
 
         E2eAssert.status(
             ownerApi.put(
-                path = "/api/playlists/${Long.MAX_VALUE}/recordings/reorder",
+                path = "/api/playlists/${Long.MAX_VALUE}/recording-order",
                 json = mapOf("recordingIds" to listOf(playlistOrderData.firstRecordingId)),
             ),
             400,
@@ -992,7 +992,7 @@ class AccountPlaylistContentE2eTest {
 
         E2eAssert.status(
             ownerApi.put(
-                path = "/api/playlists/$playlistId/recordings/reorder",
+                path = "/api/playlists/$playlistId/recording-order",
                 json = mapOf(
                     "recordingIds" to listOf(
                         playlistOrderData.firstRecordingId,
@@ -1006,7 +1006,7 @@ class AccountPlaylistContentE2eTest {
 
         E2eAssert.status(
             ownerApi.put(
-                path = "/api/playlists/$playlistId/recordings/reorder",
+                path = "/api/playlists/$playlistId/recording-order",
                 json = mapOf("recordingIds" to listOf(playlistOrderData.firstRecordingId)),
             ),
             400,
@@ -1015,7 +1015,7 @@ class AccountPlaylistContentE2eTest {
 
         E2eAssert.status(
             ownerApi.put(
-                path = "/api/playlists/$playlistId/recordings/reorder",
+                path = "/api/playlists/$playlistId/recording-order",
                 json = mapOf(
                     "recordingIds" to listOf(
                         playlistOrderData.firstRecordingId,
@@ -1106,14 +1106,14 @@ class AccountPlaylistContentE2eTest {
         )
 
         val searchResponse = state.api.get(
-            path = "/api/artists/search",
+            path = "/api/artists/search-results",
             query = mapOf("name" to "artist-source-$suffix"),
         )
         E2eAssert.status(searchResponse, 200, "[artists] search should succeed")
         E2eAssert.jsonArrayContainsId(searchResponse.body(), sourceId, "[artists] search should contain source")
 
         val emptySearchResponse = state.api.get(
-            path = "/api/artists/search",
+            path = "/api/artists/search-results",
             query = mapOf("name" to "artist-missing-$suffix"),
         )
         E2eAssert.status(emptySearchResponse, 200, "[artists] missing search should succeed")
@@ -1151,7 +1151,7 @@ class AccountPlaylistContentE2eTest {
         )
 
         val mergeResponse = state.api.post(
-            path = "/api/artists/merge",
+            path = "/api/artists/merge-requests",
             json = mapOf(
                 "targetId" to targetId,
                 "needMergeIds" to listOf(targetId, sourceId),
@@ -1160,7 +1160,7 @@ class AccountPlaylistContentE2eTest {
         E2eAssert.status(mergeResponse, 200, "[artists] merge should succeed")
 
         val searchAfterMergeResponse = state.api.get(
-            path = "/api/artists/search",
+            path = "/api/artists/search-results",
             query = mapOf("name" to "artist-source-$suffix"),
         )
         E2eAssert.status(searchAfterMergeResponse, 200, "[artists] search after merge should succeed")
@@ -1177,7 +1177,7 @@ class AccountPlaylistContentE2eTest {
 
         E2eAssert.status(
             state.api.post(
-                path = "/api/artists/merge",
+                path = "/api/artists/merge-requests",
                 json = mapOf(
                     "targetId" to Long.MAX_VALUE,
                     "needMergeIds" to listOf(Long.MAX_VALUE, targetId),
@@ -1312,7 +1312,7 @@ class AccountPlaylistContentE2eTest {
         val baselineFailed = taskCount(baselineStats, "METADATA_PARSE", "FAILED")
 
         val submitResponse = state.api.post(
-            path = "/api/task/scan",
+            path = "/api/tasks/scans",
             json = requestBody,
         )
         E2eAssert.status(submitResponse, 202, "[prepare] submit scan task should return accepted")
@@ -1333,7 +1333,7 @@ class AccountPlaylistContentE2eTest {
         val recordingId = extractFirstRecordingId(works.first(), "[prepare] first work after scan should include recording")
 
         val albumSearchResponse = state.api.get(
-            path = "/api/albums/search",
+            path = "/api/albums/search-results",
             query = mapOf("name" to fixture.albumTitle),
         )
         E2eAssert.status(albumSearchResponse, 200, "[prepare] album search after scan should succeed")
@@ -1484,7 +1484,7 @@ class AccountPlaylistContentE2eTest {
         val baselineFailed = taskCount(baselineStats, "METADATA_PARSE", "FAILED")
 
         val submitResponse = state.api.post(
-            path = "/api/task/scan",
+            path = "/api/tasks/scans",
             json = scanRequestBody(state),
         )
         E2eAssert.status(submitResponse, 202, "[scan-helper] submit scan task should return accepted")
@@ -1544,7 +1544,7 @@ class AccountPlaylistContentE2eTest {
     }
 
     private fun fetchTaskStats(state: E2eAdminSession, step: String): List<JsonNode> {
-        val response = state.api.get("/api/task/logs")
+        val response = state.api.get("/api/tasks/log-counts")
         E2eAssert.status(response, 200, "$step should succeed")
         val root = E2eJson.mapper.readTree(response.body())
         assertTrue(root.isArray, "$step expected root array")
@@ -1585,7 +1585,7 @@ class AccountPlaylistContentE2eTest {
     }
 
     private fun resolveSystemFsProviderId(state: E2eAdminSession): Long {
-        val response = state.api.get("/api/system/config")
+        val response = state.api.get("/api/system-config")
         E2eAssert.status(response, 200, "[prepare] get system config should succeed")
         val fsProviderIdNode = E2eJson.mapper.readTree(response.body()).path("fsProviderId")
         assertTrue(fsProviderIdNode.isIntegralNumber, "[prepare] fsProviderId should be integral")
@@ -1680,7 +1680,7 @@ class AccountPlaylistContentE2eTest {
 
     private fun findSingleRecordingIdByWorkTitle(state: E2eAdminSession, workTitle: String, step: String): Long {
         val response = state.api.get(
-            path = "/api/works/search",
+            path = "/api/works/search-results",
             query = mapOf("name" to workTitle),
         )
         E2eAssert.status(response, 200, "$step search should succeed")

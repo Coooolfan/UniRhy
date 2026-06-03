@@ -76,11 +76,11 @@ class RecordingController(private val service: RecordingService) {
      *
      * @param input RecordingMergeReq 合并参数
      *
-     * @api PUT /api/recordings/merge
+     * @api POST /api/recordings/merge-requests
      * @permission 需要登录认证
      * @description 调用RecordingService.mergeRecording()方法合并录音
      */
-    @PutMapping("/merge")
+    @PostMapping("/merge-requests")
     @SaCheckRole(ROLE_ADMIN)
     @ResponseStatus(HttpStatus.OK)
     fun mergeRecording(@RequestBody input: RecordingMergeReq) {
