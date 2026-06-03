@@ -52,7 +52,7 @@ class PluginService(
 
     fun upload(file: MultipartFile) {
         if (file.size > MAX_ZIP_BYTES) {
-            throw ResponseStatusException(HttpStatus.PAYLOAD_TOO_LARGE, "plugin file exceeds 10MB limit")
+            throw ResponseStatusException(HttpStatus.CONTENT_TOO_LARGE, "plugin file exceeds 10MB limit")
         }
 
         var manifestYaml: String? = null
@@ -66,7 +66,7 @@ class PluginService(
                     "plugin.wasm" -> {
                         val bytes = zis.readBytes()
                         if (bytes.size > MAX_WASM_BYTES) {
-                            throw ResponseStatusException(HttpStatus.PAYLOAD_TOO_LARGE, "wasm exceeds 20MB limit")
+                            throw ResponseStatusException(HttpStatus.CONTENT_TOO_LARGE, "wasm exceeds 20MB limit")
                         }
                         wasmBytes = bytes
                     }
