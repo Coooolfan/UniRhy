@@ -8,10 +8,9 @@ import { getPlatformRuntime } from '@/runtime/platform'
 const route = useRoute()
 const desktopPlatform = getPlatformRuntime().platform
 const usesCustomTitleBar = desktopPlatform === 'macos' || desktopPlatform === 'windows'
+const isAppRoute = computed(() => route.matched.some((record) => record.meta.requiresAuth))
 const dragRegionClass = computed(() =>
-    route.path.startsWith('/dashboard')
-        ? 'fixed left-0 top-0 z-40 h-32 w-64'
-        : 'fixed left-0 top-0 z-40 h-16 w-64',
+    isAppRoute.value ? 'fixed left-0 top-0 z-40 h-32 w-64' : 'fixed left-0 top-0 z-40 h-16 w-64',
 )
 
 const startWindowDrag = async (event: MouseEvent) => {

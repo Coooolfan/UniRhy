@@ -64,7 +64,7 @@ describe('recordingPlaybackResolver', () => {
                         id: 2_071,
                         mimeType: 'audio/mpeg',
                         objectKey: 'track-7.mp3',
-                        url: '/api/media/2071',
+                        url: '/api/media-files/2071',
                     },
                 },
             ],
@@ -80,7 +80,7 @@ describe('recordingPlaybackResolver', () => {
                             id: 9_999,
                             mimeType: 'audio/mpeg',
                             objectKey: 'track-7-new.mp3',
-                            url: '/api/media/9999',
+                            url: '/api/media-files/9999',
                         },
                     },
                 ],
@@ -91,7 +91,7 @@ describe('recordingPlaybackResolver', () => {
         expect(firstTrack).toEqual(
             expect.objectContaining({
                 mediaFileId: 2_071,
-                src: '/api/media/2071',
+                src: '/api/media-files/2071',
             }),
         )
         expect(secondTrack).toEqual(firstTrack)
@@ -109,7 +109,7 @@ describe('recordingPlaybackResolver', () => {
                         id: 2_081,
                         mimeType: 'audio/mpeg',
                         objectKey: 'track-8.mp3',
-                        url: '/api/media/2081',
+                        url: '/api/media-files/2081',
                     },
                 },
                 {
@@ -117,7 +117,7 @@ describe('recordingPlaybackResolver', () => {
                         id: 2_082,
                         mimeType: 'audio/flac',
                         objectKey: 'track-8.flac',
-                        url: '/api/media/2082',
+                        url: '/api/media-files/2082',
                     },
                 },
             ],
@@ -129,13 +129,13 @@ describe('recordingPlaybackResolver', () => {
         expect(mp3Track).toEqual(
             expect.objectContaining({
                 mediaFileId: 2_081,
-                src: '/api/media/2081',
+                src: '/api/media-files/2081',
             }),
         )
         expect(flacTrack).toEqual(
             expect.objectContaining({
                 mediaFileId: 2_082,
-                src: '/api/media/2082',
+                src: '/api/media-files/2082',
             }),
         )
     })
@@ -162,7 +162,7 @@ describe('recordingPlaybackResolver', () => {
                                 mimeType: 'audio/mpeg',
                                 size: 123,
                                 objectKey: 'track-a.mp3',
-                                url: '/api/media/2091',
+                                url: '/api/media-files/2091',
                             },
                         },
                         {
@@ -173,7 +173,7 @@ describe('recordingPlaybackResolver', () => {
                                 mimeType: 'audio/flac',
                                 size: 456,
                                 objectKey: 'track-a.flac',
-                                url: '/api/media/2092',
+                                url: '/api/media-files/2092',
                             },
                         },
                     ],
@@ -183,7 +183,7 @@ describe('recordingPlaybackResolver', () => {
                         objectKey: 'cover-702.jpg',
                         mimeType: 'image/jpeg',
                         size: 456,
-                        url: '/api/media/702',
+                        url: '/api/media-files/702',
                     },
                 },
             ],
@@ -206,7 +206,7 @@ describe('recordingPlaybackResolver', () => {
             expect.objectContaining({
                 id: 501,
                 mediaFileId: 2_092,
-                src: '/api/media/2092',
+                src: '/api/media-files/2092',
             }),
         )
         expect(secondTrack).toEqual(firstTrack)
@@ -222,7 +222,7 @@ describe('recordingPlaybackResolver', () => {
         expect(thirdTrack).toEqual(
             expect.objectContaining({
                 mediaFileId: 2_091,
-                src: '/api/media/2091',
+                src: '/api/media-files/2091',
             }),
         )
     })
@@ -249,7 +249,7 @@ describe('recordingPlaybackResolver', () => {
                                     mimeType: 'audio/mpeg',
                                     size: 123,
                                     objectKey: 'track-a.mp3',
-                                    url: '/api/media/2111',
+                                    url: '/api/media-files/2111',
                                 },
                             },
                         ],
@@ -278,7 +278,7 @@ describe('recordingPlaybackResolver', () => {
                                     mimeType: 'audio/mpeg',
                                     size: 123,
                                     objectKey: 'track-b.mp3',
-                                    url: '/api/media/2112',
+                                    url: '/api/media-files/2112',
                                 },
                             },
                         ],
@@ -315,7 +315,7 @@ describe('recordingPlaybackResolver', () => {
             expect.objectContaining({
                 id: 602,
                 mediaFileId: 2_112,
-                src: '/api/media/2112',
+                src: '/api/media-files/2112',
             }),
         )
     })
@@ -332,7 +332,7 @@ describe('recordingPlaybackResolver', () => {
                         id: 2_171,
                         mimeType: 'audio/mpeg',
                         objectKey: 'track-7.mp3',
-                        url: '/api/media/2171',
+                        url: '/api/media-files/2171',
                     },
                 },
             ],
@@ -349,7 +349,7 @@ describe('recordingPlaybackResolver', () => {
                             id: 2_172,
                             mimeType: 'audio/mpeg',
                             objectKey: 'track-7-updated.mp3',
-                            url: '/api/media/2172',
+                            url: '/api/media-files/2172',
                         },
                     },
                 ],
@@ -360,13 +360,13 @@ describe('recordingPlaybackResolver', () => {
         expect(firstResolvedTrack).toEqual(
             expect.objectContaining({
                 mediaFileId: 2_171,
-                src: '/api/media/2171',
+                src: '/api/media-files/2171',
             }),
         )
         expect(refreshedResolvedTrack).toEqual(
             expect.objectContaining({
                 mediaFileId: 2_172,
-                src: '/api/media/2172',
+                src: '/api/media-files/2172',
             }),
         )
 
@@ -392,7 +392,7 @@ describe('recordingPlaybackResolver', () => {
                                     mimeType: 'audio/mpeg',
                                     size: 123,
                                     objectKey: 'track-b.mp3',
-                                    url: '/api/media/2211',
+                                    url: '/api/media-files/2211',
                                 },
                             },
                         ],
@@ -422,7 +422,7 @@ describe('recordingPlaybackResolver', () => {
                                     mimeType: 'audio/mpeg',
                                     size: 123,
                                     objectKey: 'track-b-updated.mp3',
-                                    url: '/api/media/2212',
+                                    url: '/api/media-files/2212',
                                 },
                             },
                         ],
@@ -450,14 +450,14 @@ describe('recordingPlaybackResolver', () => {
         expect(firstAlbumTrack).toEqual(
             expect.objectContaining({
                 mediaFileId: 2_211,
-                src: '/api/media/2211',
+                src: '/api/media-files/2211',
             }),
         )
         expect(refreshedAlbumTrack).toEqual(
             expect.objectContaining({
                 title: 'Track B (Updated)',
                 mediaFileId: 2_212,
-                src: '/api/media/2212',
+                src: '/api/media-files/2212',
             }),
         )
     })

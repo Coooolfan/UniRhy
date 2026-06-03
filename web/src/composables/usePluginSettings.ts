@@ -63,7 +63,7 @@ export const usePluginSettings = () => {
         const headers: Record<string, string> = {}
         if (token) headers[TOKEN_HEADER_NAME] = token
 
-        const response = await runtimeFetch(buildApiUrl(`/api/plugins/${plugin.id}/download`), {
+        const response = await runtimeFetch(buildApiUrl(`/api/plugins/${plugin.id}/package`), {
             method: 'GET',
             credentials: 'include',
             headers,

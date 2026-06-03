@@ -59,7 +59,7 @@ class PluginE2eTest {
         val pluginArchive = pluginArchive(pluginId)
 
         val uploadResponse = state.api.postMultipartFile(
-            path = "/api/plugins/upload",
+            path = "/api/plugins",
             fieldName = "file",
             fileName = "$pluginId.up",
             fileBytes = pluginArchive,
@@ -74,7 +74,7 @@ class PluginE2eTest {
         assertFalse(uploaded.path("enabled").asBoolean(), "[plugins] uploaded plugin should start disabled")
         assertFalse(uploaded.path("isAvailable").asBoolean(), "[plugins] disabled plugin should not be loaded")
 
-        val downloadResponse = state.api.getBytes("/api/plugins/$pluginId/download")
+        val downloadResponse = state.api.getBytes("/api/plugins/$pluginId/package")
         E2eAssert.status(downloadResponse, 200, "[plugins] download should succeed")
         assertTrue(
             downloadResponse.headers().firstValue("Content-Disposition").orElse("").contains("$pluginId-0.0.1.up"),
@@ -86,7 +86,7 @@ class PluginE2eTest {
         )
 
         val enableResponse = state.api.put(
-            path = "/api/plugins/$pluginId/enabled",
+            path = "/api/plugins/$pluginId/enabled-state",
             query = mapOf("enabled" to true),
         )
         E2eAssert.status(enableResponse, 204, "[plugins] enable should succeed")
@@ -98,19 +98,19 @@ class PluginE2eTest {
         assertTrue(enabled.path("isAvailable").asBoolean(), "[plugins] enabled wasm should be loaded")
 
         val submitResponse = state.api.post(
-            path = "/api/plugins/ARTIST_NORMALIZATION/submit",
+            path = "/api/plugin-task-submissions/ARTIST_NORMALIZATION",
             json = emptyMap<String, String>(),
         )
         E2eAssert.status(submitResponse, 202, "[plugins] submit should accept loaded plugin task")
 
         val disableResponse = state.api.put(
-            path = "/api/plugins/$pluginId/enabled",
+            path = "/api/plugins/$pluginId/enabled-state",
             query = mapOf("enabled" to false),
         )
         E2eAssert.status(disableResponse, 204, "[plugins] disable should succeed")
 
         val submitAfterDisableResponse = state.api.post(
-            path = "/api/plugins/ARTIST_NORMALIZATION/submit",
+            path = "/api/plugin-task-submissions/ARTIST_NORMALIZATION",
             json = emptyMap<String, String>(),
         )
         E2eAssert.status(submitAfterDisableResponse, 400, "[plugins] submit without loaded plugin should fail")
@@ -126,14 +126,14 @@ class PluginE2eTest {
         )
 
         E2eAssert.status(
-            state.api.get("/api/plugins/$pluginId/download"),
+            state.api.get("/api/plugins/$pluginId/package"),
             404,
             "[plugins] downloading deleted plugin should fail",
         )
 
         E2eAssert.status(
             state.api.put(
-                path = "/api/plugins/$pluginId/enabled",
+                path = "/api/plugins/$pluginId/enabled-state",
                 query = mapOf("enabled" to true),
             ),
             404,
@@ -151,7 +151,7 @@ class PluginE2eTest {
     fun `plugin upload should reject invalid archives`() {
         val state = bootstrapAdminSession(baseUrl())
         val response = state.api.postMultipartFile(
-            path = "/api/plugins/upload",
+            path = "/api/plugins",
             fieldName = "file",
             fileName = "invalid.up",
             fileBytes = invalidPluginArchive(),
@@ -203,7 +203,7 @@ class PluginE2eTest {
     fun `plugin submit should reject invalid task type`() {
         val state = bootstrapAdminSession(baseUrl())
         E2eAssert.status(
-            state.api.post(path = "/api/plugins/NOT_A_TASK/submit", json = emptyMap<String, String>()),
+            state.api.post(path = "/api/plugin-task-submissions/NOT_A_TASK", json = emptyMap<String, String>()),
             400,
             "[plugins] submit should reject unknown task type",
         )

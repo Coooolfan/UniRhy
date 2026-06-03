@@ -44,7 +44,7 @@ export class PluginController {
     > = async(options) => {
         let _uri = '/api/plugins/';
         _uri += encodeURIComponent(options.id);
-        _uri += '/download';
+        _uri += '/package';
         return (await this.executor({uri: _uri, method: 'GET'})) as Promise<void>;
     }
     
@@ -80,7 +80,7 @@ export class PluginController {
     > = async(options) => {
         let _uri = '/api/plugins/';
         _uri += encodeURIComponent(options.id);
-        _uri += '/enabled';
+        _uri += '/enabled-state';
         let _separator = _uri.indexOf('?') === -1 ? '?' : '&';
         let _value: any = undefined;
         _value = options.enabled;
@@ -105,9 +105,8 @@ export class PluginController {
     readonly submitPluginTask: (options: PluginControllerOptions['submitPluginTask']) => Promise<
         void
     > = async(options) => {
-        let _uri = '/api/plugins/';
+        let _uri = '/api/plugin-task-submissions/';
         _uri += encodeURIComponent(options.taskType);
-        _uri += '/submit';
         return (await this.executor({uri: _uri, method: 'POST', body: options.body})) as Promise<void>;
     }
     
@@ -124,7 +123,7 @@ export class PluginController {
     readonly upload: (options: PluginControllerOptions['upload']) => Promise<
         void
     > = async(options) => {
-        let _uri = '/api/plugins/upload';
+        let _uri = '/api/plugins';
         const _formData = new FormData();
         const _body = options.body;
         _formData.append("file", _body.file);

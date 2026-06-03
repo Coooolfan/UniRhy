@@ -172,7 +172,7 @@ describe('ApiInstance', () => {
         await api.systemConfigController.get()
 
         expect(fetchMock).not.toHaveBeenCalled()
-        expect(pluginFetchMock).toHaveBeenCalledWith('http://localhost:8654/api/system/config', {
+        expect(pluginFetchMock).toHaveBeenCalledWith('http://localhost:8654/api/system-config', {
             method: 'GET',
             credentials: 'include',
             headers: {

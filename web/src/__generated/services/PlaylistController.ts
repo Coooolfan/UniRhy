@@ -141,7 +141,7 @@ export class PlaylistController {
     > = async(options) => {
         let _uri = '/api/playlists/';
         _uri += encodeURIComponent(options.id);
-        _uri += '/recordings/reorder';
+        _uri += '/recording-order';
         return (await this.executor({uri: _uri, method: 'PUT', body: options.body})) as Promise<void>;
     }
     

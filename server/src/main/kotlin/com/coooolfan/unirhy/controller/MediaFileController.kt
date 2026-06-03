@@ -42,7 +42,7 @@ class MediaFileController(
      *
      * @param id MediaFile ID
      *
-     * @api GET /api/media/{id}
+     * @api GET /api/media-files/{id}
      * @permission 需要登录认证或有效签名
      * @description 根据媒体文件ID返回对应的二进制内容
      */
@@ -67,7 +67,7 @@ class MediaFileController(
      *
      * @param id MediaFile ID
      *
-     * @api HEAD /api/media/{id}
+     * @api HEAD /api/media-files/{id}
      * @permission 需要登录认证或有效签名
      * @description 根据媒体文件ID返回对应资源的响应头
      */
@@ -93,7 +93,7 @@ class MediaFileController(
      *
      * @param id MediaFile ID
      *
-     * @api GET /api/media/{id} (Range)
+     * @api GET /api/media-files/{id} (Range)
      * @permission 需要登录认证或有效签名
      * @description 根据 Range 头返回媒体文件指定字节区间
      */

@@ -40,7 +40,7 @@ export class AlbumController {
     readonly getAlbumByName: (options: AlbumControllerOptions['getAlbumByName']) => Promise<
         ReadonlyArray<AlbumDto['AlbumController/DEFAULT_ALBUM_FETCHER']>
     > = async(options) => {
-        let _uri = '/api/albums/search';
+        let _uri = '/api/albums/search-results';
         let _separator = _uri.indexOf('?') === -1 ? '?' : '&';
         let _value: any = undefined;
         _value = options.name;
@@ -99,7 +99,7 @@ export class AlbumController {
     > = async(options) => {
         let _uri = '/api/albums/';
         _uri += encodeURIComponent(options.id);
-        _uri += '/recordings/reorder';
+        _uri += '/recording-order';
         return (await this.executor({uri: _uri, method: 'PUT', body: options.body})) as Promise<void>;
     }
     

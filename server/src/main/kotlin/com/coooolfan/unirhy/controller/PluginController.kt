@@ -41,7 +41,7 @@ data class PluginInfoResponse(
  * 提供插件的上传、启停、删除、导出与插件任务提交能力
  */
 @RestController
-@RequestMapping("/api/plugins")
+@RequestMapping("/api")
 @SaCheckLogin
 class PluginController(
     private val pluginService: PluginService,
@@ -60,7 +60,7 @@ class PluginController(
      * @permission 需要登录认证
      * @description 调用PluginService.listPlugins()方法获取插件列表
      */
-    @GetMapping
+    @GetMapping("/plugins")
     fun listPlugins(): List<PluginInfoResponse> {
         val loadedTaskTypes = pluginTaskService.getLoadedTaskTypes()
         return pluginService.listPlugins().map { plugin ->
@@ -86,11 +86,11 @@ class PluginController(
      *
      * @param file 插件包文件
      *
-     * @api POST /api/plugins/upload
+     * @api POST /api/plugins
      * @permission 需要登录认证
      * @description 调用PluginService.upload()方法上传并安装插件
      */
-    @PostMapping("/upload", consumes = ["multipart/form-data"])
+    @PostMapping("/plugins", consumes = ["multipart/form-data"])
     @SaCheckRole(ROLE_ADMIN)
     @ResponseStatus(HttpStatus.CREATED)
     fun upload(@RequestParam("file") file: MultipartFile) {
@@ -106,11 +106,11 @@ class PluginController(
      * @param id 插件 ID
      * @param enabled 是否启用
      *
-     * @api PUT /api/plugins/{id}/enabled
+     * @api PUT /api/plugins/{id}/enabled-state
      * @permission 需要登录认证
      * @description 调用PluginService.setEnabled()方法切换插件启用状态
      */
-    @PutMapping("/{id}/enabled")
+    @PutMapping("/plugins/{id}/enabled-state")
     @SaCheckRole(ROLE_ADMIN)
     @ResponseStatus(HttpStatus.NO_CONTENT)
     fun setEnabled(@PathVariable id: String, @RequestParam enabled: Boolean) {
@@ -129,7 +129,7 @@ class PluginController(
      * @permission 需要登录认证
      * @description 调用PluginService.delete()方法删除插件
      */
-    @DeleteMapping("/{id}")
+    @DeleteMapping("/plugins/{id}")
     @SaCheckRole(ROLE_ADMIN)
     @ResponseStatus(HttpStatus.NO_CONTENT)
     fun delete(@PathVariable id: String) {
@@ -145,11 +145,11 @@ class PluginController(
      * @param id 插件 ID
      * @param response Servlet 响应对象，用于写入二进制内容
      *
-     * @api GET /api/plugins/{id}/download
+     * @api GET /api/plugins/{id}/package
      * @permission 需要登录认证
      * @description 调用PluginService.export()方法导出插件包
      */
-    @GetMapping("/{id}/download")
+    @GetMapping("/plugins/{id}/package")
     fun download(@PathVariable id: String, response: HttpServletResponse) {
         val plugin = pluginService.getPlugin(id)
         val zipBytes = pluginService.export(id)
@@ -167,11 +167,11 @@ class PluginController(
      * @param taskType 任务类型（对应 TaskType 枚举值）
      * @param params 任务参数键值对
      *
-     * @api POST /api/plugins/{taskType}/submit
+     * @api POST /api/plugin-task-submissions/{taskType}
      * @permission 需要登录认证
      * @description 调用PluginTaskService.submit()方法提交插件任务
      */
-    @PostMapping("/{taskType}/submit")
+    @PostMapping("/plugin-task-submissions/{taskType}")
     @SaCheckRole(ROLE_ADMIN)
     @ResponseStatus(HttpStatus.ACCEPTED)
     fun submitPluginTask(

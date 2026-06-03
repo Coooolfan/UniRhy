@@ -72,11 +72,11 @@ class WorkController(
      * @param offset 时区偏移（毫秒），可空，默认 0L，建议传浏览器 `Date.getTimezoneOffset() * 60000`（毫秒，满足 `utc = local + offset`）
      * @return Work 返回随机作品（默认 fetcher）
      *
-     * @api GET /api/works/random
+     * @api GET /api/works/random-selection
      * @permission 需要登录认证
      * @description 调用WorkService.randomWork()方法获取时间窗口内的随机作品
      */
-    @GetMapping("/random")
+    @GetMapping("/random-selection")
     fun randomWork(
         @RequestParam(required = false) timestamp: Long?,
         @RequestParam(required = false) length: Long?,
@@ -92,11 +92,11 @@ class WorkController(
      * @param name 作品名称
      * @return List<Work> 返回作品列表（默认 fetcher）
      *
-     * @api GET /api/works/search
+     * @api GET /api/works/search-results
      * @permission 需要登录认证
      * @description 调用WorkService.getWorkByName()方法搜索作品
      */
-    @GetMapping("/search")
+    @GetMapping("/search-results")
     fun getWorkByName(
         @RequestParam(required = true) name: String,
     ): List<@FetchBy("DEFAULT_WORK_FETCHER") Work> {
@@ -148,11 +148,11 @@ class WorkController(
      *
      * @param input 合并请求体
      *
-     * @api POST /api/works/merge
+     * @api POST /api/works/merge-requests
      * @permission 需要登录认证
      * @description 调用WorkService.mergeWork()方法合并作品
      */
-    @PostMapping("/merge")
+    @PostMapping("/merge-requests")
     @SaCheckRole(ROLE_ADMIN)
     @ResponseStatus(HttpStatus.OK)
     fun mergeWork(@RequestBody input: WorkMergeReq) {

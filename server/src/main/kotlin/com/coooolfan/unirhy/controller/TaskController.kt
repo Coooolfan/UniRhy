@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.*
  */
 @SaCheckLogin
 @RestController
-@RequestMapping("/api/task")
+@RequestMapping("/api/tasks")
 class TaskController(
     private val scanTaskService: ScanTaskService,
     private val transcodeTaskService: TranscodeTaskService,
@@ -29,11 +29,11 @@ class TaskController(
      *
      * @param request 扫描任务请求参数
      *
-     * @api POST /api/task/scan
+     * @api POST /api/tasks/scans
      * @permission 需要登录认证
      * @description 调用ScanTaskService.submit()方法提交扫描任务
      */
-    @PostMapping("/scan")
+    @PostMapping("/scans")
     @SaCheckRole(ROLE_ADMIN)
     @ResponseStatus(HttpStatus.ACCEPTED)
     fun executeScanTask(@RequestBody request: ScanTaskRequest) {
@@ -48,11 +48,11 @@ class TaskController(
      *
      * @param request 转码任务请求参数
      *
-     * @api POST /api/task/transcode
+     * @api POST /api/tasks/transcodes
      * @permission 需要登录认证
      * @description 调用TranscodeTaskService.submit()方法提交转码任务
      */
-    @PostMapping("/transcode")
+    @PostMapping("/transcodes")
     @SaCheckRole(ROLE_ADMIN)
     @ResponseStatus(HttpStatus.ACCEPTED)
     fun executeTranscodeTask(@RequestBody request: TranscodeTaskRequest) {
@@ -67,11 +67,11 @@ class TaskController(
      *
      * @return List<AsyncTaskLogCountRow> 返回任务日志计数列表
      *
-     * @api GET /api/task/logs
+     * @api GET /api/tasks/log-counts
      * @permission 需要登录认证
      * @description 调用AsyncTaskLogService.listCounts()方法获取任务日志计数
      */
-    @GetMapping("/logs")
+    @GetMapping("/log-counts")
     fun listTaskLogs(): List<AsyncTaskLogCountRow> {
         return asyncTaskLogService.listCounts()
     }

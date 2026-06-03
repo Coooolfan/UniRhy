@@ -234,7 +234,7 @@ class PlaybackSyncWebSocketE2eTest {
             return
         }
         val response = state.api.post(
-            path = "/api/playback/current-queue/actions/clear",
+            path = "/api/playback-queues/current/clear-requests",
             json = mapOf("version" to queue.path("version").longValue()),
         )
         E2eAssert.status(response, 200, "[prepare] clearing queue for websocket test should succeed")
@@ -248,7 +248,7 @@ class PlaybackSyncWebSocketE2eTest {
         resetQueue(state)
         val queue = fetchQueue(state)
         val response = state.api.put(
-            path = "/api/playback/current-queue",
+            path = "/api/playback-queues/current",
             json = mapOf(
                 "recordingIds" to prepared.recordingIds.take(2),
                 "currentIndex" to currentIndex,
@@ -260,7 +260,7 @@ class PlaybackSyncWebSocketE2eTest {
     }
 
     private fun fetchQueue(state: E2eAdminSession) = run {
-        val response = state.api.get("/api/playback/current-queue")
+        val response = state.api.get("/api/playback-queues/current")
         E2eAssert.status(response, 200, "[prepare] get current queue for websocket test should succeed")
         E2eJson.mapper.readTree(response.body())
     }

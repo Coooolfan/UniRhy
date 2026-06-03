@@ -81,7 +81,7 @@ class MediaFileControllerTest {
 
     @Test
     fun `get full media returns 200 and standard headers`() {
-        val response = mockMvc.perform(get("/api/media/183").presigned(183))
+        val response = mockMvc.perform(get("/api/media-files/183").presigned(183))
             .andExpect(status().isOk)
             .andExpect(header().string(HttpHeaders.ACCEPT_RANGES, "bytes"))
             .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "private, max-age=31536000, immutable"))
@@ -99,7 +99,7 @@ class MediaFileControllerTest {
     @Test
     fun `single range returns 206 with content range`() {
         val response = mockMvc.perform(
-            get("/api/media/183").presigned(183)
+            get("/api/media-files/183").presigned(183)
                 .header(HttpHeaders.RANGE, "bytes=0-3"),
         )
             .andExpect(status().isPartialContent)
@@ -115,7 +115,7 @@ class MediaFileControllerTest {
     @Test
     fun `multi range returns multipart byteranges`() {
         val response = mockMvc.perform(
-            get("/api/media/183").presigned(183)
+            get("/api/media-files/183").presigned(183)
                 .header(HttpHeaders.RANGE, "bytes=0-1,4-5"),
         )
             .andExpect(status().isPartialContent)
@@ -131,7 +131,7 @@ class MediaFileControllerTest {
     @Test
     fun `invalid range returns 416`() {
         mockMvc.perform(
-            get("/api/media/183").presigned(183)
+            get("/api/media-files/183").presigned(183)
                 .header(HttpHeaders.RANGE, "bytes=100-200"),
         )
             .andExpect(status().isRequestedRangeNotSatisfiable)
@@ -141,7 +141,7 @@ class MediaFileControllerTest {
     @Test
     fun `if none match is ignored without etag support`() {
         mockMvc.perform(
-            get("/api/media/183").presigned(183)
+            get("/api/media-files/183").presigned(183)
                 .header(HttpHeaders.IF_NONE_MATCH, "\"abc123\""),
         )
             .andExpect(status().isOk)
@@ -150,7 +150,7 @@ class MediaFileControllerTest {
     @Test
     fun `range request with if none match still returns range`() {
         mockMvc.perform(
-            get("/api/media/183").presigned(183)
+            get("/api/media-files/183").presigned(183)
                 .header(HttpHeaders.RANGE, "bytes=0-3")
                 .header(HttpHeaders.IF_NONE_MATCH, "\"abc123\""),
         )
@@ -164,7 +164,7 @@ class MediaFileControllerTest {
             Instant.ofEpochMilli(mediaFile.lastModified() + 60_000).atZone(ZoneOffset.UTC),
         )
         mockMvc.perform(
-            get("/api/media/183").presigned(183)
+            get("/api/media-files/183").presigned(183)
                 .header(HttpHeaders.IF_MODIFIED_SINCE, ifModifiedSince),
         )
             .andExpect(status().isNotModified)
@@ -173,7 +173,7 @@ class MediaFileControllerTest {
     @Test
     fun `if range mismatch falls back to full 200`() {
         val response = mockMvc.perform(
-            get("/api/media/183").presigned(183)
+            get("/api/media-files/183").presigned(183)
                 .header(HttpHeaders.RANGE, "bytes=0-3")
                 .header(HttpHeaders.IF_RANGE, "\"other-tag\""),
         )
@@ -188,7 +188,7 @@ class MediaFileControllerTest {
     @Test
     fun `weak if range falls back to full 200`() {
         val response = mockMvc.perform(
-            get("/api/media/183").presigned(183)
+            get("/api/media-files/183").presigned(183)
                 .header(HttpHeaders.RANGE, "bytes=0-3")
                 .header(HttpHeaders.IF_RANGE, "W/\"abc123\""),
         )
@@ -202,7 +202,7 @@ class MediaFileControllerTest {
 
     @Test
     fun `head request returns headers without body`() {
-        val response = mockMvc.perform(head("/api/media/183").presigned(183))
+        val response = mockMvc.perform(head("/api/media-files/183").presigned(183))
             .andExpect(status().isOk)
             .andExpect(header().string(HttpHeaders.ACCEPT_RANGES, "bytes"))
             .andReturn()
@@ -218,7 +218,7 @@ class MediaFileControllerTest {
             throw ResponseStatusException(HttpStatus.NOT_FOUND, "Media file not found")
         }
 
-        mockMvc.perform(get("/api/media/404").presigned(404))
+        mockMvc.perform(get("/api/media-files/404").presigned(404))
             .andExpect(status().isNotFound)
     }
 

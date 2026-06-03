@@ -7,15 +7,9 @@ const hasPersistedAuthToken = () => {
     return token !== null && token.trim().length > 0
 }
 
-const requiresAuth = (path: string) => path.startsWith('/dashboard')
-
 const router = createRouter({
     history: createWebHistory(import.meta.env.BASE_URL),
     routes: [
-        {
-            path: '/',
-            redirect: () => (hasPersistedAuthToken() ? '/dashboard' : '/login'),
-        },
         {
             path: '/init',
             name: 'init',
@@ -27,9 +21,10 @@ const router = createRouter({
             component: () => import('../views/LoginView.vue'),
         },
         {
-            path: '/dashboard',
-            name: 'dashboard',
+            path: '/',
+            name: 'app',
             component: () => import('../views/DashboardView.vue'),
+            meta: { requiresAuth: true },
             children: [
                 {
                     path: 'search',
@@ -47,17 +42,17 @@ const router = createRouter({
                     component: () => import('../views/AlbumListView.vue'),
                 },
                 {
-                    path: 'album/:id',
+                    path: 'albums/:id',
                     name: 'album-detail',
                     component: () => import('../views/AlbumDetailView.vue'),
                 },
                 {
-                    path: 'playlist/:id',
+                    path: 'playlists/:id',
                     name: 'playlist-detail',
                     component: () => import('../views/PlaylistDetailView.vue'),
                 },
                 {
-                    path: 'work/:id',
+                    path: 'works/:id',
                     name: 'work-detail',
                     component: () => import('../views/WorkDetailView.vue'),
                 },
@@ -83,29 +78,33 @@ const router = createRouter({
                 },
             ],
         },
+        {
+            path: '/:pathMatch(.*)*',
+            redirect: '/',
+        },
     ],
 })
 
 router.beforeEach(async (to) => {
     try {
         const status = await getInitializationStatus()
+        const isAuthenticated = hasPersistedAuthToken()
+
         if (!status.initialized) {
             if (to.path !== '/init') {
                 return '/init'
             }
         } else {
             if (to.path === '/init') {
-                return '/login'
+                return isAuthenticated ? '/' : '/login'
             }
         }
 
-        const isAuthenticated = hasPersistedAuthToken()
-
         if (isAuthenticated && to.path === '/login') {
-            return '/dashboard'
+            return '/'
         }
 
-        if (!isAuthenticated && requiresAuth(to.path)) {
+        if (!isAuthenticated && to.matched.some((record) => record.meta.requiresAuth)) {
             return '/login'
         }
 

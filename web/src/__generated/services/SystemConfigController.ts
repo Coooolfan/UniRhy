@@ -23,7 +23,7 @@ export class SystemConfigController {
     readonly create: (options: SystemConfigControllerOptions['create']) => Promise<
         void
     > = async(options) => {
-        let _uri = '/api/system/config';
+        let _uri = '/api/system-config';
         return (await this.executor({uri: _uri, method: 'POST', body: options.body})) as Promise<void>;
     }
     
@@ -39,7 +39,7 @@ export class SystemConfigController {
     readonly get: () => Promise<
         SystemConfigDto['SystemConfigController/DEFAULT_SYSTEM_CONFIG_FETCHER']
     > = async() => {
-        let _uri = '/api/system/config';
+        let _uri = '/api/system-config';
         return (await this.executor({uri: _uri, method: 'GET'})) as Promise<SystemConfigDto['SystemConfigController/DEFAULT_SYSTEM_CONFIG_FETCHER']>;
     }
     
@@ -55,7 +55,7 @@ export class SystemConfigController {
     readonly isInitialized: () => Promise<
         SystemStatus
     > = async() => {
-        let _uri = '/api/system/config/status';
+        let _uri = '/api/system-config/status';
         return (await this.executor({uri: _uri, method: 'GET'})) as Promise<SystemStatus>;
     }
     
@@ -73,7 +73,7 @@ export class SystemConfigController {
     readonly update: (options: SystemConfigControllerOptions['update']) => Promise<
         SystemConfigDto['SystemConfigController/DEFAULT_SYSTEM_CONFIG_FETCHER']
     > = async(options) => {
-        let _uri = '/api/system/config';
+        let _uri = '/api/system-config';
         return (await this.executor({uri: _uri, method: 'PUT', body: options.body})) as Promise<SystemConfigDto['SystemConfigController/DEFAULT_SYSTEM_CONFIG_FETCHER']>;
     }
 }

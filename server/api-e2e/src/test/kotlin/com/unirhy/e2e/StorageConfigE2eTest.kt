@@ -50,7 +50,7 @@ class StorageConfigE2eTest {
                 parentPath = state.runtime.workspace.resolve("storage-fs-$createFsSuffix").toAbsolutePath().toString(),
                 readonly = false,
             )
-            val createResponse = state.api.post(path = "/api/storage/fs", json = createPayload)
+            val createResponse = state.api.post(path = "/api/storage/file-system-nodes", json = createPayload)
             E2eAssert.status(createResponse, 201, "[fs] create provider should succeed")
             E2eAssert.jsonAt(createResponse.body(), "/name", createPayload["name"], "[fs] created provider name should match")
             E2eAssert.jsonAt(
@@ -63,7 +63,7 @@ class StorageConfigE2eTest {
             fsProviderId = readId(createResponse.body(), "[fs] created provider should return id")
             val createdFsProviderId = requireNotNull(fsProviderId)
 
-            val getResponse = state.api.get("/api/storage/fs/$createdFsProviderId")
+            val getResponse = state.api.get("/api/storage/file-system-nodes/$createdFsProviderId")
             E2eAssert.status(getResponse, 200, "[fs] get provider should succeed")
             E2eAssert.jsonAt(getResponse.body(), "/id", createdFsProviderId, "[fs] get provider id should match")
             E2eAssert.jsonAt(getResponse.body(), "/name", createPayload["name"], "[fs] get provider name should match")
@@ -74,7 +74,7 @@ class StorageConfigE2eTest {
                 parentPath = state.runtime.workspace.resolve("storage-fs-updated-$updateFsSuffix").toAbsolutePath().toString(),
                 readonly = true,
             )
-            val updateResponse = state.api.put(path = "/api/storage/fs/$createdFsProviderId", json = updatePayload)
+            val updateResponse = state.api.put(path = "/api/storage/file-system-nodes/$createdFsProviderId", json = updatePayload)
             E2eAssert.status(updateResponse, 200, "[fs] update provider should succeed")
             E2eAssert.jsonAt(updateResponse.body(), "/id", createdFsProviderId, "[fs] updated provider id should match")
             E2eAssert.jsonAt(updateResponse.body(), "/name", updatePayload["name"], "[fs] updated provider name should match")
@@ -86,7 +86,7 @@ class StorageConfigE2eTest {
             )
             E2eAssert.jsonAt(updateResponse.body(), "/readonly", true, "[fs] updated provider readonly should match")
 
-            val listResponse = state.api.get("/api/storage/fs")
+            val listResponse = state.api.get("/api/storage/file-system-nodes")
             E2eAssert.status(listResponse, 200, "[fs] list providers should succeed")
             E2eAssert.jsonArrayContainsId(
                 responseBody = listResponse.body(),
@@ -94,11 +94,11 @@ class StorageConfigE2eTest {
                 step = "[fs] list providers should contain created provider",
             )
 
-            val deleteResponse = state.api.delete("/api/storage/fs/$createdFsProviderId")
+            val deleteResponse = state.api.delete("/api/storage/file-system-nodes/$createdFsProviderId")
             E2eAssert.status(deleteResponse, 204, "[fs] delete provider should succeed")
             fsProviderId = null
 
-            val listAfterDeleteResponse = state.api.get("/api/storage/fs")
+            val listAfterDeleteResponse = state.api.get("/api/storage/file-system-nodes")
             E2eAssert.status(listAfterDeleteResponse, 200, "[fs] list providers after delete should succeed")
             E2eAssert.jsonArrayNotContainsId(
                 responseBody = listAfterDeleteResponse.body(),
@@ -106,7 +106,7 @@ class StorageConfigE2eTest {
                 step = "[fs] deleted provider should not exist in list",
             )
         } finally {
-            fsProviderId?.let { safeDelete(state.api, "/api/storage/fs/$it") }
+            fsProviderId?.let { safeDelete(state.api, "/api/storage/file-system-nodes/$it") }
         }
     }
 
@@ -126,7 +126,7 @@ class StorageConfigE2eTest {
                 parentPath = "/root-$createOssSuffix",
                 readonly = false,
             )
-            val createResponse = state.api.post(path = "/api/storage/oss", json = createPayload)
+            val createResponse = state.api.post(path = "/api/storage/oss-nodes", json = createPayload)
             E2eAssert.status(createResponse, 201, "[oss] create provider should succeed")
             E2eAssert.jsonAt(createResponse.body(), "/name", createPayload["name"], "[oss] created provider name should match")
             E2eAssert.jsonAt(createResponse.body(), "/host", createPayload["host"], "[oss] created provider host should match")
@@ -147,7 +147,7 @@ class StorageConfigE2eTest {
             ossProviderId = readId(createResponse.body(), "[oss] created provider should return id")
             val createdOssProviderId = requireNotNull(ossProviderId)
 
-            val getResponse = state.api.get("/api/storage/oss/$createdOssProviderId")
+            val getResponse = state.api.get("/api/storage/oss-nodes/$createdOssProviderId")
             E2eAssert.status(getResponse, 200, "[oss] get provider should succeed")
             E2eAssert.jsonAt(getResponse.body(), "/id", createdOssProviderId, "[oss] get provider id should match")
             E2eAssert.jsonAt(getResponse.body(), "/name", createPayload["name"], "[oss] get provider name should match")
@@ -167,7 +167,7 @@ class StorageConfigE2eTest {
                 parentPath = "/root-updated-$updateOssSuffix",
                 readonly = true,
             )
-            val updateResponse = state.api.put(path = "/api/storage/oss/$createdOssProviderId", json = updatePayload)
+            val updateResponse = state.api.put(path = "/api/storage/oss-nodes/$createdOssProviderId", json = updatePayload)
             E2eAssert.status(updateResponse, 200, "[oss] update provider should succeed")
             E2eAssert.jsonAt(updateResponse.body(), "/id", createdOssProviderId, "[oss] updated provider id should match")
             E2eAssert.jsonAt(updateResponse.body(), "/name", updatePayload["name"], "[oss] updated provider name should match")
@@ -186,7 +186,7 @@ class StorageConfigE2eTest {
             )
             E2eAssert.jsonAt(updateResponse.body(), "/readonly", true, "[oss] updated provider readonly should match")
 
-            val listResponse = state.api.get("/api/storage/oss")
+            val listResponse = state.api.get("/api/storage/oss-nodes")
             E2eAssert.status(listResponse, 200, "[oss] list providers should succeed")
             E2eAssert.jsonArrayContainsId(
                 responseBody = listResponse.body(),
@@ -200,11 +200,11 @@ class StorageConfigE2eTest {
                 step = "[oss] list provider should not expose secret key",
             )
 
-            val deleteResponse = state.api.delete("/api/storage/oss/$createdOssProviderId")
+            val deleteResponse = state.api.delete("/api/storage/oss-nodes/$createdOssProviderId")
             E2eAssert.status(deleteResponse, 204, "[oss] delete provider should succeed")
             ossProviderId = null
 
-            val listAfterDeleteResponse = state.api.get("/api/storage/oss")
+            val listAfterDeleteResponse = state.api.get("/api/storage/oss-nodes")
             E2eAssert.status(listAfterDeleteResponse, 200, "[oss] list providers after delete should succeed")
             E2eAssert.jsonArrayNotContainsId(
                 responseBody = listAfterDeleteResponse.body(),
@@ -212,7 +212,7 @@ class StorageConfigE2eTest {
                 step = "[oss] deleted provider should not exist in list",
             )
         } finally {
-            ossProviderId?.let { safeDelete(state.api, "/api/storage/oss/$it") }
+            ossProviderId?.let { safeDelete(state.api, "/api/storage/oss-nodes/$it") }
         }
     }
 
@@ -226,7 +226,7 @@ class StorageConfigE2eTest {
         try {
             val writableFsSuffix = suffix()
             val writableFsResponse = state.api.post(
-                path = "/api/storage/fs",
+                path = "/api/storage/file-system-nodes",
                 json = fsPayload(
                     name = "e2e-fs-writable-$writableFsSuffix",
                     parentPath = state.runtime.workspace.resolve("storage-fs-writable-$writableFsSuffix").toAbsolutePath().toString(),
@@ -239,7 +239,7 @@ class StorageConfigE2eTest {
 
             val readonlyFsSuffix = suffix()
             val readonlyFsResponse = state.api.post(
-                path = "/api/storage/fs",
+                path = "/api/storage/file-system-nodes",
                 json = fsPayload(
                     name = "e2e-fs-readonly-$readonlyFsSuffix",
                     parentPath = state.runtime.workspace.resolve("storage-fs-readonly-$readonlyFsSuffix").toAbsolutePath().toString(),
@@ -252,7 +252,7 @@ class StorageConfigE2eTest {
 
             val linkageOssSuffix = suffix()
             val ossResponse = state.api.post(
-                path = "/api/storage/oss",
+                path = "/api/storage/oss-nodes",
                 json = ossPayload(
                     name = "e2e-oss-linkage-$linkageOssSuffix",
                     host = "https://oss-linkage-$linkageOssSuffix.example.invalid",
@@ -268,7 +268,7 @@ class StorageConfigE2eTest {
             val ossId = requireNotNull(ossProviderId)
 
             val bindWritableResponse = state.api.put(
-                path = "/api/system/config",
+                path = "/api/system-config",
                 json = mapOf("fsProviderId" to writableFsId),
             )
             E2eAssert.status(bindWritableResponse, 200, "[linkage] bind writable fs provider should succeed")
@@ -279,7 +279,7 @@ class StorageConfigE2eTest {
                 "[linkage] system config fs provider should be writable provider",
             )
 
-            val deleteBoundProviderResponse = state.api.delete("/api/storage/fs/$writableFsId")
+            val deleteBoundProviderResponse = state.api.delete("/api/storage/file-system-nodes/$writableFsId")
             E2eAssert.apiError(
                 deleteBoundProviderResponse,
                 family = "SYSTEM",
@@ -289,7 +289,7 @@ class StorageConfigE2eTest {
             )
 
             val bindReadonlyResponse = state.api.put(
-                path = "/api/system/config",
+                path = "/api/system-config",
                 json = mapOf("fsProviderId" to readonlyFsId),
             )
             E2eAssert.apiError(
@@ -301,7 +301,7 @@ class StorageConfigE2eTest {
             )
 
             val bindRemoteResponse = state.api.put(
-                path = "/api/system/config",
+                path = "/api/system-config",
                 json = mapOf<String, Any?>(
                     "fsProviderId" to null,
                     "ossProviderId" to ossId,
@@ -315,7 +315,7 @@ class StorageConfigE2eTest {
                 "[linkage] system config oss provider should be writable provider",
             )
 
-            val deleteBoundOssProviderResponse = state.api.delete("/api/storage/oss/$ossId")
+            val deleteBoundOssProviderResponse = state.api.delete("/api/storage/oss-nodes/$ossId")
             E2eAssert.apiError(
                 deleteBoundOssProviderResponse,
                 family = "SYSTEM",
@@ -325,7 +325,7 @@ class StorageConfigE2eTest {
             )
 
             val restoreResponse = state.api.put(
-                path = "/api/system/config",
+                path = "/api/system-config",
                 json = mapOf("fsProviderId" to 0L),
             )
             E2eAssert.status(restoreResponse, 200, "[linkage] restore default fs provider should succeed")
@@ -336,27 +336,27 @@ class StorageConfigE2eTest {
                 "[linkage] system config fs provider should be restored to default",
             )
 
-            val deleteReadonlyFsResponse = state.api.delete("/api/storage/fs/$readonlyFsId")
+            val deleteReadonlyFsResponse = state.api.delete("/api/storage/file-system-nodes/$readonlyFsId")
             E2eAssert.status(deleteReadonlyFsResponse, 204, "[linkage] delete readonly fs provider should succeed")
             readonlyFsProviderId = null
 
-            val deleteWritableFsResponse = state.api.delete("/api/storage/fs/$writableFsId")
+            val deleteWritableFsResponse = state.api.delete("/api/storage/file-system-nodes/$writableFsId")
             E2eAssert.status(deleteWritableFsResponse, 204, "[linkage] delete writable fs provider should succeed")
             writableFsProviderId = null
 
-            val deleteOssResponse = state.api.delete("/api/storage/oss/$ossId")
+            val deleteOssResponse = state.api.delete("/api/storage/oss-nodes/$ossId")
             E2eAssert.status(deleteOssResponse, 204, "[linkage] delete oss provider should succeed")
             ossProviderId = null
         } finally {
             runCatching {
                 state.api.put(
-                    path = "/api/system/config",
+                    path = "/api/system-config",
                     json = mapOf("fsProviderId" to 0L),
                 )
             }
-            writableFsProviderId?.let { safeDelete(state.api, "/api/storage/fs/$it") }
-            readonlyFsProviderId?.let { safeDelete(state.api, "/api/storage/fs/$it") }
-            ossProviderId?.let { safeDelete(state.api, "/api/storage/oss/$it") }
+            writableFsProviderId?.let { safeDelete(state.api, "/api/storage/file-system-nodes/$it") }
+            readonlyFsProviderId?.let { safeDelete(state.api, "/api/storage/file-system-nodes/$it") }
+            ossProviderId?.let { safeDelete(state.api, "/api/storage/oss-nodes/$it") }
         }
     }
 
@@ -369,7 +369,7 @@ class StorageConfigE2eTest {
         try {
             val suffix = suffix()
             val ossResponse = state.api.post(
-                path = "/api/storage/oss",
+                path = "/api/storage/oss-nodes",
                 json = ossPayload(
                     name = "e2e-oss-default-$suffix",
                     host = "https://oss-default-$suffix.example.invalid",
@@ -385,7 +385,7 @@ class StorageConfigE2eTest {
             val ossId = requireNotNull(ossProviderId)
 
             val bindRemoteResponse = state.api.put(
-                path = "/api/system/config",
+                path = "/api/system-config",
                 json = mapOf<String, Any?>(
                     "fsProviderId" to null,
                     "ossProviderId" to ossId,
@@ -407,11 +407,11 @@ class StorageConfigE2eTest {
         } finally {
             runCatching {
                 state.api.put(
-                    path = "/api/system/config",
+                    path = "/api/system-config",
                     json = mapOf("fsProviderId" to 0L),
                 )
             }
-            ossProviderId?.let { safeDelete(state.api, "/api/storage/oss/$it") }
+            ossProviderId?.let { safeDelete(state.api, "/api/storage/oss-nodes/$it") }
         }
     }
 

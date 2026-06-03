@@ -315,7 +315,7 @@ const handleLogin = async () => {
         alert(normalizedError.message || '登录失败')
         return
     }
-    router.push('/dashboard')
+    router.push('/')
 }
 
 const handleRegister = async () => {

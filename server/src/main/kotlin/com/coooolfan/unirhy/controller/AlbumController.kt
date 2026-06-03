@@ -69,11 +69,11 @@ class AlbumController(private val service: AlbumService) {
      * @param name 专辑名称
      * @return List<Album> 返回专辑列表（默认 fetcher）
      *
-     * @api GET /api/albums/search
+     * @api GET /api/albums/search-results
      * @permission 需要登录认证
      * @description 调用AlbumService.getAlbumByName()方法搜索专辑
      */
-    @GetMapping("/search")
+    @GetMapping("/search-results")
     fun getAlbumByName(
         @RequestParam(required = true) name: String,
     ): List<@FetchBy("DEFAULT_ALBUM_FETCHER") Album> {
@@ -112,10 +112,10 @@ class AlbumController(private val service: AlbumService) {
      * @param id 专辑 ID
      * @param input 新顺序下的录音 id 列表
      *
-     * @api PUT /api/albums/{id}/recordings/reorder
+     * @api PUT /api/albums/{id}/recording-order
      * @permission 需要登录认证
      */
-    @PutMapping("/{id}/recordings/reorder")
+    @PutMapping("/{id}/recording-order")
     @SaCheckRole(ROLE_ADMIN)
     @ResponseStatus(HttpStatus.NO_CONTENT)
     fun reorderAlbumRecordings(

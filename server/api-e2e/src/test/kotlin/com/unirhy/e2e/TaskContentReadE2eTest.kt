@@ -78,7 +78,7 @@ class TaskContentReadE2eTest {
         val state = bootstrapAdminSession(baseUrl())
         val data = ensurePreparedData(state, caller = "media")
 
-        val fullMediaResponse = state.api.getBytes("/api/media/${data.mediaId}")
+        val fullMediaResponse = state.api.getBytes("/api/media-files/${data.mediaId}")
         E2eAssert.status(fullMediaResponse, 200, "[media] full response should succeed")
         assertEquals(
             "bytes",
@@ -88,7 +88,7 @@ class TaskContentReadE2eTest {
         assertTrue(fullMediaResponse.body().isNotEmpty(), "[media] full response body should not be empty")
 
         val partialResponse = state.api.getBytes(
-            path = "/api/media/${data.mediaId}",
+            path = "/api/media-files/${data.mediaId}",
             headers = mapOf("Range" to "bytes=0-15"),
         )
         E2eAssert.status(partialResponse, 206, "[media] range response should return partial content")
@@ -96,7 +96,7 @@ class TaskContentReadE2eTest {
         assertTrue(contentRange.startsWith("bytes 0-"), "[media] range response should include content-range header")
         assertTrue(partialResponse.body().isNotEmpty(), "[media] range response should include body bytes")
 
-        val headResponse = state.api.head("/api/media/${data.mediaId}")
+        val headResponse = state.api.head("/api/media-files/${data.mediaId}")
         E2eAssert.status(headResponse, 200, "[media] head response should succeed")
         val contentLength = headResponse.headers().firstValue("Content-Length").orElse("")
         val contentLengthValue = contentLength.toLongOrNull()
@@ -104,7 +104,7 @@ class TaskContentReadE2eTest {
         assertTrue(contentLengthValue > 0L, "[media] head response should contain positive content-length")
 
         val invalidRangeResponse = state.api.getBytes(
-            path = "/api/media/${data.mediaId}",
+            path = "/api/media-files/${data.mediaId}",
             headers = mapOf("Range" to "bytes=999999999-999999999"),
         )
         E2eAssert.status(invalidRangeResponse, 416, "[media] invalid range should return 416")
@@ -113,7 +113,7 @@ class TaskContentReadE2eTest {
             "[media] invalid range should expose unsatisfied content-range",
         )
 
-        val notFoundMediaResponse = state.api.get("/api/media/999999999999")
+        val notFoundMediaResponse = state.api.get("/api/media-files/999999999999")
         E2eAssert.status(notFoundMediaResponse, 404, "[media] unknown media id should return 404")
     }
 
@@ -146,22 +146,22 @@ class TaskContentReadE2eTest {
             "length" to 3_600_000L,
             "offset" to 0L,
         )
-        val randomWorkResponse1 = state.api.get("/api/works/random", query = randomQuery)
+        val randomWorkResponse1 = state.api.get("/api/works/random-selection", query = randomQuery)
         E2eAssert.status(randomWorkResponse1, 200, "[works] random work call should succeed")
-        val randomWorkResponse2 = state.api.get("/api/works/random", query = randomQuery)
+        val randomWorkResponse2 = state.api.get("/api/works/random-selection", query = randomQuery)
         E2eAssert.status(randomWorkResponse2, 200, "[works] random work call should remain stable in same window")
         val randomWorkId1 = readIdFromObject(randomWorkResponse1.body(), "/id", "[works] random response 1 should contain id")
         val randomWorkId2 = readIdFromObject(randomWorkResponse2.body(), "/id", "[works] random response 2 should contain id")
         assertEquals(randomWorkId1, randomWorkId2, "[works] random work id should stay stable in same window")
 
         val invalidLengthRandomResponse = state.api.get(
-            path = "/api/works/random",
+            path = "/api/works/random-selection",
             query = mapOf("length" to 0L),
         )
         E2eAssert.status(invalidLengthRandomResponse, 400, "[works] random with non-positive length should fail")
 
         val albumsListResponse = state.api.get(
-            path = "/api/albums/search",
+            path = "/api/albums/search-results",
             query = mapOf("name" to data.albumTitle),
         )
         E2eAssert.status(albumsListResponse, 200, "[albums] search should succeed")
@@ -245,7 +245,7 @@ class TaskContentReadE2eTest {
         val baselineFailed = taskCount(baselineStats, "METADATA_PARSE", "FAILED")
 
         val submitResponse = state.api.post(
-            path = "/api/task/scan",
+            path = "/api/tasks/scans",
             json = scanRequestBody,
         )
         E2eAssert.status(submitResponse, 202, "[scan] submit scan task should return accepted")
@@ -277,7 +277,7 @@ class TaskContentReadE2eTest {
         val mediaId = extractMediaId(workRows.first(), "[scan] first work should include media file id")
 
         val albumsResponse = state.api.get(
-            path = "/api/albums/search",
+            path = "/api/albums/search-results",
             query = mapOf("name" to fixture.albumTitle),
         )
         E2eAssert.status(albumsResponse, 200, "[scan] album search should succeed after scan")
@@ -361,7 +361,7 @@ class TaskContentReadE2eTest {
         baselineFailed: Long,
     ) {
         val duplicateSubmitResponse = state.api.post(
-            path = "/api/task/scan",
+            path = "/api/tasks/scans",
             json = scanRequestBody,
         )
         E2eAssert.status(
@@ -428,7 +428,7 @@ class TaskContentReadE2eTest {
         val baselineFailed = taskCount(baselineStats, "TRANSCODE", "FAILED")
 
         val submitResponse = state.api.post(
-            path = "/api/task/transcode",
+            path = "/api/tasks/transcodes",
             json = transcodeRequestBody(state),
         )
         E2eAssert.status(submitResponse, 202, "[transcode] submit transcode task should return accepted")
@@ -501,7 +501,7 @@ class TaskContentReadE2eTest {
     }
 
     private fun fetchTaskStats(state: E2eAdminSession, step: String): List<JsonNode> {
-        val response = state.api.get("/api/task/logs")
+        val response = state.api.get("/api/tasks/log-counts")
         E2eAssert.status(response, 200, "$step should succeed")
         return taskStatRows(response.body(), step)
     }
@@ -634,10 +634,10 @@ class TaskContentReadE2eTest {
     }
 
     private fun resolveSystemFsProviderId(state: E2eAdminSession): Long {
-        val response = state.api.get("/api/system/config")
+        val response = state.api.get("/api/system-config")
         E2eAssert.status(response, 200, "[prepare] get system config should succeed before scan")
         val fsProviderIdNode = E2eJson.mapper.readTree(response.body()).path("fsProviderId")
-        assertTrue(fsProviderIdNode.isIntegralNumber, "[prepare] /api/system/config fsProviderId should be an integer")
+        assertTrue(fsProviderIdNode.isIntegralNumber, "[prepare] /api/system-config fsProviderId should be an integer")
         return fsProviderIdNode.longValue()
     }
 

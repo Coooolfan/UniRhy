@@ -80,7 +80,7 @@ class PlaybackSyncRecoveryE2eTest {
             client.awaitMessage(PlaybackSyncMessageType.ROOM_EVENT_DEVICE_CHANGE)
 
             val response = state.api.put(
-                path = "/api/playback/current-queue/current",
+                path = "/api/playback-queues/current/current-index",
                 json = mapOf(
                     "currentIndex" to 1,
                     "version" to queue.path("version").longValue(),
@@ -133,7 +133,7 @@ class PlaybackSyncRecoveryE2eTest {
 
             val currentAfterPlay = fetchQueue(state)
             val nextResponse = state.api.post(
-                path = "/api/playback/current-queue/actions/next",
+                path = "/api/playback-queues/current/next-navigation-requests",
                 json = mapOf("version" to currentAfterPlay.path("version").longValue()),
             )
             E2eAssert.status(nextResponse, 200, "[playing] next action should succeed")
@@ -157,7 +157,7 @@ class PlaybackSyncRecoveryE2eTest {
             val persistedAfterNext = fetchQueue(state)
 
             val removeResponse = state.api.post(
-                path = "/api/playback/current-queue/actions/remove",
+                path = "/api/playback-queues/current/item-removals",
                 json = mapOf(
                     "index" to persistedAfterNext.path("currentIndex").intValue(),
                     "version" to persistedAfterNext.path("version").longValue(),
@@ -254,7 +254,7 @@ class PlaybackSyncRecoveryE2eTest {
         resetQueue(state)
         val queue = fetchQueue(state)
         val response = state.api.put(
-            path = "/api/playback/current-queue",
+            path = "/api/playback-queues/current",
             json = mapOf(
                 "recordingIds" to prepared.recordingIds,
                 "currentIndex" to currentIndex,
@@ -271,14 +271,14 @@ class PlaybackSyncRecoveryE2eTest {
             return
         }
         val response = state.api.post(
-            path = "/api/playback/current-queue/actions/clear",
+            path = "/api/playback-queues/current/clear-requests",
             json = mapOf("version" to queue.path("version").longValue()),
         )
         E2eAssert.status(response, 200, "[prepare] clear queue for recovery test should succeed")
     }
 
     private fun fetchQueue(state: E2eAdminSession): JsonNode {
-        val response = state.api.get("/api/playback/current-queue")
+        val response = state.api.get("/api/playback-queues/current")
         E2eAssert.status(response, 200, "[prepare] get queue for recovery test should succeed")
         return E2eJson.mapper.readTree(response.body())
     }

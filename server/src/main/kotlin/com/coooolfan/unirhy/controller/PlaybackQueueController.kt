@@ -31,7 +31,7 @@ import org.springframework.web.bind.annotation.RestController
  */
 @SaCheckLogin
 @RestController
-@RequestMapping("/api/playback/current-queue")
+@RequestMapping("/api/playback-queues/current")
 class PlaybackQueueController(
     private val currentQueueService: CurrentQueueService,
     private val queueMutationCoordinator: PlaybackQueueMutationCoordinator,
@@ -45,7 +45,7 @@ class PlaybackQueueController(
      *
      * @return CurrentQueueDto 返回当前队列
      *
-     * @api GET /api/playback/current-queue
+     * @api GET /api/playback-queues/current
      * @permission 需要登录认证
      * @description 调用CurrentQueueService.getQueue()方法获取当前队列
      */
@@ -65,7 +65,7 @@ class PlaybackQueueController(
      * @param input 替换请求参数（录音列表、当前索引、期望版本号）
      * @return CurrentQueueDto 返回替换后的队列
      *
-     * @api PUT /api/playback/current-queue
+     * @api PUT /api/playback-queues/current
      * @permission 需要登录认证
      * @description 调用CurrentQueueService.replaceQueue()方法替换队列
      */
@@ -99,7 +99,7 @@ class PlaybackQueueController(
      * @param input 追加请求参数（录音列表、期望版本号）
      * @return CurrentQueueDto 返回追加后的队列
      *
-     * @api POST /api/playback/current-queue/items
+     * @api POST /api/playback-queues/current/items
      * @permission 需要登录认证
      * @description 调用CurrentQueueService.appendToQueue()方法追加录音
      */
@@ -127,11 +127,11 @@ class PlaybackQueueController(
      * @param input 重排请求参数（新顺序下的录音列表、当前索引、期望版本号）
      * @return CurrentQueueDto 返回重排后的队列
      *
-     * @api PUT /api/playback/current-queue/order
+     * @api PUT /api/playback-queues/current/item-order
      * @permission 需要登录认证
      * @description 调用CurrentQueueService.reorderQueue()方法重排队列
      */
-    @PutMapping("/order")
+    @PutMapping("/item-order")
     @ResponseStatus(HttpStatus.OK)
     fun reorderCurrentQueue(
         @RequestBody input: CurrentQueueReorderRequest,
@@ -156,11 +156,11 @@ class PlaybackQueueController(
      * @param input 设置当前索引的请求参数（当前索引、期望版本号）
      * @return CurrentQueueDto 返回更新后的队列
      *
-     * @api PUT /api/playback/current-queue/current
+     * @api PUT /api/playback-queues/current/current-index
      * @permission 需要登录认证
      * @description 调用CurrentQueueService.setCurrentIndex()方法切换当前项
      */
-    @PutMapping("/current")
+    @PutMapping("/current-index")
     @ResponseStatus(HttpStatus.OK)
     fun setCurrentIndex(
         @RequestBody input: CurrentQueueSetCurrentRequest,
@@ -189,11 +189,11 @@ class PlaybackQueueController(
      * @param input 策略更新参数（播放策略、停止策略、期望版本号）
      * @return CurrentQueueDto 返回更新后的队列
      *
-     * @api PUT /api/playback/current-queue/strategy
+     * @api PUT /api/playback-queues/current/strategies
      * @permission 需要登录认证
      * @description 调用CurrentQueueService.updateStrategies()方法更新播放策略
      */
-    @PutMapping("/strategy")
+    @PutMapping("/strategies")
     @ResponseStatus(HttpStatus.OK)
     fun updateCurrentQueueStrategy(
         @RequestBody input: CurrentQueueStrategyUpdateRequest,
@@ -218,11 +218,11 @@ class PlaybackQueueController(
      * @param input 版本号请求参数（期望版本号）
      * @return CurrentQueueDto 返回更新后的队列
      *
-     * @api POST /api/playback/current-queue/actions/next
+     * @api POST /api/playback-queues/current/next-navigation-requests
      * @permission 需要登录认证
      * @description 调用CurrentQueueService.navigateToNext()方法导航到下一首
      */
-    @PostMapping("/actions/next")
+    @PostMapping("/next-navigation-requests")
     @ResponseStatus(HttpStatus.OK)
     fun playNextInCurrentQueue(
         @RequestBody input: CurrentQueueVersionRequest,
@@ -246,11 +246,11 @@ class PlaybackQueueController(
      * @param input 版本号请求参数（期望版本号）
      * @return CurrentQueueDto 返回更新后的队列
      *
-     * @api POST /api/playback/current-queue/actions/previous
+     * @api POST /api/playback-queues/current/previous-navigation-requests
      * @permission 需要登录认证
      * @description 调用CurrentQueueService.navigateToPrevious()方法导航到上一首
      */
-    @PostMapping("/actions/previous")
+    @PostMapping("/previous-navigation-requests")
     @ResponseStatus(HttpStatus.OK)
     fun playPreviousInCurrentQueue(
         @RequestBody input: CurrentQueueVersionRequest,
@@ -274,11 +274,11 @@ class PlaybackQueueController(
      * @param input 移除请求参数（待移除项下标、期望版本号）
      * @return CurrentQueueDto 返回移除后的队列
      *
-     * @api POST /api/playback/current-queue/actions/remove
+     * @api POST /api/playback-queues/current/item-removals
      * @permission 需要登录认证
      * @description 调用CurrentQueueService.removeAt()方法移除队列项
      */
-    @PostMapping("/actions/remove")
+    @PostMapping("/item-removals")
     @ResponseStatus(HttpStatus.OK)
     fun removeCurrentQueueEntry(
         @RequestBody input: CurrentQueueRemoveRequest,
@@ -307,11 +307,11 @@ class PlaybackQueueController(
      * @param input 版本号请求参数（期望版本号）
      * @return CurrentQueueDto 返回清空后的队列
      *
-     * @api POST /api/playback/current-queue/actions/clear
+     * @api POST /api/playback-queues/current/clear-requests
      * @permission 需要登录认证
      * @description 调用CurrentQueueService.clearQueue()方法清空队列
      */
-    @PostMapping("/actions/clear")
+    @PostMapping("/clear-requests")
     @ResponseStatus(HttpStatus.OK)
     fun clearCurrentQueue(
         @RequestBody input: CurrentQueueVersionRequest,

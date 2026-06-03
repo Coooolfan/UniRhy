@@ -22,7 +22,7 @@ import org.springframework.web.bind.annotation.*
  * 提供系统配置的增删改查能力
  */
 @RestController
-@RequestMapping("/api/system/config")
+@RequestMapping("/api/system-config")
 class SystemConfigController(private val service: SystemConfigService) {
 
     /**
@@ -33,7 +33,7 @@ class SystemConfigController(private val service: SystemConfigService) {
      *
      * @return SystemStatus 返回系统初始化状态
      *
-     * @api GET /api/system/config/status
+     * @api GET /api/system-config/status
      * @permission 不需要登录认证
      * @description 调用SystemConfigService.initialized()方法获取系统初始化状态
      */
@@ -50,7 +50,7 @@ class SystemConfigController(private val service: SystemConfigService) {
      *
      * @return SystemConfig 返回系统配置（默认 fetcher）
      *
-     * @api GET /api/system/config
+     * @api GET /api/system-config
      * @permission 需要登录认证
      * @description 调用SystemConfigService.get()方法获取系统配置
      */
@@ -67,7 +67,7 @@ class SystemConfigController(private val service: SystemConfigService) {
      *
      * @param create 创建参数
      *
-     * @api POST /api/system/config
+     * @api POST /api/system-config
      * @description 调用SystemConfigService.create()方法创建系统配置
      */
     @PostMapping
@@ -86,7 +86,7 @@ class SystemConfigController(private val service: SystemConfigService) {
      * @param update 更新参数
      * @return SystemConfig 返回更新后的系统配置（默认 fetcher）
      *
-     * @api PUT /api/system/config
+     * @api PUT /api/system-config
      * @permission 需要登录认证
      * @description 调用SystemConfigService.update()方法更新系统配置
      */
