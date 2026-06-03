@@ -101,10 +101,12 @@ const setup = () => {
   container.appendChild(renderer.domElement)
   rendererRef.value = renderer
 
+  const Color = THREE.Color
+  const Vector3 = THREE.Vector3
   // Convert hex colors to RGB
   const parseColor = (hex: string): THREE.Vector3 => {
-    const color = new THREE.Color(hex)
-    return new THREE.Vector3(color.r, color.g, color.b)
+    const color = new Color(hex)
+    return new Vector3(color.r, color.g, color.b)
   }
 
   // Shader material

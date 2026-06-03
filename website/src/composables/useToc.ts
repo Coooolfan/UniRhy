@@ -9,8 +9,8 @@ export interface TocItem {
 function slugify(text: string): string {
   return text
     .toLowerCase()
-    .replaceAll(/\s+/g, '-')
-    .replaceAll(/[^\w\u4E00-\u9FFF-]/g, '')
+    .replaceAll(/\s+/gu, '-')
+    .replaceAll(/[^\w\u4E00-\u9FFF-]/gu, '')
 }
 
 function scrollToHeading(id: string) {

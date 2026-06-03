@@ -1,9 +1,8 @@
 import * as fs from 'node:fs'
-import * as path from 'node:path'
-import { fileURLToPath } from 'node:url'
+import path from 'node:path'
 import { SUPPORTED_LANGS } from '@/router/routes'
 
-const HERE = path.dirname(fileURLToPath(import.meta.url))
+const HERE = import.meta.dirname
 const CONTENT_ROOT = path.resolve(HERE, '../../content/blog')
 
 export interface PrerenderPath {
@@ -18,7 +17,7 @@ function listSlugs(lang: 'zh' | 'en'): string[] {
   return fs
     .readdirSync(dir)
     .filter((f) => f.endsWith('.md'))
-    .map((f) => f.replace(/\.md$/, ''))
+    .map((f) => f.replace(/\.md$/u, ''))
 }
 
 export function listPrerenderPaths(): PrerenderPath[] {

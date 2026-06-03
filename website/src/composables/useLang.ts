@@ -43,7 +43,7 @@ export function useLang() {
     preferenceLang.value = next
     const param = route.params.lang
     if (isLang(param) && param !== next) {
-      const newPath = route.fullPath.replace(/^\/(zh|en)(?=\/|$)/, `/${next}`)
+      const newPath = route.fullPath.replace(/^\/(?:zh|en)(?=\/|$)/u, `/${next}`)
       void router.push(newPath)
     }
   }

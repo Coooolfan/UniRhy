@@ -1,13 +1,14 @@
 import { renderToString } from 'vue/server-renderer'
-import { renderSSRHead } from '@unhead/ssr'
 import { createHead } from '@unhead/vue/server'
 import { createApp } from './app'
 
 export { listPrerenderPaths } from './app/routing'
 
+type RenderedHead = Awaited<ReturnType<ReturnType<typeof createHead>['render']>>
+
 export interface RenderedPage {
   appHtml: string
-  head: Awaited<ReturnType<typeof renderSSRHead>>
+  head: RenderedHead
   pathname: string
 }
 
@@ -18,6 +19,6 @@ export async function renderPage(pathname: string): Promise<RenderedPage> {
   await router.push(pathname)
   await router.isReady()
   const appHtml = await renderToString(app)
-  const headPayload = await renderSSRHead(head)
+  const headPayload = head.render()
   return { appHtml, head: headPayload, pathname }
 }

@@ -21,31 +21,31 @@
     "fix": "run-s lint:fix"
   },
   "dependencies": {
-    "@types/three": "^0.183.1",
-    "@unhead/ssr": "^2",
-    "@unhead/vue": "^2",
+    "@types/three": "^0.184.1",
+    "@unhead/ssr": "^3.1.1",
+    "@unhead/vue": "^3.1.1",
     "gray-matter": "^4.0.3",
-    "markdown-it": "^14.1.1",
-    "three": "^0.183.2",
-    "unhead": "^2",
-    "vue": "^3.5.30",
-    "vue-router": "^5.0.4"
+    "markdown-it": "^14.2.0",
+    "three": "^0.184.0",
+    "unhead": "^3.1.1",
+    "vue": "^3.5.35",
+    "vue-router": "^5.1.0"
   },
   "devDependencies": {
-    "@tailwindcss/vite": "^4.2.2",
+    "@tailwindcss/vite": "^4.3.0",
     "@tsconfig/node24": "^24.0.4",
     "@types/markdown-it": "^14.1.2",
-    "@types/node": "^24.12.0",
-    "@vitejs/plugin-vue": "^6.0.5",
+    "@types/node": "^24.12.4",
+    "@vitejs/plugin-vue": "^6.0.7",
     "@vue/tsconfig": "^0.9.1",
-    "npm-run-all2": "^8.0.4",
-    "oxfmt": "^0.42.0",
-    "oxlint": "~1.57.0",
-    "oxlint-tsgolint": "^0.17.3",
-    "tailwindcss": "^4.2.2",
-    "typescript": "~6.0.2",
-    "vite": "^8.0.2",
-    "vite-plugin-vue-devtools": "^8.1.1"
+    "npm-run-all2": "^9.0.1",
+    "oxfmt": "^0.53.0",
+    "oxlint": "~1.68.0",
+    "oxlint-tsgolint": "^0.23.0",
+    "tailwindcss": "^4.3.0",
+    "typescript": "~6.0.3",
+    "vite": "^8.0.16",
+    "vite-plugin-vue-devtools": "^8.1.2"
   },
   "engines": {
     "node": "^24.0.0"

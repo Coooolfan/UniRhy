@@ -81,7 +81,7 @@ function renderDocument({ appHtml, head }, clientEntry) {
 
 function resolveOutputFile(pathname) {
   if (pathname === '/') return path.join(distDir, 'index.html')
-  return path.join(distDir, pathname.replace(/^\//, ''), 'index.html')
+  return path.join(distDir, pathname.replace(/^\//u, ''), 'index.html')
 }
 
 function writeHtmlFile(targetFile, html) {
