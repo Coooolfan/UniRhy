@@ -81,13 +81,13 @@ onMounted(() => {
         </div>
 
         <div class="mx-auto mt-10 max-w-5xl px-8">
-            <SystemStatusSection
+            <!-- <SystemStatusSection
                 :active-storage-label="activeStorageLabel"
                 :system-config="systemConfig"
                 :active-node="activeNode"
                 :is-loading="isLoadingSystem"
                 :error="systemError"
-            />
+            /> -->
 
             <StorageNodesSection
                 class="mt-16"
