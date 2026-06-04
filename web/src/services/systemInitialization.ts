@@ -1,8 +1,7 @@
 import { api } from '@/ApiInstance'
+import type { SystemStatus } from '@/__generated/model/static'
 
-export type InitializationStatus = {
-    initialized: boolean
-}
+export type InitializationStatus = SystemStatus
 
 let initializationStatusPromise: Promise<InitializationStatus> | null = null
 

@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import DashboardTopBar from '@/components/dashboard/DashboardTopBar.vue'
 import StorageNodesSection from '@/components/settings/StorageNodesSection.vue'
 import SystemStatusSection from '@/components/settings/SystemStatusSection.vue'
 import PluginsSection from '@/components/settings/PluginsSection.vue'
 import { useStorageSettings } from '@/composables/useStorageSettings'
 import { usePluginSettings } from '@/composables/usePluginSettings'
+import { api } from '@/ApiInstance'
+import type { SystemStatus } from '@/__generated/model/static'
 
 const {
     storageNodes,
@@ -44,9 +46,24 @@ const activeNode = computed(
         ) ?? null,
 )
 
+const buildInfo = ref<SystemStatus | null>(null)
+
+const formattedBuildTime = computed(() => {
+    const t = buildInfo.value?.buildTime
+    if (!t) return null
+    const d = new Date(t)
+    if (Number.isNaN(d.getTime())) return t
+    return d.toLocaleString(undefined, { timeZoneName: 'short' })
+})
+
+const shortCommit = computed(() => buildInfo.value?.gitCommit?.slice(0, 7) ?? null)
+
 onMounted(() => {
     loadData()
     void fetchPlugins()
+    void api.systemConfigController.isInitialized().then((status) => {
+        buildInfo.value = status
+    })
 })
 </script>
 
@@ -96,6 +113,28 @@ onMounted(() => {
                 :on-delete="deletePlugin"
                 :on-download="downloadPlugin"
             />
+
+            <footer
+                v-if="buildInfo"
+                class="mt-16 border-t border-[#E5DED5] pt-6 font-serif text-xs text-[#8A8A8A]"
+            >
+                <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+                    <span v-if="buildInfo.version">v{{ buildInfo.version }}</span>
+                    <a
+                        v-if="buildInfo.gitUrl && shortCommit"
+                        :href="buildInfo.gitUrl"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="underline-offset-2 hover:text-[#C67C4E] hover:underline"
+                    >
+                        {{ buildInfo.gitBranch ?? 'unknown' }}@{{ shortCommit }}
+                    </a>
+                    <span v-else-if="shortCommit">
+                        {{ buildInfo.gitBranch ?? 'unknown' }}@{{ shortCommit }}
+                    </span>
+                    <span v-if="formattedBuildTime">构建于 {{ formattedBuildTime }}</span>
+                </div>
+            </footer>
         </div>
     </div>
 </template>

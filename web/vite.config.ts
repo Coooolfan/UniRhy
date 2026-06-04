@@ -12,7 +12,13 @@ const devWebSocketServer = devServer.replace(/^http/iu, 'ws')
 
 // https://vite.dev/config/
 export default defineConfig({
-    plugins: [vue(), vueDevTools(), tailwindcss()],
+    plugins: [
+        vue(),
+        vueDevTools({
+            launchEditor: 'zed',
+        }),
+        tailwindcss(),
+    ],
     envPrefix: ['VITE_', 'TAURI_ENV_'],
     resolve: {
         alias: {
