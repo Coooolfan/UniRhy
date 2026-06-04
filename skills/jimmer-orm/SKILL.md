@@ -3,6 +3,10 @@ name: jimmer-orm
 description: Jimmer ORM 开发助手，帮助编写实体映射代码和 DSL 查询语句。适用于：(1) 定义或修改 Jimmer 实体（使用 @Entity 注解的 interface）；(2) 编写 Jimmer DSL 查询代码；(3) 配置实体关联关系（@ManyToOne, @OneToMany, @ManyToMany）；(4) 使用动态谓词、动态表连接或隐式子查询；(5) 编辑包含 Jimmer 相关代码的 Java/Kotlin 文件。
 ---
 
+## 事实源
+
+如果当前上下文中指名了 Jimmer 项目的源码的本地路径，应当以源码实现作为基准。如果有其他情况需要查阅 Jimmer 的具体实现，其代码仓库为 `https://github.com/babyfish-ct/jimmer`
+
 ## 核心概念
 
 ### 实体定义特点
@@ -31,14 +35,21 @@ Jimmer 为 Kotlin 提供了特化的 API 风格
 ## 关键注解速查
 
 - `@Entity` - 标记实体类型
+- `@MappedSuperclass` - 标记映射父接口，复用公共字段
+- `@Embeddable` - 标记嵌入值对象
 - `@Id` - 标记主键
 - `@GeneratedValue` - 主键生成策略
 - `@Key` - 业务键
 - `@ManyToOne` / `@OneToMany` / `@ManyToMany` / `@OneToOne` - 关联映射
+- `@ManyToManyView` - 通过中间实体暴露多对多视图
+- `@IdView` - 关联 id 视图
 - `@JoinColumn` - 自定义外键列名
 - `@JoinTable` - 自定义中间表
 - `@Column` - 自定义列名（仅用于非关联字段）
 - `@Table` - 自定义表名
+- `@Version` - 乐观锁版本字段
+- `@LogicalDeleted` - 逻辑删除字段
+- `@Formula` / `@Transient` - 计算属性
 - `?` (Kotlin) - 标记可空属性
 
 ## 命名约定
@@ -52,13 +63,16 @@ Jimmer 为 Kotlin 提供了特化的 API 风格
 1. **定义实体时：**
    - 使用 interface 而非 class
    - 根据项目语言参考对应的实体模板和映射文档
+   - 中间表有排序、时间、来源等业务字段时，定义中间实体并用 `@ManyToManyView` 暴露只读多对多视图
+   - 需要直接按外键查询或写入 input 时，优先为关联补充 `@IdView`
    - 参考 `assets/EntityTemplate.kt` 和 `references/entity-mapping.md`
    - 参考 `references/dto.md` 完成 DTO 定义
 
 2. **编写查询时：**
-   - 优先使用动态谓词（Kotlin: `ilike?`/`between?`）
-   - 使用动态表连接处理关联查询
-   - 使用隐式子查询处理集合关联
+   - 优先使用动态谓词（Kotlin: `` `ilike?` ``/`` `between?` ``/`` `valueIn?` ``）
+   - 使用动态表连接处理单值关联查询
+   - 使用隐式子查询处理集合关联，避免集合 JOIN 导致结果重复和分页失效
+   - API 返回实体时使用 fetcher/DTO 控制投影，不要依赖默认序列化形状
    - 根据项目语言参考对应的 DSL 查询文档
    - 参考 `references/dsl-queries.md`
 

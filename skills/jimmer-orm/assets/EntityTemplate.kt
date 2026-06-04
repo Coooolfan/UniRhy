@@ -38,6 +38,9 @@ interface EntityTemplate {
     @ManyToOne
     val parent: ParentEntity?
 
+    @IdView("parent")
+    val parentId: Long?
+
     // ========== 一对多关联（镜像） ==========
     @OneToMany(mappedBy = "parent")
     val children: List<ChildEntity>
@@ -50,4 +53,18 @@ interface EntityTemplate {
         inverseJoinColumnName = "RELATED_ID"
     )
     val relatedEntities: List<RelatedEntity>
+
+    // ========== 带业务字段的中间实体视图 ==========
+    @OneToMany(mappedBy = "owner", orderedProps = [OrderedProp("sortOrder")])
+    val relationLinks: List<EntityRelationLink>
+
+    @ManyToManyView(prop = "relationLinks", deeperProp = "target")
+    val orderedTargets: List<TargetEntity>
+
+    // ========== 版本与逻辑删除 ==========
+    @Version
+    val version: Int
+
+    @LogicalDeleted("true")
+    val deleted: Boolean
 }
