@@ -98,6 +98,34 @@ tasks.withType<BootJar> {
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
 
+springBoot {
+    buildInfo {
+        properties {
+            val serverUrl = providers.environmentVariable("GITHUB_SERVER_URL")
+                .orElse("https://github.com")
+            val repo = providers.environmentVariable("GITHUB_REPOSITORY")
+                .orElse("Coolfan/UniRhy")
+            val sha = providers.environmentVariable("GITHUB_SHA")
+                .orElse(
+                    providers.exec { commandLine("git", "rev-parse", "HEAD") }
+                        .standardOutput.asText.map { it.trim() }
+                )
+            val branch = providers.environmentVariable("GITHUB_REF_NAME")
+                .orElse(
+                    providers.exec { commandLine("git", "rev-parse", "--abbrev-ref", "HEAD") }
+                        .standardOutput.asText.map { it.trim() }
+                )
+
+            additional.put("git.branch", branch)
+            additional.put("git.commit", sha)
+            additional.put(
+                "git.url",
+                serverUrl.zip(repo) { s, r -> "$s/$r" }.zip(sha) { base, h -> "$base/commit/$h" }
+            )
+        }
+    }
+}
+
 tasks.named<com.github.benmanes.gradle.versions.updates.DependencyUpdatesTask>("dependencyUpdates") {
     rejectVersionIf {
         isNonStable(candidate.version) && !isNonStable(currentVersion)

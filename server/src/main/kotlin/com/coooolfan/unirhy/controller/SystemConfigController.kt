@@ -13,6 +13,7 @@ import com.coooolfan.unirhy.service.SystemConfigService
 import org.babyfish.jimmer.client.FetchBy
 import org.babyfish.jimmer.sql.fetcher.Fetcher
 import org.babyfish.jimmer.sql.kt.fetcher.newFetcher
+import org.springframework.boot.info.BuildProperties
 import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.*
 
@@ -23,7 +24,10 @@ import org.springframework.web.bind.annotation.*
  */
 @RestController
 @RequestMapping("/api/system-config")
-class SystemConfigController(private val service: SystemConfigService) {
+class SystemConfigController(
+    private val service: SystemConfigService,
+    private val buildProperties: BuildProperties,
+) {
 
     /**
      * 获取系统初始化状态
@@ -39,7 +43,14 @@ class SystemConfigController(private val service: SystemConfigService) {
      */
     @GetMapping("/status")
     fun isInitialized(): SystemStatus {
-        return SystemStatus(service.initialized())
+        return SystemStatus(
+            initialized = service.initialized(),
+            version = buildProperties.version,
+            buildTime = buildProperties.time?.toString(),
+            gitBranch = buildProperties.get("git.branch"),
+            gitCommit = buildProperties.get("git.commit"),
+            gitUrl = buildProperties.get("git.url"),
+        )
     }
 
     /**
