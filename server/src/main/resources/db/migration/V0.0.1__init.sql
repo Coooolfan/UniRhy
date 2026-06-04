@@ -291,10 +291,10 @@ CREATE TABLE public.play_queue
             )
         ),
     CONSTRAINT play_queue_strategy_check CHECK (
-        playback_strategy IN ('SEQUENTIAL', 'SHUFFLE')
+        playback_strategy IN ('SEQUENTIAL', 'SHUFFLE', 'SINGLE')
         ),
     CONSTRAINT play_queue_stop_strategy_check CHECK (
-        stop_strategy IN ('TRACK', 'LIST')
+        stop_strategy IN ('TRACK', 'LIST', 'NEVER')
         ),
     CONSTRAINT play_queue_status_check CHECK (
         playback_status IN ('PLAYING', 'PAUSED')
