@@ -5,6 +5,7 @@ import ArtistCard from '@/components/artist/ArtistCard.vue'
 import ArtistEditModal, { type ArtistEditForm } from '@/components/artist/ArtistEditModal.vue'
 import LibraryEmptyHint from '@/components/dashboard/LibraryEmptyHint.vue'
 import { useModal } from '@/composables/useModal'
+import { useUserStore } from '@/stores/user'
 
 type ArtistItem = {
     id: number
@@ -23,6 +24,7 @@ const emit = defineEmits<{
 }>()
 
 const modal = useModal()
+const userStore = useUserStore()
 
 const isLoading = ref(false)
 const errorMessage = ref('')
@@ -74,6 +76,10 @@ watch(
 )
 
 const openEditModal = async (artist: ArtistItem) => {
+    if (!userStore.isAdmin) {
+        return
+    }
+
     await modal.open(ArtistEditModal, {
         title: '编辑艺术家',
         size: 'md',
@@ -128,6 +134,7 @@ const openEditModal = async (artist: ArtistItem) => {
                     :id="artist.id"
                     :title="artist.displayName"
                     :subtitle="subtitleOf(artist)"
+                    :openable="userStore.isAdmin"
                     @open="openEditModal(artist)"
                 />
             </div>

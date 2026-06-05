@@ -29,10 +29,12 @@ import {
     pickInitialRecordingIdFromCandidates,
     type RecordingPlaybackCandidate,
 } from '@/services/recordingPlaybackResolver'
+import { useUserStore } from '@/stores/user'
 import { hasSameItemOrder, moveItemById, type ReorderPayload } from '@/utils/recordingOrder'
 
 const route = useRoute()
 const modal = useModal()
+const userStore = useUserStore()
 const currentRecordingId = ref<number | null>(null)
 const isLoading = ref(true)
 const isCdVisible = ref(false)
@@ -210,6 +212,9 @@ const handleRecordingReorder = async (payload: ReorderPayload) => {
     if (Number.isNaN(albumId) || isReorderingRecordings.value) {
         return
     }
+    if (!userStore.isAdmin) {
+        return
+    }
 
     const previousRecordings = [...recordings.value]
     const nextRecordings = moveItemById(previousRecordings, payload)
@@ -311,6 +316,7 @@ watch(
                 :is-cd-visible="isCdVisible"
                 :has-playable-recording="hasPlayableRecording"
                 :is-current-playing="isCurrentRecordingPlaying"
+                :can-edit="userStore.isAdmin"
                 @play="handlePlay()"
                 @edit="openEditAlbumModal"
             />
@@ -320,7 +326,7 @@ watch(
                 :summary="`${recordings.length} 首曲目`"
                 :items="recordings"
                 :playing-id="playingId"
-                enable-reorder
+                :enable-reorder="userStore.isAdmin"
                 :reorder-disabled="isReorderingRecordings"
                 @item-double-click="onRecordingDoubleClick"
                 @item-keydown="onRecordingKeydown"
@@ -336,7 +342,7 @@ watch(
                         :title="item.title"
                         :label="buildRecordingLabel(item)"
                         :show-add-button="true"
-                        :show-edit-button="true"
+                        :show-edit-button="userStore.isAdmin"
                         :is-playing="
                             audioStore.isPlaying && audioStore.currentTrack?.id === item.id
                         "

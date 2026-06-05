@@ -16,10 +16,12 @@ import {
     resolveWorkPlayableTrack,
 } from '@/services/playableTrackResolver'
 import { useAudioStore } from '@/stores/audio'
+import { useUserStore } from '@/stores/user'
 
 const route = useRoute()
 const router = useRouter()
 const audioStore = useAudioStore()
+const userStore = useUserStore()
 const modal = useModal()
 
 const searchQuery = ref('')
@@ -67,6 +69,10 @@ const isArtistSelected = (item: SearchResultItem) =>
     item.type === 'artist' && typeof item.id === 'number' && selectedArtistIds.value.has(item.id)
 
 const toggleWorkSelection = (item: SearchResultItem) => {
+    if (!userStore.isAdmin) {
+        return
+    }
+
     if (item.type !== 'work' || typeof item.id !== 'number') {
         return
     }
@@ -91,6 +97,10 @@ const toggleWorkSelection = (item: SearchResultItem) => {
 }
 
 const toggleArtistSelection = (item: SearchResultItem) => {
+    if (!userStore.isAdmin) {
+        return
+    }
+
     if (item.type !== 'artist' || typeof item.id !== 'number') {
         return
     }
@@ -174,7 +184,7 @@ async function performSearch(query: string) {
 }
 
 const openMergeWorksModal = async () => {
-    if (!hasSelectedWorks.value) {
+    if (!userStore.isAdmin || !hasSelectedWorks.value) {
         return
     }
 
@@ -210,7 +220,7 @@ const openMergeWorksModal = async () => {
 }
 
 const openMergeArtistsModal = async () => {
-    if (!hasSelectedArtists.value) {
+    if (!userStore.isAdmin || !hasSelectedArtists.value) {
         return
     }
 
@@ -379,7 +389,7 @@ const playItem = async (item: SearchResultItem) => {
                 </div>
                 <div class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
                     <button
-                        v-if="hasSelectedArtists"
+                        v-if="userStore.isAdmin && hasSelectedArtists"
                         type="button"
                         class="mt-1 w-full border border-[#C27E46] px-4 py-2 text-sm tracking-wide text-[#C27E46] transition-colors hover:bg-[#C27E46] hover:text-white sm:w-auto sm:shrink-0"
                         @click="openMergeArtistsModal"
@@ -387,7 +397,7 @@ const playItem = async (item: SearchResultItem) => {
                         合并艺术家
                     </button>
                     <button
-                        v-if="hasSelectedWorks"
+                        v-if="userStore.isAdmin && hasSelectedWorks"
                         type="button"
                         class="mt-1 w-full border border-[#C27E46] px-4 py-2 text-sm tracking-wide text-[#C27E46] transition-colors hover:bg-[#C27E46] hover:text-white sm:w-auto sm:shrink-0"
                         @click="openMergeWorksModal"
@@ -446,7 +456,7 @@ const playItem = async (item: SearchResultItem) => {
                             :id="item.id"
                             :title="item.title"
                             :subtitle="item.subtitle"
-                            selectable
+                            :selectable="userStore.isAdmin"
                             :selected="isArtistSelected(item)"
                             @toggle-select="toggleArtistSelection(item)"
                         />
@@ -489,7 +499,7 @@ const playItem = async (item: SearchResultItem) => {
                             :cover="item.cover"
                             :stacked-images="item.stackedImages || []"
                             :is-selected="isWorkSelected(item)"
-                            selectable
+                            :selectable="userStore.isAdmin"
                             :play-loading="playLoadingItemId === item.id"
                             :is-playing="isItemPlaying(item)"
                             @open="navigateToDetail(item)"

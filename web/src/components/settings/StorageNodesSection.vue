@@ -16,6 +16,7 @@ type Props = {
     updateStorageNode: (id: number, value: StorageNodeForm) => Promise<string | null>
     deleteStorageNode: (node: StorageNode) => Promise<string | null>
     setSystemStorageNode: (node: StorageNode) => Promise<string | null>
+    canManage?: boolean
 }
 
 const props = defineProps<Props>()
@@ -132,6 +133,7 @@ const confirmSetSystemStorageNode = async (node: StorageNode) => {
         >
             <h2 class="text-2xl font-serif text-[#4A3B32] tracking-wide">存储节点</h2>
             <button
+                v-if="canManage"
                 class="group flex w-full items-center justify-center gap-2 bg-[#C67C4E] px-6 py-2 text-[#F7F5F0] transition-all duration-300 shadow-md hover:bg-[#A6633C] hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto sm:justify-start"
                 :disabled="isSaving"
                 @click="openCreateStorageNodeModal"
@@ -151,6 +153,7 @@ const confirmSetSystemStorageNode = async (node: StorageNode) => {
                     :active-fs-id="systemConfig.fsProviderId"
                     :active-oss-id="systemConfig.ossProviderId"
                     :is-saving="isSaving"
+                    :can-manage="canManage"
                     @edit="openEditStorageNodeModal(node)"
                     @delete="confirmDeleteStorageNode(node)"
                     @set-system="confirmSetSystemStorageNode(node)"

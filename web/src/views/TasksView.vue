@@ -16,6 +16,7 @@ import {
     RefreshCw,
     ServerCog,
 } from 'lucide-vue-next'
+import { useUserStore } from '@/stores/user'
 
 type SubmitFeedbackStatus = 'idle' | 'success'
 type SummaryTone = 'idle' | 'working' | 'failed' | 'done'
@@ -69,6 +70,7 @@ const {
     init,
 } = useTaskManagement()
 const modal = useModal()
+const userStore = useUserStore()
 
 const submitFeedbackStatus = ref<SubmitFeedbackStatus>('idle')
 let submitFeedbackTimer: ReturnType<typeof setTimeout> | null = null
@@ -92,7 +94,7 @@ const taskActionButtonLabel = computed(() =>
 )
 
 const isTaskActionButtonDisabled = computed(
-    () => isSubmitting.value || submitFeedbackStatus.value === 'success',
+    () => !userStore.isAdmin || isSubmitting.value || submitFeedbackStatus.value === 'success',
 )
 
 const totalCountByStatus = (status: TaskStatus) =>
@@ -275,7 +277,7 @@ watch(activeTaskCount, () => {
 })
 
 const openTaskModal = async () => {
-    if (isTaskActionButtonDisabled.value) return
+    if (!userStore.isAdmin || isTaskActionButtonDisabled.value) return
     clearSubmitFeedbackTimer()
     submitFeedbackStatus.value = 'idle'
     clearSubmitError()
@@ -359,6 +361,7 @@ const refreshAll = () => {
                     </p>
 
                     <button
+                        v-if="userStore.isAdmin"
                         type="button"
                         data-test="open-task-button"
                         class="relative mt-6 flex w-full items-center justify-center gap-2 overflow-hidden bg-[#C67C4E] px-4 py-3 text-sm uppercase tracking-[0.18em] text-[#F7F5F0] shadow-md transition-colors hover:bg-[#B46B3A] disabled:cursor-not-allowed"

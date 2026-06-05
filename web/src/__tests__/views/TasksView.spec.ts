@@ -1,7 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { nextTick } from 'vue'
+import { createPinia, setActivePinia } from 'pinia'
 import AppModalHost from '@/components/modals/AppModalHost.vue'
+import { useUserStore } from '@/stores/user'
 
 vi.mock('@/ApiInstance', async (importOriginal) => {
     const actual = await importOriginal<typeof import('@/ApiInstance')>()
@@ -22,6 +24,10 @@ vi.mock('@/ApiInstance', async (importOriginal) => {
             systemConfigController: {
                 get: vi.fn(),
             },
+            pluginController: {
+                listPlugins: vi.fn(),
+                submitPluginTask: vi.fn(),
+            },
         },
     }
 })
@@ -35,6 +41,8 @@ const executeTranscodeTaskMock = vi.mocked(api.taskController.executeTranscodeTa
 const listFileSystemStorageMock = vi.mocked(api.fileSystemStorageController.list)
 const listOssStorageMock = vi.mocked(api.ossStorageController.list)
 const getSystemConfigMock = vi.mocked(api.systemConfigController.get)
+const listPluginsMock = vi.mocked(api.pluginController.listPlugins)
+const submitPluginTaskMock = vi.mocked(api.pluginController.submitPluginTask)
 
 const flushView = async () => {
     await Promise.resolve()
@@ -68,14 +76,32 @@ const mountWithModalHost = () =>
         },
     )
 
+const setUser = (admin: boolean) => {
+    const userStore = useUserStore()
+    userStore.user = {
+        id: 1,
+        name: 'Tester',
+        email: 'tester@example.com',
+        admin,
+        preferences: {
+            preferredAssetFormat: 'audio/opus',
+        },
+    }
+}
+
 describe('TasksView', () => {
     beforeEach(() => {
+        setActivePinia(createPinia())
+        setUser(true)
         listTaskLogsMock.mockReset()
         executeScanTaskMock.mockReset()
         executeTranscodeTaskMock.mockReset()
         listFileSystemStorageMock.mockReset()
         listOssStorageMock.mockReset()
         getSystemConfigMock.mockReset()
+        listPluginsMock.mockReset()
+        submitPluginTaskMock.mockReset()
+        listPluginsMock.mockResolvedValue([])
         vi.useRealTimers()
     })
 
@@ -111,11 +137,18 @@ describe('TasksView', () => {
         vi.useFakeTimers()
         listTaskLogsMock.mockResolvedValue([])
         executeScanTaskMock.mockResolvedValue(undefined)
-        listFileSystemStorageMock.mockResolvedValue([])
+        listFileSystemStorageMock.mockResolvedValue([
+            {
+                id: 1,
+                name: 'Library',
+                parentPath: '/music/library',
+                readonly: false,
+            },
+        ])
         listOssStorageMock.mockResolvedValue([])
         getSystemConfigMock.mockResolvedValue({
             id: 0,
-            fsProviderId: 1,
+            fsProviderId: undefined,
             ossProviderId: undefined,
         })
 
@@ -232,5 +265,19 @@ describe('TasksView', () => {
         expect(listFileSystemStorageMock).toHaveBeenCalledTimes(1)
         expect(listOssStorageMock).toHaveBeenCalledTimes(1)
         expect(getSystemConfigMock).toHaveBeenCalledTimes(1)
+    })
+
+    it('hides task submission entry for ordinary users while keeping status readable', async () => {
+        setUser(false)
+        listTaskLogsMock.mockResolvedValue([])
+
+        const wrapper = mountWithModalHost()
+
+        await flushView()
+
+        expect(listTaskLogsMock).toHaveBeenCalledTimes(1)
+        expect(wrapper.find('[data-test="open-task-button"]').exists()).toBe(false)
+        expect(wrapper.text()).toContain('状态概览')
+        expect(wrapper.text()).toContain('任务类型分布')
     })
 })

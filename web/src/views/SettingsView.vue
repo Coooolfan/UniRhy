@@ -8,6 +8,9 @@ import { useStorageSettings } from '@/composables/useStorageSettings'
 import { usePluginSettings } from '@/composables/usePluginSettings'
 import { api } from '@/ApiInstance'
 import type { SystemStatus } from '@/__generated/model/static'
+import { useUserStore } from '@/stores/user'
+
+const userStore = useUserStore()
 
 const {
     storageNodes,
@@ -100,6 +103,7 @@ onMounted(() => {
                 :update-storage-node="updateStorageNode"
                 :delete-storage-node="deleteStorageNode"
                 :set-system-storage-node="setSystemStorageNode"
+                :can-manage="userStore.isAdmin"
             />
 
             <PluginsSection
@@ -112,6 +116,7 @@ onMounted(() => {
                 :on-set-enabled="setEnabled"
                 :on-delete="deletePlugin"
                 :on-download="downloadPlugin"
+                :can-manage="userStore.isAdmin"
             />
 
             <footer

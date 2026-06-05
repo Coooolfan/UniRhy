@@ -74,13 +74,19 @@ const buildPlayableWork = () => ({
     ],
 })
 
-const setPreferredAssetFormat = (preferredAssetFormat: string) => {
+const setUser = ({
+    preferredAssetFormat = 'audio/opus',
+    admin = false,
+}: {
+    preferredAssetFormat?: string
+    admin?: boolean
+} = {}) => {
     const userStore = useUserStore()
     userStore.user = {
         id: 1,
         name: 'Tester',
         email: 'tester@example.com',
-        admin: false,
+        admin,
         preferences: {
             preferredAssetFormat,
         },
@@ -129,7 +135,7 @@ describe('DashboardHero', () => {
         resetRecordingPlaybackResolverCaches()
         randomWorkMock.mockReset()
         pushMock.mockReset()
-        setPreferredAssetFormat('audio/opus')
+        setUser()
 
         const audioStore = useAudioStore()
         audioStore.currentTrack = null
@@ -165,7 +171,7 @@ describe('DashboardHero', () => {
         expect(pushMock).not.toHaveBeenCalled()
     })
 
-    it('shows empty-state hint and navigates to settings when request fails', async () => {
+    it('hides settings action for ordinary users when request fails', async () => {
         randomWorkMock.mockRejectedValueOnce(new Error('daily pick failed'))
 
         const wrapper = mount(DashboardHero)
@@ -173,6 +179,20 @@ describe('DashboardHero', () => {
 
         expect(wrapper.text()).toContain('旋律不可调')
         expect(wrapper.text()).toContain('资料库中未能发现可用旋律')
+
+        const settingsButton = wrapper
+            .findAll('button')
+            .find((button) => button.text().includes('前往设置'))
+        expect(settingsButton).toBeUndefined()
+        expect(pushMock).not.toHaveBeenCalled()
+    })
+
+    it('shows empty-state settings action for admins when request fails', async () => {
+        setUser({ admin: true })
+        randomWorkMock.mockRejectedValueOnce(new Error('daily pick failed'))
+
+        const wrapper = mount(DashboardHero)
+        await flushView()
 
         const settingsButton = wrapper
             .findAll('button')
@@ -196,16 +216,11 @@ describe('DashboardHero', () => {
         const settingsButton = wrapper
             .findAll('button')
             .find((button) => button.text().includes('前往设置'))
-        expect(settingsButton).toBeTruthy()
-
-        await settingsButton!.trigger('click')
-
-        expect(pushMock).toHaveBeenCalledTimes(1)
-        expect(pushMock).toHaveBeenCalledWith({ name: 'settings' })
+        expect(settingsButton).toBeUndefined()
     })
 
     it('prefers the user selected asset format for the featured work', async () => {
-        setPreferredAssetFormat('audio/flac')
+        setUser({ preferredAssetFormat: 'audio/flac' })
         randomWorkMock.mockResolvedValueOnce({
             ...buildPlayableWork(),
             recordings: [

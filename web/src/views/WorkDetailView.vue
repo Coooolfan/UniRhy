@@ -30,9 +30,11 @@ import {
     pickInitialRecordingIdFromCandidates,
     type RecordingPlaybackCandidate,
 } from '@/services/recordingPlaybackResolver'
+import { useUserStore } from '@/stores/user'
 
 const route = useRoute()
 const modal = useModal()
+const userStore = useUserStore()
 const currentRecordingId = ref<number | null>(null)
 const isLoading = ref(true)
 
@@ -154,6 +156,10 @@ const mergeState = useRecordingMergeState<Recording>({
         subtitle: recording.artist,
     }),
     mergeRequest: async ({ targetId, sourceIds }) => {
+        if (!userStore.isAdmin) {
+            return
+        }
+
         const workId = Number(route.params.id)
         if (Number.isNaN(workId)) {
             return
@@ -176,12 +182,23 @@ const {
     selectedIds: selectedRecordingIds,
     selectedOptions: selectedRecordingOptions,
     hasEnoughSelectedItems: hasEnoughSelectedRecordings,
-    toggleSelection: toggleRecordingSelection,
+    toggleSelection,
     resetState: resetMergeState,
 } = mergeState
 mergeStateActions.resetState = resetMergeState
 
+const toggleRecordingSelection = (recording: Recording, event?: MouseEvent) => {
+    if (!userStore.isAdmin) {
+        return
+    }
+    toggleSelection(recording, event)
+}
+
 const openEditModal = async () => {
+    if (!userStore.isAdmin) {
+        return
+    }
+
     const id = Number(route.params.id)
     if (Number.isNaN(id)) {
         return
@@ -208,6 +225,10 @@ const openEditModal = async () => {
 }
 
 const openEditRecordingModal = async (recording: Recording) => {
+    if (!userStore.isAdmin) {
+        return
+    }
+
     await modal.open(RecordingEditModal, {
         size: 'xl',
         props: {
@@ -286,7 +307,7 @@ const buildRecordingSubtitle = (recording: Recording) => {
 }
 
 const openRecordingMergeModal = async () => {
-    if (!hasEnoughSelectedRecordings.value) {
+    if (!userStore.isAdmin || !hasEnoughSelectedRecordings.value) {
         return
     }
 
@@ -364,6 +385,7 @@ watch(
                 :recordings="recordings"
                 :has-playable-recording="hasPlayableRecording"
                 :is-current-playing="isCurrentRecordingPlaying"
+                :can-edit="userStore.isAdmin"
                 @play="handlePlay()"
                 @edit-work="openEditModal"
             />
@@ -372,7 +394,7 @@ watch(
                 title="曲目"
                 :items="recordings"
                 :playing-id="playingId"
-                enable-multi-select
+                :enable-multi-select="userStore.isAdmin"
                 :selected-ids="selectedRecordingIds"
                 @item-double-click="onRecordingDoubleClick"
                 @item-toggle-select="toggleRecordingSelection"
@@ -380,7 +402,7 @@ watch(
             >
                 <template #actions>
                     <button
-                        v-if="hasEnoughSelectedRecordings"
+                        v-if="userStore.isAdmin && hasEnoughSelectedRecordings"
                         type="button"
                         data-testid="open-merge-recording-button"
                         class="px-3 py-1 border border-[#C27E46] text-[#C27E46] text-xs tracking-wide transition-colors hover:bg-[#C27E46] hover:text-white uppercase"
@@ -395,7 +417,7 @@ watch(
                         :label="buildRecordingLabel(item)"
                         :cover="item.cover"
                         :show-add-button="true"
-                        :show-edit-button="true"
+                        :show-edit-button="userStore.isAdmin"
                         :is-default="item.isDefault"
                         :subtitle="buildRecordingSubtitle(item)"
                         :is-playing="

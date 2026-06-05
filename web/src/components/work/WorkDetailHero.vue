@@ -18,6 +18,7 @@ defineProps<{
     recordings: WorkHeroRecording[]
     hasPlayableRecording: boolean
     isCurrentPlaying: boolean
+    canEdit?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -40,6 +41,7 @@ const emit = defineEmits<{
             >
                 <span>Musical Work</span>
                 <button
+                    v-if="canEdit"
                     class="cursor-pointer p-1 text-[#8C857B] opacity-100 transition-all hover:text-[#C17D46] md:opacity-0 md:group-hover:opacity-100"
                     title="编辑作品"
                     @click="emit('edit-work')"

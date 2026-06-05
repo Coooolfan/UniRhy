@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Disc3, Settings } from 'lucide-vue-next'
 import { useRouter } from 'vue-router'
+import { useUserStore } from '@/stores/user'
 
 withDefaults(
     defineProps<{
@@ -22,6 +23,7 @@ withDefaults(
 )
 
 const router = useRouter()
+const userStore = useUserStore()
 
 const navigateToSettings = () => {
     router.push({ name: 'settings' })
@@ -54,7 +56,7 @@ const navigateToSettings = () => {
             </p>
 
             <button
-                v-if="showSettingsButton"
+                v-if="showSettingsButton && userStore.isAdmin"
                 type="button"
                 class="px-8 py-3 border border-[#C27E46] text-[#C27E46] text-sm hover:bg-[#C27E46] hover:text-white transition-all duration-500 rounded-sm font-medium tracking-wide uppercase inline-flex items-center gap-2"
                 @click="navigateToSettings"

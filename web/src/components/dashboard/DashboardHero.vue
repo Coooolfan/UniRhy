@@ -47,13 +47,17 @@ const featuredActionLabel = computed(() => {
     if (featuredStatus.value === 'ready') {
         return isFeaturedPlaying.value ? '暂停播放' : '立即播放'
     }
-    if (featuredStatus.value === 'empty') {
+    if (featuredStatus.value === 'empty' && userStore.isAdmin) {
         return '前往设置'
     }
     return '加载中'
 })
 
 const isFeaturedActionDisabled = computed(() => featuredStatus.value === 'loading')
+const showFeaturedAction = computed(
+    () =>
+        featuredStatus.value === 'ready' || userStore.isAdmin || featuredStatus.value === 'loading',
+)
 
 const navigateToSettings = () => {
     router.push({ name: 'settings' })
@@ -267,7 +271,7 @@ watch(
                                 资料库中未能发现可用旋律
                             </p>
                         </template>
-                        <div class="flex items-center">
+                        <div v-if="showFeaturedAction" class="flex items-center">
                             <button
                                 class="w-full rounded-sm border border-[#C27E46] px-6 py-3 text-sm font-medium tracking-wide text-[#C27E46] uppercase transition-all duration-500 hover:bg-[#C27E46] hover:text-white disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-[#C27E46] sm:w-auto sm:px-8"
                                 :disabled="

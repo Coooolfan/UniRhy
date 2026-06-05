@@ -28,6 +28,7 @@ const mountSection = ({
     setSystemStorageNode = vi
         .fn<(_: (typeof storageNodes)[number]) => Promise<string | null>>()
         .mockResolvedValue(null),
+    canManage = true,
 } = {}) => {
     const Wrapper = {
         components: {
@@ -46,6 +47,7 @@ const mountSection = ({
                     :update-storage-node="updateStorageNode"
                     :delete-storage-node="deleteStorageNode"
                     :set-system-storage-node="setSystemStorageNode"
+                    :can-manage="canManage"
                 />
                 <AppModalHost />
             </div>
@@ -60,6 +62,7 @@ const mountSection = ({
             updateStorageNode,
             deleteStorageNode,
             setSystemStorageNode,
+            canManage,
         }),
     }
 
@@ -212,5 +215,15 @@ describe('StorageNodesSection', () => {
         await flushPromises()
 
         expect(setSystemStorageNode).toHaveBeenCalledWith(storageNodes[0])
+    })
+
+    it('hides storage management actions when management is not allowed', () => {
+        const { wrapper } = mountSection({ canManage: false })
+
+        expect(wrapper.text()).toContain('Library')
+        expect(wrapper.findAll('button').map((button) => button.text())).not.toContain('新增节点')
+        expect(wrapper.find('button[title="编辑"]').exists()).toBe(false)
+        expect(wrapper.find('button[title="删除"]').exists()).toBe(false)
+        expect(wrapper.find('button[title="设为系统节点"]').exists()).toBe(false)
     })
 })
