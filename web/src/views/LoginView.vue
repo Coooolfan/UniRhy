@@ -8,10 +8,72 @@
         >
             <div class="deco-circle circle-1"></div>
             <div class="deco-circle circle-2"></div>
+            <!-- Register Card (Back/Front based on state) -->
             <div
-                class="paper-card absolute inset-0 z-20 flex flex-col rounded-xs p-6 transition-all duration-700 ease-in-out sm:p-10"
+                class="paper-card absolute inset-0 flex flex-col rounded-xs p-6 transition-all duration-700 ease-in-out sm:p-10"
+                :class="
+                    isLoginMode
+                        ? 'z-0 transform -rotate-3 -translate-x-2 translate-y-2 opacity-80 scale-[0.98] cursor-pointer md:-translate-x-4 md:hover:-translate-y-1'
+                        : 'z-20 transform rotate-0 translate-x-0 translate-y-0 opacity-100 scale-100'
+                "
+                :role="isLoginMode ? 'button' : undefined"
+                :tabindex="isLoginMode ? 0 : -1"
+                :aria-label="isLoginMode ? '切换到注册' : undefined"
+                @click="switchToRegister"
+                @keydown.enter.space.prevent.self="switchToRegister"
             >
-                <div class="relative h-full flex flex-col">
+                <div v-if="!isLoginMode" class="relative h-full flex flex-col">
+                    <h1
+                        class="mb-8 border-b-2 border-[#2c2825] pb-4 text-left text-3xl font-bold tracking-widest sm:mb-10"
+                    >
+                        注册
+                    </h1>
+
+                    <div
+                        class="flex-1 flex flex-col items-center justify-center text-center text-[#5a534d] leading-relaxed tracking-wide"
+                    >
+                        <p>这不是一个公共站点</p>
+                        <p class="mt-2">请联系管理员创建账号</p>
+                    </div>
+
+                    <div class="text-center mt-6">
+                        <button
+                            @click.stop="switchToLogin"
+                            class="text-sm text-[#8a817c] hover:text-[#d98c28] underline decoration-dotted underline-offset-4"
+                        >
+                            已有账号？去登录
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Vertical Text for collapsed state -->
+                <div
+                    v-else
+                    class="flex h-full items-center justify-center opacity-40 transition-opacity md:group-hover:opacity-60"
+                >
+                    <h2
+                        class="writing-vertical-rl select-none text-2xl font-bold tracking-widest sm:text-3xl"
+                    >
+                        登录
+                    </h2>
+                </div>
+            </div>
+
+            <!-- Login Card (Back/Front based on state) -->
+            <div
+                class="paper-card absolute inset-0 flex flex-col rounded-xs p-6 transition-all duration-700 ease-in-out sm:p-10"
+                :class="
+                    !isLoginMode
+                        ? 'z-0 transform rotate-3 translate-x-2 translate-y-2 opacity-80 scale-[0.98] cursor-pointer md:translate-x-4 md:hover:-translate-y-1'
+                        : 'z-20 transform rotate-0 translate-x-0 translate-y-0 opacity-100 scale-100'
+                "
+                :role="!isLoginMode ? 'button' : undefined"
+                :tabindex="!isLoginMode ? 0 : -1"
+                :aria-label="!isLoginMode ? '切换到登录' : undefined"
+                @click="switchToLogin"
+                @keydown.enter.space.prevent.self="switchToLogin"
+            >
+                <div v-if="isLoginMode" class="relative h-full flex flex-col">
                     <h1
                         class="mb-8 border-b-2 border-[#2c2825] pb-4 text-left text-3xl tracking-widest sm:mb-10"
                     >
@@ -73,11 +135,12 @@
                     </form>
 
                     <div class="text-center mt-6 px-2">
-                        <a
-                            href="#"
+                        <button
+                            @click.stop="switchToRegister"
                             class="text-sm text-[#8a817c] hover:text-[#d98c28] decoration-dotted hover:underline underline-offset-4 transition-colors"
-                            >忘记密码？</a
                         >
+                            注册账号
+                        </button>
                     </div>
 
                     <!-- Backend endpoint config (Tauri only) -->
@@ -100,6 +163,14 @@
                         </div>
                     </div>
                 </div>
+
+                <div v-else class="h-full flex items-center justify-center opacity-40">
+                    <h2
+                        class="writing-vertical-rl select-none text-2xl font-bold tracking-widest sm:text-3xl"
+                    >
+                        注册
+                    </h2>
+                </div>
             </div>
         </div>
     </div>
@@ -112,6 +183,7 @@ import { api, normalizeApiError, saveAuthToken } from '@/ApiInstance'
 import { getPlatformRuntime } from '@/runtime/platform'
 
 const router = useRouter()
+const isLoginMode = ref(true)
 const showBackendEndpoint = getPlatformRuntime().platform !== 'web'
 const backendUrl = ref('')
 
@@ -135,6 +207,18 @@ const saveBackendUrl = async () => {
         window.location.reload()
     } catch (error) {
         alert(typeof error === 'string' ? error : '保存失败')
+    }
+}
+
+const switchToRegister = () => {
+    if (isLoginMode.value) {
+        isLoginMode.value = false
+    }
+}
+
+const switchToLogin = () => {
+    if (!isLoginMode.value) {
+        isLoginMode.value = true
     }
 }
 
