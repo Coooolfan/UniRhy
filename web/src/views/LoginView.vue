@@ -20,7 +20,7 @@
                 :tabindex="isLoginMode ? 0 : -1"
                 :aria-label="isLoginMode ? '切换到注册' : undefined"
                 @click="switchToRegister"
-                @keydown.enter.space.prevent.self="switchToRegister"
+                @keydown.enter.space.self.prevent="switchToRegister"
             >
                 <div v-if="!isLoginMode" class="relative h-full flex flex-col">
                     <h1
@@ -71,7 +71,7 @@
                 :tabindex="!isLoginMode ? 0 : -1"
                 :aria-label="!isLoginMode ? '切换到登录' : undefined"
                 @click="switchToLogin"
-                @keydown.enter.space.prevent.self="switchToLogin"
+                @keydown.enter.space.self.prevent="switchToLogin"
             >
                 <div v-if="isLoginMode" class="relative h-full flex flex-col">
                     <h1
