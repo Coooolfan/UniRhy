@@ -6,14 +6,17 @@ import DashboardSidebar from '@/components/dashboard/DashboardSidebar.vue'
 import { useMediaSession } from '@/composables/useMediaSession'
 import { provideDashboardLayout } from '@/composables/useDashboardLayout'
 import { useAudioStore } from '@/stores/audio'
+import { useUserStore } from '@/stores/user'
 
 const audioStore = useAudioStore()
+const userStore = useUserStore()
 const route = useRoute()
 const dashboardLayout = provideDashboardLayout()
 
 useMediaSession(audioStore)
 
 onMounted(() => {
+    void userStore.ensureUserLoaded()
     audioStore.connectPlaybackSync()
 })
 

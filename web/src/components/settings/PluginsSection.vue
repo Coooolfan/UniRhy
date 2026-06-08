@@ -12,6 +12,7 @@ const props = defineProps<{
     onSetEnabled: (id: string, enabled: boolean) => Promise<void>
     onDelete: (id: string) => Promise<void>
     onDownload: (plugin: PluginInfoResponse) => Promise<void>
+    canManage?: boolean
 }>()
 
 const fileInputRef = ref<HTMLInputElement | null>(null)
@@ -48,6 +49,7 @@ const handleDelete = async (id: string) => {
 }
 
 const handleDownload = async (plugin: PluginInfoResponse) => {
+    if (!props.canManage) return
     downloadingId.value = plugin.id
     try {
         await props.onDownload(plugin)
@@ -64,6 +66,7 @@ const handleDownload = async (plugin: PluginInfoResponse) => {
         >
             <h2 class="font-serif text-2xl text-[#2C2A28]">插件</h2>
             <input
+                v-if="canManage"
                 ref="fileInputRef"
                 type="file"
                 accept=".up"
@@ -71,6 +74,7 @@ const handleDownload = async (plugin: PluginInfoResponse) => {
                 @change="handleFileChange"
             />
             <button
+                v-if="canManage"
                 type="button"
                 class="group flex w-full items-center justify-center gap-2 bg-[#C67C4E] px-6 py-2 text-[#F7F5F0] transition-all duration-300 shadow-md hover:bg-[#A6633C] hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto sm:justify-start"
                 :disabled="isUploading"
@@ -90,8 +94,7 @@ const handleDownload = async (plugin: PluginInfoResponse) => {
         </div>
 
         <p class="mb-4 text-xs italic text-[#8A8A8A]">
-            插件允许您扩展 UniRhy 的功能，上传 .up
-            文件后即可在此管理（此功能仍处于早期阶段，相关能力正在完善）
+            插件允许您扩展 UniRhy 的功能（此功能仍处于早期阶段，相关能力正在完善）
         </p>
 
         <div v-if="isLoading" class="flex items-center justify-center py-10 text-sm text-[#6B635B]">
@@ -105,7 +108,7 @@ const handleDownload = async (plugin: PluginInfoResponse) => {
         >
             <Puzzle class="h-10 w-10 text-[#C27E46]" />
             <p class="mt-4 text-sm text-[#6B635B]">暂无已安装的插件</p>
-            <p class="mt-1 text-xs text-[#9C968B]">上传 .up 文件后即可在此管理</p>
+            <p v-if="canManage" class="mt-1 text-xs text-[#9C968B]">上传 .up 文件后即可在此管理</p>
         </div>
 
         <div v-else class="space-y-4">
@@ -158,6 +161,7 @@ const handleDownload = async (plugin: PluginInfoResponse) => {
 
                     <div class="flex shrink-0 items-center gap-2">
                         <button
+                            v-if="canManage"
                             type="button"
                             class="flex items-center gap-1.5 px-3 py-1.5 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                             :class="
@@ -173,6 +177,7 @@ const handleDownload = async (plugin: PluginInfoResponse) => {
                         </button>
 
                         <button
+                            v-if="canManage"
                             type="button"
                             class="p-1.5 text-[#9C968B] transition-colors hover:text-[#C27E46] disabled:opacity-50"
                             :disabled="downloadingId === plugin.id"
@@ -187,6 +192,7 @@ const handleDownload = async (plugin: PluginInfoResponse) => {
                         </button>
 
                         <button
+                            v-if="canManage"
                             type="button"
                             class="p-1.5 text-[#9C968B] transition-colors hover:text-rose-500 disabled:opacity-50"
                             :disabled="deletingId === plugin.id"

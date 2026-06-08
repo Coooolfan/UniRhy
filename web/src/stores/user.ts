@@ -15,6 +15,7 @@ export const useUserStore = defineStore('user', () => {
     const preferredAssetFormat = computed(
         () => user.value?.preferences.preferredAssetFormat ?? DEFAULT_PREFERRED_ASSET_FORMAT,
     )
+    const isAdmin = computed(() => user.value?.admin === true)
 
     const loadUser = async () => {
         try {
@@ -86,6 +87,7 @@ export const useUserStore = defineStore('user', () => {
 
     return {
         user,
+        isAdmin,
         preferredAssetFormat,
         fetchUser,
         ensureUserLoaded,

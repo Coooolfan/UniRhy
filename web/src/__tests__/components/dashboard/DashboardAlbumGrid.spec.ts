@@ -60,13 +60,19 @@ const buildAlbumPage = () => ({
     totalRowCount: 1,
 })
 
-const setPreferredAssetFormat = (preferredAssetFormat: string) => {
+const setUser = ({
+    preferredAssetFormat = 'audio/opus',
+    admin = false,
+}: {
+    preferredAssetFormat?: string
+    admin?: boolean
+} = {}) => {
     const userStore = useUserStore()
     userStore.user = {
         id: 1,
         name: 'Tester',
         email: 'tester@example.com',
-        admin: false,
+        admin,
         preferences: {
             preferredAssetFormat,
         },
@@ -80,10 +86,10 @@ describe('DashboardAlbumGrid', () => {
         listAlbumsMock.mockReset()
         getAlbumMock.mockReset()
         pushMock.mockReset()
-        setPreferredAssetFormat('audio/opus')
+        setUser()
     })
 
-    it('shows centered empty state and navigates to settings when album list is empty', async () => {
+    it('hides settings action for ordinary users when album list is empty', async () => {
         listAlbumsMock.mockResolvedValueOnce({
             rows: [],
             totalPageCount: 0,
@@ -94,7 +100,24 @@ describe('DashboardAlbumGrid', () => {
         await flushView()
 
         expect(wrapper.text()).toContain('唱片架空空如也')
-        expect(wrapper.text()).toContain('前往设置')
+
+        const settingsButton = wrapper
+            .findAll('button')
+            .find((button) => button.text().includes('前往设置'))
+        expect(settingsButton).toBeUndefined()
+        expect(pushMock).not.toHaveBeenCalled()
+    })
+
+    it('shows settings action for admins when album list is empty', async () => {
+        setUser({ admin: true })
+        listAlbumsMock.mockResolvedValueOnce({
+            rows: [],
+            totalPageCount: 0,
+            totalRowCount: 0,
+        })
+
+        const wrapper = mount(DashboardAlbumGrid)
+        await flushView()
 
         const settingsButton = wrapper
             .findAll('button')
@@ -226,7 +249,7 @@ describe('DashboardAlbumGrid', () => {
     })
 
     it('prefers the user selected asset format when album playback has multiple audio assets', async () => {
-        setPreferredAssetFormat('audio/flac')
+        setUser({ preferredAssetFormat: 'audio/flac' })
         listAlbumsMock.mockResolvedValueOnce(buildAlbumPage())
         getAlbumMock.mockResolvedValueOnce({
             id: 101,

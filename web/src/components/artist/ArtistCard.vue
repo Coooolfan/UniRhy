@@ -6,10 +6,12 @@ const props = withDefaults(
         subtitle: string
         selectable?: boolean
         selected?: boolean
+        openable?: boolean
     }>(),
     {
         selectable: false,
         selected: false,
+        openable: true,
     },
 )
 
@@ -20,7 +22,11 @@ const emit = defineEmits<{
 </script>
 
 <template>
-    <div class="group flex cursor-pointer flex-col items-center text-center" @click="emit('open')">
+    <div
+        class="group flex flex-col items-center text-center"
+        :class="{ 'cursor-pointer': openable }"
+        @click="openable ? emit('open') : undefined"
+    >
         <div class="relative mb-4 h-24 w-24 sm:h-32 sm:w-32 md:h-40 md:w-40">
             <div
                 class="relative flex aspect-square h-full w-full items-center justify-center overflow-hidden rounded-full bg-[#EFEAE2] text-6xl shadow-md transition-all duration-300 group-hover:scale-105"

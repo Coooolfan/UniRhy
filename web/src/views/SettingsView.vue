@@ -4,10 +4,15 @@ import DashboardTopBar from '@/components/dashboard/DashboardTopBar.vue'
 import StorageNodesSection from '@/components/settings/StorageNodesSection.vue'
 import SystemStatusSection from '@/components/settings/SystemStatusSection.vue'
 import PluginsSection from '@/components/settings/PluginsSection.vue'
+import AccountsSection from '@/components/settings/AccountsSection.vue'
 import { useStorageSettings } from '@/composables/useStorageSettings'
 import { usePluginSettings } from '@/composables/usePluginSettings'
+import { useAccountSettings } from '@/composables/useAccountSettings'
 import { api } from '@/ApiInstance'
 import type { SystemStatus } from '@/__generated/model/static'
+import { useUserStore } from '@/stores/user'
+
+const userStore = useUserStore()
 
 const {
     storageNodes,
@@ -24,6 +29,17 @@ const {
     deleteStorageNode,
     setSystemStorageNode,
 } = useStorageSettings()
+
+const {
+    accounts,
+    isLoading: isLoadingAccounts,
+    isSaving: isSavingAccount,
+    error: accountError,
+    fetchAccounts,
+    createAccount,
+    updateAccount,
+    deleteAccount,
+} = useAccountSettings()
 
 const {
     plugins,
@@ -58,9 +74,17 @@ const formattedBuildTime = computed(() => {
 
 const shortCommit = computed(() => buildInfo.value?.gitCommit?.slice(0, 7) ?? null)
 
+const fetchAdminAccounts = async () => {
+    const loadedUser = await userStore.ensureUserLoaded()
+    if (loadedUser?.admin === true) {
+        await fetchAccounts()
+    }
+}
+
 onMounted(() => {
-    loadData()
+    void loadData()
     void fetchPlugins()
+    void fetchAdminAccounts()
     void api.systemConfigController.isInitialized().then((status) => {
         buildInfo.value = status
     })
@@ -100,6 +124,21 @@ onMounted(() => {
                 :update-storage-node="updateStorageNode"
                 :delete-storage-node="deleteStorageNode"
                 :set-system-storage-node="setSystemStorageNode"
+                :can-manage="userStore.isAdmin"
+            />
+
+            <AccountsSection
+                v-if="userStore.isAdmin"
+                class="mt-16"
+                :accounts="accounts"
+                :current-account-id="userStore.user?.id ?? null"
+                :is-loading="isLoadingAccounts"
+                :is-saving="isSavingAccount"
+                :error="accountError"
+                :create-account="createAccount"
+                :update-account="updateAccount"
+                :delete-account="deleteAccount"
+                :can-manage="userStore.isAdmin"
             />
 
             <PluginsSection
@@ -112,6 +151,7 @@ onMounted(() => {
                 :on-set-enabled="setEnabled"
                 :on-delete="deletePlugin"
                 :on-download="downloadPlugin"
+                :can-manage="userStore.isAdmin"
             />
 
             <footer

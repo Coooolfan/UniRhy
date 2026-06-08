@@ -106,13 +106,19 @@ const buildAlbumResponse = () => ({
     ],
 })
 
-const setPreferredAssetFormat = (preferredAssetFormat: string) => {
+const setUser = ({
+    preferredAssetFormat = 'audio/opus',
+    admin = false,
+}: {
+    preferredAssetFormat?: string
+    admin?: boolean
+} = {}) => {
     const userStore = useUserStore()
     userStore.user = {
         id: 1,
         name: 'Tester',
         email: 'tester@example.com',
-        admin: false,
+        admin,
         preferences: {
             preferredAssetFormat,
         },
@@ -126,7 +132,7 @@ describe('AlbumDetailView', () => {
         getAlbumMock.mockReset()
         reorderAlbumRecordingsMock.mockReset()
         updateRecordingMock.mockReset()
-        setPreferredAssetFormat('audio/opus')
+        setUser()
     })
 
     it('disables hero play button when no playable recordings exist', async () => {
@@ -154,6 +160,7 @@ describe('AlbumDetailView', () => {
     })
 
     it('opens recording edit modal and submits recording update payload', async () => {
+        setUser({ admin: true })
         getAlbumMock.mockResolvedValueOnce(buildAlbumResponse())
         updateRecordingMock.mockResolvedValueOnce()
 
@@ -190,6 +197,7 @@ describe('AlbumDetailView', () => {
     })
 
     it('reorders recordings via reorderAlbumRecordings API', async () => {
+        setUser({ admin: true })
         getAlbumMock.mockResolvedValueOnce(buildAlbumResponse())
         reorderAlbumRecordingsMock.mockResolvedValue(undefined)
 
@@ -222,5 +230,21 @@ describe('AlbumDetailView', () => {
             id: 1,
             body: { recordingIds: [12, 11] },
         })
+    })
+
+    it('hides album and recording management actions for ordinary users', async () => {
+        getAlbumMock.mockResolvedValueOnce(buildAlbumResponse())
+
+        const wrapper = mountWithModalHost()
+
+        await flushView()
+
+        expect(wrapper.find('button[title="编辑专辑"]').exists()).toBe(false)
+        expect(wrapper.find('button[title="关于曲目"]').exists()).toBe(false)
+        expect(
+            wrapper
+                .findAll('[data-testid="media-list-drag-handle"]')
+                .some((handle) => handle.attributes('draggable') === 'true'),
+        ).toBe(false)
     })
 })

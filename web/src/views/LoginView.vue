@@ -20,7 +20,7 @@
                 :tabindex="isLoginMode ? 0 : -1"
                 :aria-label="isLoginMode ? '切换到注册' : undefined"
                 @click="switchToRegister"
-                @keydown.enter.space.prevent.self="switchToRegister"
+                @keydown.enter.space.self.prevent="switchToRegister"
             >
                 <div v-if="!isLoginMode" class="relative h-full flex flex-col">
                     <h1
@@ -29,80 +29,12 @@
                         注册
                     </h1>
 
-                    <form
-                        @submit.prevent="handleRegister"
-                        class="flex-1 flex flex-col justify-center space-y-6"
+                    <div
+                        class="flex-1 flex flex-col items-center justify-center text-center text-[#5a534d] leading-relaxed tracking-wide"
                     >
-                        <div class="group relative">
-                            <input
-                                id="reg-username"
-                                v-model="registerForm.username"
-                                type="text"
-                                name="username"
-                                autocomplete="username"
-                                autocapitalize="off"
-                                inputmode="text"
-                                required
-                                class="peer w-full bg-transparent border-b border-[#d6d0c4] focus:border-[#d98c28] outline-none py-2 text-[#2c2825] placeholder-transparent transition-colors"
-                                placeholder="Username"
-                            />
-                            <label
-                                for="reg-username"
-                                class="absolute left-0 -top-3.5 text-[#8a817c] text-sm transition-all peer-placeholder-shown:text-base peer-placeholder-shown:text-[#b0a8a0] peer-placeholder-shown:top-2 peer-focus:-top-3.5 peer-focus:text-[#2c2825] peer-focus:text-sm cursor-text"
-                            >
-                                用户名
-                            </label>
-                        </div>
-
-                        <div class="group relative">
-                            <input
-                                id="reg-email"
-                                v-model="registerForm.email"
-                                type="email"
-                                name="email"
-                                autocomplete="email"
-                                autocapitalize="off"
-                                inputmode="email"
-                                required
-                                class="peer w-full bg-transparent border-b border-[#d6d0c4] focus:border-[#d98c28] outline-none py-2 text-[#2c2825] placeholder-transparent transition-colors"
-                                placeholder="Email"
-                            />
-                            <label
-                                for="reg-email"
-                                class="absolute left-0 -top-3.5 text-[#8a817c] text-sm transition-all peer-placeholder-shown:text-base peer-placeholder-shown:text-[#b0a8a0] peer-placeholder-shown:top-2 peer-focus:-top-3.5 peer-focus:text-[#2c2825] peer-focus:text-sm cursor-text"
-                            >
-                                电子邮箱
-                            </label>
-                        </div>
-
-                        <div class="group relative">
-                            <input
-                                id="reg-password"
-                                v-model="registerForm.password"
-                                type="password"
-                                name="password"
-                                autocomplete="new-password"
-                                required
-                                class="peer w-full bg-transparent border-b border-[#d6d0c4] focus:border-[#d98c28] outline-none py-2 text-[#2c2825] placeholder-transparent transition-colors"
-                                placeholder="Password"
-                            />
-                            <label
-                                for="reg-password"
-                                class="absolute left-0 -top-3.5 text-[#8a817c] text-sm transition-all peer-placeholder-shown:text-base peer-placeholder-shown:text-[#b0a8a0] peer-placeholder-shown:top-2 peer-focus:-top-3.5 peer-focus:text-[#2c2825] peer-focus:text-sm cursor-text"
-                            >
-                                密码
-                            </label>
-                        </div>
-
-                        <div class="pt-8 text-center">
-                            <button
-                                type="submit"
-                                class="outline-button px-8 py-2 font-bold tracking-widest transition-all duration-300"
-                            >
-                                提交
-                            </button>
-                        </div>
-                    </form>
+                        <p>这不是一个公共站点</p>
+                        <p class="mt-2">请联系管理员创建账号</p>
+                    </div>
 
                     <div class="text-center mt-6">
                         <button
@@ -139,7 +71,7 @@
                 :tabindex="!isLoginMode ? 0 : -1"
                 :aria-label="!isLoginMode ? '切换到登录' : undefined"
                 @click="switchToLogin"
-                @keydown.enter.space.prevent.self="switchToLogin"
+                @keydown.enter.space.self.prevent="switchToLogin"
             >
                 <div v-if="isLoginMode" class="relative h-full flex flex-col">
                     <h1
@@ -202,12 +134,7 @@
                         </div>
                     </form>
 
-                    <div class="text-center mt-6 flex justify-between items-center px-2">
-                        <a
-                            href="#"
-                            class="text-sm text-[#8a817c] hover:text-[#d98c28] decoration-dotted hover:underline underline-offset-4 transition-colors"
-                            >忘记密码？</a
-                        >
+                    <div class="text-center mt-6 px-2">
                         <button
                             @click.stop="switchToRegister"
                             class="text-sm text-[#8a817c] hover:text-[#d98c28] decoration-dotted hover:underline underline-offset-4 transition-colors"
@@ -265,12 +192,6 @@ const loginForm = reactive({
     password: '',
 })
 
-const registerForm = reactive({
-    username: '',
-    email: '',
-    password: '',
-})
-
 onMounted(async () => {
     if (showBackendEndpoint) {
         const { invoke } = await import('@tauri-apps/api/core')
@@ -316,25 +237,6 @@ const handleLogin = async () => {
         return
     }
     router.push('/')
-}
-
-const handleRegister = async () => {
-    try {
-        await api.accountController.create({
-            body: {
-                name: registerForm.username,
-                email: registerForm.email,
-                password: registerForm.password,
-            },
-        })
-    } catch (error) {
-        const normalizedError = normalizeApiError(error, 'accountController', 'create')
-        alert(normalizedError.message || '注册失败')
-        return
-    }
-
-    alert('注册成功，请登录')
-    switchToLogin()
 }
 </script>
 

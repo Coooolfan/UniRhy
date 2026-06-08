@@ -28,7 +28,6 @@ vi.mock('@/ApiInstance', async (importOriginal) => {
 })
 
 import { api } from '@/ApiInstance'
-import { buildRecordingOrderStorageKey } from '@/utils/recordingOrder'
 import WorkDetailView from '@/views/WorkDetailView.vue'
 import { useUserStore } from '@/stores/user'
 
@@ -68,12 +67,6 @@ const mountWithModalHost = () =>
         },
     )
 
-const createDragTransfer = () => ({
-    effectAllowed: '',
-    dropEffect: '',
-    setData: vi.fn(),
-})
-
 const buildWorkResponse = () => ({
     id: 9,
     title: 'Work One',
@@ -105,13 +98,19 @@ const buildWorkResponse = () => ({
     ],
 })
 
-const setPreferredAssetFormat = (preferredAssetFormat: string) => {
+const setUser = ({
+    preferredAssetFormat = 'audio/opus',
+    admin = false,
+}: {
+    preferredAssetFormat?: string
+    admin?: boolean
+} = {}) => {
     const userStore = useUserStore()
     userStore.user = {
         id: 1,
         name: 'Tester',
         email: 'tester@example.com',
-        admin: false,
+        admin,
         preferences: {
             preferredAssetFormat,
         },
@@ -125,7 +124,7 @@ describe('WorkDetailView', () => {
         getWorkByIdMock.mockReset()
         updateRecordingMock.mockReset()
         mergeRecordingMock.mockReset()
-        setPreferredAssetFormat('audio/opus')
+        setUser()
     })
 
     it('disables hero play button when no playable recordings exist', async () => {
@@ -154,6 +153,7 @@ describe('WorkDetailView', () => {
     })
 
     it('submits defaultInWork=true and keeps a single default recording in list', async () => {
+        setUser({ admin: true })
         getWorkByIdMock.mockResolvedValueOnce(buildWorkResponse())
         updateRecordingMock.mockResolvedValueOnce()
 
@@ -202,6 +202,7 @@ describe('WorkDetailView', () => {
     })
 
     it('shows merge button only when at least two recordings are selected and modal target options are selected items only', async () => {
+        setUser({ admin: true })
         getWorkByIdMock.mockResolvedValueOnce(buildWorkResponse())
 
         const wrapper = mountWithModalHost()
@@ -236,6 +237,7 @@ describe('WorkDetailView', () => {
     })
 
     it('submits merge request with selected target and refreshes work detail on success', async () => {
+        setUser({ admin: true })
         getWorkByIdMock.mockResolvedValue(buildWorkResponse())
         mergeRecordingMock.mockResolvedValueOnce()
 
@@ -279,6 +281,7 @@ describe('WorkDetailView', () => {
     })
 
     it('shows merge error and keeps selected recordings when merge fails', async () => {
+        setUser({ admin: true })
         getWorkByIdMock.mockResolvedValue(buildWorkResponse())
         mergeRecordingMock.mockRejectedValueOnce({ message: '合并曲目失败（测试）' })
 
@@ -309,52 +312,16 @@ describe('WorkDetailView', () => {
         expect(wrapper.findAll('[data-testid="recording-select-checkbox"]:checked')).toHaveLength(2)
     })
 
-    it('reorders recordings locally and reuses stored order on remount', async () => {
-        getWorkByIdMock.mockResolvedValue(buildWorkResponse())
+    it('hides work and recording management actions for ordinary users', async () => {
+        getWorkByIdMock.mockResolvedValueOnce(buildWorkResponse())
 
         const wrapper = mountWithModalHost()
 
         await flushView()
 
-        const rows = wrapper.findAll('[data-testid="media-list-row"]')
-        const firstRow = rows[0]
-        const dragHandles = wrapper.findAll('[data-testid="media-list-drag-handle"]')
-        const secondHandle = dragHandles[1]
-        if (!firstRow || !secondHandle) {
-            throw new Error('Missing media list rows in test setup')
-        }
-
-        const dataTransfer = createDragTransfer()
-        await secondHandle.trigger('dragstart', { dataTransfer })
-        await firstRow.trigger('dragover', { clientY: 0, dataTransfer })
-        await firstRow.trigger('drop', { clientY: 0, dataTransfer })
-        await nextTick()
-
-        const reorderedIds = wrapper
-            .findAll('[data-testid="media-list-row"]')
-            .map((row) => Number(row.attributes('data-item-id')))
-        expect(reorderedIds).toEqual([22, 21])
-        expect(window.localStorage.getItem(buildRecordingOrderStorageKey('work', 9))).toBe(
-            '[22,21]',
-        )
-
-        wrapper.unmount()
-
-        const remountedWrapper = mount(WorkDetailView, {
-            global: {
-                stubs: {
-                    teleport: true,
-                    transition: false,
-                    DashboardTopBar: true,
-                },
-            },
-        })
-
-        await flushView()
-
-        const remountedIds = remountedWrapper
-            .findAll('[data-testid="media-list-row"]')
-            .map((row) => Number(row.attributes('data-item-id')))
-        expect(remountedIds).toEqual([22, 21])
+        expect(wrapper.find('button[title="编辑作品"]').exists()).toBe(false)
+        expect(wrapper.find('button[title="关于曲目"]').exists()).toBe(false)
+        expect(wrapper.find('[data-testid="recording-select-checkbox"]').exists()).toBe(false)
+        expect(wrapper.find('[data-testid="open-merge-recording-button"]').exists()).toBe(false)
     })
 })
