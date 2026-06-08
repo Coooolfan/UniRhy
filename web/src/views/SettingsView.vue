@@ -74,12 +74,17 @@ const formattedBuildTime = computed(() => {
 
 const shortCommit = computed(() => buildInfo.value?.gitCommit?.slice(0, 7) ?? null)
 
-onMounted(() => {
-    loadData()
-    void fetchPlugins()
-    if (userStore.isAdmin) {
-        void fetchAccounts()
+const fetchAdminAccounts = async () => {
+    const loadedUser = await userStore.ensureUserLoaded()
+    if (loadedUser?.admin === true) {
+        await fetchAccounts()
     }
+}
+
+onMounted(() => {
+    void loadData()
+    void fetchPlugins()
+    void fetchAdminAccounts()
     void api.systemConfigController.isInitialized().then((status) => {
         buildInfo.value = status
     })
