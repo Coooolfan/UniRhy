@@ -1,0 +1,78 @@
+name: UniRhy E2E
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 18 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  JAVA_VERSION: "25"
+  DB_HOST: localhost
+  DB_PORT: "5432"
+  DB_USER: postgres
+  DB_PASSWORD: postgres
+  POSTGRES_DB: postgres
+  POSTGRES_ADMIN_DB: postgres
+
+jobs:
+  api-e2e:
+    name: API E2E 回归
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: postgres
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v5
+
+      - name: 设置 JDK 环境
+        uses: actions/setup-java@v5
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: temurin
+
+      - name: 缓存 Gradle 依赖
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('server/**/*.gradle*', 'server/gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: 运行 API E2E
+        working-directory: ./server
+        run: |
+          chmod +x ./gradlew
+          ./gradlew :api-e2e:test
+          ./gradlew --stop || true
+
+      - name: 上传失败报告
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-e2e-reports
+          path: |
+            server/api-e2e/build/reports/tests/test
+            server/api-e2e/build/test-results/test
+          if-no-files-found: ignore

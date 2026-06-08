@@ -1,35 +1,155 @@
 name: UniRhy Builder
+
 on:
-  release:
-    types: [ published ]
   workflow_dispatch:
     inputs:
       version:
-        description: "版本号"
+        description: "发布版本号，例如 0.1.0-rc.1 或 0.1.0"
         required: true
-        default: "dev"
+        type: string
+      target_ref:
+        description: "要发布的 branch/tag/SHA，稳定版必须指向 origin/main 当前 HEAD"
+        required: true
+        default: "main"
+        type: string
+      prerelease:
+        description: "是否作为预发布版本"
+        required: true
+        default: true
+        type: boolean
 
 permissions:
   contents: write
 
-jobs:
-  build-frontend:
-    name: 构建前端资源
-    runs-on: ubuntu-latest
+concurrency:
+  group: builder-${{ inputs.version }}
+  cancel-in-progress: false
 
+env:
+  NODE_VERSION: "24"
+  YARN_VERSION: "4.12.0"
+  JAVA_VERSION: "25"
+
+jobs:
+  prepare-release:
+    name: 准备发布上下文
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.prepare.outputs.version }}
+      target_sha: ${{ steps.prepare.outputs.target_sha }}
+      prerelease: ${{ steps.prepare.outputs.prerelease }}
+      publish_latest: ${{ steps.prepare.outputs.publish_latest }}
     steps:
       - name: 检出代码
         uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.target_ref }}
+
+      - name: 校验版本与目标引用
+        id: prepare
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          INPUT_TARGET_REF: ${{ inputs.target_ref }}
+          INPUT_PRERELEASE: ${{ inputs.prerelease }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          if [[ ! "$INPUT_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z][0-9A-Za-z.-]*)?$ ]]; then
+            echo "::error::版本号必须是 SemVer 且不能包含 build metadata，例如 0.1.0、0.1.0-rc.1"
+            exit 1
+          fi
+
+          if [[ "$INPUT_VERSION" == v* ]]; then
+            echo "::error::UniRhy 发布 tag 不使用 v 前缀，请输入 0.1.0 而不是 v0.1.0"
+            exit 1
+          fi
+
+          git fetch --force --tags origin
+          TARGET_SHA="$(git rev-parse --verify HEAD)"
+
+          EXISTING_TAG_SHA="$(git rev-parse --verify --quiet "refs/tags/$INPUT_VERSION^{}" || true)"
+          if [[ -n "$EXISTING_TAG_SHA" ]]; then
+            if [[ "$EXISTING_TAG_SHA" != "$TARGET_SHA" ]]; then
+              echo "::error::tag $INPUT_VERSION 已存在，但指向 $EXISTING_TAG_SHA，不是目标 $TARGET_SHA"
+              exit 1
+            fi
+
+            if RELEASE_DRAFT="$(gh release view "$INPUT_VERSION" --json isDraft --jq .isDraft 2>/dev/null)"; then
+              if [[ "$RELEASE_DRAFT" != "true" ]]; then
+                echo "::error::Release $INPUT_VERSION 已发布，不能重跑同版本发布"
+                exit 1
+              fi
+              echo "::notice::发现同版本草稿 Release，将复用该草稿"
+            else
+              echo "::notice::发现同版本 tag 但没有 Release，将创建草稿 Release"
+            fi
+          fi
+
+          if [[ "$INPUT_PRERELEASE" != "true" && "$INPUT_VERSION" == *-* ]]; then
+            echo "::error::包含预发布后缀的版本必须勾选 prerelease"
+            exit 1
+          fi
+
+          if [[ "$INPUT_PRERELEASE" == "true" && "$INPUT_VERSION" != *-* ]]; then
+            echo "::warning::版本号不含预发布后缀，但 prerelease=true"
+          fi
+
+          if [[ "$INPUT_PRERELEASE" != "true" ]]; then
+            git fetch --force origin main
+            MAIN_SHA="$(git rev-parse --verify origin/main)"
+            if [[ "$TARGET_SHA" != "$MAIN_SHA" ]]; then
+              echo "::error::稳定版只能从 origin/main 当前 HEAD 发布。target_ref=$INPUT_TARGET_REF target_sha=$TARGET_SHA origin/main=$MAIN_SHA"
+              exit 1
+            fi
+          fi
+
+          {
+            echo "version=$INPUT_VERSION"
+            echo "target_sha=$TARGET_SHA"
+            echo "prerelease=$INPUT_PRERELEASE"
+            if [[ "$INPUT_PRERELEASE" == "true" ]]; then
+              echo "publish_latest=false"
+            else
+              echo "publish_latest=true"
+            fi
+          } >> "$GITHUB_OUTPUT"
+
+      - name: 输出发布摘要
+        run: |
+          {
+            echo "## UniRhy Release"
+            echo
+            echo "- Version: \`${{ steps.prepare.outputs.version }}\`"
+            echo "- Target ref: \`${{ inputs.target_ref }}\`"
+            echo "- Target SHA: \`${{ steps.prepare.outputs.target_sha }}\`"
+            echo "- Prerelease: \`${{ steps.prepare.outputs.prerelease }}\`"
+            echo "- Publish Docker latest: \`${{ steps.prepare.outputs.publish_latest }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  build-frontend:
+    name: 构建前端资源
+    needs: prepare-release
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./web
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.prepare-release.outputs.target_sha }}
 
       - name: 设置 Node 环境
         uses: actions/setup-node@v4
         with:
-          node-version: '24'
+          node-version: ${{ env.NODE_VERSION }}
 
-      - name: 启用 Corepack 并激活 Yarn 4
+      - name: 启用 Corepack 并激活 Yarn
         run: |
           corepack enable
-          corepack prepare yarn@4.12.0 --activate
+          corepack prepare yarn@${{ env.YARN_VERSION }} --activate
 
       - name: 缓存 Yarn 包缓存
         uses: actions/cache@v4
@@ -40,10 +160,11 @@ jobs:
             ${{ runner.os }}-yarn-web-
 
       - name: 构建前端
-        working-directory: ./web
         run: |
           yarn --version
           yarn install --immutable
+          yarn verify
+          yarn format:check
           yarn build
 
       - name: 上传前端产物
@@ -51,25 +172,30 @@ jobs:
         with:
           name: frontend-dist
           path: web/dist
+          if-no-files-found: error
 
   build-website:
     name: 构建官网资源
-    if: github.event_name == 'release'
+    needs: prepare-release
     runs-on: ubuntu-latest
-
+    defaults:
+      run:
+        working-directory: ./website
     steps:
       - name: 检出代码
         uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.prepare-release.outputs.target_sha }}
 
       - name: 设置 Node 环境
         uses: actions/setup-node@v4
         with:
-          node-version: '24'
+          node-version: ${{ env.NODE_VERSION }}
 
-      - name: 启用 Corepack 并激活 Yarn 4
+      - name: 启用 Corepack 并激活 Yarn
         run: |
           corepack enable
-          corepack prepare yarn@4.12.0 --activate
+          corepack prepare yarn@${{ env.YARN_VERSION }} --activate
 
       - name: 缓存 Yarn 包缓存
         uses: actions/cache@v4
@@ -80,10 +206,11 @@ jobs:
             ${{ runner.os }}-yarn-website-
 
       - name: 构建官网
-        working-directory: ./website
         run: |
           yarn --version
           yarn install --immutable
+          yarn verify
+          yarn format:check
           yarn build
 
       - name: 上传官网产物
@@ -91,29 +218,25 @@ jobs:
         with:
           name: website-dist
           path: website/dist
+          if-no-files-found: error
 
   build-jar:
     name: 构建 JAR 包
-    needs: build-frontend
+    needs:
+      - prepare-release
+      - build-frontend
     runs-on: ubuntu-latest
-
     steps:
       - name: 检出代码
         uses: actions/checkout@v5
-
-      - name: 设置版本号
-        run: |
-          if [ "${{ github.event_name }}" = "release" ]; then
-            echo "VERSION=${{ github.event.release.tag_name }}" >> $GITHUB_ENV
-          else
-            echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_ENV
-          fi
+        with:
+          ref: ${{ needs.prepare-release.outputs.target_sha }}
 
       - name: 设置 JDK 环境
         uses: actions/setup-java@v5
         with:
-          java-version: '25'
-          distribution: 'temurin'
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: temurin
 
       - name: 缓存 Gradle 依赖
         uses: actions/cache@v4
@@ -121,7 +244,7 @@ jobs:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ hashFiles('server/**/*.gradle*', 'server/gradle-wrapper.properties') }}
+          key: ${{ runner.os }}-gradle-${{ hashFiles('server/**/*.gradle*', 'server/gradle/wrapper/gradle-wrapper.properties') }}
           restore-keys: |
             ${{ runner.os }}-gradle-
 
@@ -135,28 +258,102 @@ jobs:
         working-directory: ./server
         run: |
           chmod +x ./gradlew
-          ./gradlew bootJar
+          ./gradlew :compileKotlin :test bootJar
           ./gradlew --stop || true
 
       - name: 整理 JAR 产物
         working-directory: ./server/build/libs
+        env:
+          VERSION: ${{ needs.prepare-release.outputs.version }}
         run: |
-          ls -al
-          JAR_FILE=$(ls *.jar | grep -v plain | head -n 1)
+          set -euo pipefail
+          JAR_FILE="$(ls *.jar | grep -v plain | head -n 1)"
+          test -n "$JAR_FILE"
           mv "$JAR_FILE" "unirhy-v${VERSION}.jar"
+          ls -al "unirhy-v${VERSION}.jar"
 
-      - name: 上传编译产物
+      - name: 上传 JAR 产物
         uses: actions/upload-artifact@v4
         with:
           name: jar
-          path: server/build/libs/unirhy-v${{ env.VERSION }}.jar
+          path: server/build/libs/unirhy-v${{ needs.prepare-release.outputs.version }}.jar
+          if-no-files-found: error
+
+  create-draft-release:
+    name: 创建 tag 与草稿 Release
+    needs:
+      - prepare-release
+      - build-jar
+      - build-website
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          ref: ${{ needs.prepare-release.outputs.target_sha }}
+
+      - name: 创建并推送 tag
+        env:
+          VERSION: ${{ needs.prepare-release.outputs.version }}
+          TARGET_SHA: ${{ needs.prepare-release.outputs.target_sha }}
+        run: |
+          set -euo pipefail
+          git fetch --force --tags origin
+          EXISTING_TAG_SHA="$(git rev-parse --verify --quiet "refs/tags/$VERSION^{}" || true)"
+          if [[ -n "$EXISTING_TAG_SHA" ]]; then
+            if [[ "$EXISTING_TAG_SHA" != "$TARGET_SHA" ]]; then
+              echo "::error::tag $VERSION 已存在，但指向 $EXISTING_TAG_SHA，不是目标 $TARGET_SHA"
+              exit 1
+            fi
+            echo "::notice::tag $VERSION 已存在且指向目标 commit，继续复用"
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git tag -a "$VERSION" "$TARGET_SHA" -m "Release $VERSION"
+            git push origin "$VERSION"
+          fi
+
+      - name: 创建草稿 Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.prepare-release.outputs.version }}
+          TARGET_SHA: ${{ needs.prepare-release.outputs.target_sha }}
+          PRERELEASE: ${{ needs.prepare-release.outputs.prerelease }}
+        run: |
+          set -euo pipefail
+          if RELEASE_JSON="$(gh release view "$VERSION" --json isDraft,isPrerelease 2>/dev/null)"; then
+            RELEASE_DRAFT="$(jq -r .isDraft <<< "$RELEASE_JSON")"
+            RELEASE_PRERELEASE="$(jq -r .isPrerelease <<< "$RELEASE_JSON")"
+            if [[ "$RELEASE_DRAFT" != "true" ]]; then
+              echo "::error::Release $VERSION 已发布，不能复用"
+              exit 1
+            fi
+            if [[ "$RELEASE_PRERELEASE" != "$PRERELEASE" ]]; then
+              echo "::error::草稿 Release 的 prerelease=$RELEASE_PRERELEASE 与本次输入 prerelease=$PRERELEASE 不一致"
+              exit 1
+            fi
+            echo "::notice::草稿 Release $VERSION 已存在，继续复用"
+          else
+            RELEASE_ARGS=(
+              --draft \
+              --verify-tag \
+              --target "$TARGET_SHA" \
+              --title "UniRhy $VERSION" \
+              --notes "UniRhy $VERSION"
+            )
+            if [[ "$PRERELEASE" == "true" ]]; then
+              RELEASE_ARGS+=(--prerelease)
+            fi
+            gh release create "$VERSION" "${RELEASE_ARGS[@]}"
+          fi
 
   upload-release-assets:
     name: 上传产物到 Release
-    if: github.event_name == 'release'
-    needs: build-jar
+    needs:
+      - prepare-release
+      - create-draft-release
     runs-on: ubuntu-latest
-
     steps:
       - name: 下载 JAR 产物
         uses: actions/download-artifact@v4
@@ -164,27 +361,27 @@ jobs:
           name: jar
           path: dist
 
-      - name: 查看产物结构
-        run: ls -R dist
-
       - name: 上传到 Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.event.release.tag_name }}
-          files: |
-            dist/unirhy-v${{ github.event.release.tag_name }}.jar
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.prepare-release.outputs.version }}
+        run: |
+          set -euo pipefail
+          ls -R dist
+          gh release upload "$VERSION" "dist/unirhy-v${VERSION}.jar" --clobber
 
   build-docker-for-jvm:
     name: 构建并推送 Docker 镜像
-    if: github.event_name == 'release'
-    needs: build-jar
+    needs:
+      - prepare-release
+      - create-draft-release
+      - deploy-cloudflare
     runs-on: ubuntu-latest
-
     steps:
       - name: 检出代码
         uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.prepare-release.outputs.target_sha }}
 
       - name: 设置 QEMU
         uses: docker/setup-qemu-action@v3
@@ -210,8 +407,8 @@ jobs:
         with:
           images: ${{ secrets.DOCKERHUB_USERNAME }}/unirhy
           tags: |
-            type=raw,value=${{ github.event.release.tag_name }}
-            type=raw,value=latest,enable=${{ !github.event.release.prerelease }}
+            type=raw,value=${{ needs.prepare-release.outputs.version }}
+            type=raw,value=latest,enable=${{ needs.prepare-release.outputs.publish_latest == 'true' }}
 
       - name: 构建并推送 Docker 镜像
         uses: docker/build-push-action@v6
@@ -222,17 +419,19 @@ jobs:
           platforms: linux/amd64,linux/arm64
           tags: ${{ steps.meta.outputs.tags }}
           build-args: |
-            JAR_FILE=dist/unirhy-v${{ github.event.release.tag_name }}.jar
+            JAR_FILE=dist/unirhy-v${{ needs.prepare-release.outputs.version }}.jar
 
   deploy-cloudflare:
     name: 部署官网到 Cloudflare Workers
-    if: github.event_name == 'release'
-    needs: build-website
+    needs:
+      - prepare-release
+      - create-draft-release
     runs-on: ubuntu-latest
-
     steps:
       - name: 检出代码
         uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.prepare-release.outputs.target_sha }}
 
       - name: 下载官网产物
         uses: actions/download-artifact@v4
@@ -241,17 +440,34 @@ jobs:
           path: website/dist
 
       - name: 上传预览版本（不切生产流量）
-        if: github.event.release.prerelease
+        if: needs.prepare-release.outputs.prerelease == 'true'
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: versions upload --tag ${{ github.event.release.tag_name }} --message "Prerelease ${{ github.event.release.tag_name }}"
+          command: versions upload --tag ${{ needs.prepare-release.outputs.version }} --message "Prerelease ${{ needs.prepare-release.outputs.version }}"
 
       - name: 部署到生产（上传并切 100% 流量）
-        if: ${{ !github.event.release.prerelease }}
+        if: needs.prepare-release.outputs.prerelease != 'true'
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: deploy
+
+  publish-release:
+    name: 发布 Release
+    needs:
+      - prepare-release
+      - upload-release-assets
+      - build-docker-for-jvm
+      - deploy-cloudflare
+    runs-on: ubuntu-latest
+    steps:
+      - name: 切换 Release 为发布态
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.prepare-release.outputs.version }}
+        run: |
+          set -euo pipefail
+          gh release edit "$VERSION" --draft=false
