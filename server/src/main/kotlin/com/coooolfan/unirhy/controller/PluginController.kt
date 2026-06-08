@@ -140,16 +140,17 @@ class PluginController(
      * 导出（下载）插件包
      *
      * 此接口用于将指定插件打包为 `.up` 文件并以附件形式下载
-     * 需要用户登录认证才能访问
+     * 需要管理员角色才能访问
      *
      * @param id 插件 ID
      * @param response Servlet 响应对象，用于写入二进制内容
      *
      * @api GET /api/plugins/{id}/package
-     * @permission 需要登录认证
+     * @permission 需要管理员角色
      * @description 调用PluginService.export()方法导出插件包
      */
     @GetMapping("/plugins/{id}/package")
+    @SaCheckRole(ROLE_ADMIN)
     fun download(@PathVariable id: String, response: HttpServletResponse) {
         val plugin = pluginService.getPlugin(id)
         val zipBytes = pluginService.export(id)

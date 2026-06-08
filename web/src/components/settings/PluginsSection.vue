@@ -49,6 +49,7 @@ const handleDelete = async (id: string) => {
 }
 
 const handleDownload = async (plugin: PluginInfoResponse) => {
+    if (!props.canManage) return
     downloadingId.value = plugin.id
     try {
         await props.onDownload(plugin)
@@ -176,6 +177,7 @@ const handleDownload = async (plugin: PluginInfoResponse) => {
                         </button>
 
                         <button
+                            v-if="canManage"
                             type="button"
                             class="p-1.5 text-[#9C968B] transition-colors hover:text-[#C27E46] disabled:opacity-50"
                             :disabled="downloadingId === plugin.id"
