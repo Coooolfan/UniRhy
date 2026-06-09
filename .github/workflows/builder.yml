@@ -7,11 +7,6 @@ on:
         description: "发布版本号，例如 0.1.0-rc.1 或 0.1.0"
         required: true
         type: string
-      prerelease:
-        description: "是否作为预发布版本"
-        required: true
-        default: true
-        type: boolean
 
 permissions:
   contents: write
@@ -44,12 +39,12 @@ jobs:
         id: prepare
         env:
           INPUT_VERSION: ${{ inputs.version }}
-          INPUT_PRERELEASE: ${{ inputs.prerelease }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
 
-          if [[ ! "$INPUT_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z][0-9A-Za-z.-]*)?$ ]]; then
+          SEMVER_REGEX='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-((0|[1-9][0-9]*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)(\.(0|[1-9][0-9]*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))*))?$'
+          if [[ ! "$INPUT_VERSION" =~ $SEMVER_REGEX ]]; then
             echo "::error::版本号必须是 SemVer 且不能包含 build metadata，例如 0.1.0、0.1.0-rc.1"
             exit 1
           fi
@@ -61,6 +56,11 @@ jobs:
 
           git fetch --force --tags origin
           TARGET_SHA="$(git rev-parse --verify HEAD)"
+          if [[ "$INPUT_VERSION" == *-* ]]; then
+            PRERELEASE=true
+          else
+            PRERELEASE=false
+          fi
 
           EXISTING_TAG_SHA="$(git rev-parse --verify --quiet "refs/tags/$INPUT_VERSION^{}" || true)"
           if [[ -n "$EXISTING_TAG_SHA" ]]; then
@@ -80,16 +80,7 @@ jobs:
             fi
           fi
 
-          if [[ "$INPUT_PRERELEASE" != "true" && "$INPUT_VERSION" == *-* ]]; then
-            echo "::error::包含预发布后缀的版本必须勾选 prerelease"
-            exit 1
-          fi
-
-          if [[ "$INPUT_PRERELEASE" == "true" && "$INPUT_VERSION" != *-* ]]; then
-            echo "::warning::版本号不含预发布后缀，但 prerelease=true"
-          fi
-
-          if [[ "$INPUT_PRERELEASE" != "true" ]]; then
+          if [[ "$PRERELEASE" != "true" ]]; then
             git fetch --force origin main
             MAIN_SHA="$(git rev-parse --verify origin/main)"
             if [[ "$TARGET_SHA" != "$MAIN_SHA" ]]; then
@@ -101,8 +92,8 @@ jobs:
           {
             echo "version=$INPUT_VERSION"
             echo "target_sha=$TARGET_SHA"
-            echo "prerelease=$INPUT_PRERELEASE"
-            if [[ "$INPUT_PRERELEASE" == "true" ]]; then
+            echo "prerelease=$PRERELEASE"
+            if [[ "$PRERELEASE" == "true" ]]; then
               echo "publish_latest=false"
             else
               echo "publish_latest=true"
