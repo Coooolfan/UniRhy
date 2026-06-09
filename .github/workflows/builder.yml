@@ -7,11 +7,6 @@ on:
         description: "发布版本号，例如 0.1.0-rc.1 或 0.1.0"
         required: true
         type: string
-      target_ref:
-        description: "要发布的 branch/tag/SHA，稳定版必须指向 origin/main 当前 HEAD"
-        required: true
-        default: "main"
-        type: string
       prerelease:
         description: "是否作为预发布版本"
         required: true
@@ -44,13 +39,11 @@ jobs:
         uses: actions/checkout@v5
         with:
           fetch-depth: 0
-          ref: ${{ inputs.target_ref }}
 
       - name: 校验版本与目标引用
         id: prepare
         env:
           INPUT_VERSION: ${{ inputs.version }}
-          INPUT_TARGET_REF: ${{ inputs.target_ref }}
           INPUT_PRERELEASE: ${{ inputs.prerelease }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -100,7 +93,7 @@ jobs:
             git fetch --force origin main
             MAIN_SHA="$(git rev-parse --verify origin/main)"
             if [[ "$TARGET_SHA" != "$MAIN_SHA" ]]; then
-              echo "::error::稳定版只能从 origin/main 当前 HEAD 发布。target_ref=$INPUT_TARGET_REF target_sha=$TARGET_SHA origin/main=$MAIN_SHA"
+              echo "::error::稳定版只能从 origin/main 当前 HEAD 发布。workflow_ref=$GITHUB_REF_NAME target_sha=$TARGET_SHA origin/main=$MAIN_SHA"
               exit 1
             fi
           fi
@@ -122,7 +115,7 @@ jobs:
             echo "## UniRhy Release"
             echo
             echo "- Version: \`${{ steps.prepare.outputs.version }}\`"
-            echo "- Target ref: \`${{ inputs.target_ref }}\`"
+            echo "- Workflow ref: \`${{ github.ref_name }}\`"
             echo "- Target SHA: \`${{ steps.prepare.outputs.target_sha }}\`"
             echo "- Prerelease: \`${{ steps.prepare.outputs.prerelease }}\`"
             echo "- Publish Docker latest: \`${{ steps.prepare.outputs.publish_latest }}\`"
