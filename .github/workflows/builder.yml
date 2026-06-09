@@ -40,65 +40,7 @@ jobs:
         env:
           INPUT_VERSION: ${{ inputs.version }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-
-          SEMVER_REGEX='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-(alpha|beta|rc)\.(0|[1-9][0-9]*))?$'
-          if [[ ! "$INPUT_VERSION" =~ $SEMVER_REGEX ]]; then
-            echo "::error::版本号必须是 0.1.0 或 0.1.0-rc.1 形式，预发布标签仅允许 alpha、beta、rc，且不能包含 build metadata"
-            exit 1
-          fi
-
-          if [[ "$INPUT_VERSION" == v* ]]; then
-            echo "::error::UniRhy 发布 tag 不使用 v 前缀，请输入 0.1.0 而不是 v0.1.0"
-            exit 1
-          fi
-
-          git fetch --force --tags origin
-          TARGET_SHA="$(git rev-parse --verify HEAD)"
-          if [[ "$INPUT_VERSION" == *-* ]]; then
-            PRERELEASE=true
-          else
-            PRERELEASE=false
-          fi
-
-          EXISTING_TAG_SHA="$(git rev-parse --verify --quiet "refs/tags/$INPUT_VERSION^{}" || true)"
-          if [[ -n "$EXISTING_TAG_SHA" ]]; then
-            if [[ "$EXISTING_TAG_SHA" != "$TARGET_SHA" ]]; then
-              echo "::error::tag $INPUT_VERSION 已存在，但指向 $EXISTING_TAG_SHA，不是目标 $TARGET_SHA"
-              exit 1
-            fi
-
-            if RELEASE_DRAFT="$(gh release view "$INPUT_VERSION" --json isDraft --jq .isDraft 2>/dev/null)"; then
-              if [[ "$RELEASE_DRAFT" != "true" ]]; then
-                echo "::error::Release $INPUT_VERSION 已发布，不能重跑同版本发布"
-                exit 1
-              fi
-              echo "::notice::发现同版本草稿 Release，将复用该草稿"
-            else
-              echo "::notice::发现同版本 tag 但没有 Release，将创建草稿 Release"
-            fi
-          fi
-
-          if [[ "$PRERELEASE" != "true" ]]; then
-            git fetch --force origin main
-            MAIN_SHA="$(git rev-parse --verify origin/main)"
-            if [[ "$TARGET_SHA" != "$MAIN_SHA" ]]; then
-              echo "::error::稳定版只能从 origin/main 当前 HEAD 发布。workflow_ref=$GITHUB_REF_NAME target_sha=$TARGET_SHA origin/main=$MAIN_SHA"
-              exit 1
-            fi
-          fi
-
-          {
-            echo "version=$INPUT_VERSION"
-            echo "target_sha=$TARGET_SHA"
-            echo "prerelease=$PRERELEASE"
-            if [[ "$PRERELEASE" == "true" ]]; then
-              echo "publish_latest=false"
-            else
-              echo "publish_latest=true"
-            fi
-          } >> "$GITHUB_OUTPUT"
+        run: ./.github/scripts/release/prepare-release.sh
 
       - name: 输出发布摘要
         run: |
@@ -277,60 +219,13 @@ jobs:
           fetch-depth: 0
           ref: ${{ needs.prepare-release.outputs.target_sha }}
 
-      - name: 创建并推送 tag
-        env:
-          VERSION: ${{ needs.prepare-release.outputs.version }}
-          TARGET_SHA: ${{ needs.prepare-release.outputs.target_sha }}
-        run: |
-          set -euo pipefail
-          git fetch --force --tags origin
-          EXISTING_TAG_SHA="$(git rev-parse --verify --quiet "refs/tags/$VERSION^{}" || true)"
-          if [[ -n "$EXISTING_TAG_SHA" ]]; then
-            if [[ "$EXISTING_TAG_SHA" != "$TARGET_SHA" ]]; then
-              echo "::error::tag $VERSION 已存在，但指向 $EXISTING_TAG_SHA，不是目标 $TARGET_SHA"
-              exit 1
-            fi
-            echo "::notice::tag $VERSION 已存在且指向目标 commit，继续复用"
-          else
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git tag -a "$VERSION" "$TARGET_SHA" -m "Release $VERSION"
-            git push origin "$VERSION"
-          fi
-
-      - name: 创建草稿 Release
+      - name: 创建 tag 与草稿 Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ needs.prepare-release.outputs.version }}
           TARGET_SHA: ${{ needs.prepare-release.outputs.target_sha }}
           PRERELEASE: ${{ needs.prepare-release.outputs.prerelease }}
-        run: |
-          set -euo pipefail
-          if RELEASE_JSON="$(gh release view "$VERSION" --json isDraft,isPrerelease 2>/dev/null)"; then
-            RELEASE_DRAFT="$(jq -r .isDraft <<< "$RELEASE_JSON")"
-            RELEASE_PRERELEASE="$(jq -r .isPrerelease <<< "$RELEASE_JSON")"
-            if [[ "$RELEASE_DRAFT" != "true" ]]; then
-              echo "::error::Release $VERSION 已发布，不能复用"
-              exit 1
-            fi
-            if [[ "$RELEASE_PRERELEASE" != "$PRERELEASE" ]]; then
-              echo "::error::草稿 Release 的 prerelease=$RELEASE_PRERELEASE 与本次输入 prerelease=$PRERELEASE 不一致"
-              exit 1
-            fi
-            echo "::notice::草稿 Release $VERSION 已存在，继续复用"
-          else
-            RELEASE_ARGS=(
-              --draft \
-              --verify-tag \
-              --target "$TARGET_SHA" \
-              --title "UniRhy $VERSION" \
-              --notes "UniRhy $VERSION"
-            )
-            if [[ "$PRERELEASE" == "true" ]]; then
-              RELEASE_ARGS+=(--prerelease)
-            fi
-            gh release create "$VERSION" "${RELEASE_ARGS[@]}"
-          fi
+        run: ./.github/scripts/release/create-draft-release.sh
 
   upload-release-assets:
     name: 上传产物到 Release
