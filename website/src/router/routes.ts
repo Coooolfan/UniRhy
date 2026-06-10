@@ -33,4 +33,29 @@ export const routes: RouteRecordRaw[] = [
       return `/${DEFAULT_LANG}/blog/${slug}`
     },
   },
+  {
+    path: '/:lang(zh|en)/docs',
+    name: 'docs-index',
+    component: () => import('@/views/DocsIndexView.vue'),
+  },
+  {
+    path: '/:lang(zh|en)/docs/:section/:slug',
+    name: 'docs-article',
+    component: () => import('@/views/DocsArticleView.vue'),
+  },
+  {
+    path: '/docs',
+    redirect: `/${DEFAULT_LANG}/docs`,
+  },
+  {
+    path: '/docs/:section/:slug',
+    // eslint-disable-next-line typescript-eslint/prefer-readonly-parameter-types -- vue-router redirect callback signature
+    redirect: (to) => {
+      const rawSection = to.params.section
+      const rawSlug = to.params.slug
+      const section = Array.isArray(rawSection) ? rawSection[0] : rawSection
+      const slug = Array.isArray(rawSlug) ? rawSlug[0] : rawSlug
+      return `/${DEFAULT_LANG}/docs/${section}/${slug}`
+    },
+  },
 ]

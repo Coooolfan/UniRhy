@@ -9,6 +9,7 @@ import { useLang } from '@/composables/useLang'
 const { lang, setLang } = useLang()
 const isChinese = computed(() => lang.value === 'zh')
 const blogPath = computed(() => `/${lang.value}/blog`)
+const docsPath = computed(() => `/${lang.value}/docs`)
 
 useHead(() => ({
   title: 'UniRhy · 独一律',
@@ -49,6 +50,13 @@ useHead(() => ({
       <div
         class="pointer-events-auto flex items-center justify-center gap-4 text-[1.1rem] text-white/60"
       >
+        <router-link
+          class="text-inherit no-underline transition-all duration-400 ease-[cubic-bezier(0.25,0.46,0.45,0.94)] hover:text-white/90"
+          :to="docsPath"
+        >
+          {{ isChinese ? '文档' : 'Docs' }}
+        </router-link>
+        <span class="cursor-default opacity-30">/</span>
         <router-link
           class="text-inherit no-underline transition-all duration-400 ease-[cubic-bezier(0.25,0.46,0.45,0.94)] hover:text-white/90"
           :to="blogPath"
