@@ -1,4 +1,5 @@
 @import 'tailwindcss';
+@import './prose.css';
 
 @theme {
   --font-brand-sans: 'Barlow Condensed', sans-serif;
