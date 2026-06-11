@@ -9,6 +9,9 @@ import blogPlugin from './plugins/blog'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [blogPlugin(), vue(), vueDevTools(), tailwindcss()],
+  server: {
+    allowedHosts: ['mini.home.coooolfan.com'],
+  },
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('src', import.meta.url)),

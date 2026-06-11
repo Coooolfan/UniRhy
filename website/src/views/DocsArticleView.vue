@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useHead } from '@unhead/vue'
 import DocsLayout from '@/components/DocsLayout.vue'
@@ -13,11 +13,87 @@ const { lang } = useLang()
 const docsHome = computed(() => `/${lang.value}/docs`)
 
 const proseRef = ref<HTMLElement | null>(null)
+const tocListRef = ref<HTMLElement | null>(null)
 const { items: tocItems, activeIds, scrollTo, refresh: refreshToc } = useToc(proseRef)
+const activeTocIndexes = computed(() =>
+  tocItems.value.flatMap((item, index) => (activeIds.has(item.id) ? [index] : [])),
+)
+const primaryActiveTocId = computed(() => {
+  const firstIndex = activeTocIndexes.value[0]
+  return firstIndex === undefined ? undefined : tocItems.value[firstIndex]?.id
+})
+const activeTocTrackStyle = ref({ height: '0px', opacity: '0', top: '0px' })
+let tocTrackFrame = 0
+
+function updateActiveTocTrack() {
+  const list = tocListRef.value
+  if (!list || tocItems.value.length === 0) {
+    activeTocTrackStyle.value = { ...activeTocTrackStyle.value, opacity: '0' }
+    return
+  }
+
+  const firstIndex = activeTocIndexes.value[0]
+  const lastIndex = activeTocIndexes.value.at(-1) ?? firstIndex
+  if (firstIndex === undefined || lastIndex === undefined) {
+    activeTocTrackStyle.value = { ...activeTocTrackStyle.value, opacity: '0' }
+    return
+  }
+
+  const entries = list.querySelectorAll<HTMLElement>('.toc-entry')
+  const firstEntry = entries[firstIndex]
+  const lastEntry = entries[lastIndex]
+  if (!firstEntry || !lastEntry) {
+    activeTocTrackStyle.value = { ...activeTocTrackStyle.value, opacity: '0' }
+    return
+  }
+
+  const listRect = list.getBoundingClientRect()
+  const firstRect = firstEntry.getBoundingClientRect()
+  const lastRect = lastEntry.getBoundingClientRect()
+  const top = firstRect.top - listRect.top
+  const bottom = lastRect.bottom - listRect.top
+
+  activeTocTrackStyle.value = {
+    top: `${top}px`,
+    height: `${Math.max(2, bottom - top)}px`,
+    opacity: '1',
+  }
+}
+
+function scheduleActiveTocTrackUpdate() {
+  if (tocTrackFrame !== 0) return
+  tocTrackFrame = window.requestAnimationFrame(() => {
+    tocTrackFrame = 0
+    updateActiveTocTrack()
+  })
+}
 
 watch([lang, () => route.params.section, () => route.params.slug], async () => {
   await nextTick()
   refreshToc()
+})
+
+watch(
+  () => [tocItems.value.map((item) => item.id).join('\n'), activeTocIndexes.value.join(',')],
+  async () => {
+    await nextTick()
+    updateActiveTocTrack()
+  },
+  { flush: 'post' },
+)
+
+onMounted(() => {
+  window.addEventListener('scroll', scheduleActiveTocTrackUpdate, { passive: true })
+  window.addEventListener('resize', scheduleActiveTocTrackUpdate)
+})
+
+onUnmounted(() => {
+  if (tocTrackFrame !== 0) {
+    window.cancelAnimationFrame(tocTrackFrame)
+    tocTrackFrame = 0
+  }
+  window.removeEventListener('scroll', scheduleActiveTocTrackUpdate)
+  window.removeEventListener('resize', scheduleActiveTocTrackUpdate)
 })
 
 const modules = import.meta.glob<DocsModule>('/content/docs/**/*.md', { eager: true })
@@ -96,21 +172,21 @@ useHead(() => {
         <p class="mb-3 font-brand-sans text-xs tracking-[0.15em] text-[#9c968b] uppercase">
           {{ lang === 'zh' ? '本页目录' : 'On this page' }}
         </p>
-        <ul class="toc-list space-y-1">
-          <li
-            v-for="item in tocItems"
-            :key="item.id"
-            :style="{ paddingLeft: `${(item.level - 1) * 0.75}rem` }"
-          >
-            <button
-              class="toc-item w-full text-left"
-              :class="activeIds.has(item.id) ? 'toc-item-active' : ''"
-              @click="scrollTo(item.id)"
-            >
-              {{ item.text }}
-            </button>
-          </li>
-        </ul>
+        <div class="toc-list-frame">
+          <div aria-hidden="true" class="toc-active-track" :style="activeTocTrackStyle"></div>
+          <ul ref="tocListRef" class="toc-list">
+            <li v-for="item in tocItems" :key="item.id" class="toc-entry">
+              <button
+                class="toc-item w-full text-left"
+                :class="item.id === primaryActiveTocId ? 'toc-item-active' : ''"
+                :style="{ '--toc-indent': `${(item.level - 1) * 0.75}rem` }"
+                @click="scrollTo(item.id)"
+              >
+                {{ item.text }}
+              </button>
+            </li>
+          </ul>
+        </div>
       </aside>
 
       <div class="mx-auto max-w-[760px] xl:mr-72">
@@ -193,24 +269,57 @@ useHead(() => {
   }
 }
 
+.toc-list-frame {
+  position: relative;
+}
+
+.toc-list-frame::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 2px;
+  background: #e5ddd2;
+  z-index: 0;
+}
+
+.toc-active-track {
+  position: absolute;
+  left: 0;
+  width: 2px;
+  background: #d98c28;
+  transform: translateZ(0);
+  transition:
+    top 180ms ease,
+    height 180ms ease,
+    opacity 120ms ease;
+  z-index: 1;
+}
+
 .toc-list {
   list-style: none;
   padding: 0;
   margin: 0;
+  position: relative;
+  z-index: 2;
+}
+
+.toc-entry {
+  position: relative;
 }
 
 .toc-item {
   display: block;
-  padding: 0.3rem 0.5rem;
+  padding: 0.3rem 0.5rem 0.3rem calc(0.75rem + var(--toc-indent));
   font-family: 'Barlow Condensed', sans-serif;
   font-size: 0.8rem;
   line-height: 1.4;
   color: #8a817c;
   border: none;
   background: none;
-  border-left: 2px solid transparent;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: color 0.2s;
 }
 
 .toc-item:hover {
@@ -219,7 +328,7 @@ useHead(() => {
 
 .toc-item-active {
   color: #d98c28;
-  border-left-color: #d98c28;
+  font-weight: 700;
 }
 
 .docs-article-card {
