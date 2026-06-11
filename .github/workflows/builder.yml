@@ -7,6 +7,11 @@ on:
         description: "发布版本号，例如 0.1.0-rc.1 或 0.1.0"
         required: true
         type: string
+      latest:
+        description: "发布为默认版本：推送 Docker latest、标记 GitHub Release Latest，并部署官网生产流量"
+        required: true
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -39,6 +44,7 @@ jobs:
         id: prepare
         env:
           INPUT_VERSION: ${{ inputs.version }}
+          INPUT_LATEST: ${{ inputs.latest }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: ./.github/scripts/release/prepare-release.sh
 
@@ -51,7 +57,7 @@ jobs:
             echo "- Workflow ref: \`${{ github.ref_name }}\`"
             echo "- Target SHA: \`${{ steps.prepare.outputs.target_sha }}\`"
             echo "- Prerelease: \`${{ steps.prepare.outputs.prerelease }}\`"
-            echo "- Publish Docker latest: \`${{ steps.prepare.outputs.publish_latest }}\`"
+            echo "- Latest: \`${{ steps.prepare.outputs.publish_latest }}\`"
           } >> "$GITHUB_STEP_SUMMARY"
 
   build-frontend:
@@ -318,16 +324,16 @@ jobs:
           name: website-dist
           path: website/dist
 
-      - name: 上传预览版本（不切生产流量）
-        if: needs.prepare-release.outputs.prerelease == 'true'
+      - name: 上传版本（不切生产流量）
+        if: needs.prepare-release.outputs.publish_latest != 'true'
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: versions upload --tag ${{ needs.prepare-release.outputs.version }} --message "Prerelease ${{ needs.prepare-release.outputs.version }}"
+          command: versions upload --tag ${{ needs.prepare-release.outputs.version }} --message "Release ${{ needs.prepare-release.outputs.version }}"
 
       - name: 部署到生产（上传并切 100% 流量）
-        if: needs.prepare-release.outputs.prerelease != 'true'
+        if: needs.prepare-release.outputs.publish_latest == 'true'
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -347,6 +353,18 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ needs.prepare-release.outputs.version }}
+          PUBLISH_LATEST: ${{ needs.prepare-release.outputs.publish_latest }}
         run: |
           set -euo pipefail
-          gh release edit "$VERSION" --draft=false
+          case "$PUBLISH_LATEST" in
+            true | false) ;;
+            *)
+              echo "::error::PUBLISH_LATEST 必须是 true 或 false，当前为 $PUBLISH_LATEST"
+              exit 1
+              ;;
+          esac
+          RELEASE_ID="$(gh release view "$VERSION" --json databaseId --jq .databaseId)"
+          gh api --method PATCH "repos/{owner}/{repo}/releases/$RELEASE_ID" \
+            -F draft=false \
+            -F "make_latest=$PUBLISH_LATEST" \
+            --silent

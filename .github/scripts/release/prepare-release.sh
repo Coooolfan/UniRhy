@@ -12,12 +12,25 @@ if [[ "$INPUT_VERSION" == v* ]]; then
   exit 1
 fi
 
+case "$INPUT_LATEST" in
+  true | false) ;;
+  *)
+    echo "::error::latest 参数必须是 true 或 false，当前为 $INPUT_LATEST"
+    exit 1
+    ;;
+esac
+
 git fetch --force --tags origin
 TARGET_SHA="$(git rev-parse --verify HEAD)"
 if [[ "$INPUT_VERSION" == *-* ]]; then
   PRERELEASE=true
 else
   PRERELEASE=false
+fi
+
+if [[ "$PRERELEASE" == "true" && "$INPUT_LATEST" == "true" ]]; then
+  echo "::error::预发布版本不能发布为 latest。请取消 latest，或使用稳定版版本号"
+  exit 1
 fi
 
 EXISTING_TAG_SHA="$(git rev-parse --verify --quiet "refs/tags/$INPUT_VERSION^{}" || true)"
@@ -38,11 +51,11 @@ if [[ -n "$EXISTING_TAG_SHA" ]]; then
   fi
 fi
 
-if [[ "$PRERELEASE" != "true" ]]; then
+if [[ "$INPUT_LATEST" == "true" ]]; then
   git fetch --force origin main
   MAIN_SHA="$(git rev-parse --verify origin/main)"
   if [[ "$TARGET_SHA" != "$MAIN_SHA" ]]; then
-    echo "::error::稳定版只能从 origin/main 当前 HEAD 发布。workflow_ref=$GITHUB_REF_NAME target_sha=$TARGET_SHA origin/main=$MAIN_SHA"
+    echo "::error::latest 只能从 origin/main 当前 HEAD 发布。workflow_ref=$GITHUB_REF_NAME target_sha=$TARGET_SHA origin/main=$MAIN_SHA"
     exit 1
   fi
 fi
@@ -51,9 +64,5 @@ fi
   echo "version=$INPUT_VERSION"
   echo "target_sha=$TARGET_SHA"
   echo "prerelease=$PRERELEASE"
-  if [[ "$PRERELEASE" == "true" ]]; then
-    echo "publish_latest=false"
-  else
-    echo "publish_latest=true"
-  fi
+  echo "publish_latest=$INPUT_LATEST"
 } >> "$GITHUB_OUTPUT"
