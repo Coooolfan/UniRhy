@@ -4619,6 +4619,7 @@ __metadata:
     uuid: "npm:^14.0.0"
     vite: "npm:^8.0.16"
     vite-plugin-vue-devtools: "npm:^8.1.2"
+    vite-plugin-vue-inspector-copy: "https://github.com/Coooolfan/vite-plugin-vue-inspector-copy/archive/refs/tags/v0.1.0.tar.gz"
     vitest: "npm:^4.1.8"
     vue: "npm:^3.5.35"
     vue-echarts: "npm:^8.0.1"
@@ -4734,6 +4735,15 @@ __metadata:
   peerDependencies:
     vite: ^6.0.0 || ^7.0.0 || ^8.0.0
   checksum: 10c0/f8879761fd37953b39ea79cd2a856090e8b3343219188f5e8ff9f4e2de6ad554940b08d7cf0f8dd4492849f2ac05e66f7bcbf9f9a788c77ceebf95c435da7402
+  languageName: node
+  linkType: hard
+
+"vite-plugin-vue-inspector-copy@https://github.com/Coooolfan/vite-plugin-vue-inspector-copy/archive/refs/tags/v0.1.0.tar.gz":
+  version: 0.1.0
+  resolution: "vite-plugin-vue-inspector-copy@https://github.com/Coooolfan/vite-plugin-vue-inspector-copy/archive/refs/tags/v0.1.0.tar.gz"
+  peerDependencies:
+    vite: ^5.0.0 || ^6.0.0 || ^7.0.0 || ^8.0.0
+  checksum: 10c0/493146a2ff5a6318f55890aea91dfeaa019547b215bcdbbc277ab2f8b925fd842e94e73d2406505680d7df27b5fce08a9fa2dbbcea2c2cd267718d141dd21508
   languageName: node
   linkType: hard
 

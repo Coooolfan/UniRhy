@@ -48,7 +48,8 @@
     "tailwindcss": "^4.3.0",
     "typescript": "~6.0.3",
     "vite": "^8.0.16",
-    "vite-plugin-vue-devtools": "^8.1.2"
+    "vite-plugin-vue-devtools": "^8.1.2",
+    "vite-plugin-vue-inspector-copy": "https://github.com/Coooolfan/vite-plugin-vue-inspector-copy/archive/refs/tags/v0.1.0.tar.gz"
   },
   "engines": {
     "node": "^24.0.0"
