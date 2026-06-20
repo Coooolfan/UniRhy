@@ -20,6 +20,7 @@ env:
   DB_PASSWORD: postgres
   POSTGRES_DB: postgres
   POSTGRES_ADMIN_DB: postgres
+  SA_TOKEN_JWT_SECRET_KEY: unirhy-e2e-jwt-secret
 
 jobs:
   api-e2e:
