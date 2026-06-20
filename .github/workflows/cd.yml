@@ -1,14 +1,14 @@
-name: UniRhy Builder
+name: UniRhy CD
 
 on:
   workflow_dispatch:
     inputs:
       version:
-        description: "发布版本号，例如 0.1.0-rc.1 或 0.1.0"
+        description: "发布版本号：例如 0.1.0-rc.1 或 0.1.0"
         required: true
         type: string
       latest:
-        description: "发布为默认版本：推送 Docker latest、标记 GitHub Release Latest，并部署官网生产流量"
+        description: "设为默认版本：推送 Docker latest、标记 GitHub Release Latest，并部署官网"
         required: true
         type: boolean
         default: false
@@ -17,7 +17,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: builder-${{ inputs.version }}
+  group: cd-${{ inputs.version }}
   cancel-in-progress: false
 
 env:
