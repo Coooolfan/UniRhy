@@ -73,7 +73,7 @@ const handleDragStart = (itemId: number, event: DragEvent) => {
         const currentTarget = event.currentTarget
         if (currentTarget instanceof HTMLElement) {
             const row = currentTarget.closest<HTMLElement>('[data-testid="media-list-row"]')
-            if (row) {
+            if (row && event.dataTransfer.setDragImage) {
                 event.dataTransfer.setDragImage(row, 24, row.clientHeight / 2)
             }
         }

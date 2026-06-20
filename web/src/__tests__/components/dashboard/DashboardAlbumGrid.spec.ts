@@ -4,6 +4,17 @@ import { createPinia, setActivePinia } from 'pinia'
 import { nextTick } from 'vue'
 
 const pushMock = vi.fn()
+const audioStoreMock = vi.hoisted(() => {
+    const state = {
+        currentTrack: null as unknown,
+        isPlaying: false,
+        play: vi.fn((track: unknown) => {
+            state.currentTrack = track
+        }),
+    }
+
+    return state
+})
 
 vi.mock('vue-router', () => ({
     useRouter: () => ({
@@ -13,16 +24,27 @@ vi.mock('vue-router', () => ({
 
 vi.mock('@/ApiInstance', async (importOriginal) => {
     const actual = await importOriginal<typeof import('@/ApiInstance')>()
+    const albumController = Object.assign(
+        Object.create(Object.getPrototypeOf(actual.api.albumController)),
+        actual.api.albumController,
+        {
+            listAlbums: vi.fn(),
+            getAlbum: vi.fn(),
+        },
+    )
+    const api = Object.assign(Object.create(Object.getPrototypeOf(actual.api)), actual.api, {
+        albumController,
+    })
+
     return {
         ...actual,
-        api: {
-            albumController: {
-                listAlbums: vi.fn(),
-                getAlbum: vi.fn(),
-            },
-        },
+        api,
     }
 })
+
+vi.mock('@/stores/audio', () => ({
+    useAudioStore: () => audioStoreMock,
+}))
 
 import { api } from '@/ApiInstance'
 import DashboardAlbumGrid from '@/components/dashboard/DashboardAlbumGrid.vue'
@@ -83,9 +105,13 @@ describe('DashboardAlbumGrid', () => {
     beforeEach(() => {
         setActivePinia(createPinia())
         resetRecordingPlaybackResolverCaches()
+        window.localStorage.clear()
         listAlbumsMock.mockReset()
         getAlbumMock.mockReset()
         pushMock.mockReset()
+        audioStoreMock.currentTrack = null
+        audioStoreMock.isPlaying = false
+        audioStoreMock.play.mockClear()
         setUser()
     })
 
@@ -99,7 +125,7 @@ describe('DashboardAlbumGrid', () => {
         const wrapper = mount(DashboardAlbumGrid)
         await flushView()
 
-        expect(wrapper.text()).toContain('唱片架空空如也')
+        expect(wrapper.text()).toContain('专辑柜空空如也')
 
         const settingsButton = wrapper
             .findAll('button')
@@ -136,7 +162,7 @@ describe('DashboardAlbumGrid', () => {
         const wrapper = mount(DashboardAlbumGrid)
         await flushView()
 
-        expect(wrapper.text()).toContain('唱片架空空如也')
+        expect(wrapper.text()).toContain('专辑柜空空如也')
         expect(wrapper.text()).toContain('数据加载失败，请检查配置后重试。')
     })
 
@@ -148,7 +174,7 @@ describe('DashboardAlbumGrid', () => {
 
         expect(wrapper.text()).toContain('Album A')
         expect(wrapper.text()).toContain('Artist A')
-        expect(wrapper.text()).not.toContain('唱片架空空如也')
+        expect(wrapper.text()).not.toContain('专辑柜空空如也')
         expect(listAlbumsMock).toHaveBeenCalledWith({ pageIndex: 0, pageSize: 10 })
     })
 
@@ -232,10 +258,12 @@ describe('DashboardAlbumGrid', () => {
         const albumPlayButton = playButtons.find((button) => button.attributes('type') === 'button')
         expect(albumPlayButton).toBeTruthy()
 
-        await albumPlayButton!.trigger('click')
-        await flushView()
-
         const audioStore = useAudioStore()
+        await albumPlayButton!.trigger('click')
+        await vi.waitFor(() => {
+            expect(audioStore.play).toHaveBeenCalledTimes(1)
+        })
+
         expect(audioStore.currentTrack).toEqual(
             expect.objectContaining({
                 id: 502,
@@ -306,10 +334,12 @@ describe('DashboardAlbumGrid', () => {
         const albumPlayButton = playButtons.find((button) => button.attributes('type') === 'button')
         expect(albumPlayButton).toBeTruthy()
 
-        await albumPlayButton!.trigger('click')
-        await flushView()
-
         const audioStore = useAudioStore()
+        await albumPlayButton!.trigger('click')
+        await vi.waitFor(() => {
+            expect(audioStore.play).toHaveBeenCalledTimes(1)
+        })
+
         expect(audioStore.currentTrack).toEqual(
             expect.objectContaining({
                 id: 502,

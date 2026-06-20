@@ -19,6 +19,7 @@ type TestTrack = {
 const audioStore = reactive({
     currentTrack: null as TestTrack | null,
     isPlaying: false,
+    queueEntries: [] as Array<{ recordingId: number }>,
     replaceQueueAndPlay: vi.fn((tracks: TestTrack[], currentIndex: number) => {
         const targetTrack = tracks[currentIndex]
         if (!targetTrack) {
@@ -34,6 +35,7 @@ const audioStore = reactive({
             mediaFileId: targetTrack.mediaFileId,
             ...(targetTrack.workId === undefined ? {} : { workId: targetTrack.workId }),
         }
+        audioStore.queueEntries = tracks.map((track) => ({ recordingId: track.id }))
         return Promise.resolve()
     }),
 })
@@ -59,6 +61,7 @@ describe('useRecordingPlayback', () => {
         resetRecordingPlaybackResolverCaches()
         audioStore.currentTrack = null
         audioStore.isPlaying = false
+        audioStore.queueEntries = []
         audioStore.replaceQueueAndPlay.mockReset()
         audioStore.replaceQueueAndPlay.mockImplementation((tracks: TestTrack[], currentIndex) => {
             const targetTrack = tracks[currentIndex]
@@ -75,6 +78,7 @@ describe('useRecordingPlayback', () => {
                 mediaFileId: targetTrack.mediaFileId,
                 ...(targetTrack.workId === undefined ? {} : { workId: targetTrack.workId }),
             }
+            audioStore.queueEntries = tracks.map((track) => ({ recordingId: track.id }))
             return Promise.resolve()
         })
 
@@ -255,7 +259,7 @@ describe('useRecordingPlayback', () => {
         expect(isCurrentRecordingPlaying.value).toBe(true)
 
         currentRecordingId.value = 2
-        expect(isCurrentRecordingPlaying.value).toBe(false)
+        expect(isCurrentRecordingPlaying.value).toBe(true)
     })
 
     it('falls back from an unplayable default selection to the first playable recording', async () => {

@@ -12,6 +12,10 @@ const detect = (): Breakpoint => {
     if (typeof window === 'undefined') {
         return 'base'
     }
+    if (!window.matchMedia) {
+        return 'base'
+    }
+
     for (const { breakpoint, query } of QUERIES) {
         if (window.matchMedia(query).matches) {
             return breakpoint
@@ -29,6 +33,10 @@ export const useBreakpoint = () => {
     }
 
     onMounted(() => {
+        if (!window.matchMedia) {
+            return
+        }
+
         QUERIES.forEach(({ query }) => {
             const list = window.matchMedia(query)
             list.addEventListener('change', sync)

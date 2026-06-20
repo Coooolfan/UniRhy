@@ -172,7 +172,7 @@ describe('WorkDetailView', () => {
 
         const defaultToggleLabel = wrapper
             .findAll('label')
-            .find((label) => label.text().includes('默认版本'))
+            .find((label) => label.text().includes('作品默认曲目'))
         expect(defaultToggleLabel).toBeTruthy()
         const defaultCheckbox = defaultToggleLabel!.find('input[type="checkbox"]')
         expect(defaultCheckbox.exists()).toBe(true)

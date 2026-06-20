@@ -23,6 +23,8 @@ const audioStore = reactive({
     syncStatusText: '同步重连中',
     canSendRealtimeControl: false,
     canNavigateQueue: false,
+    canPlayPrevious: false,
+    canPlayNext: false,
     playbackStrategy: 'SEQUENTIAL',
     stopStrategy: 'LIST',
     currentQueueEntry: {
@@ -87,6 +89,8 @@ describe('AudioPlayer', () => {
         audioStore.syncStatusText = '同步重连中'
         audioStore.canSendRealtimeControl = false
         audioStore.canNavigateQueue = false
+        audioStore.canPlayPrevious = false
+        audioStore.canPlayNext = false
         audioStore.playbackStrategy = 'SEQUENTIAL'
         audioStore.stopStrategy = 'LIST'
         audioStore.currentQueueEntry = {
@@ -220,6 +224,8 @@ describe('AudioPlayer', () => {
     it('uses queue navigation controls when realtime control is available', async () => {
         audioStore.canSendRealtimeControl = true
         audioStore.canNavigateQueue = true
+        audioStore.canPlayPrevious = true
+        audioStore.canPlayNext = true
         audioStore.queueEntries = [
             {
                 entryId: 101,
@@ -250,13 +256,15 @@ describe('AudioPlayer', () => {
         expect(audioStore.playPrevious).toHaveBeenCalledTimes(1)
         expect(audioStore.playNext).toHaveBeenCalledTimes(1)
         expect(wrapper.find('[data-test="queue-sidebar"]').exists()).toBe(true)
-        expect(wrapper.text()).toContain('Current Queue')
-        expect(wrapper.text()).toContain('2 tracks')
+        expect(wrapper.text()).toContain('播放队列')
+        expect(wrapper.text()).toContain('2 首曲目')
     })
 
     it('updates playback and stop strategies through the store', async () => {
         audioStore.canSendRealtimeControl = true
         audioStore.canNavigateQueue = true
+        audioStore.canPlayPrevious = true
+        audioStore.canPlayNext = true
 
         const wrapper = mount(AudioPlayer)
 

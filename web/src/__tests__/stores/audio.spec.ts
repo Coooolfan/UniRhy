@@ -1715,8 +1715,8 @@ describe('audio store', () => {
         expect(audioStore.currentTrack).toEqual(
             expect.objectContaining({
                 id: 7,
-                title: 'Recording #7',
-                artist: 'Unknown Artist',
+                title: '曲目 #7',
+                artist: '未知艺术家',
                 cover: '',
             }),
         )

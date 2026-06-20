@@ -54,6 +54,7 @@ const focusableSelector = [
     '[tabindex]:not([tabindex="-1"])',
 ].join(',')
 let previouslyFocusedElement: HTMLElement | null = null
+let isRedirectingFocus = false
 
 const panelFrameStyle = computed(() => {
     let minWidth = 420
@@ -137,8 +138,19 @@ const getFocusableElements = () => {
     )
 }
 
+const focusElement = (element: HTMLElement) => {
+    isRedirectingFocus = true
+    try {
+        element.focus({ preventScroll: true })
+    } finally {
+        isRedirectingFocus = false
+    }
+}
+
 const focusModalContainer = () => {
-    modalContainerRef.value?.focus({ preventScroll: true })
+    if (modalContainerRef.value) {
+        focusElement(modalContainerRef.value)
+    }
 }
 
 const focusFirstFocusableElement = () => {
@@ -146,7 +158,7 @@ const focusFirstFocusableElement = () => {
     const firstElement = focusableElements[0]
 
     if (firstElement) {
-        firstElement.focus({ preventScroll: true })
+        focusElement(firstElement)
         return
     }
 
@@ -158,7 +170,7 @@ const focusLastFocusableElement = () => {
     const [lastElement] = focusableElements.slice(-1)
 
     if (lastElement) {
-        lastElement.focus({ preventScroll: true })
+        focusElement(lastElement)
         return
     }
 
@@ -269,7 +281,7 @@ const handleTab = (event: KeyboardEvent) => {
 }
 
 const handleFocusIn = (event: FocusEvent) => {
-    if (!props.isTopmost) {
+    if (!props.isTopmost || isRedirectingFocus) {
         return
     }
 

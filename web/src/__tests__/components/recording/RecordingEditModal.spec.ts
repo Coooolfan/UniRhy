@@ -74,7 +74,7 @@ describe('RecordingEditModal', () => {
         expect(wrapper.text()).toContain('#42')
         expect(wrapper.text()).toContain('艺术家')
         expect(wrapper.text()).toContain('Artist A')
-        expect(wrapper.text()).toContain('file(s) attached')
+        expect(wrapper.text()).toContain('已关联 1 个文件')
         expect(wrapper.text()).toContain('audio/file.mp3')
     })
 
@@ -90,7 +90,7 @@ describe('RecordingEditModal', () => {
 
         await wrapper.get('button[aria-label="修改标签"]').trigger('click')
 
-        const labelInput = wrapper.find('input[placeholder="唱片公司或厂牌"]')
+        const labelInput = wrapper.find('input[placeholder="未命名标签"]')
         await labelInput.setValue('  Updated Label  ')
 
         const commentInput = wrapper.find('textarea[placeholder="在此添加曲目描述"]')

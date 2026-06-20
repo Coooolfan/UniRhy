@@ -1,7 +1,8 @@
-import { describe, expect, it } from 'vitest'
-import { mount } from '@vue/test-utils'
-import { nextTick } from 'vue'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { enableAutoUnmount, mount } from '@vue/test-utils'
 import BaseModalShell from '@/components/modals/BaseModalShell.vue'
+
+enableAutoUnmount(afterEach)
 
 const mountShell = (
     overrides: Partial<InstanceType<typeof BaseModalShell>['$props']> = {},
@@ -22,6 +23,7 @@ const mountShell = (
                 transition: false,
             },
         },
+        attachTo: document.body,
     })
 
 describe('BaseModalShell', () => {
@@ -60,6 +62,7 @@ describe('BaseModalShell', () => {
                     transition: false,
                 },
             },
+            attachTo: document.body,
         })
 
         expect(wrapper.find('[data-testid="app-modal-header"]').exists()).toBe(false)
@@ -117,16 +120,18 @@ describe('BaseModalShell', () => {
         outsideButton.focus()
 
         const wrapper = mountShell(
-            {},
+            { closable: false },
             {
                 default:
                     '<div><button type="button" data-testid="first-focusable">first</button><button type="button">second</button></div>',
             },
         )
 
-        await nextTick()
-
-        expect(document.activeElement).toBe(wrapper.get('[data-testid="first-focusable"]').element)
+        await vi.waitFor(() => {
+            expect(document.activeElement).toBe(
+                wrapper.get('[data-testid="first-focusable"]').element,
+            )
+        })
 
         wrapper.unmount()
         outsideButton.remove()
@@ -134,14 +139,12 @@ describe('BaseModalShell', () => {
 
     it('keeps Tab navigation cycling inside the modal', async () => {
         const wrapper = mountShell(
-            {},
+            { closable: false },
             {
                 default:
                     '<div><button type="button" data-testid="first-focusable">first</button><button type="button" data-testid="last-focusable">last</button></div>',
             },
         )
-
-        await nextTick()
 
         const firstButton = wrapper.get('[data-testid="first-focusable"]').element
         const lastButton = wrapper.get('[data-testid="last-focusable"]').element
@@ -155,6 +158,10 @@ describe('BaseModalShell', () => {
         ) {
             throw new TypeError('Expected modal focus targets to be buttons')
         }
+
+        await vi.waitFor(() => {
+            expect(document.activeElement).toBe(firstButton)
+        })
 
         lastButton.focus()
         window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab' }))
