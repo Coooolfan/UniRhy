@@ -203,29 +203,11 @@ class CurrentQueueService(
         accountId: Long,
         expectedVersion: Long? = null,
         nowMs: Long = timeProvider.nowMs(),
-    ): CurrentQueueChangeResult {
-        return withMutationContext(accountId, expectedVersion) { context ->
-            val currentState = context.currentState
-            if (currentState.recordingIds.isEmpty()) {
-                return@withMutationContext buildNoopChangeResult(currentState)
-            }
+    ): CurrentQueueChangeResult = navigate(accountId, step = 1, expectedVersion, nowMs)
 
-            val nextState = context.nextState
-            val changed = when (nextState.playbackStrategy) {
-                PlaybackStrategy.SEQUENTIAL, PlaybackStrategy.SINGLE -> moveSequentialLocked(nextState, 1)
-                PlaybackStrategy.SHUFFLE -> moveShuffleLocked(nextState, 1)
-            }
-            if (!changed) {
-                return@withMutationContext buildNoopChangeResult(currentState)
-            }
-
-            clearPlaybackProgress(nextState)
-            buildPersistedChangeResult(context, nowMs)
-        }
-    }
-
-    fun navigateToPrevious(
+    fun navigate(
         accountId: Long,
+        step: Int,
         expectedVersion: Long? = null,
         nowMs: Long = timeProvider.nowMs(),
     ): CurrentQueueChangeResult {
@@ -237,8 +219,8 @@ class CurrentQueueService(
 
             val nextState = context.nextState
             val changed = when (nextState.playbackStrategy) {
-                PlaybackStrategy.SEQUENTIAL, PlaybackStrategy.SINGLE -> moveSequentialLocked(nextState, -1)
-                PlaybackStrategy.SHUFFLE -> moveShuffleLocked(nextState, -1)
+                PlaybackStrategy.SEQUENTIAL, PlaybackStrategy.SINGLE -> moveSequentialLocked(nextState, step)
+                PlaybackStrategy.SHUFFLE -> moveShuffleLocked(nextState, step)
             }
             if (!changed) {
                 return@withMutationContext buildNoopChangeResult(currentState)
@@ -327,7 +309,7 @@ class CurrentQueueService(
         nowMs: Long = timeProvider.nowMs(),
     ): AccountPlaybackState {
         return withMutationContext(accountId, expectedVersion) { context ->
-            requirePlayableIndex(context.currentState, currentIndex)
+            requireValidCurrentIndex(context.currentState.recordingIds, currentIndex)
 
             val nextState = context.nextState
             nextState.currentIndex = currentIndex
@@ -351,7 +333,7 @@ class CurrentQueueService(
             if (currentIndex == null || nextState.recordingIds.isEmpty()) {
                 forceEmptyStateLocked(nextState)
             } else {
-                requirePlayableIndex(nextState, currentIndex)
+                requireValidCurrentIndex(nextState.recordingIds, currentIndex)
                 nextState.currentIndex = currentIndex
                 nextState.playbackStatus = PlaybackStatus.PAUSED
                 nextState.positionMs = positionMs
@@ -370,7 +352,7 @@ class CurrentQueueService(
         nowMs: Long = timeProvider.nowMs(),
     ): AccountPlaybackState {
         return withMutationContext(accountId, expectedVersion) { context ->
-            requirePlayableIndex(context.currentState, currentIndex)
+            requireValidCurrentIndex(context.currentState.recordingIds, currentIndex)
 
             val nextState = context.nextState
             nextState.currentIndex = currentIndex
@@ -403,13 +385,6 @@ class CurrentQueueService(
         return lockManager.withAccountLock(accountId) {
             loadActiveStateLocked(accountId).version
         }
-    }
-
-    private fun requirePlayableIndex(
-        state: AccountPlayQueueState,
-        currentIndex: Int,
-    ) {
-        requireValidCurrentIndex(state.recordingIds, currentIndex)
     }
 
     private fun requireEmptyQueueIndex(currentIndex: Int) {

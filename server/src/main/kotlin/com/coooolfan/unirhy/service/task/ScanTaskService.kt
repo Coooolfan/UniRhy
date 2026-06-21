@@ -1,13 +1,12 @@
 package com.coooolfan.unirhy.service.task
 
 import com.coooolfan.unirhy.model.*
-import com.coooolfan.unirhy.model.storage.FileProviderFileSystem
 import com.coooolfan.unirhy.model.storage.FileProviderType
 import com.coooolfan.unirhy.service.SystemConfigService.Companion.SYSTEM_CONFIG_ID
-import com.coooolfan.unirhy.service.storage.FileSystemStorageNode
-import com.coooolfan.unirhy.service.storage.OssStorageNode
 import com.coooolfan.unirhy.service.storage.StorageNode
 import com.coooolfan.unirhy.service.storage.StorageNodeObjectService
+import com.coooolfan.unirhy.service.storage.bindProvider
+import com.coooolfan.unirhy.service.storage.resolveWriteableStorageNode
 import com.coooolfan.unirhy.service.task.common.*
 import tools.jackson.databind.ObjectMapper
 import org.babyfish.jimmer.sql.ast.mutation.AssociatedSaveMode
@@ -25,7 +24,6 @@ import org.springframework.transaction.support.TransactionTemplate
 import java.io.File
 import java.nio.file.Files
 import java.time.LocalDate
-import kotlin.io.path.Path
 
 @Service
 class ScanTaskService(
@@ -43,7 +41,7 @@ class ScanTaskService(
 
         // 分批插入
         val paramsJsonBatch = mutableListOf<String>()
-        for (payload in discoverScanFileTaskPayloads(storageObjects, provider)) {
+        for (payload in discoverScanFileTaskPayloads(provider)) {
             paramsJsonBatch += objectMapper.writeValueAsString(payload)
             if (paramsJsonBatch.size >= SCAN_ENQUEUE_BATCH_SIZE) {
                 queueStore.enqueueIgnoringConflicts(TaskType.METADATA_PARSE, paramsJsonBatch)
@@ -86,11 +84,7 @@ class ScanTaskService(
             )
         )
         val writeableProvider = sql.findOneById(SYSTEM_CONFIG_FETCHER, SYSTEM_CONFIG_ID)
-            .let { config ->
-                config.fsProvider?.let { storageObjects.resolve(FileProviderType.FILE_SYSTEM, it.id) }
-                    ?: config.ossProvider?.let { storageObjects.resolve(FileProviderType.OSS, it.id) }
-                    ?: error("System storage provider is not configured")
-            }
+            .resolveWriteableStorageNode(storageObjects)
 
         val stat = runCatching { storageObjects.stat(provider, payload.objectKey) }.getOrNull()
         if (stat == null) {
@@ -162,35 +156,14 @@ data class ScanFileTaskPayload(
     val objectKey: String,
 )
 
-fun discoverScanFileTaskPayloads(
-    storageObjects: StorageNodeObjectService,
-    provider: StorageNode,
-): Sequence<ScanFileTaskPayload> {
+fun discoverScanFileTaskPayloads(provider: StorageNode): Sequence<ScanFileTaskPayload> {
     return sequence {
-        for (objectKey in storageObjects.listAudioObjectKeys(provider)) {
+        for (objectKey in provider.listAudioObjectKeys()) {
             yield(
                 ScanFileTaskPayload(
                     providerType = provider.providerType,
                     providerId = provider.providerId,
                     objectKey = objectKey,
-                )
-            )
-        }
-    }
-}
-
-fun discoverScanFileTaskPayloads(
-    rootDir: File,
-    providerType: FileProviderType,
-    providerId: Long,
-): Sequence<ScanFileTaskPayload> {
-    return sequence {
-        for (file in findAudioFilesRecursively(rootDir)) {
-            yield(
-                ScanFileTaskPayload(
-                    providerType = providerType,
-                    providerId = providerId,
-                    objectKey = file.relativeTo(rootDir).path,
                 )
             )
         }
@@ -374,60 +347,6 @@ fun fetchCover(
     }
 }
 
-fun fetchCover(
-    file: File,
-    provider: FileProviderFileSystem,
-    writeableProvider: FileProviderFileSystem,
-    artwork: Artwork?,
-): MediaFile? {
-    for (ext in COVER_EXTENSIONS) {
-        var coverFile = File(file.parentFile, "${file.nameWithoutExtension}.$ext")
-        if (!coverFile.exists()) {
-            coverFile = File(file.parentFile, "${file.nameWithoutExtension}.${ext.uppercase()}")
-        }
-        if (!coverFile.exists()) {
-            continue
-        }
-        return MediaFile {
-            objectKey = coverFile.relativeTo(Path(provider.parentPath).toFile()).path
-            mimeType = Files.probeContentType(coverFile.toPath())
-            size = coverFile.length()
-            width = null
-            height = null
-            ossProvider = null
-            fsProvider = provider
-        }
-    }
-
-    val safeArtwork = artwork ?: return null
-    val binaryData = safeArtwork.binaryData ?: return null
-    if (binaryData.isEmpty()) {
-        return null
-    }
-
-    val mimeType = safeArtwork.mimeType?.trim().takeIf { !it.isNullOrBlank() } ?: "image/jpeg"
-    val extension = extensionFromMime(mimeType)
-
-    val targetProvider = if (provider.readonly) writeableProvider else provider
-    val objectKey = oldEmbeddedCoverObjectKey(file, provider, extension)
-    val coverFile = File(targetProvider.parentPath, objectKey)
-
-    if (!coverFile.exists()) {
-        coverFile.parentFile?.mkdirs()
-        coverFile.writeBytes(binaryData)
-    }
-
-    return MediaFile {
-        this.objectKey = objectKey
-        this.mimeType = Files.probeContentType(coverFile.toPath()) ?: mimeType
-        this.size = binaryData.size.toLong()
-        this.width = safeArtwork.width.takeIf { it > 0 }
-        this.height = safeArtwork.height.takeIf { it > 0 }
-        this.ossProvider = null
-        this.fsProvider = targetProvider
-    }
-}
-
 private fun extensionFromMime(mimeType: String): String =
     when (mimeType.lowercase()) {
         "image/jpeg", "image/jpg" -> "jpg"
@@ -445,30 +364,6 @@ private fun embeddedCoverObjectKey(
 ): String {
     val coverObjectKey = sourceObjectKey.substringBeforeLast('.', sourceObjectKey)
     return "covers/${provider.providerType.name.lowercase()}-${provider.providerId}/$coverObjectKey.$extension"
-}
-
-private fun oldEmbeddedCoverObjectKey(
-    file: File,
-    provider: FileProviderFileSystem,
-    extension: String,
-): String {
-    val sourceObjectKey = file.relativeTo(Path(provider.parentPath).toFile()).path
-    val coverObjectKey = sourceObjectKey.substringBeforeLast('.', sourceObjectKey)
-    return "covers/${provider.id}/$coverObjectKey.$extension"
-}
-
-private fun MediaFileDraft.bindProvider(provider: StorageNode) {
-    when (provider) {
-        is FileSystemStorageNode -> {
-            ossProvider = null
-            fsProvider = provider.provider
-        }
-
-        is OssStorageNode -> {
-            ossProvider = provider.provider
-            fsProvider = null
-        }
-    }
 }
 
 private fun mimeFromExtension(extension: String): String =

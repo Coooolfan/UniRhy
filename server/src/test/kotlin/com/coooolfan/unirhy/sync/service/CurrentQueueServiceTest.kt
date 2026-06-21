@@ -96,8 +96,9 @@ class CurrentQueueServiceTest {
             stateStore = stateStore,
         )
 
-        val rewound = restored.navigateToPrevious(
+        val rewound = restored.navigate(
             accountId = 42L,
+            step = -1,
             expectedVersion = advanced.version,
         )
 

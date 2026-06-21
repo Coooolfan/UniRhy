@@ -176,7 +176,7 @@ class MediaFileResponseBuilder {
         }
 
         val ifRangeDate = parseHttpDate(ifRange) ?: return false
-        return normalizeToSeconds(lastModified) <= normalizeToSeconds(ifRangeDate)
+        return lastModified <= normalizeToSeconds(ifRangeDate)
     }
 
     private fun isNotModified(
@@ -187,7 +187,7 @@ class MediaFileResponseBuilder {
         if (ifModifiedSince < 0) {
             return false
         }
-        return normalizeToSeconds(lastModified) <= normalizeToSeconds(ifModifiedSince)
+        return lastModified <= normalizeToSeconds(ifModifiedSince)
     }
 
     private fun parseHttpDate(headerValue: String): Long? {

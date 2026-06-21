@@ -1,6 +1,7 @@
 package com.coooolfan.unirhy.service.task
 
-import com.coooolfan.unirhy.model.storage.FileProviderType
+import com.coooolfan.unirhy.model.storage.FileProviderFileSystem
+import com.coooolfan.unirhy.service.storage.FileSystemStorageNode
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.nio.file.Files
@@ -42,14 +43,16 @@ class ScanTaskDiscoveryTest {
         )
     }
 
-    private fun discover(
-        rootDir: Path,
-    ): List<ScanFileTaskPayload> {
-        return discoverScanFileTaskPayloads(
-            rootDir = rootDir.toFile(),
-            providerType = FileProviderType.FILE_SYSTEM,
-            providerId = 42L,
-        ).toList()
+    private fun discover(rootDir: Path): List<ScanFileTaskPayload> {
+        val provider = FileSystemStorageNode(
+            FileProviderFileSystem {
+                id = 42L
+                name = "test-provider"
+                parentPath = rootDir.toString()
+                readonly = false
+            }
+        )
+        return discoverScanFileTaskPayloads(provider).toList()
     }
 
     private fun prepareLibrary(vararg relativePaths: String): Path {

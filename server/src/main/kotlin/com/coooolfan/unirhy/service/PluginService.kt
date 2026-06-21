@@ -121,7 +121,7 @@ class PluginService(
             this.id = id
             this.enabled = enabled
         }, SaveMode.UPDATE_ONLY).execute()
-        val taskType = runCatching { TaskType.valueOf(plugin.taskType) }.getOrNull() ?: return
+        val taskType = plugin.resolvedTaskType() ?: return
         if (enabled) {
             pluginTaskService.reloadPlugin(id)
         } else {
@@ -131,8 +131,7 @@ class PluginService(
 
     fun delete(id: String) {
         val plugin = getPlugin(id)
-        val taskType = runCatching { TaskType.valueOf(plugin.taskType) }.getOrNull()
-        taskType?.let { pluginTaskService.unloadPlugin(it) }
+        plugin.resolvedTaskType()?.let { pluginTaskService.unloadPlugin(it) }
         sql.deleteById(Plugin::class, id)
     }
 
@@ -152,6 +151,11 @@ class PluginService(
 
     fun parseFormFields(plugin: Plugin): List<PluginFormField> =
         objectMapper.readValue(plugin.formFields, formFieldsType)
+
+    companion object {
+        fun Plugin.resolvedTaskType(): TaskType? =
+            runCatching { TaskType.valueOf(taskType) }.getOrNull()
+    }
 
     private fun reconstructManifestYaml(plugin: Plugin): String {
         val data = mapOf(

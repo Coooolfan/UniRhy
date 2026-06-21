@@ -4,6 +4,7 @@ import cn.dev33.satoken.annotation.SaCheckLogin
 import cn.dev33.satoken.annotation.SaCheckRole
 import com.coooolfan.unirhy.config.ROLE_ADMIN
 import com.coooolfan.unirhy.service.PluginService
+import com.coooolfan.unirhy.service.PluginService.Companion.resolvedTaskType
 import com.coooolfan.unirhy.service.plugin.PluginForm
 import com.coooolfan.unirhy.service.plugin.PluginFormField
 import com.coooolfan.unirhy.service.task.PluginTaskService
@@ -64,7 +65,7 @@ class PluginController(
     fun listPlugins(): List<PluginInfoResponse> {
         val loadedTaskTypes = pluginTaskService.getLoadedTaskTypes()
         return pluginService.listPlugins().map { plugin ->
-            val taskType = runCatching { TaskType.valueOf(plugin.taskType) }.getOrNull()
+            val taskType = plugin.resolvedTaskType()
             PluginInfoResponse(
                 id = plugin.id,
                 name = plugin.name,

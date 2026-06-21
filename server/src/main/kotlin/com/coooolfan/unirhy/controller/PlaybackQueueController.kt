@@ -248,7 +248,7 @@ class PlaybackQueueController(
      *
      * @api POST /api/playback-queues/current/previous-navigation-requests
      * @permission 需要登录认证
-     * @description 调用CurrentQueueService.navigateToPrevious()方法导航到上一首
+     * @description 调用CurrentQueueService.navigate(step=-1)方法导航到上一首
      */
     @PostMapping("/previous-navigation-requests")
     @ResponseStatus(HttpStatus.OK)
@@ -256,8 +256,9 @@ class PlaybackQueueController(
         @RequestBody input: CurrentQueueVersionRequest,
     ): CurrentQueueDto {
         val accountId = StpUtil.getLoginIdAsLong()
-        val change = currentQueueService.navigateToPrevious(
+        val change = currentQueueService.navigate(
             accountId = accountId,
+            step = -1,
             expectedVersion = input.version,
         )
         broadcastQueueIfChanged(accountId, change)

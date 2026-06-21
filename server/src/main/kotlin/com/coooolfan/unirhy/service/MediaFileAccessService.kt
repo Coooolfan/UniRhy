@@ -3,9 +3,8 @@ package com.coooolfan.unirhy.service
 import com.coooolfan.unirhy.model.MediaFile
 import com.coooolfan.unirhy.model.by
 import com.coooolfan.unirhy.model.id
-import com.coooolfan.unirhy.model.storage.FileProviderType
-import com.coooolfan.unirhy.service.storage.StorageNode
 import com.coooolfan.unirhy.service.storage.StorageNodeObjectService
+import com.coooolfan.unirhy.service.storage.resolveStorageNode
 import org.babyfish.jimmer.sql.fetcher.Fetcher
 import org.babyfish.jimmer.sql.kt.KSqlClient
 import org.babyfish.jimmer.sql.kt.ast.expression.eq
@@ -25,7 +24,7 @@ class MediaFileAccessService(
             ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Media file not found")
 
         val node = try {
-            resolveStorageNode(mediaFile)
+            mediaFile.resolveStorageNode(storageObjects)
         } catch (_: IllegalStateException) {
             throw ResponseStatusException(HttpStatus.FORBIDDEN, "Invalid storage provider")
         }
@@ -52,16 +51,6 @@ class MediaFileAccessService(
             where(table.id eq id)
             select(table.fetch(MEDIA_FILE_FETCHER))
         }.firstOrNull()
-    }
-
-    private fun resolveStorageNode(mediaFile: MediaFile): StorageNode {
-        mediaFile.fsProvider?.let {
-            return storageObjects.resolve(FileProviderType.FILE_SYSTEM, it.id)
-        }
-        mediaFile.ossProvider?.let {
-            return storageObjects.resolve(FileProviderType.OSS, it.id)
-        }
-        error("Media file has no storage provider")
     }
 
     companion object {

@@ -82,12 +82,7 @@ class PlaylistService(private val sql: KSqlClient) {
 
     @Transactional
     fun addRecordingToPlaylist(playlistId: Long, recordingId: Long) {
-        val playlist = sql.executeQuery(Playlist::class) {
-            where(table.id eq playlistId)
-            where(table.ownerId eq StpUtil.getLoginIdAsLong())
-            selectCount()
-        }.first() == 0L
-        if (playlist) throw ResponseStatusException(HttpStatus.NOT_FOUND, "Playlist not found")
+        requirePlaylistOwned(playlistId)
 
         val alreadyExists = sql.createQuery(PlaylistRecording::class) {
             where(table.playlistId eq playlistId)
@@ -114,17 +109,21 @@ class PlaylistService(private val sql: KSqlClient) {
 
     @Transactional
     fun removeRecordingFromPlaylist(playlistId: Long, recordingId: Long) {
-        val playlist = sql.executeQuery(Playlist::class) {
-            where(table.id eq playlistId)
-            where(table.ownerId eq StpUtil.getLoginIdAsLong())
-            selectCount()
-        }.first() == 0L
-        if (playlist) throw ResponseStatusException(HttpStatus.NOT_FOUND, "Playlist not found")
+        requirePlaylistOwned(playlistId)
 
         sql.createDelete(PlaylistRecording::class) {
             where(table.playlistId eq playlistId)
             where(table.recordingId eq recordingId)
         }.execute()
+    }
+
+    private fun requirePlaylistOwned(playlistId: Long) {
+        val exists = sql.executeQuery(Playlist::class) {
+            where(table.id eq playlistId)
+            where(table.ownerId eq StpUtil.getLoginIdAsLong())
+            selectCount()
+        }.first() > 0L
+        if (!exists) throw ResponseStatusException(HttpStatus.NOT_FOUND, "Playlist not found")
     }
 
     @Transactional

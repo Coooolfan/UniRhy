@@ -2,10 +2,9 @@ package com.coooolfan.unirhy.service.task
 
 import com.coooolfan.unirhy.model.*
 import com.coooolfan.unirhy.model.storage.FileProviderType
-import com.coooolfan.unirhy.service.storage.FileSystemStorageNode
-import com.coooolfan.unirhy.service.storage.OssStorageNode
 import com.coooolfan.unirhy.service.storage.StorageNode
 import com.coooolfan.unirhy.service.storage.StorageNodeObjectService
+import com.coooolfan.unirhy.service.storage.bindProvider
 import com.coooolfan.unirhy.service.task.common.AsyncTaskQueueStore
 import com.coooolfan.unirhy.service.task.common.TaskStatus
 import com.coooolfan.unirhy.service.task.common.TaskType
@@ -329,18 +328,4 @@ data class TranscodeTaskPayload(
 
 enum class CodecType {
     MP3, OPUS, AAC,
-}
-
-private fun MediaFileDraft.bindProvider(provider: StorageNode) {
-    when (provider) {
-        is FileSystemStorageNode -> {
-            ossProvider = null
-            fsProvider = provider.provider
-        }
-
-        is OssStorageNode -> {
-            ossProvider = provider.provider
-            fsProvider = null
-        }
-    }
 }
