@@ -9,7 +9,7 @@ const docsDir = path.resolve(import.meta.dirname, '..', 'content', 'docs')
 
 const sources = [
   {
-    from: path.join(rootDir, 'README', 'TERMINOLOGY.md'),
+    from: path.join(rootDir, 'docs', 'TERMINOLOGY.md'),
     to: path.join(docsDir, 'zh', 'reference', 'terminology.md'),
     title: '术语词典',
     description: '同步自仓库根目录的 TERMINOLOGY.md，是项目级术语标准源。',

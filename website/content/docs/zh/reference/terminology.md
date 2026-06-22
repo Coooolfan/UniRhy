@@ -3,7 +3,7 @@ title: 术语词典
 description: 同步自仓库根目录的 TERMINOLOGY.md，是项目级术语标准源。
 ---
 
-> 本页由构建脚本同步自 `README/TERMINOLOGY.md`，请勿在 website 内直接编辑——修改请提交到源文件。
+> 本页由构建脚本同步自 `docs/TERMINOLOGY.md`，请勿在 website 内直接编辑——修改请提交到源文件。
 
 ## 目的与适用范围
 

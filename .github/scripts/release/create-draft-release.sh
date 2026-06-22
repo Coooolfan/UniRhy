@@ -16,6 +16,12 @@ else
   git push origin "$VERSION"
 fi
 
+NOTES_FILE="docs/release_notes/${VERSION}.md"
+if [[ ! -f "$NOTES_FILE" ]]; then
+  echo "::error::Release notes 文件不存在: $NOTES_FILE"
+  exit 1
+fi
+
 if RELEASE_JSON="$(gh release view "$VERSION" --json isDraft,isPrerelease 2>/dev/null)"; then
   RELEASE_DRAFT="$(jq -r .isDraft <<< "$RELEASE_JSON")"
   RELEASE_PRERELEASE="$(jq -r .isPrerelease <<< "$RELEASE_JSON")"
@@ -34,7 +40,7 @@ else
     --verify-tag
     --target "$TARGET_SHA"
     --title "UniRhy $VERSION"
-    --notes "UniRhy $VERSION"
+    --notes-file "$NOTES_FILE"
   )
   if [[ "$PRERELEASE" == "true" ]]; then
     RELEASE_ARGS+=(--prerelease)

@@ -21,7 +21,7 @@ UniRhy（独一律）是一个私有化的音乐流媒体平台，采用 monorep
 - `web/`：主前端客户端，基于 Vue、TypeScript、Vite、Pinia 与 Tailwind CSS，并包含 Tauri 2 桌面端配置。
 - `website/`：项目官网，基于 Vue、TypeScript 与 Vite。
 - `docker/`：容器化部署相关文件。
-- `README/`：项目级补充文档。
+- `docs/`：项目级补充文档，发行说明位于 `docs/release_notes/`。
 - `skills/`：开发辅助技能与领域约定文档。
 
 ## 环境要求
