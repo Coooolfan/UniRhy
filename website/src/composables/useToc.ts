@@ -85,7 +85,7 @@ export function useToc(containerRef: Ref<HTMLElement | null>) {
 
       heading.id = slug
       headingIds.push(slug)
-      items.value.push({ id: slug, text, level: Number.parseInt(heading.tagName[1], 10) })
+      items.value.push({ id: slug, text, level: Math.trunc(Number(heading.tagName[1])) })
     }
 
     observer = new IntersectionObserver(
