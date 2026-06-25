@@ -266,6 +266,11 @@ useHead(() => {
     width: 14rem;
     max-height: calc(100vh - 8rem);
     overflow-y: auto;
+    scrollbar-width: none;
+  }
+
+  .docs-toc::-webkit-scrollbar {
+    display: none;
   }
 }
 
@@ -328,7 +333,6 @@ useHead(() => {
 
 .toc-item-active {
   color: #d98c28;
-  font-weight: 700;
 }
 
 .docs-article-card {

@@ -25,6 +25,38 @@ html:has(.blog-layout) {
   overflow: auto;
 }
 
+html,
+body {
+  scrollbar-width: none;
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+  display: none;
+}
+
+.docs-sidebar {
+  scrollbar-color: #d6d1c4 transparent;
+}
+
+.docs-sidebar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.docs-sidebar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.docs-sidebar::-webkit-scrollbar-thumb {
+  background-color: #d6d1c4;
+  border-radius: 3px;
+}
+
+.docs-sidebar::-webkit-scrollbar-thumb:hover {
+  background-color: #c0bab0;
+}
+
 .fade-up-enter-active,
 .fade-up-leave-active {
   transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
