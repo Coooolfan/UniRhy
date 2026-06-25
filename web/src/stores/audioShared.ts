@@ -117,7 +117,7 @@ export const readSavedVolume = () => {
         return 1
     }
 
-    const parsed = Number.parseFloat(raw)
+    const parsed = Number(raw)
     if (Number.isNaN(parsed)) {
         return 1
     }

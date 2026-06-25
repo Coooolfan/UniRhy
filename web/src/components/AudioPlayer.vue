@@ -24,7 +24,7 @@ const isQueueExpanded = ref(false)
 
 const updateSeekPreview = (e: Event) => {
     const target = e.target as HTMLInputElement
-    pendingSeekValue.value = parseFloat(target.value)
+    pendingSeekValue.value = Number(target.value)
 }
 
 const commitSeek = () => {

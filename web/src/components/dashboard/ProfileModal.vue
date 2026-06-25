@@ -54,7 +54,7 @@ const startEdit = () => {
     successMessage.value = ''
     resetFormFromUser()
 
-    nextTick(() => {
+    nextTick().then(() => {
         const input = document.querySelector('input[name="username"]')
         if (input instanceof HTMLInputElement) {
             input.focus()

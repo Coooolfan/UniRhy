@@ -14,6 +14,7 @@ const props = withDefaults(
         reorderDisabled?: boolean
     }>(),
     {
+        summary: '',
         enableMultiSelect: false,
         selectedIds: () => new Set(),
         enableReorder: false,
