@@ -1,4 +1,5 @@
 name: UniRhy CD
+run-name: CD ${{ inputs.version }}${{ inputs.latest && ' (latest)' || '' }}
 
 on:
   workflow_dispatch:
