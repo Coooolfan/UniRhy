@@ -3,9 +3,7 @@ title: Docker
 description: Launch UniRhy and PostgreSQL together with a single Docker Compose file.
 ---
 
-# Docker
-
-Docker is the recommended deployment shape for UniRhy. One `docker-compose.yml` brings up PostgreSQL and the UniRhy server together; the frontend static assets are served by the server itself, so no extra components are needed.
+Docker is the recommended deployment shape for UniRhy. One `compose.yml` (formerly `docker-compose.yml`) brings up PostgreSQL and the UniRhy server together; the frontend static assets are served by the server itself, so no extra components are needed.
 
 ## Prerequisites
 
@@ -14,9 +12,9 @@ Docker is the recommended deployment shape for UniRhy. One `docker-compose.yml` 
 - At least 2 GB of free memory
 - Disk space for music files and database data
 
-## docker-compose.yml
+## compose.yml
 
-Create a `docker-compose.yml` anywhere:
+Create a `compose.yml` anywhere:
 
 ```yaml
 services:
@@ -26,33 +24,21 @@ services:
     environment:
       POSTGRES_DB: unirhy
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
     volumes:
       - pgdata:/var/lib/postgresql/data
-    healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U postgres -d unirhy']
-      interval: 5s
-      timeout: 5s
-      retries: 5
 
   app:
-    image: coooolfan/unirhy:latest
+    image: coolfan1024/unirhy:latest
     restart: unless-stopped
-    depends_on:
-      db:
-        condition: service_healthy
+    depends_on: [db]
     environment:
-      SERVER_PORT: 8654
-      DB_HOST: db
-      DB_PORT: 5432
-      POSTGRES_DB: unirhy
-      DB_USER: postgres
-      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+      DB_PASSWORD: ${DB_PASSWORD}
       SA_TOKEN_JWT_SECRET_KEY: ${SA_TOKEN_JWT_SECRET_KEY}
       UNIRHY_MEDIA_SIGNING_KEY: ${UNIRHY_MEDIA_SIGNING_KEY}
-      UNIRHY_CORS_ALLOWED_ORIGINS: ${UNIRHY_CORS_ALLOWED_ORIGINS:-http://localhost:8654}
+      UNIRHY_CORS_ALLOWED_ORIGINS: ${UNIRHY_CORS_ALLOWED_ORIGINS}
     volumes:
-      - ./music:/music
+      - ./data:/data
     ports:
       - '8654:8654'
 
@@ -60,11 +46,11 @@ volumes:
   pgdata:
 ```
 
-> Images are published to DockerHub as `coooolfan/unirhy`, tagged to match GitHub releases (e.g. `0.1.0-beta.1`, `latest`). Pin a specific version in production rather than using `latest`.
+> Images are published to DockerHub as `coolfan1024/unirhy`, tagged to match GitHub releases (e.g. `0.1.0-beta.1`, `latest`). Pin a specific version in production rather than using `latest`.
 
 ## Environment variables
 
-Create a `.env` next to `docker-compose.yml`:
+Create a `.env` next to `compose.yml`:
 
 ```sh
 # Database password (required)
@@ -92,7 +78,7 @@ openssl rand -hex 32
 docker compose up -d
 ```
 
-On first start the server runs Flyway migrations to create the schema. After 10-30 seconds, open:
+On first start the server initializes its schema automatically. After 10-30 seconds, open:
 
 ```
 http://<your-host>:8654
@@ -122,4 +108,4 @@ docker compose pull
 docker compose up -d
 ```
 
-Each release applies its migrations automatically on container start. Back up the PostgreSQL volume before upgrading. See [Upgrade](/en/docs/install/upgrade) for details.
+Schema changes are applied automatically on container start. Back up the PostgreSQL volume before upgrading.

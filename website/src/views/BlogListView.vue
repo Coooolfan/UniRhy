@@ -104,11 +104,7 @@ function formatDate(epochSeconds: number): string {
         </h1>
         <div class="mx-auto mb-4 h-[2px] w-10 bg-[#d98c28]"></div>
         <p class="font-serif text-lg italic text-[#8a817c]">
-          {{
-            lang === 'zh'
-              ? '关于音乐、技术和产品的思考'
-              : 'Thoughts on music, technology and product'
-          }}
+          {{ lang === 'zh' ? '碎碎念' : 'Stray notes' }}
         </p>
       </header>
 

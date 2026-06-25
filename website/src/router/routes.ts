@@ -1,8 +1,19 @@
 import type { RouteRecordRaw } from 'vue-router'
+import { DOCS_SECTIONS } from '@/app/docs.config'
 
 export const SUPPORTED_LANGS = ['zh', 'en'] as const
 export type SupportedLang = (typeof SUPPORTED_LANGS)[number]
 export const DEFAULT_LANG: SupportedLang = 'zh'
+
+const firstDocsSection = DOCS_SECTIONS[0]
+const firstDocsPage = firstDocsSection.pages[0]
+export function docsLandingPath(lang: SupportedLang): string {
+  return `/${lang}/docs/${firstDocsSection.slug}/${firstDocsPage.slug}`
+}
+
+function isSupportedLang(value: string): value is SupportedLang {
+  return (SUPPORTED_LANGS as readonly string[]).includes(value)
+}
 
 export const routes: RouteRecordRaw[] = [
   {
@@ -35,8 +46,13 @@ export const routes: RouteRecordRaw[] = [
   },
   {
     path: '/:lang(zh|en)/docs',
-    name: 'docs-index',
-    component: () => import('@/views/DocsIndexView.vue'),
+    // eslint-disable-next-line typescript-eslint/prefer-readonly-parameter-types -- vue-router redirect callback signature
+    redirect: (to) => {
+      const raw = to.params.lang
+      const value = Array.isArray(raw) ? raw[0] : raw
+      const lang = isSupportedLang(value) ? value : DEFAULT_LANG
+      return docsLandingPath(lang)
+    },
   },
   {
     path: '/:lang(zh|en)/docs/:section/:slug',
@@ -45,7 +61,7 @@ export const routes: RouteRecordRaw[] = [
   },
   {
     path: '/docs',
-    redirect: `/${DEFAULT_LANG}/docs`,
+    redirect: docsLandingPath(DEFAULT_LANG),
   },
   {
     path: '/docs/:section/:slug',

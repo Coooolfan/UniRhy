@@ -1,73 +1,68 @@
 ---
-title: 数据库准备
-description: PostgreSQL 版本要求、初始化、备份与维护建议。
+title: 自有数据库
+description: 让 UniRhy 连接到外部已有的 PostgreSQL 实例。
 ---
 
-# 数据库准备
+[Docker 部署](/zh/docs/install/docker) 默认随附 PostgreSQL 容器，开箱即用。若需对接外部已有的 PostgreSQL（托管 RDS、内网共享实例等），可让 UniRhy 直接连接外部实例，无需启动内置容器。
 
-UniRhy 当前只支持 **PostgreSQL**。
+> 建议仅连接到可完全掌控的 PostgreSQL 实例。后续版本可能引入需要在数据库侧加载的扩展或插件，托管 RDS 不一定提供此类能力。
 
 ## 版本要求
 
-- **PostgreSQL 17+**。其他版本未经测试。
-- 推荐使用官方镜像 `postgres:17` 或对应的发行版包管理器版本。
+- **PostgreSQL 17+**，其他版本未经测试。
+- Encoding 必须为 `UTF8`。
 
-> Docker Compose 部署的用户可以跳过本页大部分内容，按 [Docker 部署](/zh/docs/install/docker) 直接启动；本页面向裸机/独立数据库用户。
+## 创建数据库与用户
 
-## 初始化
-
-UniRhy 需要一个独立的数据库与可读写的用户：
+在目标 PostgreSQL 实例上执行：
 
 ```sql
 CREATE USER unirhy WITH PASSWORD 'your-strong-password';
 CREATE DATABASE unirhy OWNER unirhy ENCODING 'UTF8';
 ```
 
-server 启动时会通过 Flyway 自动创建所有表与索引，**不需要预先建表**。
+UniRhy 在首次启动时自动初始化所需表结构，**无需预先建表**。
 
-## 连接参数
+## 连接配置
 
-server 通过以下环境变量连接数据库（默认值见 `server/src/main/resources/application.yaml`）：
+UniRhy 通过以下环境变量读取连接参数：
 
-| 变量          | 默认值     | 说明       |
-| ------------- | ---------- | ---------- |
-| `DB_HOST`     | `db`       | 数据库主机 |
-| `DB_PORT`     | `5432`     | 数据库端口 |
-| `POSTGRES_DB` | `unirhy`   | 数据库名   |
-| `DB_USER`     | `postgres` | 数据库用户 |
-| `DB_PASSWORD` | （必填）   | 数据库密码 |
+| 变量          | 必填 | 说明                          |
+| ------------- | ---- | ----------------------------- |
+| `DB_HOST`     | 是   | 数据库主机或 IP               |
+| `DB_PORT`     | 否   | 端口，默认 `5432`             |
+| `POSTGRES_DB` | 否   | 数据库名，默认 `unirhy`       |
+| `DB_USER`     | 否   | 数据库用户，默认 `postgres`   |
+| `DB_PASSWORD` | 是   | 数据库密码                    |
 
-JDBC URL 由这些值拼接而成：
+JDBC URL 由上述变量拼接：
 
 ```
 jdbc:postgresql://${DB_HOST}:${DB_PORT}/${POSTGRES_DB}
 ```
 
-如需更复杂的连接参数（SSL、连接池），后续可通过自定义 `application.yaml` 覆盖。
+## 调整 compose.yml
 
-## 字符集与时区
+从 `compose.yml` 中**移除 `db` 服务与 `pgdata` 卷**，并在 `app.environment` 中补全连接变量：
 
-- 数据库 encoding 必须为 `UTF8`（默认即是）。
-- 服务器侧时区不影响 UniRhy 的业务逻辑；时间统一以 UTC 存储。
-
-## 备份
-
-UniRhy 不内置备份功能。推荐：
-
-```sh
-pg_dump -U unirhy -d unirhy -F c -f unirhy.dump
+```yaml
+services:
+  app:
+    image: coolfan1024/unirhy:latest
+    restart: unless-stopped
+    environment:
+      DB_HOST: postgres.internal.example.com
+      DB_PORT: '5432'
+      POSTGRES_DB: unirhy
+      DB_USER: unirhy
+      DB_PASSWORD: ${DB_PASSWORD}
+      SA_TOKEN_JWT_SECRET_KEY: ${SA_TOKEN_JWT_SECRET_KEY}
+      UNIRHY_MEDIA_SIGNING_KEY: ${UNIRHY_MEDIA_SIGNING_KEY}
+      UNIRHY_CORS_ALLOWED_ORIGINS: ${UNIRHY_CORS_ALLOWED_ORIGINS}
+    volumes:
+      - ./data:/data
+    ports:
+      - '8654:8654'
 ```
 
-恢复：
-
-```sh
-pg_restore -U unirhy -d unirhy -c unirhy.dump
-```
-
-如果你使用 Docker Compose，注意备份 `pgdata` 卷或在容器内执行 `pg_dump`。
-
-## 维护建议
-
-- 启用 PostgreSQL 自动 `VACUUM`（默认开启），不需要额外配置。
-- 媒体文件**不存储在数据库**，只存元数据与签名信息，所以数据库体量很小，单库通常不超过几百 MB。
-- 不要直接改 UniRhy 的表结构——所有 schema 变更必须经 Flyway 迁移走，否则版本升级会失败。
+随后 `docker compose up -d` 即可。

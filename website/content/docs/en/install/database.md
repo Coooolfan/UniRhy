@@ -1,41 +1,39 @@
 ---
-title: Database
-description: PostgreSQL version requirements, initialization, backup and maintenance.
+title: Bring Your Own Database
+description: Connect UniRhy to an existing external PostgreSQL instance.
 ---
 
-# Database
+The default [Docker installation](/en/docs/install/docker) bundles a PostgreSQL container for an out-of-the-box deployment. To integrate with an existing external PostgreSQL — a managed RDS instance, a shared internal cluster, etc. — UniRhy can connect directly to that external instance without starting the bundled container.
 
-UniRhy currently supports **PostgreSQL** only.
+> Only connect to a PostgreSQL instance that is fully under your control. Future releases may require server-side extensions or plugins to be installed on the database, and managed RDS offerings do not always permit that.
 
 ## Version
 
 - **PostgreSQL 17+**. Other versions are untested.
-- Use the official `postgres:17` image or the equivalent OS package.
+- Encoding must be `UTF8`.
 
-> If you deploy via Docker Compose you can skip most of this page — see [Docker installation](/en/docs/install/docker) directly. This page is for bare-metal / managed-database users.
+## Create database and role
 
-## Initialization
-
-UniRhy needs its own database and a user with full access:
+Execute the following on the target PostgreSQL instance:
 
 ```sql
 CREATE USER unirhy WITH PASSWORD 'your-strong-password';
 CREATE DATABASE unirhy OWNER unirhy ENCODING 'UTF8';
 ```
 
-On startup the server runs Flyway migrations to create all tables and indexes automatically — **no manual schema setup is needed**.
+UniRhy initializes the required tables on first start — **no manual schema setup is needed**.
 
-## Connection parameters
+## Connection settings
 
-The server reads these environment variables (defaults from `server/src/main/resources/application.yaml`):
+Connection parameters are read from the following environment variables:
 
-| Variable      | Default    | Description       |
-| ------------- | ---------- | ----------------- |
-| `DB_HOST`     | `db`       | Database host     |
-| `DB_PORT`     | `5432`     | Database port     |
-| `POSTGRES_DB` | `unirhy`   | Database name     |
-| `DB_USER`     | `postgres` | Database user     |
-| `DB_PASSWORD` | (required) | Database password |
+| Variable      | Required | Description                           |
+| ------------- | -------- | ------------------------------------- |
+| `DB_HOST`     | yes      | Database host or IP                   |
+| `DB_PORT`     | no       | Port, defaults to `5432`              |
+| `POSTGRES_DB` | no       | Database name, defaults to `unirhy`   |
+| `DB_USER`     | no       | Database role, defaults to `postgres` |
+| `DB_PASSWORD` | yes      | Database password                     |
 
 The JDBC URL is composed from these:
 
@@ -43,31 +41,28 @@ The JDBC URL is composed from these:
 jdbc:postgresql://${DB_HOST}:${DB_PORT}/${POSTGRES_DB}
 ```
 
-For advanced connection options (SSL, pool settings) override `application.yaml` with your own.
+## Adjust compose.yml
 
-## Encoding and timezone
+**Remove the `db` service and the `pgdata` volume** from `compose.yml`, and supply the connection variables under `app.environment`:
 
-- Database encoding must be `UTF8` (default).
-- Server timezone does not affect UniRhy logic; timestamps are stored in UTC.
-
-## Backup
-
-UniRhy ships no built-in backup. Recommended:
-
-```sh
-pg_dump -U unirhy -d unirhy -F c -f unirhy.dump
+```yaml
+services:
+  app:
+    image: coolfan1024/unirhy:latest
+    restart: unless-stopped
+    environment:
+      DB_HOST: postgres.internal.example.com
+      DB_PORT: '5432'
+      POSTGRES_DB: unirhy
+      DB_USER: unirhy
+      DB_PASSWORD: ${DB_PASSWORD}
+      SA_TOKEN_JWT_SECRET_KEY: ${SA_TOKEN_JWT_SECRET_KEY}
+      UNIRHY_MEDIA_SIGNING_KEY: ${UNIRHY_MEDIA_SIGNING_KEY}
+      UNIRHY_CORS_ALLOWED_ORIGINS: ${UNIRHY_CORS_ALLOWED_ORIGINS}
+    volumes:
+      - ./data:/data
+    ports:
+      - '8654:8654'
 ```
 
-Restore:
-
-```sh
-pg_restore -U unirhy -d unirhy -c unirhy.dump
-```
-
-For Docker Compose deployments, either back up the `pgdata` volume or run `pg_dump` inside the container.
-
-## Maintenance
-
-- PostgreSQL auto `VACUUM` is enabled by default — no extra configuration needed.
-- Media files are **not stored in the database**, only metadata and signatures. The database stays small, typically under a few hundred MB.
-- Never modify UniRhy tables manually — every schema change must go through Flyway migrations, or upgrades will fail.
+Then start with `docker compose up -d`.

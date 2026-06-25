@@ -339,7 +339,7 @@ useHead(() => {
   background: #fcfbf9;
   border: 1px solid rgba(255, 255, 255, 0.8);
   box-shadow: 0 10px 30px -10px rgba(168, 160, 149, 0.4);
-  border-radius: 4px;
+  border-radius: 2px;
   position: relative;
   overflow: hidden;
 }
@@ -371,7 +371,7 @@ useHead(() => {
   padding: 1rem 1.25rem;
   background: rgba(252, 251, 249, 0.7);
   border: 1px solid #dcd6cc;
-  border-radius: 4px;
+  border-radius: 2px;
   text-decoration: none;
   transition: all 0.3s ease;
 }

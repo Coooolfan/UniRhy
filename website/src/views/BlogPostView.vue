@@ -1,24 +1,98 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useHead } from '@unhead/vue'
 import BlogLayout from '@/components/BlogLayout.vue'
 import type { BlogModule } from '@/types/blog'
 import { useLang } from '@/composables/useLang'
 import { useToc } from '@/composables/useToc'
-import { useBlogWidth } from '@/composables/useBlogWidth'
 
 const route = useRoute()
 const { lang, setLang } = useLang()
-const { isWide } = useBlogWidth()
 const blogListPath = computed(() => `/${lang.value}/blog`)
 
 const proseRef = ref<HTMLElement | null>(null)
+const tocListRef = ref<HTMLElement | null>(null)
 const { items: tocItems, activeIds, scrollTo, refresh: refreshToc } = useToc(proseRef)
+const activeTocIndexes = computed(() =>
+  tocItems.value.flatMap((item, index) => (activeIds.has(item.id) ? [index] : [])),
+)
+const primaryActiveTocId = computed(() => {
+  const firstIndex = activeTocIndexes.value[0]
+  return firstIndex === undefined ? undefined : tocItems.value[firstIndex]?.id
+})
+const activeTocTrackStyle = ref({ height: '0px', opacity: '0', top: '0px' })
+let tocTrackFrame = 0
 
-watch(lang, async () => {
+function updateActiveTocTrack() {
+  const list = tocListRef.value
+  if (!list || tocItems.value.length === 0) {
+    activeTocTrackStyle.value = { ...activeTocTrackStyle.value, opacity: '0' }
+    return
+  }
+
+  const firstIndex = activeTocIndexes.value[0]
+  const lastIndex = activeTocIndexes.value.at(-1) ?? firstIndex
+  if (firstIndex === undefined || lastIndex === undefined) {
+    activeTocTrackStyle.value = { ...activeTocTrackStyle.value, opacity: '0' }
+    return
+  }
+
+  const entries = list.querySelectorAll<HTMLElement>('.toc-entry')
+  const firstEntry = entries[firstIndex]
+  const lastEntry = entries[lastIndex]
+  if (!firstEntry || !lastEntry) {
+    activeTocTrackStyle.value = { ...activeTocTrackStyle.value, opacity: '0' }
+    return
+  }
+
+  const listRect = list.getBoundingClientRect()
+  const firstRect = firstEntry.getBoundingClientRect()
+  const lastRect = lastEntry.getBoundingClientRect()
+  const top = firstRect.top - listRect.top
+  const bottom = lastRect.bottom - listRect.top
+
+  activeTocTrackStyle.value = {
+    top: `${top}px`,
+    height: `${Math.max(2, bottom - top)}px`,
+    opacity: '1',
+  }
+}
+
+function scheduleActiveTocTrackUpdate() {
+  if (tocTrackFrame !== 0) return
+  tocTrackFrame = window.requestAnimationFrame(() => {
+    tocTrackFrame = 0
+    updateActiveTocTrack()
+  })
+}
+
+watch([lang, () => route.params.slug], async () => {
   await nextTick()
   refreshToc()
+})
+
+watch(
+  () => [tocItems.value.map((item) => item.id).join('\n'), activeTocIndexes.value.join(',')],
+  async () => {
+    await nextTick()
+    updateActiveTocTrack()
+  },
+  { flush: 'post' },
+)
+
+onMounted(() => {
+  window.addEventListener('scroll', scheduleActiveTocTrackUpdate, { passive: true })
+  window.addEventListener('resize', scheduleActiveTocTrackUpdate)
+})
+
+onUnmounted(() => {
+  if (tocTrackFrame !== 0) {
+    window.cancelAnimationFrame(tocTrackFrame)
+    tocTrackFrame = 0
+  }
+  window.removeEventListener('scroll', scheduleActiveTocTrackUpdate)
+  window.removeEventListener('resize', scheduleActiveTocTrackUpdate)
 })
 
 const modules = import.meta.glob<BlogModule>('/content/blog/**/*.md', { eager: true })
@@ -88,186 +162,191 @@ function formatDate(epochSeconds: number): string {
 
 <template>
   <BlogLayout>
-    <!-- Not Found -->
-    <div v-if="!post" class="mx-auto max-w-[700px] px-6 py-16">
-      <div class="py-20 text-center">
-        <h1 class="mb-4 font-serif text-4xl font-bold text-[#2c2825]">404</h1>
-        <p class="mb-8 text-lg italic text-[#8a817c]">
-          {{ lang === 'zh' ? '文章不存在' : 'Post not found' }}
-        </p>
-        <router-link
-          :to="blogListPath"
-          class="inline-block border border-[#d98c28] bg-transparent px-8 py-3 font-brand-sans text-sm font-bold tracking-[0.15em] text-[#d98c28] uppercase no-underline transition-all duration-300 hover:bg-[#d98c28] hover:text-white hover:shadow-[0_4px_15px_rgba(217,140,40,0.25)]"
+    <!-- Top bar -->
+    <div
+      class="fixed top-4 right-4 left-4 z-20 flex items-center justify-between font-brand-sans text-sm select-none lg:top-8 lg:right-8 lg:left-8"
+    >
+      <router-link
+        to="/"
+        class="tracking-wide text-[#9c968b] no-underline transition-colors duration-300 hover:text-[#2c2825]"
+      >
+        ← UniRhy
+      </router-link>
+      <div class="flex items-center gap-3">
+        <span
+          class="cursor-pointer tracking-wide transition-all duration-300"
+          :class="lang === 'zh' ? 'font-bold text-[#d98c28]' : 'text-[#9c968b] hover:text-[#2c2825]'"
+          @click="setLang('zh')"
         >
-          {{ lang === 'zh' ? '返回博客' : 'Back to Blog' }}
-        </router-link>
+          中文
+        </span>
+        <span class="text-[#dcd6cc]">/</span>
+        <span
+          class="cursor-pointer tracking-wide transition-all duration-300"
+          :class="lang === 'en' ? 'font-bold text-[#d98c28]' : 'text-[#9c968b] hover:text-[#2c2825]'"
+          @click="setLang('en')"
+        >
+          EN
+        </span>
       </div>
     </div>
 
-    <!-- Post Content -->
-    <div v-else class="px-6 py-16">
-      <!-- Back Link (small screens only, sidebar has it on lg) -->
+    <!-- Not Found -->
+    <div v-if="!post" class="mx-auto max-w-[700px] px-6 py-20 text-center">
+      <h1 class="mb-4 font-serif text-4xl font-bold text-[#2c2825]">404</h1>
+      <p class="mb-8 text-lg italic text-[#8a817c]">
+        {{ lang === 'zh' ? '文章不存在' : 'Post not found' }}
+      </p>
       <router-link
         :to="blogListPath"
-        class="fixed top-4 left-4 z-10 inline-block font-brand-sans text-xs tracking-[0.2em] text-[#9c968b] uppercase no-underline transition-colors duration-300 hover:text-[#d98c28] lg:hidden"
+        class="inline-block border border-[#d98c28] bg-transparent px-8 py-3 font-brand-sans text-sm font-bold tracking-[0.15em] text-[#d98c28] uppercase no-underline transition-all duration-300 hover:bg-[#d98c28] hover:text-white"
       >
-        ← Blog
+        ← {{ lang === 'zh' ? '回到碎碎念' : 'Back to stray notes' }}
       </router-link>
+    </div>
 
-      <!-- TOC Sidebar (fixed position) -->
-      <aside v-if="tocItems.length > 0" class="fixed top-8 left-8 hidden w-52 lg:block">
-        <nav>
-          <!-- Back Link -->
-          <router-link
-            :to="blogListPath"
-            class="mb-5 inline-block font-brand-sans text-xs tracking-[0.2em] text-[#9c968b] uppercase no-underline transition-colors duration-300 hover:text-[#d98c28]"
-          >
-            ← Blog
-          </router-link>
-
-          <!-- TOC Heading -->
-          <p class="mb-3 font-brand-sans text-xs tracking-[0.15em] text-[#9c968b] uppercase">
-            {{ lang === 'zh' ? '目录' : 'Contents' }}
-          </p>
-
-          <!-- TOC Items -->
-          <ul class="toc-list space-y-1">
-            <li
-              v-for="item in tocItems"
-              :key="item.id"
-              :style="{ paddingLeft: `${(item.level - 1) * 0.75}rem` }"
-            >
+    <!-- Article -->
+    <div v-else class="px-6 py-16 lg:py-12 xl:pl-72">
+      <!-- TOC -->
+      <aside v-if="tocItems.length > 0" class="docs-toc">
+        <p class="mb-3 font-brand-sans text-xs tracking-[0.15em] text-[#9c968b] uppercase">
+          {{ lang === 'zh' ? '目录' : 'Contents' }}
+        </p>
+        <div class="toc-list-frame">
+          <div aria-hidden="true" class="toc-active-track" :style="activeTocTrackStyle"></div>
+          <ul ref="tocListRef" class="toc-list">
+            <li v-for="item in tocItems" :key="item.id" class="toc-entry">
               <button
                 class="toc-item w-full text-left"
-                :class="activeIds.has(item.id) ? 'toc-item-active' : ''"
+                :class="item.id === primaryActiveTocId ? 'toc-item-active' : ''"
+                :style="{ '--toc-indent': `${(item.level - 1) * 0.75}rem` }"
                 @click="scrollTo(item.id)"
               >
                 {{ item.text }}
               </button>
             </li>
           </ul>
-        </nav>
+        </div>
       </aside>
 
-      <!-- Top-right Controls (fixed) -->
-      <div
-        class="fixed top-4 right-4 z-10 flex flex-col items-end gap-3 font-brand-sans text-sm select-none lg:top-8 lg:right-8"
-      >
-        <div class="flex items-center gap-3">
-          <span
-            class="cursor-pointer tracking-wide transition-all duration-300"
-            :class="
-              lang === 'zh' ? 'font-bold text-[#d98c28]' : 'text-[#9c968b] hover:text-[#2c2825]'
-            "
-            @click="setLang('zh')"
+      <div class="mx-auto max-w-[760px]">
+        <header class="mb-10">
+          <h1
+            class="mb-4 font-serif text-[clamp(1.875rem,4vw,2.5rem)] font-bold leading-[1.2] tracking-[0.02em] text-[#2c2825]"
           >
-            中文
-          </span>
-          <span class="text-[#dcd6cc]">/</span>
-          <span
-            class="cursor-pointer tracking-wide transition-all duration-300"
-            :class="
-              lang === 'en' ? 'font-bold text-[#d98c28]' : 'text-[#9c968b] hover:text-[#2c2825]'
-            "
-            @click="setLang('en')"
-          >
-            EN
-          </span>
+            {{ post.frontmatter.title }}
+          </h1>
+          <time class="block font-brand-sans text-xs tracking-[0.15em] text-[#9c968b] uppercase">
+            {{ formatDate(post.frontmatter.publishAt) }}
+          </time>
+          <p v-if="post.frontmatter.description" class="mt-3 text-base italic text-[#8a817c]">
+            {{ post.frontmatter.description }}
+          </p>
+          <div class="mt-4 h-[2px] w-10 bg-[#d98c28]"></div>
+        </header>
+
+        <div v-if="post.frontmatter.cover" class="mb-10 overflow-hidden rounded">
+          <img
+            :src="post.frontmatter.cover"
+            :alt="post.frontmatter.title"
+            class="w-full object-cover"
+          />
         </div>
-        <div class="hidden items-center gap-3 lg:flex">
-          <span
-            class="cursor-pointer tracking-wide transition-all duration-300"
-            :class="!isWide ? 'font-bold text-[#d98c28]' : 'text-[#9c968b] hover:text-[#2c2825]'"
-            @click="isWide = false"
-          >
-            {{ lang === 'zh' ? '标准' : 'Standard' }}
-          </span>
-          <span class="text-[#dcd6cc]">/</span>
-          <span
-            class="cursor-pointer tracking-wide transition-all duration-300"
-            :class="isWide ? 'font-bold text-[#d98c28]' : 'text-[#9c968b] hover:text-[#2c2825]'"
-            @click="isWide = true"
-          >
-            {{ lang === 'zh' ? '全宽' : 'Wide' }}
-          </span>
-        </div>
-      </div>
 
-      <!-- Main Content -->
-      <div class="lg:pl-60">
-        <div
-          class="mx-auto transition-[max-width] duration-300"
-          :class="isWide ? 'max-w-[1200px]' : 'max-w-[700px]'"
-        >
-          <header class="mb-12 text-center">
-            <h1
-              class="mb-4 font-serif text-[clamp(2rem,5vw,3rem)] font-bold leading-[1.15] tracking-[0.02em] text-[#2c2825]"
-            >
-              {{ post.frontmatter.title }}
-            </h1>
-            <time
-              class="mb-4 block font-brand-sans text-xs tracking-[0.15em] text-[#9c968b] uppercase"
-            >
-              {{ formatDate(post.frontmatter.publishAt) }}
-            </time>
-            <div class="mx-auto mt-4 h-[2px] w-10 bg-[#d98c28]"></div>
-          </header>
-
-          <!-- Cover Image -->
-          <div v-if="post.frontmatter.cover" class="mb-10 overflow-hidden rounded">
-            <img
-              :src="post.frontmatter.cover"
-              :alt="post.frontmatter.title"
-              class="w-full object-cover"
-            />
-          </div>
-
-          <!-- Article Body -->
-          <article class="blog-article">
-            <div class="card-stack-1"></div>
-            <div class="card-stack-2"></div>
-            <div class="blog-article-card">
-              <div class="blog-article-inner">
-                <div ref="proseRef" class="blog-prose" v-html="post.html"></div>
-              </div>
+        <article class="docs-article">
+          <div class="docs-article-card">
+            <div class="docs-article-inner">
+              <div ref="proseRef" class="blog-prose" v-html="post.html"></div>
             </div>
-          </article>
+          </div>
+        </article>
 
-          <!-- Footer Nav -->
-          <footer class="mt-12 border-t border-[#dcd6cc] pt-8 text-center">
-            <router-link
-              :to="blogListPath"
-              class="inline-block border border-[#d98c28] bg-transparent px-8 py-3 font-brand-sans text-sm font-bold tracking-[0.15em] text-[#d98c28] uppercase no-underline transition-all duration-300 hover:bg-[#d98c28] hover:text-white hover:shadow-[0_4px_15px_rgba(217,140,40,0.25)]"
-            >
-              {{ lang === 'zh' ? '返回博客' : 'Back to Blog' }}
-            </router-link>
-          </footer>
-        </div>
+        <footer class="mt-12 border-t border-[#dcd6cc] pt-8 text-center">
+          <router-link
+            :to="blogListPath"
+            class="inline-block border border-[#d98c28] bg-transparent px-8 py-3 font-brand-sans text-sm font-bold tracking-[0.15em] text-[#d98c28] uppercase no-underline transition-all duration-300 hover:bg-[#d98c28] hover:text-white"
+          >
+            ← {{ lang === 'zh' ? '回到碎碎念' : 'Back to stray notes' }}
+          </router-link>
+        </footer>
       </div>
     </div>
   </BlogLayout>
 </template>
 
 <style scoped>
+.docs-toc {
+  display: none;
+}
+
+@media (min-width: 1280px) {
+  .docs-toc {
+    display: block;
+    position: fixed;
+    top: 5rem;
+    left: 2rem;
+    width: 14rem;
+    max-height: calc(100vh - 8rem);
+    overflow-y: auto;
+    scrollbar-width: none;
+  }
+
+  .docs-toc::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+.toc-list-frame {
+  position: relative;
+}
+
+.toc-list-frame::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 2px;
+  background: #e5ddd2;
+  z-index: 0;
+}
+
+.toc-active-track {
+  position: absolute;
+  left: 0;
+  width: 2px;
+  background: #d98c28;
+  transform: translateZ(0);
+  transition:
+    top 180ms ease,
+    height 180ms ease,
+    opacity 120ms ease;
+  z-index: 1;
+}
+
 .toc-list {
   list-style: none;
   padding: 0;
   margin: 0;
+  position: relative;
+  z-index: 2;
+}
+
+.toc-entry {
+  position: relative;
 }
 
 .toc-item {
   display: block;
-  padding: 0.3rem 0.5rem;
+  padding: 0.3rem 0.5rem 0.3rem calc(0.75rem + var(--toc-indent));
   font-family: 'Barlow Condensed', sans-serif;
   font-size: 0.8rem;
   line-height: 1.4;
   color: #8a817c;
   border: none;
   background: none;
-  border-left: 2px solid transparent;
   cursor: pointer;
-  transition: all 0.2s;
-  border-radius: 0;
+  transition: color 0.2s;
 }
 
 .toc-item:hover {
@@ -276,50 +355,18 @@ function formatDate(epochSeconds: number): string {
 
 .toc-item-active {
   color: #d98c28;
-  border-left-color: #d98c28;
 }
 
-.blog-article {
-  position: relative;
-}
-
-.card-stack-1 {
-  position: absolute;
-  top: 1rem;
-  left: 1rem;
-  right: -0.5rem;
-  bottom: -0.5rem;
-  background: #f0ebe3;
-  border: 1px solid #e6e1d8;
-  transform: rotate(1deg);
-  border-radius: 4px;
-  z-index: -2;
-}
-
-.card-stack-2 {
-  position: absolute;
-  top: 0.5rem;
-  left: 0.5rem;
-  right: -0.25rem;
-  bottom: -0.25rem;
-  background: #f5f2eb;
-  border: 1px solid #e6e1d8;
-  transform: rotate(-1deg);
-  border-radius: 4px;
-  z-index: -1;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-}
-
-.blog-article-card {
+.docs-article-card {
   background: #fcfbf9;
   border: 1px solid rgba(255, 255, 255, 0.8);
   box-shadow: 0 10px 30px -10px rgba(168, 160, 149, 0.4);
-  border-radius: 4px;
+  border-radius: 2px;
   position: relative;
   overflow: hidden;
 }
 
-.blog-article-card::before {
+.docs-article-card::before {
   content: '';
   position: absolute;
   inset: 0;
@@ -329,15 +376,15 @@ function formatDate(epochSeconds: number): string {
   z-index: 0;
 }
 
-.blog-article-inner {
+.docs-article-inner {
   position: relative;
   z-index: 1;
-  padding: 3rem 2.5rem;
+  padding: 2.5rem 2rem;
 }
 
 @media (max-width: 640px) {
-  .blog-article-inner {
-    padding: 2rem 1.5rem;
+  .docs-article-inner {
+    padding: 1.75rem 1.25rem;
   }
 }
 </style>

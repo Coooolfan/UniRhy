@@ -48,7 +48,6 @@ export function listPrerenderPaths(): PrerenderPath[] {
     for (const slug of listBlogSlugs(lang)) {
       paths.push({ pathname: `/${lang}/blog/${slug}`, lang, slug })
     }
-    paths.push({ pathname: `/${lang}/docs`, lang, slug: null })
     for (const doc of listDocsPaths(lang)) {
       paths.push({
         pathname: `/${lang}/docs/${doc.section}/${doc.slug}`,

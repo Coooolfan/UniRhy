@@ -5,8 +5,6 @@ publishAt: 1774137600
 draft: true
 ---
 
-# Hello, UniRhy Blog
-
 Welcome to the UniRhy Blog! Here we'll share stories about music, technology, and product development.
 
 ## About UniRhy

@@ -80,11 +80,16 @@ function isActive(sectionSlug: string, pageSlug: string): boolean {
 
       <router-link
         :to="docsHome"
-        class="mb-6 block font-serif text-xl font-bold tracking-wide text-[#2c2825] no-underline transition-colors duration-300 hover:text-[#d98c28]"
+        class="mb-1 block font-serif text-xl font-bold tracking-wide text-[#2c2825] no-underline transition-colors duration-300 hover:text-[#d98c28]"
         @click="drawerOpen = false"
       >
         {{ lang === 'zh' ? '文档' : 'Docs' }}
       </router-link>
+      <p
+        class="mb-6 inline-block rounded border border-[#d98c28]/40 bg-[#d98c28]/10 px-2 py-0.5 font-brand-sans text-[10px] tracking-[0.15em] text-[#b8721b] uppercase"
+      >
+        {{ lang === 'zh' ? '施工中' : 'Under construction' }}
+      </p>
 
       <nav class="space-y-6">
         <div v-for="section in DOCS_SECTIONS" :key="section.slug">
