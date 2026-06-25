@@ -122,7 +122,7 @@ const handlePlaybackModeChange = (event: Event) => {
                     <div>
                         <h2 class="font-serif text-xl text-[#2B221B]">播放模式</h2>
                         <p class="text-xs text-[#8C857B]">
-                            控制播放器是否与后端房间通过 WebSocket 同步
+                            控制本设备的播放队列与状态是否和同账号下的不同设备实时同步
                         </p>
                     </div>
                 </div>
@@ -141,7 +141,7 @@ const handlePlaybackModeChange = (event: Event) => {
                         <option value="INDEPENDENT">独立</option>
                     </select>
                     <p class="ml-1 text-xs text-[#B8B0A3]">
-                        独立模式下播放队列和控制只保存在当前客户端，不连接同步 WebSocket
+                        独立模式下播放队列和控制只保存在当前客户端，不连接同步至其他设备
                     </p>
                 </div>
             </section>
