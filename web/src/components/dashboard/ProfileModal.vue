@@ -119,13 +119,11 @@ const confirmLogout = async () => {
     isSubmitting.value = true
     try {
         await userStore.logout()
-        modal.resolve(undefined)
-        router.push({ name: 'login' })
     } catch (error) {
         console.error('Logout failed', error)
-        router.push({ name: 'login' })
     } finally {
-        isSubmitting.value = false
+        modal.resolve(undefined)
+        window.location.assign(router.resolve({ name: 'login' }).href)
     }
 }
 

@@ -236,7 +236,7 @@ const handleLogin = async () => {
         alert(normalizedError.message || '登录失败')
         return
     }
-    router.push('/')
+    window.location.assign(router.resolve('/').href)
 }
 </script>
 
