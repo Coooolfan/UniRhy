@@ -73,6 +73,39 @@ watch([lang, () => route.params.section, () => route.params.slug], async () => {
   refreshToc()
 })
 
+const copyResetTimers = new WeakMap<HTMLButtonElement, number>()
+
+function handleProseClick(event: MouseEvent): void {
+  const target = (event.target as HTMLElement | null)?.closest<HTMLButtonElement>(
+    '.mermaid-copy-btn',
+  )
+  if (!target) return
+  event.preventDefault()
+  const encoded = target.dataset.mermaidSource ?? ''
+  let source: string
+  try {
+    const binary = atob(encoded)
+    source = new TextDecoder().decode(Uint8Array.from(binary, (c) => c.codePointAt(0) ?? 0))
+  } catch {
+    return
+  }
+  if (!source) return
+  void navigator.clipboard.writeText(source).then(() => {
+    const label = target.querySelector<HTMLElement>('.mermaid-copy-label')
+    const original = label?.textContent ?? 'Copy'
+    target.dataset.copied = 'true'
+    if (label) label.textContent = lang.value === 'zh' ? '已复制' : 'Copied'
+    const existing = copyResetTimers.get(target)
+    if (existing !== undefined) window.clearTimeout(existing)
+    const timer = window.setTimeout(() => {
+      delete target.dataset.copied
+      if (label) label.textContent = original
+      copyResetTimers.delete(target)
+    }, 1600)
+    copyResetTimers.set(target, timer)
+  })
+}
+
 watch(
   () => [tocItems.value.map((item) => item.id).join('\n'), activeTocIndexes.value.join(',')],
   async () => {
@@ -211,7 +244,12 @@ useHead(() => {
         <article class="docs-article">
           <div class="docs-article-card">
             <div class="docs-article-inner">
-              <div ref="proseRef" class="blog-prose" v-html="post.html"></div>
+              <div
+                ref="proseRef"
+                class="blog-prose"
+                v-html="post.html"
+                @click="handleProseClick"
+              ></div>
             </div>
           </div>
         </article>

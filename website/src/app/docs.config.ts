@@ -57,6 +57,10 @@ export const DOCS_SECTIONS: readonly DocsSection[] = [
         slug: 'first-run',
         title: { zh: '首次启动', en: 'First Run' },
       },
+      {
+        slug: 'data-model',
+        title: { zh: '作品与版本', en: 'Works & Renditions' },
+      },
     ],
   },
 ] as const
