@@ -129,7 +129,7 @@
   font-weight: 600;
 }
 
-.blog-prose .mermaid-figure {
+.blog-prose .diagram-figure {
   position: relative;
   margin: 1.75rem 0;
   padding: 1.25rem;
@@ -141,60 +141,10 @@
   overflow-x: auto;
 }
 
-.blog-prose .mermaid-figure svg {
+.blog-prose .diagram-figure svg {
   max-width: 100%;
   height: auto;
   font-family: 'Georgia', 'Times New Roman', Times, serif;
-}
-
-.blog-prose .mermaid-figure .edgeLabel,
-.blog-prose .mermaid-figure .edgeLabel rect,
-.blog-prose .mermaid-figure .edgeLabel foreignObject {
-  background: #f5f0e6 !important;
-  fill: #f5f0e6 !important;
-  color: #6b6560 !important;
-}
-
-.blog-prose .mermaid-copy-btn {
-  position: absolute;
-  top: 0.5rem;
-  right: 0.5rem;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-  padding: 0.25rem 0.6rem;
-  font-family: 'Barlow Condensed', sans-serif;
-  font-size: 0.75rem;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: #9c968b;
-  background: rgba(252, 251, 249, 0.6);
-  border: 1px solid #e5ddd2;
-  border-radius: 3px;
-  cursor: pointer;
-  opacity: 0.55;
-  transition:
-    opacity 0.2s ease,
-    color 0.2s ease,
-    border-color 0.2s ease,
-    background 0.2s ease;
-}
-
-.blog-prose .mermaid-figure:hover .mermaid-copy-btn,
-.blog-prose .mermaid-copy-btn:focus-visible {
-  opacity: 1;
-}
-
-.blog-prose .mermaid-copy-btn:hover,
-.blog-prose .mermaid-copy-btn:focus-visible {
-  color: #d98c28;
-  border-color: #d98c28;
-  background: #fcfbf9;
-}
-
-.blog-prose .mermaid-copy-btn[data-copied='true'] {
-  color: #4a7d3a;
-  border-color: #4a7d3a;
 }
 
 .blog-prose .sr-only {
