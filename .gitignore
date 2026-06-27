@@ -21,4 +21,10 @@ website/node_modules
 
 web/.vscode
 web/node_modules
-web/.yarn
+
+**/.yarn/*
+!**/.yarn/patches
+!**/.yarn/plugins
+!**/.yarn/releases
+!**/.yarn/sdks
+!**/.yarn/versions
