@@ -175,7 +175,9 @@ function formatDate(epochSeconds: number): string {
       <div class="flex items-center gap-3">
         <span
           class="cursor-pointer tracking-wide transition-all duration-300"
-          :class="lang === 'zh' ? 'font-bold text-[#d98c28]' : 'text-[#9c968b] hover:text-[#2c2825]'"
+          :class="
+            lang === 'zh' ? 'font-bold text-[#d98c28]' : 'text-[#9c968b] hover:text-[#2c2825]'
+          "
           @click="setLang('zh')"
         >
           中文
@@ -183,7 +185,9 @@ function formatDate(epochSeconds: number): string {
         <span class="text-[#dcd6cc]">/</span>
         <span
           class="cursor-pointer tracking-wide transition-all duration-300"
-          :class="lang === 'en' ? 'font-bold text-[#d98c28]' : 'text-[#9c968b] hover:text-[#2c2825]'"
+          :class="
+            lang === 'en' ? 'font-bold text-[#d98c28]' : 'text-[#9c968b] hover:text-[#2c2825]'
+          "
           @click="setLang('en')"
         >
           EN
