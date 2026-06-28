@@ -1,6 +1,6 @@
 ---
 title: Docker
-description: Launch UniRhy and PostgreSQL together with a single Docker Compose file.
+description: Launch UniRhy and its bundled PostgreSQL with a single Docker Compose file.
 ---
 
 Docker is the recommended deployment shape for UniRhy. One `compose.yml` (formerly `docker-compose.yml`) brings up PostgreSQL and the UniRhy server together; the frontend static assets are served by the server itself, so no extra components are needed.
@@ -9,7 +9,7 @@ Docker is the recommended deployment shape for UniRhy. One `compose.yml` (former
 
 - Docker 24+
 - Docker Compose v2
-- At least 2 GB of free memory
+- At least 2 GB of free memory (transcoding typically requires more)
 - Disk space for music files and database data
 
 ## compose.yml
@@ -46,8 +46,6 @@ volumes:
   pgdata:
 ```
 
-> Images are published to DockerHub as `coolfan1024/unirhy`, tagged to match GitHub releases (e.g. `0.1.0-beta.1`, `latest`). Pin a specific version in production rather than using `latest`.
-
 ## Environment variables
 
 Create a `.env` next to `compose.yml`:
@@ -66,19 +64,13 @@ UNIRHY_MEDIA_SIGNING_KEY=replace-with-random-hex
 UNIRHY_CORS_ALLOWED_ORIGINS=https://music.example.com
 ```
 
-To generate a random key:
-
-```sh
-openssl rand -hex 32
-```
-
 ## Start
 
 ```sh
 docker compose up -d
 ```
 
-On first start the server initializes its schema automatically. After 10-30 seconds, open:
+On first start the server initializes its schema automatically. After 5–10 seconds, open:
 
 ```
 http://<your-host>:8654

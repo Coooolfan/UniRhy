@@ -1,6 +1,6 @@
 ---
 title: Docker 部署
-description: 使用 Docker Compose 一键启动 UniRhy 与 PostgreSQL。
+description: 使用 Docker Compose 一键启动 UniRhy 与配套 PostgreSQL。
 ---
 
 Docker 是 UniRhy 推荐的部署形态。一份 `compose.yml`（即旧名 `docker-compose.yml`）同时拉起 PostgreSQL 与 UniRhy server，前端静态资源由 server 直接服务，无需额外组件。
@@ -9,7 +9,7 @@ Docker 是 UniRhy 推荐的部署形态。一份 `compose.yml`（即旧名 `dock
 
 - Docker 24+
 - Docker Compose v2
-- 至少 2 GB 可用内存
+- 至少 2 GB 可用内存（转码通常需要较大的运行内存）
 - 用于存放音乐文件与数据库数据的磁盘空间
 
 ## 准备 compose.yml
@@ -46,8 +46,6 @@ volumes:
   pgdata:
 ```
 
-> Docker 镜像位于 DockerHub `coolfan1024/unirhy`，标签与 GitHub Release 同名（如 `0.1.0-beta.1`、`latest`）。生产环境建议钉具体版本号，不要使用 `latest`。
-
 ## 准备环境变量
 
 在 `compose.yml` 同目录下新建 `.env`：
@@ -66,19 +64,13 @@ UNIRHY_MEDIA_SIGNING_KEY=replace-with-random-hex
 UNIRHY_CORS_ALLOWED_ORIGINS=https://music.example.com
 ```
 
-生成随机密钥的一种方式：
-
-```sh
-openssl rand -hex 32
-```
-
 ## 启动
 
 ```sh
 docker compose up -d
 ```
 
-首次启动时 server 会自动运行迁移建立 schema。等待 10~30 秒后访问：
+首次启动时 server 会自动运行迁移建立 schema。等待 5~10 秒后访问：
 
 ```
 http://<服务器地址>:8654

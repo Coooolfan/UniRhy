@@ -3,7 +3,6 @@ import { fileURLToPath, URL } from 'node:url'
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import vueDevTools from 'vite-plugin-vue-devtools'
-import vueInspectorCopy from 'vite-plugin-vue-inspector-copy'
 import tailwindcss from '@tailwindcss/vite'
 import blogPlugin from './plugins/blog'
 
@@ -17,9 +16,10 @@ export default defineConfig({
     vueDevTools({
       componentInspector: {
         toggleComboKey: inspectorToggleComboKey,
+        launchEditor: 'zed',
       },
     }),
-    vueInspectorCopy(),
+    // vueInspectorCopy(),
     tailwindcss(),
   ],
   server: {

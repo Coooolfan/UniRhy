@@ -9,8 +9,8 @@ The default [Docker installation](/en/docs/install/docker) bundles a PostgreSQL 
 
 ## Version
 
-- **PostgreSQL 17+**. Other versions are untested.
-- Encoding must be `UTF8`.
+- **PostgreSQL 17+**
+- Encoding must be `UTF8`
 
 ## Create database and role
 

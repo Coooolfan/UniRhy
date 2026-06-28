@@ -9,8 +9,8 @@ description: 让 UniRhy 连接到外部已有的 PostgreSQL 实例。
 
 ## 版本要求
 
-- **PostgreSQL 17+**，其他版本未经测试。
-- Encoding 必须为 `UTF8`。
+- **PostgreSQL 17+**
+- Encoding 必须为 `UTF8`
 
 ## 创建数据库与用户
 
