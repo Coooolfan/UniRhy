@@ -32,7 +32,7 @@ When a playback request does not name a track, the system plays the track marked
 
 **Albums** and **playlists** do not collect abstract works. They collect **specific tracks**.
 
-For example: adding a track to a playlist adds the exact track that was playing at that moment. Reopening the playlist later plays the same track — not another performance, and not another recording of it.
+For example: adding a track to a playlist adds the exact track that was playing at that moment. Reopening the playlist later plays the same track — not another performance, and not another take of it.
 
 When a pop song exists as a studio version, a cover, an acoustic and a live take, UniRhy keeps them all under the same work while preserving each one's identity.
 
@@ -106,14 +106,14 @@ When a pop song exists as a studio version, a cover, an acoustic and a live take
 </figure>
 
 - A **work** holds many **tracks**;
-- Each **track** holds one or more **audio files** (different formats or bitrates of the same recording — the client picks one based on network conditions);
+- Each **track** holds one or more **audio files** (different formats or bitrates of the same track — the client picks one based on network conditions);
 - **Albums** and **playlists** are ordered collections of **tracks**.
 
 ## What this enables
 
-### Multiple recordings of a classical work
+### Multiple tracks of a classical work
 
-For classical music, recordings of the same work by different conductors, ensembles and eras differ substantially and are the dimension listeners care about most. UniRhy groups them under a single work, enabling side-by-side browsing, comparison and independent inclusion in different playlists.
+For classical music, tracks of the same work by different conductors, ensembles and eras differ substantially and are the dimension listeners care about most. UniRhy groups them under a single work, enabling side-by-side browsing, comparison and independent inclusion in different playlists.
 
 ### Clean placement of covers and arrangements
 
@@ -121,12 +121,12 @@ Live, acoustic, remix and cover variants of a pop song no longer clutter search 
 
 ### Playlist stability
 
-A playlist references the track, not the work. A track added today will remain the one played six months from now; it will not be silently replaced because a later import introduced a new recording sharing the same title.
+A playlist references the track, not the work. A track added today will remain the one played six months from now; it will not be silently replaced because a later import introduced a new track sharing the same title.
 
 ## Behaviour during everyday use
 
 - **During import**: UniRhy reads embedded metadata (title, artist, etc.) to determine the work a file belongs to and which track it is. Manual intervention is rarely required.
-- **When metadata is inaccurate**: if recordings of a single work are split across separate works, or unrelated tracks are merged into one, the grouping can be corrected from the admin UI.
+- **When metadata is inaccurate**: if tracks of a single work are split across separate works, or unrelated tracks are merged into one, the grouping can be corrected from the admin UI.
 - **Multiple files per track**: the original lossless file and its Opus/MP3 transcodes are automatically attached to the same track; the client picks an appropriate one for playback without surfacing the detail.
 
 In day-to-day use the visible concepts are mainly Albums, Playlists, Artists and Works. The term Track appears mostly on the work detail page, yet it is the layer that ties the whole structure together.
