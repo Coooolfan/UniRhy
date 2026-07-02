@@ -61,6 +61,10 @@ export const DOCS_SECTIONS: readonly DocsSection[] = [
         slug: 'data-model',
         title: { zh: '作品与版本', en: 'Works & Renditions' },
       },
+      {
+        slug: 'storage-nodes',
+        title: { zh: '存储节点', en: 'Storage Nodes' },
+      },
     ],
   },
 ] as const
