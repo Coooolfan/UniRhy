@@ -7,11 +7,15 @@ import { getPlatformRuntime } from '@/runtime/platform'
 
 const route = useRoute()
 const desktopPlatform = getPlatformRuntime().platform
+const isMacDesktop = desktopPlatform === 'macos'
 const usesCustomTitleBar = desktopPlatform === 'macos' || desktopPlatform === 'windows'
 const isAppRoute = computed(() => route.matched.some((record) => record.meta.requiresAuth))
-const dragRegionClass = computed(() =>
-    isAppRoute.value ? 'fixed left-0 top-0 z-40 h-32 w-64' : 'fixed left-0 top-0 z-40 h-16 w-64',
-)
+const dragRegionClass = computed(() => {
+    const heightClass = isAppRoute.value ? 'h-32' : 'h-16'
+    const leftClass = isMacDesktop ? 'left-24' : 'left-0'
+
+    return `fixed ${leftClass} top-0 z-40 ${heightClass} w-64`
+})
 
 const startWindowDrag = async (event: MouseEvent) => {
     if (!usesCustomTitleBar || event.button !== 0) {

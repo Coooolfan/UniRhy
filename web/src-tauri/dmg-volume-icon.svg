@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 150 150">
+  <linearGradient id="outerBodyGradient" x1="2.292" x2="146.6" y1="69.88" y2="69.88" gradientUnits="userSpaceOnUse">
+    <stop stop-color="#D3D3D3" offset="0"/>
+    <stop stop-color="#DBDBDD" offset="1"/>
+  </linearGradient>
+  <path fill="url(#outerBodyGradient)" d="m116.6 2-83.6 0.1c-4.9 0-9.2 3.1-10.1 7.5l-20.6 108.6v2.6l1 11.2c0.6 3.6 4.4 7.6 9.9 7.6h122.4c4.9 0 9.4-3.6 10-7.6l0.9-10v-3.6l-20.3-108.7c-0.7-4.4-4.6-7.7-9.6-7.7z"/>
+  <linearGradient id="bottomRimGradient" x1="2.292" x2="146.2" y1="129" y2="129" gradientUnits="userSpaceOnUse">
+    <stop stop-color="#BBBCBF" offset="0"/>
+    <stop stop-color="#898A8C" offset="1"/>
+  </linearGradient>
+  <path fill="url(#bottomRimGradient)" d="m138.9 116.8-129-0.2c-5 0.1-7.8 2.5-7.6 6.4l1 9c0.7 3.9 4.7 7.6 9.9 7.6h122.4c4.8 0 9.4-3.3 10-7.6l0.6-8.7c0.2-4.1-2.3-6.5-7.3-6.5z"/>
+  <linearGradient id="frontFaceGradient" x1="4.442" x2="144.5" y1="69.73" y2="69.73" gradientUnits="userSpaceOnUse">
+    <stop stop-color="#F2F2F3" offset="0"/>
+    <stop stop-color="#DCDCDE" offset="1"/>
+  </linearGradient>
+  <path fill="url(#frontFaceGradient)" d="m144.5 117.3-18.8-107.7c-0.8-4.1-4.3-7.6-9.3-7.6h-83.4c-4.1 0-8.3 2.5-9.1 6.6l-19.5 108.4c1.2 0.6 2.7-0.4 5.6-0.4l128.5 0.2c2.7-0.2 5.5 1.1 6 0.5z"/>
+  <linearGradient id="leftEdgeGradient" x1="20.3" x2="20.3" y1="6.768" y2="116.3" gradientUnits="userSpaceOnUse">
+    <stop stop-color="#BABABD" offset="0"/>
+    <stop stop-color="#DDDFDE" offset=".1453"/>
+    <stop stop-color="#9C9CA0" offset=".3084"/>
+    <stop stop-color="#D8D9DA" offset=".9073"/>
+    <stop stop-color="#ECECED" offset="1"/>
+  </linearGradient>
+  <polygon fill="url(#leftEdgeGradient)" points="7.5 116.3 26.7 4.3 24.9 5.9 3.9 116.3"/>
+  <linearGradient id="rightEdgeGradient" x1="-39.39" x2="-38.49" y1="-175.5" y2="-175.5" gradientTransform="matrix(-1 0 0 -1 100.5 -99)" gradientUnits="userSpaceOnUse">
+    <stop stop-color="#BABABA" offset="0"/>
+    <stop stop-color="#878787" offset="1"/>
+  </linearGradient>
+  <path fill="url(#rightEdgeGradient)" d="m122.9 4.1 20.4 112.5 1.6 1-20.3-112-1.7-1.5z"/>
+  <path fill="#A8AAAD" d="m10.3 116.6c-5.3 0.1-7.9 2.4-7.7 6.4l0.1 0.2c0-3.5 2.7-6 7.5-6h128.8c4 0 7 1.8 7 5.8h0.2c0.3-4-2.6-6.4-7.4-6.4h-128.5z"/>
+  <linearGradient id="lowerPanelGradient" x1="4.32" x2="144.2" y1="128.3" y2="128.3" gradientUnits="userSpaceOnUse">
+    <stop stop-color="#CBCCCD" offset=".005618"/>
+    <stop stop-color="#C7C8C9" offset=".2796"/>
+    <stop stop-color="#BCBDBF" offset=".5629"/>
+    <stop stop-color="#AAAAAC" offset=".848"/>
+    <stop stop-color="#9EA0A2" offset="1"/>
+  </linearGradient>
+  <path d="m138.5 118h-128.6c-3.7 0.2-5.6 1.6-5.6 4.6l0.7 9.3c0.5 3.3 3.9 6.5 8.6 6.5l121.4-0.1c4.1 0 8.2-2.4 8.6-6.7l0.6-9.1c0-2.8-1.9-4.4-5.7-4.5z" fill="url(#lowerPanelGradient)"/>
+  <path fill="#79797B" d="m5.5 130.8-0.6-7.8c-0.3-3.6 2.1-4.9 5.5-5-3.7 0-6.3 0.8-6.1 5l0.7 8.3c0.5 3.5 3.9 6.8 8.6 6.8h121.4c5 0 8.4-3.1 8.6-6.7l0.6-8.4-0.1-1.6-0.8 9.6c-0.4 4.3-3.9 6.8-8.3 6.8h-121.4c-4.1 0-7.6-2.7-8.1-7z"/>
+  <ellipse cx="125.5" cy="128.1" rx="2.4" ry="1.9" fill="#C6C5BD"/>
+  <linearGradient id="indicatorLightGradient" x1="125.4" x2="125.7" y1="126" y2="129.9" gradientUnits="userSpaceOnUse">
+    <stop stop-color="#FFF8A5" offset="0"/>
+    <stop stop-color="#F7B413" offset=".5255"/>
+    <stop stop-color="#D87301" offset="1"/>
+  </linearGradient>
+  <path d="m127.8 127.8c0 1.1-1.1 2-2.3 2s-2.4-0.8-2.4-1.8 1.1-2 2.5-1.9c1.3 0 2.3 0.9 2.2 1.7z" fill="url(#indicatorLightGradient)"/>
+  <path fill="#EFA208" d="m110.6 16.4c-9.3 2.8-16.6 3.8-22.1 5.1-2.4 0.6-3.4 0.8-4.7 1.7s-3 2.4-3.4 5.2c-1 7.6-4.2 27.8-6 39.8-0.9 4.5-3.4 5.9-6 5.9-3.2 0-6.1-2.1-6.1-6.5 0.1-3.2 3.1-6 6.3-6 2.1 0 3 0.6 3 0.6l1.4-8.6c-1.1-0.4-2.4-0.6-4.3-0.5-7 0-14.9 5.6-15.3 15.1 0 9.4 6.2 15.4 14.2 15.4 3.8 0.1 11.8-1.5 14.4-10 1-3.2 1.1-5 2-11.1 1.4-9.3 2.9-24.4 3.6-27.6 1-4.4 5.5-4.7 10.9-5.9 6.6-1.3 8.7-2.4 9.1-2.6 3.4-1.7 2.8-6.8 3-10.2v0.2zm-41.7 73.3c-13.4 0-22-9-21.9-20.7 0.1-7.5 4.1-10.8 6-15 2-4.5 6-14.8 6.9-17.1 0.5-1.4 1.3-1.9 2.3-1.9 1.5 0 2.2 1 2 2.9-0.3 3.2-1.7 10.5-1.7 10.5 1.2-0.2 3.2-1 6.9-1.1l1.6 0.1c0.5-3 1-7.9 1.2-9 0.4-5.8-3-10-9.6-10.2-6.5 0-9 3.4-10.6 6.9-0.4 1.1-5 12.1-8.6 19-2.3 4.3-4.4 8.5-4.8 14.5-0.6 15.9 10.1 29.9 27.1 30 18 0.8 29.3-10 28.2-21.7-0.7-5.5-1.4-1.8-3.4 1-4.9 6.6-12 11.7-21.6 11.8z"/>
+</svg>

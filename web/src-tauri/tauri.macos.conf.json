@@ -1,0 +1,20 @@
+{
+  "app": {
+    "windows": [
+      {
+        "title": "UniRhy",
+        "width": 1280,
+        "height": 800,
+        "minWidth": 900,
+        "minHeight": 600,
+        "decorations": true,
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true,
+        "trafficLightPosition": {
+          "x": 18,
+          "y": 18
+        }
+      }
+    ]
+  }
+}
