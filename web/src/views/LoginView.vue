@@ -4,7 +4,8 @@
     >
         <!-- Main Container -->
         <div
-            class="relative z-10 mx-auto h-125 w-full max-w-sm perspective-1000 md:translate-x-64 md:max-w-100"
+            class="relative z-10 mx-auto w-full max-w-sm perspective-1000 md:translate-x-64 md:max-w-100"
+            :class="showBackendEndpoint ? 'h-[32.5rem]' : 'h-125'"
         >
             <div class="deco-circle circle-1"></div>
             <div class="deco-circle circle-2"></div>
@@ -144,7 +145,10 @@
                     </div>
 
                     <!-- Backend endpoint config (Tauri only) -->
-                    <div v-if="showBackendEndpoint" class="mt-6 pt-4 border-t border-[#e6dcc8]">
+                    <div
+                        v-if="showBackendEndpoint"
+                        class="mt-4 mb-2 border-t border-[#e6dcc8] pt-3 pb-1"
+                    >
                         <label class="text-xs text-[#8a817c] mb-2 block">服务端地址</label>
                         <div class="flex gap-2">
                             <input
