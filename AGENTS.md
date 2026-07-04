@@ -24,6 +24,7 @@ UniRhy (独一律) 是一个私有化的音乐流媒体平台
 - `./skills` 文件夹为技能包存放位置，其中包含某一领域的额外文档、脚本等，先探索项目，再决定是否需要读取相关技能
   - `./skills/jimmer-orm` Jimmer ORM 开发指南：适用于：(1) 定义或修改 Jimmer 实体（使用 @Entity 注解的 interface）；(2) 编写 Jimmer DSL 查询代码；(3) 配置实体关联关系（@ManyToOne, @OneToMany, @ManyToMany）；(4) 使用动态谓词、动态表连接或隐式子查询；(5) 编辑包含 Jimmer 相关代码的 Java/Kotlin 文件。
   - `./skills/jvm-live-debug` JVM 运行时断点调试：适用于在 CLI 环境中对 bootRun 启动的服务做交互式断点调试（JDWP + jdb + tmux 组合），可设断点、看变量、在断点处调用方法。
+  - `./skills/release-note-creator` Release Notes 撰写：适用于发版前为指定版本号生成更新日志，包含变更范围判定规则与书写规范，产出写入 `docs/release_notes/<version>.md`。
 - Commit Message 应当和以往风格一致
 - 所有描述性文字应该始终是面向 开发者/用户 的最终产物，不需要描述中间过程和演变原因。
 - 除非用户主动要求，不需要考虑 API/数据库/模式 的向前兼容。
