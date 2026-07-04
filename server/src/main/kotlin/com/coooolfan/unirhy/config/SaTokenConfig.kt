@@ -30,7 +30,13 @@ class SaTokenConfig(
     }
 
     @Bean
-    fun getStpLogicJwt(): StpLogic {
+    fun getStpLogicJwt(
+        @Value("\${sa-token.jwt-secret-key:}") jwtSecretKey: String,
+    ): StpLogic {
+        check(jwtSecretKey.isNotBlank()) {
+            "JWT secret key is not configured. " +
+                "Set SA_TOKEN_JWT_SECRET_KEY (or the shared UNIRHY_SECRET_KEY) before starting the server."
+        }
         return StpLogicJwtForStateless()
     }
 

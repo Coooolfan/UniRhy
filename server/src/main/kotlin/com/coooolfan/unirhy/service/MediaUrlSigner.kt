@@ -26,7 +26,7 @@ class MediaUrlSigner(
             return key.toByteArray(Charsets.UTF_8)
         }
         logger.warn(
-            "UNIRHY_MEDIA_SIGNING_KEY is not configured. " +
+            "UNIRHY_MEDIA_SIGNING_KEY (or the shared UNIRHY_SECRET_KEY) is not configured. " +
                 "A random key has been generated — presigned URLs will not survive restarts."
         )
         val random = ByteArray(32)
