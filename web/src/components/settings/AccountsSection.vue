@@ -12,7 +12,7 @@ type Props = {
     isSaving: boolean
     error: string
     createAccount: (form: AccountForm) => Promise<string | null>
-    updateAccount: (id: number, form: AccountForm) => Promise<string | null>
+    updateAccount: (id: number, form: AccountForm, currentEmail: string) => Promise<string | null>
     deleteAccount: (account: Account) => Promise<string | null>
     canManage?: boolean
 }
@@ -51,7 +51,7 @@ const openEditAccountModal = async (account: Account) => {
             mode: 'update',
             initialName: account.name,
             initialEmail: account.email,
-            submit: (form: AccountForm) => props.updateAccount(account.id, form),
+            submit: (form: AccountForm) => props.updateAccount(account.id, form, account.email),
         },
     })
 }

@@ -21,7 +21,13 @@ const form = reactive({
     name: '',
     email: '',
     password: '',
+    currentPassword: '',
 })
+
+// 修改邮箱或密码属于凭据变更，需验证当前密码
+const emailChanged = computed(() => form.email !== (userStore.user?.email ?? ''))
+const passwordChanged = computed(() => form.password.trim().length > 0)
+const requiresCurrentPassword = computed(() => emailChanged.value || passwordChanged.value)
 let successResetTimer: ReturnType<typeof setTimeout> | null = null
 
 const contentWidthClass = computed(() => {
@@ -44,6 +50,7 @@ const resetFormFromUser = () => {
     form.name = user.name
     form.email = user.email
     form.password = ''
+    form.currentPassword = ''
 }
 
 resetFormFromUser()
@@ -75,18 +82,30 @@ const togglePasswordVisibility = () => {
 const handleUpdate = async () => {
     if (isSubmitting.value) return
 
-    isSubmitting.value = true
     errorMessage.value = ''
     successMessage.value = ''
 
+    if (requiresCurrentPassword.value && !form.currentPassword) {
+        errorMessage.value = '修改邮箱或密码需要输入当前密码'
+        return
+    }
+
+    isSubmitting.value = true
+
     try {
-        await userStore.updateUser({
-            name: form.name,
-            email: form.email,
-            password: form.password.trim() ? form.password : undefined,
-        })
+        if (form.name !== (userStore.user?.name ?? '')) {
+            await userStore.updateUser({ name: form.name })
+        }
+        if (requiresCurrentPassword.value) {
+            await userStore.updateCredentials({
+                currentPassword: form.currentPassword,
+                ...(emailChanged.value ? { email: form.email } : {}),
+                ...(passwordChanged.value ? { password: form.password } : {}),
+            })
+        }
         successMessage.value = '个人信息更新成功'
         form.password = ''
+        form.currentPassword = ''
         showPassword.value = false
         successResetTimer = setTimeout(() => {
             mode.value = 'view'
@@ -274,6 +293,29 @@ onUnmounted(() => {
                             <Eye v-if="!showPassword" :size="18" />
                             <EyeOff v-else :size="18" />
                         </button>
+                    </div>
+                </div>
+
+                <div v-if="requiresCurrentPassword" class="space-y-1">
+                    <label class="ml-1 text-xs font-medium uppercase tracking-wider text-[#8C857B]">
+                        当前密码
+                        <span class="normal-case tracking-normal text-[#B95D5D]">
+                            (修改邮箱或密码需验证)
+                        </span>
+                    </label>
+                    <div class="group relative">
+                        <div
+                            class="absolute top-1/2 left-3 -translate-y-1/2 text-[#D6D1C4] transition-colors group-focus-within:text-[#D98C28]"
+                        >
+                            <Lock :size="18" />
+                        </div>
+                        <input
+                            v-model="form.currentPassword"
+                            type="password"
+                            autocomplete="current-password"
+                            class="w-full border border-[#D6D1C4] bg-white py-2.5 pr-4 pl-10 text-[#2C2825] outline-none transition-all placeholder-[#E0DCD6] focus:border-[#D98C28] focus:ring-1 focus:ring-[#D98C28]"
+                            placeholder="请输入当前密码"
+                        />
                     </div>
                 </div>
 

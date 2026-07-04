@@ -2,11 +2,11 @@ export type AllErrors = {
         family: 'COMMON', 
         code: 'FORBIDDEN'
     } | {
-        family: 'SYSTEM', 
-        code: 'SYSTEM_ALREADY_INITIALIZED'
-    } | {
         family: 'COMMON', 
         code: 'AUTHENTICATION_FAILED'
+    } | {
+        family: 'SYSTEM', 
+        code: 'SYSTEM_ALREADY_INITIALIZED'
     };
 export type ApiErrors = {
     'accountController': {
@@ -23,6 +23,15 @@ export type ApiErrors = {
         'create': AllErrors & ({
                 family: 'COMMON', 
                 code: 'FORBIDDEN', 
+                readonly [key:string]: any
+            }), 
+        'updateCredentials': AllErrors & ({
+                family: 'COMMON', 
+                code: 'FORBIDDEN', 
+                readonly [key:string]: any
+            } | {
+                family: 'COMMON', 
+                code: 'AUTHENTICATION_FAILED', 
                 readonly [key:string]: any
             })
     }, 

@@ -94,7 +94,11 @@ export const useAccountSettings = () => {
         }
     }
 
-    const updateAccount = async (id: number, form: AccountForm): Promise<string | null> => {
+    const updateAccount = async (
+        id: number,
+        form: AccountForm,
+        currentEmail: string,
+    ): Promise<string | null> => {
         const validated = validateAccountForm(form, { mode: 'update' })
         if ('error' in validated) {
             return validated.error
@@ -103,16 +107,25 @@ export const useAccountSettings = () => {
             return '已有保存操作正在执行'
         }
 
+        const emailChanged = validated.payload.email !== currentEmail
+        const passwordChanged = validated.payload.password.length > 0
+
         isSaving.value = true
         try {
             await api.accountController.update({
                 id,
-                body: {
-                    name: validated.payload.name,
-                    email: validated.payload.email,
-                    ...(validated.payload.password ? { password: validated.payload.password } : {}),
-                },
+                body: { name: validated.payload.name },
             })
+            // 邮箱与密码属于登录凭据，走独立端点；管理员重置他人凭据无需当前密码
+            if (emailChanged || passwordChanged) {
+                await api.accountController.updateCredentials({
+                    id,
+                    body: {
+                        ...(emailChanged ? { email: validated.payload.email } : {}),
+                        ...(passwordChanged ? { password: validated.payload.password } : {}),
+                    },
+                })
+            }
             await fetchAccounts()
             return null
         } catch (e) {

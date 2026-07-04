@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { api, clearAuthToken } from '@/ApiInstance'
 import type { AccountDto } from '@/__generated/model/dto/AccountDto'
 import type { AccountUpdate } from '@/__generated/model/static/AccountUpdate'
+import type { AccountCredentialsUpdate } from '@/__generated/model/static/AccountCredentialsUpdate'
 
 export const DEFAULT_PREFERRED_ASSET_FORMAT = 'audio/opus'
 
@@ -64,6 +65,20 @@ export const useUserStore = defineStore('user', () => {
         }
     }
 
+    const updateCredentials = async (payload: AccountCredentialsUpdate) => {
+        if (!user.value) return
+        try {
+            const updatedUser = await api.accountController.updateCredentials({
+                id: user.value.id,
+                body: payload,
+            })
+            user.value = updatedUser
+        } catch (error) {
+            console.error('Failed to update credentials', error)
+            throw error
+        }
+    }
+
     const logout = async () => {
         try {
             await api.tokenController.logout()
@@ -93,6 +108,7 @@ export const useUserStore = defineStore('user', () => {
         ensureUserLoaded,
         getPreferredAssetFormat,
         updateUser,
+        updateCredentials,
         logout,
         clearUser,
     }

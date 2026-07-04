@@ -1,6 +1,6 @@
 import type {Executor} from '../';
 import type {AccountDto} from '../model/dto/';
-import type {AccountCreate, AccountUpdate} from '../model/static/';
+import type {AccountCreate, AccountCredentialsUpdate, AccountUpdate} from '../model/static/';
 
 /**
  * 账户管理接口
@@ -98,6 +98,27 @@ export class AccountController {
         _uri += encodeURIComponent(options.id);
         return (await this.executor({uri: _uri, method: 'PUT', body: options.body})) as Promise<AccountDto['AccountController/DEFAULT_ACCOUNT_FETCHER']>;
     }
+    
+    /**
+     * 更新指定账户的登录凭据
+     * 
+     * 此接口用于修改指定ID账户的密码或邮箱
+     * 本人操作必须提供当前密码以验证身份；管理员重置他人凭据时无需提供
+     * 
+     * @parameter {AccountControllerOptions['updateCredentials']} options
+     * - id 账户 ID
+     * - update 凭据更新参数
+     * @return Account 返回更新后的账户（默认 fetcher）
+     * 
+     */
+    readonly updateCredentials: (options: AccountControllerOptions['updateCredentials']) => Promise<
+        AccountDto['AccountController/DEFAULT_ACCOUNT_FETCHER']
+    > = async(options) => {
+        let _uri = '/api/accounts/';
+        _uri += encodeURIComponent(options.id);
+        _uri += '/credentials';
+        return (await this.executor({uri: _uri, method: 'PUT', body: options.body})) as Promise<AccountDto['AccountController/DEFAULT_ACCOUNT_FETCHER']>;
+    }
 }
 
 export type AccountControllerOptions = {
@@ -125,5 +146,15 @@ export type AccountControllerOptions = {
          * 更新参数
          */
         readonly body: AccountUpdate
+    }, 
+    'updateCredentials': {
+        /**
+         * 账户 ID
+         */
+        readonly id: number, 
+        /**
+         * 凭据更新参数
+         */
+        readonly body: AccountCredentialsUpdate
     }
 }

@@ -32,7 +32,7 @@ export class PluginController {
      * 导出（下载）插件包
      * 
      * 此接口用于将指定插件打包为 `.up` 文件并以附件形式下载
-     * 需要用户登录认证才能访问
+     * 需要管理员角色才能访问
      * 
      * @parameter {PluginControllerOptions['download']} options
      * - id 插件 ID

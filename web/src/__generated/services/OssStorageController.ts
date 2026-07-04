@@ -15,7 +15,7 @@ export class OssStorageController {
      * 创建OSS存储配置
      * 
      * 此接口用于创建新的OSS存储配置
-     * 需要用户登录认证才能访问
+     * 需要管理员权限才能访问
      * 
      * @parameter {OssStorageControllerOptions['create']} options
      * - create 创建参数
@@ -33,7 +33,7 @@ export class OssStorageController {
      * 删除指定OSS存储配置
      * 
      * 此接口用于删除指定ID的OSS存储配置
-     * 需要用户登录认证才能访问
+     * 需要管理员权限才能访问
      * 
      * @parameter {OssStorageControllerOptions['delete']} options
      * - id 存储配置 ID
@@ -51,7 +51,7 @@ export class OssStorageController {
      * 获取指定OSS存储配置
      * 
      * 此接口用于获取指定ID的OSS存储配置详情
-     * 需要用户登录认证才能访问
+     * 需要管理员权限才能访问
      * 
      * @parameter {OssStorageControllerOptions['get']} options
      * - id 存储配置 ID
@@ -70,7 +70,7 @@ export class OssStorageController {
      * 获取OSS存储列表
      * 
      * 此接口用于获取所有OSS存储配置
-     * 需要用户登录认证才能访问
+     * 需要管理员权限才能访问
      * 
      * @return List<FileProviderOss> 返回OSS存储列表（默认 fetcher）
      * 
@@ -86,7 +86,7 @@ export class OssStorageController {
      * 更新指定OSS存储配置
      * 
      * 此接口用于更新指定ID的OSS存储配置信息
-     * 需要用户登录认证才能访问
+     * 需要管理员权限才能访问
      * 
      * @parameter {OssStorageControllerOptions['update']} options
      * - id 存储配置 ID

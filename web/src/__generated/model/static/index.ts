@@ -1,4 +1,5 @@
 export type {AccountCreate} from './AccountCreate';
+export type {AccountCredentialsUpdate} from './AccountCredentialsUpdate';
 export type {AccountPreferences} from './AccountPreferences';
 export type {AccountUpdate} from './AccountUpdate';
 export type {AlbumUpdate} from './AlbumUpdate';

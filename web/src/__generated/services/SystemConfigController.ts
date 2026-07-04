@@ -31,7 +31,7 @@ export class SystemConfigController {
      * 获取系统配置
      * 
      * 此接口用于获取当前系统配置
-     * 需要用户登录认证才能访问
+     * 需要管理员权限才能访问
      * 
      * @return SystemConfig 返回系统配置（默认 fetcher）
      * 
