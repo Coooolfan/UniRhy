@@ -153,6 +153,76 @@ jobs:
           path: website/dist
           if-no-files-found: error
 
+  build-desktop-macos:
+    name: 构建 macOS 桌面应用
+    needs: prepare-release
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: ./web
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.prepare-release.outputs.target_sha }}
+
+      - name: 设置 Node 环境
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: 启用 Corepack 并激活 Yarn
+        run: |
+          corepack enable
+          corepack prepare yarn@${{ env.YARN_VERSION }} --activate
+
+      - name: 缓存 Yarn 包缓存
+        uses: actions/cache@v4
+        with:
+          path: web/.yarn/cache
+          key: ${{ runner.os }}-yarn-web-${{ hashFiles('web/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-yarn-web-
+
+      - name: 设置 Rust 工具链
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: 缓存 Cargo 依赖
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            web/src-tauri/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('web/src-tauri/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: 构建 Tauri 应用
+        env:
+          VERSION: ${{ needs.prepare-release.outputs.version }}
+        run: |
+          yarn --version
+          yarn install --immutable
+          yarn tauri build --config "{\"version\":\"${VERSION}\",\"build\":{\"beforeBuildCommand\":\"yarn build\"}}"
+
+      - name: 整理 DMG 产物
+        env:
+          VERSION: ${{ needs.prepare-release.outputs.version }}
+        run: |
+          set -euo pipefail
+          DMG_FILE="$(ls src-tauri/target/release/bundle/dmg/*.dmg | head -n 1)"
+          test -n "$DMG_FILE"
+          mv "$DMG_FILE" "src-tauri/target/release/bundle/dmg/unirhy-v${VERSION}-macos-arm64.dmg"
+          ls -al "src-tauri/target/release/bundle/dmg/unirhy-v${VERSION}-macos-arm64.dmg"
+
+      - name: 上传桌面产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-macos
+          path: web/src-tauri/target/release/bundle/dmg/unirhy-v${{ needs.prepare-release.outputs.version }}-macos-arm64.dmg
+          if-no-files-found: error
+
   build-jar:
     name: 构建 JAR 包
     needs:
@@ -239,12 +309,19 @@ jobs:
     needs:
       - prepare-release
       - create-draft-release
+      - build-desktop-macos
     runs-on: ubuntu-latest
     steps:
       - name: 下载 JAR 产物
         uses: actions/download-artifact@v4
         with:
           name: jar
+          path: dist
+
+      - name: 下载桌面产物
+        uses: actions/download-artifact@v4
+        with:
+          name: desktop-macos
           path: dist
 
       - name: 上传到 Release
@@ -255,7 +332,10 @@ jobs:
         run: |
           set -euo pipefail
           ls -R dist
-          gh release upload "$VERSION" "dist/unirhy-v${VERSION}.jar" --clobber
+          gh release upload "$VERSION" \
+            "dist/unirhy-v${VERSION}.jar" \
+            "dist/unirhy-v${VERSION}-macos-arm64.dmg" \
+            --clobber
 
   build-docker-for-jvm:
     name: 构建并推送 Docker 镜像
