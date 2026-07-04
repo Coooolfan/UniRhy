@@ -250,6 +250,7 @@ jobs:
       - name: 上传到 Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
           VERSION: ${{ needs.prepare-release.outputs.version }}
         run: |
           set -euo pipefail
@@ -331,6 +332,7 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          wranglerVersion: "4.107.0"
           command: versions upload --tag ${{ needs.prepare-release.outputs.version }} --message "Release ${{ needs.prepare-release.outputs.version }}"
 
       - name: 部署到生产（上传并切 100% 流量）
@@ -339,6 +341,7 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          wranglerVersion: "4.107.0"
           command: deploy
 
   publish-release:
@@ -353,6 +356,7 @@ jobs:
       - name: 切换 Release 为发布态
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
           VERSION: ${{ needs.prepare-release.outputs.version }}
           PUBLISH_LATEST: ${{ needs.prepare-release.outputs.publish_latest }}
         run: |
