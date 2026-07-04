@@ -90,6 +90,25 @@ class AsyncTaskQueueStore(
         }
     }
 
+    /**
+     * 将所有 RUNNING 任务重置回 PENDING。
+     *
+     * 单节点部署下，进程启动瞬间不可能存在真正执行中的任务，
+     * 此时的 RUNNING 记录只能是上次进程崩溃的遗留，需要重新入队。
+     */
+    fun resetRunningTasksToPending(): Int {
+        val sql = """
+            UPDATE public.async_task_log
+            SET status = :pendingStatus,
+                started_at = NULL
+            WHERE status = :runningStatus
+        """.trimIndent()
+        val params = MapSqlParameterSource()
+            .addValue("pendingStatus", TaskStatus.PENDING.name)
+            .addValue("runningStatus", TaskStatus.RUNNING.name)
+        return jdbc.update(sql, params)
+    }
+
     fun completeTask(logId: Long, status: TaskStatus, reason: String) {
         sql.createUpdate(AsyncTaskLog::class) {
             set(table.status, status)

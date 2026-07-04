@@ -28,6 +28,7 @@ import org.springframework.web.bind.annotation.RestController
  * 提供OSS存储配置的增删改查能力
  */
 @SaCheckLogin
+@SaCheckRole(ROLE_ADMIN)
 @RestController
 @RequestMapping("/api/storage/oss-nodes")
 class OssStorageController(private val service: OssStorageService) {
@@ -36,12 +37,12 @@ class OssStorageController(private val service: OssStorageService) {
      * 获取OSS存储列表
      *
      * 此接口用于获取所有OSS存储配置
-     * 需要用户登录认证才能访问
+     * 需要管理员权限才能访问
      *
      * @return List<FileProviderOss> 返回OSS存储列表（默认 fetcher）
      *
      * @api GET /api/storage/oss-nodes
-     * @permission 需要登录认证
+     * @permission 需要管理员权限
      * @description 调用OssStorageService.list()方法获取存储列表
      */
     @GetMapping
@@ -53,13 +54,13 @@ class OssStorageController(private val service: OssStorageService) {
      * 获取指定OSS存储配置
      *
      * 此接口用于获取指定ID的OSS存储配置详情
-     * 需要用户登录认证才能访问
+     * 需要管理员权限才能访问
      *
      * @param id 存储配置 ID
      * @return FileProviderOss 返回OSS存储配置（默认 fetcher）
      *
      * @api GET /api/storage/oss-nodes/{id}
-     * @permission 需要登录认证
+     * @permission 需要管理员权限
      * @description 调用OssStorageService.get()方法获取存储配置
      */
     @GetMapping("/{id}")
@@ -71,17 +72,16 @@ class OssStorageController(private val service: OssStorageService) {
      * 创建OSS存储配置
      *
      * 此接口用于创建新的OSS存储配置
-     * 需要用户登录认证才能访问
+     * 需要管理员权限才能访问
      *
      * @param create 创建参数
      * @return FileProviderOss 返回创建后的OSS存储配置（默认 fetcher）
      *
      * @api POST /api/storage/oss-nodes
-     * @permission 需要登录认证
+     * @permission 需要管理员权限
      * @description 调用OssStorageService.create()方法创建存储配置
      */
     @PostMapping
-    @SaCheckRole(ROLE_ADMIN)
     @ResponseStatus(HttpStatus.CREATED)
     fun create(@RequestBody create: FileProviderOssCreate): @FetchBy("DEFAULT_OSS_FETCHER") FileProviderOss {
         return service.create(create, DEFAULT_OSS_FETCHER)
@@ -91,18 +91,17 @@ class OssStorageController(private val service: OssStorageService) {
      * 更新指定OSS存储配置
      *
      * 此接口用于更新指定ID的OSS存储配置信息
-     * 需要用户登录认证才能访问
+     * 需要管理员权限才能访问
      *
      * @param id 存储配置 ID
      * @param update 更新参数
      * @return FileProviderOss 返回更新后的OSS存储配置（默认 fetcher）
      *
      * @api PUT /api/storage/oss-nodes/{id}
-     * @permission 需要登录认证
+     * @permission 需要管理员权限
      * @description 调用OssStorageService.update()方法更新存储配置
      */
     @PutMapping("/{id}")
-    @SaCheckRole(ROLE_ADMIN)
     fun update(
         @PathVariable id: Long,
         @RequestBody update: FileProviderOssUpdate,
@@ -114,16 +113,15 @@ class OssStorageController(private val service: OssStorageService) {
      * 删除指定OSS存储配置
      *
      * 此接口用于删除指定ID的OSS存储配置
-     * 需要用户登录认证才能访问
+     * 需要管理员权限才能访问
      *
      * @param id 存储配置 ID
      *
      * @api DELETE /api/storage/oss-nodes/{id}
-     * @permission 需要登录认证
+     * @permission 需要管理员权限
      * @description 调用OssStorageService.delete()方法删除存储配置
      */
     @DeleteMapping("/{id}")
-    @SaCheckRole(ROLE_ADMIN)
     @ResponseStatus(HttpStatus.NO_CONTENT)
     fun delete(@PathVariable id: Long) {
         service.delete(id)

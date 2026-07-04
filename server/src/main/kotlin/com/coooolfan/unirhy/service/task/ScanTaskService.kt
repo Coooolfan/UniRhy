@@ -52,23 +52,39 @@ class ScanTaskService(
     }
 
     fun consumePendingTask() {
+        // claim 使用独立短事务，下载与元数据解析等重 IO 在事务外执行；
+        // 崩溃遗留的 RUNNING 任务由启动期的 resetRunningTasksToPending 重新入队
+        val claimedTasks = try {
+            transactionTemplate.execute {
+                queueStore.claim(TaskType.METADATA_PARSE, METADATA_PARSE_CLAIM_LIMIT)
+            }.orEmpty()
+        } catch (ex: Throwable) {
+            logger.error("Failed to claim pending scan tasks", ex)
+            return
+        }
+
+        for (claimedTask in claimedTasks) {
+            try {
+                val payload = objectMapper.readValue(claimedTask.params, ScanFileTaskPayload::class.java)
+                val prepared = prepare(payload)
+                transactionTemplate.executeWithoutResult {
+                    prepared.recording?.let(::saveScannedRecording)
+                    queueStore.completeTask(claimedTask.id, TaskStatus.COMPLETED, prepared.reason)
+                }
+            } catch (ex: Throwable) {
+                logger.error("Scan task failed, logId={}", claimedTask.id, ex)
+                completeTaskQuietly(claimedTask.id, failureReason(ex))
+            }
+        }
+    }
+
+    private fun completeTaskQuietly(logId: Long, reason: String) {
         try {
             transactionTemplate.executeWithoutResult {
-                val claimedTasks = queueStore.claim(TaskType.METADATA_PARSE, METADATA_PARSE_CLAIM_LIMIT)
-
-                for (claimedTask in claimedTasks) {
-                    val (status, reason) = try {
-                        val payload = objectMapper.readValue(claimedTask.params, ScanFileTaskPayload::class.java)
-                        TaskStatus.COMPLETED to execute(payload)
-                    } catch (ex: Throwable) {
-                        logger.error("Scan task failed, logId={}", claimedTask.id, ex)
-                        TaskStatus.FAILED to failureReason(ex)
-                    }
-                    queueStore.completeTask(claimedTask.id, status, reason)
-                }
+                queueStore.completeTask(logId, TaskStatus.FAILED, reason)
             }
         } catch (ex: Throwable) {
-            logger.error("Failed to consume pending scan task", ex)
+            logger.error("Failed to mark scan task as failed, logId={}", logId, ex)
         }
     }
 
@@ -76,7 +92,12 @@ class ScanTaskService(
         return storageObjects.resolve(request.providerType, request.providerId)
     }
 
-    private fun execute(payload: ScanFileTaskPayload): String {
+    private data class PreparedScan(
+        val recording: Recording?,
+        val reason: String,
+    )
+
+    private fun prepare(payload: ScanFileTaskPayload): PreparedScan {
         val provider = validateRequest(
             ScanTaskRequest(
                 providerType = payload.providerType,
@@ -93,11 +114,11 @@ class ScanTaskService(
                 provider.providerId,
                 payload.objectKey
             )
-            return "SKIPPED: source file missing"
+            return PreparedScan(recording = null, reason = "SKIPPED: source file missing")
         }
 
         if (audioMediaFileExists(provider.providerType, provider.providerId, payload.objectKey)) {
-            return "SKIPPED: media file already scanned"
+            return PreparedScan(recording = null, reason = "SKIPPED: media file already scanned")
         }
 
         val scannedRecording = storageObjects.materializeTempFile(provider, payload.objectKey).use { tempFile ->
@@ -110,8 +131,11 @@ class ScanTaskService(
                 size = stat.size,
             )
         }
+        return PreparedScan(recording = scannedRecording, reason = "SUCCESS")
+    }
 
-        sql.saveEntities(listOf(scannedRecording)) {
+    private fun saveScannedRecording(recording: Recording) {
+        sql.saveEntities(listOf(recording)) {
             setMode(SaveMode.INSERT_ONLY)
             setAssociatedModeAll(AssociatedSaveMode.APPEND)
             setAssociatedMode(Recording::work, AssociatedSaveMode.APPEND_IF_ABSENT)
@@ -124,7 +148,6 @@ class ScanTaskService(
             setAssociatedMode(Recording::albumRecordings, AssociatedSaveMode.APPEND_IF_ABSENT)
             setAssociatedMode(AlbumRecording::album, AssociatedSaveMode.APPEND_IF_ABSENT)
         }
-        return "SUCCESS"
     }
 
     private fun audioMediaFileExists(providerType: FileProviderType, providerId: Long, objectKey: String): Boolean {

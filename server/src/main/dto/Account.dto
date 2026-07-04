@@ -3,10 +3,6 @@ export com.coooolfan.unirhy.model.Account
 input AccountUpdate {
     name?
 
-    password?
-
-    email?
-
     preferences?
 }
 

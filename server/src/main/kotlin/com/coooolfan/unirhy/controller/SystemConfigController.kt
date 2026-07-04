@@ -57,15 +57,16 @@ class SystemConfigController(
      * 获取系统配置
      *
      * 此接口用于获取当前系统配置
-     * 需要用户登录认证才能访问
+     * 需要管理员权限才能访问
      *
      * @return SystemConfig 返回系统配置（默认 fetcher）
      *
      * @api GET /api/system-config
-     * @permission 需要登录认证
+     * @permission 需要管理员权限
      * @description 调用SystemConfigService.get()方法获取系统配置
      */
     @SaCheckLogin
+    @SaCheckRole(ROLE_ADMIN)
     @GetMapping
     fun get(): @FetchBy("DEFAULT_SYSTEM_CONFIG_FETCHER") SystemConfig {
         return service.get(DEFAULT_SYSTEM_CONFIG_FETCHER)

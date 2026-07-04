@@ -7,6 +7,7 @@ import com.coooolfan.unirhy.error.CommonException
 import com.coooolfan.unirhy.model.Account
 import com.coooolfan.unirhy.model.by
 import com.coooolfan.unirhy.model.dto.AccountCreate
+import com.coooolfan.unirhy.model.dto.AccountCredentialsUpdate
 import com.coooolfan.unirhy.model.dto.AccountUpdate
 import com.coooolfan.unirhy.service.AccountService
 import org.babyfish.jimmer.client.FetchBy
@@ -118,6 +119,30 @@ class AccountController(private val service: AccountService) {
     @PutMapping("/{id}")
     fun update(@PathVariable id: Long, @RequestBody update: AccountUpdate): @FetchBy("DEFAULT_ACCOUNT_FETCHER") Account {
         return service.update(update.toEntity { this.id = id }, DEFAULT_ACCOUNT_FETCHER)
+    }
+
+    /**
+     * 更新指定账户的登录凭据
+     *
+     * 此接口用于修改指定ID账户的密码或邮箱
+     * 本人操作必须提供当前密码以验证身份；管理员重置他人凭据时无需提供
+     *
+     * @param id 账户 ID
+     * @param update 凭据更新参数
+     * @return Account 返回更新后的账户（默认 fetcher）
+     *
+     * @api PUT /api/accounts/{id}/credentials
+     * @permission 需要登录认证；修改本人凭据需验证当前密码，修改他人凭据需要管理员权限
+     * @description 调用AccountService.updateCredentials()方法更新账户凭据
+     */
+    @SaCheckLogin
+    @PutMapping("/{id}/credentials")
+    @Throws(CommonException.Forbidden::class, CommonException.AuthenticationFailed::class)
+    fun updateCredentials(
+        @PathVariable id: Long,
+        @RequestBody update: AccountCredentialsUpdate,
+    ): @FetchBy("DEFAULT_ACCOUNT_FETCHER") Account {
+        return service.updateCredentials(id, update, DEFAULT_ACCOUNT_FETCHER)
     }
 
     companion object {

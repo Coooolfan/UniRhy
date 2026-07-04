@@ -70,26 +70,37 @@ class TranscodeTaskService(
         if (!consumerEnabled) {
             return
         }
+        // claim 使用独立短事务，下载、ffmpeg 转码与上传等重 IO 在事务外执行；
+        // 崩溃遗留的 RUNNING 任务由启动期的 resetRunningTasksToPending 重新入队
+        val claimedTask = try {
+            transactionTemplate.execute {
+                queueStore.claim(TaskType.TRANSCODE, TRANSCODE_CLAIM_LIMIT)
+            }.orEmpty().firstOrNull()
+        } catch (ex: Throwable) {
+            logger.error("Failed to claim pending transcode task", ex)
+            return
+        } ?: return
+
         try {
+            val payload = objectMapper.readValue(claimedTask.params, TranscodeTaskPayload::class.java)
+            val transcodedAsset = prepareTranscodedAsset(payload)
             transactionTemplate.executeWithoutResult {
-                val claimedTasks = queueStore.claim(TaskType.TRANSCODE, TRANSCODE_CLAIM_LIMIT)
-                if (claimedTasks.isEmpty()) {
-                    return@executeWithoutResult
-                }
-                for (claimedTask in claimedTasks) {
-                    val (status, reason) = try {
-                        val payload = objectMapper.readValue(claimedTask.params, TranscodeTaskPayload::class.java)
-                        execute(payload)
-                        TaskStatus.COMPLETED to "SUCCESS"
-                    } catch (ex: Throwable) {
-                        logger.error("Transcode task failed, logId={}", claimedTask.id, ex)
-                        TaskStatus.FAILED to failureReason(ex)
-                    }
-                    queueStore.completeTask(claimedTask.id, status, reason)
-                }
+                saveTranscodedAsset(transcodedAsset)
+                queueStore.completeTask(claimedTask.id, TaskStatus.COMPLETED, "SUCCESS")
             }
         } catch (ex: Throwable) {
-            logger.error("Failed to consume pending transcode task", ex)
+            logger.error("Transcode task failed, logId={}", claimedTask.id, ex)
+            completeTaskQuietly(claimedTask.id, failureReason(ex))
+        }
+    }
+
+    private fun completeTaskQuietly(logId: Long, reason: String) {
+        try {
+            transactionTemplate.executeWithoutResult {
+                queueStore.completeTask(logId, TaskStatus.FAILED, reason)
+            }
+        } catch (ex: Throwable) {
+            logger.error("Failed to mark transcode task as failed, logId={}", logId, ex)
         }
     }
 
@@ -115,7 +126,7 @@ class TranscodeTaskService(
         return true
     }
 
-    private fun execute(payload: TranscodeTaskPayload) {
+    private fun prepareTranscodedAsset(payload: TranscodeTaskPayload): Asset {
         if (payload.targetCodec != CodecType.OPUS) {
             error("Unsupported target codec: ${payload.targetCodec}")
         }
@@ -139,7 +150,7 @@ class TranscodeTaskService(
 
             storageObjects.writeFile(dstProvider, dstObjectKey, outputFile, "audio/opus")
 
-            sql.saveCommand(Asset {
+            return Asset {
                 recording = Recording { id = payload.recordingId }
                 mediaFile {
                     objectKey = dstObjectKey
@@ -150,15 +161,19 @@ class TranscodeTaskService(
                     bindProvider(dstProvider)
                 }
                 comment = "transcoded from ${payload.srcObjectKey} at ${srcProvider.name}"
-            }) {
-                setMode(SaveMode.INSERT_ONLY)
-                setAssociatedMode(Asset::recording, AssociatedSaveMode.APPEND_IF_ABSENT)
-                setAssociatedMode(MediaFile::fsProvider, AssociatedSaveMode.APPEND_IF_ABSENT)
-                setAssociatedMode(MediaFile::ossProvider, AssociatedSaveMode.APPEND_IF_ABSENT)
-            }.execute()
+            }
         } finally {
             deleteOutputFileQuietly(outputFile)
         }
+    }
+
+    private fun saveTranscodedAsset(asset: Asset) {
+        sql.saveCommand(asset) {
+            setMode(SaveMode.INSERT_ONLY)
+            setAssociatedMode(Asset::recording, AssociatedSaveMode.APPEND_IF_ABSENT)
+            setAssociatedMode(MediaFile::fsProvider, AssociatedSaveMode.APPEND_IF_ABSENT)
+            setAssociatedMode(MediaFile::ossProvider, AssociatedSaveMode.APPEND_IF_ABSENT)
+        }.execute()
     }
 
     private fun createOutputFile(): File {
