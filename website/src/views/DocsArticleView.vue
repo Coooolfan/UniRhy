@@ -166,7 +166,7 @@ useHead(() => {
     </div>
 
     <!-- Article -->
-    <div v-else class="px-6 py-16 lg:py-12">
+    <div v-else class="px-6 py-16 lg:py-12 xl:pr-72">
       <!-- TOC -->
       <aside v-if="tocItems.length > 0" class="docs-toc">
         <p class="mb-3 font-brand-sans text-xs tracking-[0.15em] text-[#9c968b] uppercase">
@@ -189,7 +189,7 @@ useHead(() => {
         </div>
       </aside>
 
-      <div class="mx-auto max-w-[760px] xl:mr-72">
+      <div class="mx-auto max-w-[760px]">
         <p
           v-if="meta"
           class="mb-3 font-brand-sans text-xs tracking-[0.2em] text-[#9c968b] uppercase"
