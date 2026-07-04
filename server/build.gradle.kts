@@ -35,7 +35,6 @@ dependencies {
     implementation(libs.kotlin.reflect)
 
     implementation(libs.jimmer.spring.boot.starter)
-    implementation(libs.jimmer.client.scalar)
     ksp(libs.jimmer.ksp)
 
     implementation(libs.sa.token.starter) {
@@ -58,6 +57,8 @@ dependencies {
     testImplementation(libs.test.spring.boot.starter.webmvc)
     testImplementation(libs.test.kotlin)
     testRuntimeOnly(libs.test.launcher)
+
+    developmentOnly(libs.jimmer.client.scalar)
 }
 
 kotlin {
