@@ -204,7 +204,7 @@ jobs:
         run: |
           yarn --version
           yarn install --immutable
-          yarn tauri build --config "{\"version\":\"${VERSION}\",\"build\":{\"beforeBuildCommand\":\"yarn build\"}}"
+          yarn tauri build --config "{\"version\":\"${VERSION}\",\"build\":{\"beforeBuildCommand\":\"yarn build\"},\"bundle\":{\"active\":true,\"targets\":[\"dmg\"]}}"
 
       - name: 整理 DMG 产物
         env:
