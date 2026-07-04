@@ -11,7 +11,9 @@ import software.amazon.awssdk.services.s3.model.HeadObjectRequest
 import software.amazon.awssdk.services.s3.model.PutObjectRequest
 import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest
 import java.io.File
+import java.io.InputStream
 import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import java.time.Duration
 import java.time.Instant
 
@@ -57,32 +59,38 @@ class StorageNodeObjectService(private val sql: KSqlClient) {
         }
     }
 
-    fun readAll(node: StorageNode, objectKey: String): ByteArray {
+    fun openStream(node: StorageNode, objectKey: String): InputStream {
         return when (node) {
-            is FileSystemStorageNode -> node.file(objectKey).readBytes()
-            is OssStorageNode -> node.client().getObjectAsBytes(
+            is FileSystemStorageNode -> node.file(objectKey).inputStream()
+            is OssStorageNode -> node.client().getObject(
                 GetObjectRequest.builder()
                     .bucket(node.provider.bucket)
                     .key(node.storageKey(objectKey))
                     .build()
-            ).asByteArray()
+            )
         }
     }
 
-    fun readRange(node: StorageNode, objectKey: String, start: Long, endInclusive: Long): ByteArray {
+    fun openStream(node: StorageNode, objectKey: String, start: Long, endInclusive: Long): InputStream {
         return when (node) {
-            is FileSystemStorageNode -> node.file(objectKey).inputStream().use { input ->
-                input.skipNBytes(start)
-                input.readNBytes((endInclusive - start + 1).toInt())
+            is FileSystemStorageNode -> {
+                val input = node.file(objectKey).inputStream()
+                try {
+                    input.skipNBytes(start)
+                } catch (ex: Exception) {
+                    input.close()
+                    throw ex
+                }
+                BoundedInputStream(input, endInclusive - start + 1)
             }
 
-            is OssStorageNode -> node.client().getObjectAsBytes(
+            is OssStorageNode -> node.client().getObject(
                 GetObjectRequest.builder()
                     .bucket(node.provider.bucket)
                     .key(node.storageKey(objectKey))
                     .range("bytes=$start-$endInclusive")
                     .build()
-            ).asByteArray()
+            )
         }
     }
 
@@ -91,9 +99,16 @@ class StorageNodeObjectService(private val sql: KSqlClient) {
             .takeIf { it.isNotBlank() }
             ?.let { ".$it" }
             ?: ".bin"
-        val tempFile = Files.createTempFile("unirhy-storage-", suffix).toFile()
-        tempFile.writeBytes(readAll(node, objectKey))
-        return TemporaryStorageFile(tempFile)
+        val tempFile = Files.createTempFile("unirhy-storage-", suffix)
+        try {
+            openStream(node, objectKey).use { input ->
+                Files.copy(input, tempFile, StandardCopyOption.REPLACE_EXISTING)
+            }
+        } catch (ex: Exception) {
+            Files.deleteIfExists(tempFile)
+            throw ex
+        }
+        return TemporaryStorageFile(tempFile.toFile())
     }
 
     fun write(node: StorageNode, objectKey: String, bytes: ByteArray, contentType: String) {
@@ -140,6 +155,38 @@ class StorageNodeObjectService(private val sql: KSqlClient) {
                 RequestBody.fromFile(file),
             )
         }
+    }
+
+    /** 将底层流限制为最多读取 [remaining] 字节，供文件系统的区间读取使用 */
+    private class BoundedInputStream(
+        private val delegate: InputStream,
+        private var remaining: Long,
+    ) : InputStream() {
+        override fun read(): Int {
+            if (remaining <= 0) {
+                return -1
+            }
+            val byte = delegate.read()
+            if (byte >= 0) {
+                remaining -= 1
+            }
+            return byte
+        }
+
+        override fun read(b: ByteArray, off: Int, len: Int): Int {
+            if (remaining <= 0) {
+                return -1
+            }
+            val bytesRead = delegate.read(b, off, minOf(len.toLong(), remaining).toInt())
+            if (bytesRead > 0) {
+                remaining -= bytesRead
+            }
+            return bytesRead
+        }
+
+        override fun available(): Int = minOf(delegate.available().toLong(), remaining).toInt()
+
+        override fun close() = delegate.close()
     }
 
     fun directReadUrl(node: OssStorageNode, objectKey: String, ttlSeconds: Long): String {

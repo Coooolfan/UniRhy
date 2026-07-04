@@ -8,11 +8,10 @@ import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
 import org.springframework.stereotype.Component
-import java.io.ByteArrayOutputStream
+import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody
 import java.nio.charset.StandardCharsets
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
-import java.util.UUID
 
 @Component
 class MediaFileResponseBuilder {
@@ -20,7 +19,7 @@ class MediaFileResponseBuilder {
     fun full(
         resolved: ResolvedMediaFile,
         requestHeaders: HttpHeaders,
-    ): ResponseEntity<ByteArray> {
+    ): ResponseEntity<StreamingResponseBody> {
         val mediaType = parseMediaType(resolved.mediaFile.mimeType)
         val lastModified = normalizeToSeconds(resolved.lastModified.toEpochMilli())
 
@@ -28,7 +27,7 @@ class MediaFileResponseBuilder {
             return notModified(resolved, lastModified)
         }
 
-        return fullBytesResponse(resolved, mediaType, lastModified)
+        return fullStreamResponse(resolved, mediaType, lastModified)
     }
 
     fun head(
@@ -54,7 +53,7 @@ class MediaFileResponseBuilder {
     fun range(
         resolved: ResolvedMediaFile,
         requestHeaders: HttpHeaders,
-    ): ResponseEntity<ByteArray> {
+    ): ResponseEntity<StreamingResponseBody> {
         val mediaType = parseMediaType(resolved.mediaFile.mimeType)
         val lastModified = normalizeToSeconds(resolved.lastModified.toEpochMilli())
         val total = resolved.size
@@ -64,7 +63,7 @@ class MediaFileResponseBuilder {
         }
 
         if (!ifRangeMatched(requestHeaders, lastModified)) {
-            return fullBytesResponse(resolved, mediaType, lastModified)
+            return fullStreamResponse(resolved, mediaType, lastModified)
         }
 
         val rawRange = requestHeaders.getFirst(HttpHeaders.RANGE)
@@ -87,44 +86,50 @@ class MediaFileResponseBuilder {
             return rangeNotSatisfiable(resolved, total, lastModified)
         }
 
-        if (normalizedRanges.size == 1) {
-            val (start, end) = normalizedRanges.first()
-            val body = resolved.readRange(start, end)
-            val responseHeaders = baseHeaders(resolved, lastModified, mediaType)
-            responseHeaders[HttpHeaders.CONTENT_RANGE] = "bytes $start-$end/$total"
-            responseHeaders.contentLength = body.size.toLong()
-            return ResponseEntity.status(HttpStatus.PARTIAL_CONTENT)
-                .headers(responseHeaders)
-                .body(body)
+        // 多区间请求现实中几乎没有客户端使用，按 RFC 9110 允许的方式忽略 Range，退化为完整响应
+        if (normalizedRanges.size > 1) {
+            return fullStreamResponse(resolved, mediaType, lastModified)
         }
 
-        val boundary = "unirhy-${UUID.randomUUID()}"
-        val body = buildMultipartByteRanges(resolved, mediaType, total, normalizedRanges, boundary)
-        val responseHeaders = baseHeaders(resolved, lastModified, null)
-        responseHeaders.contentType = MediaType.parseMediaType("multipart/byteranges; boundary=$boundary")
-        responseHeaders.contentLength = body.size.toLong()
+        val (start, end) = normalizedRanges.first()
+        val responseHeaders = baseHeaders(resolved, lastModified, mediaType)
+        responseHeaders[HttpHeaders.CONTENT_RANGE] = "bytes $start-$end/$total"
+        responseHeaders.contentLength = end - start + 1
         return ResponseEntity.status(HttpStatus.PARTIAL_CONTENT)
             .headers(responseHeaders)
-            .body(body)
+            .body(streamOf(resolved, start, end))
     }
 
-    private fun fullBytesResponse(
+    private fun fullStreamResponse(
         resolved: ResolvedMediaFile,
         mediaType: MediaType,
         lastModified: Long,
-    ): ResponseEntity<ByteArray> {
-        val body = resolved.readAll()
+    ): ResponseEntity<StreamingResponseBody> {
         val responseHeaders = baseHeaders(resolved, lastModified, mediaType)
-        responseHeaders.contentLength = body.size.toLong()
+        responseHeaders.contentLength = resolved.size
         return ResponseEntity.status(HttpStatus.OK)
             .headers(responseHeaders)
-            .body(body)
+            .body(streamOf(resolved, 0, resolved.size - 1))
+    }
+
+    private fun streamOf(
+        resolved: ResolvedMediaFile,
+        start: Long,
+        endInclusive: Long,
+    ): StreamingResponseBody {
+        return StreamingResponseBody { output ->
+            if (endInclusive >= start) {
+                resolved.openStream(start, endInclusive).use { input ->
+                    input.copyTo(output)
+                }
+            }
+        }
     }
 
     private fun notModified(
         resolved: ResolvedMediaFile,
         lastModified: Long,
-    ): ResponseEntity<ByteArray> {
+    ): ResponseEntity<StreamingResponseBody> {
         return ResponseEntity.status(HttpStatus.NOT_MODIFIED)
             .headers(baseHeaders(resolved, lastModified, null))
             .build()
@@ -134,7 +139,7 @@ class MediaFileResponseBuilder {
         resolved: ResolvedMediaFile,
         total: Long,
         lastModified: Long,
-    ): ResponseEntity<ByteArray> {
+    ): ResponseEntity<StreamingResponseBody> {
         val responseHeaders = baseHeaders(resolved, lastModified, null)
         responseHeaders[HttpHeaders.CONTENT_RANGE] = "bytes */$total"
         return ResponseEntity.status(HttpStatus.REQUESTED_RANGE_NOT_SATISFIABLE)
@@ -213,29 +218,6 @@ class MediaFileResponseBuilder {
         } catch (_: IllegalArgumentException) {
             MediaType.APPLICATION_OCTET_STREAM
         }
-    }
-
-    private fun buildMultipartByteRanges(
-        resolved: ResolvedMediaFile,
-        mediaType: MediaType,
-        total: Long,
-        ranges: List<Pair<Long, Long>>,
-        boundary: String,
-    ): ByteArray {
-        val body = ByteArrayOutputStream()
-        for ((start, end) in ranges) {
-            body.writeUtf8("--$boundary\r\n")
-            body.writeUtf8("Content-Type: $mediaType\r\n")
-            body.writeUtf8("Content-Range: bytes $start-$end/$total\r\n\r\n")
-            body.write(resolved.readRange(start, end))
-            body.writeUtf8("\r\n")
-        }
-        body.writeUtf8("--$boundary--\r\n")
-        return body.toByteArray()
-    }
-
-    private fun ByteArrayOutputStream.writeUtf8(value: String) {
-        write(value.toByteArray(StandardCharsets.UTF_8))
     }
 
     companion object {

@@ -39,9 +39,8 @@ class MediaFileAccessService(
             fileName = stat.fileName,
             size = stat.size,
             lastModified = stat.lastModified,
-            readAll = { storageObjects.readAll(node, mediaFile.objectKey) },
-            readRange = { start, endInclusive ->
-                storageObjects.readRange(node, mediaFile.objectKey, start, endInclusive)
+            openStream = { start, endInclusive ->
+                storageObjects.openStream(node, mediaFile.objectKey, start, endInclusive)
             },
         )
     }

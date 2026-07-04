@@ -1,6 +1,7 @@
 package com.coooolfan.unirhy.service
 
 import com.coooolfan.unirhy.model.MediaFile
+import java.io.InputStream
 import java.time.Instant
 
 data class ResolvedMediaFile(
@@ -8,6 +9,5 @@ data class ResolvedMediaFile(
     val fileName: String,
     val size: Long,
     val lastModified: Instant,
-    val readAll: () -> ByteArray,
-    val readRange: (start: Long, endInclusive: Long) -> ByteArray,
+    val openStream: (start: Long, endInclusive: Long) -> InputStream,
 )

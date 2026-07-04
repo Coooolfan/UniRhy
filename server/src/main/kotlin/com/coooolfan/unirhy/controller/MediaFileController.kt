@@ -9,6 +9,7 @@ import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
+import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody
 
 /**
  * 媒体文件访问接口
@@ -53,7 +54,7 @@ class MediaFileController(
         @RequestHeader headers: HttpHeaders,
         @RequestParam("_sig", required = false) sig: String?,
         @RequestParam("_exp", required = false) exp: Long?,
-    ): ResponseEntity<ByteArray> {
+    ): ResponseEntity<StreamingResponseBody> {
         authenticateRequest(id, sig, exp)
         val resolved = service.load(id)
         return responses.full(resolved, headers)
@@ -104,7 +105,7 @@ class MediaFileController(
         @RequestHeader headers: HttpHeaders,
         @RequestParam("_sig", required = false) sig: String?,
         @RequestParam("_exp", required = false) exp: Long?,
-    ): ResponseEntity<ByteArray> {
+    ): ResponseEntity<StreamingResponseBody> {
         authenticateRequest(id, sig, exp)
         val resolved = service.load(id)
         return responses.range(resolved, headers)
