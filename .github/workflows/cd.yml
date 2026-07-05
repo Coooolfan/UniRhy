@@ -25,6 +25,7 @@ env:
   NODE_VERSION: "24"
   YARN_VERSION: "4.12.0"
   JAVA_VERSION: "25"
+  ANDROID_JAVA_VERSION: "21"
 
 jobs:
   prepare-release:
@@ -223,6 +224,94 @@ jobs:
           path: web/src-tauri/target/release/bundle/dmg/unirhy-v${{ needs.prepare-release.outputs.version }}-macos-arm64.dmg
           if-no-files-found: error
 
+  build-android-arm64:
+    name: 构建 Android arm64 应用
+    needs: prepare-release
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./web
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.prepare-release.outputs.target_sha }}
+
+      - name: 设置 Node 环境
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: 启用 Corepack 并激活 Yarn
+        run: |
+          corepack enable
+          corepack prepare yarn@${{ env.YARN_VERSION }} --activate
+
+      - name: 缓存 Yarn 包缓存
+        uses: actions/cache@v4
+        with:
+          path: web/.yarn/cache
+          key: ${{ runner.os }}-yarn-web-${{ hashFiles('web/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-yarn-web-
+
+      - name: 设置 JDK 环境
+        uses: actions/setup-java@v5
+        with:
+          java-version: ${{ env.ANDROID_JAVA_VERSION }}
+          distribution: temurin
+
+      - name: 设置 Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: 设置 Rust 工具链
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+
+      - name: 缓存 Cargo 依赖
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            web/src-tauri/target
+          key: ${{ runner.os }}-cargo-android-arm64-${{ hashFiles('web/src-tauri/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-android-arm64-
+            ${{ runner.os }}-cargo-
+
+      - name: 构建 Android 应用
+        env:
+          VERSION: ${{ needs.prepare-release.outputs.version }}
+        run: |
+          yarn --version
+          yarn install --immutable
+          yarn tauri android build --target aarch64 --split-per-abi --apk --aab --ci --config "{\"version\":\"${VERSION}\",\"build\":{\"beforeBuildCommand\":\"yarn build\"}}"
+
+      - name: 整理 Android 产物
+        env:
+          VERSION: ${{ needs.prepare-release.outputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir -p src-tauri/gen/android/release-assets
+          APK_FILE="$(find src-tauri/gen/android/app/build/outputs -type f -name '*.apk' | head -n 1)"
+          AAB_FILE="$(find src-tauri/gen/android/app/build/outputs -type f -name '*.aab' | head -n 1)"
+          test -n "$APK_FILE"
+          test -n "$AAB_FILE"
+          cp "$APK_FILE" "src-tauri/gen/android/release-assets/unirhy-v${VERSION}-android-arm64.apk"
+          cp "$AAB_FILE" "src-tauri/gen/android/release-assets/unirhy-v${VERSION}-android-arm64.aab"
+          ls -al src-tauri/gen/android/release-assets
+
+      - name: 上传 Android 产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-arm64
+          path: |
+            web/src-tauri/gen/android/release-assets/unirhy-v${{ needs.prepare-release.outputs.version }}-android-arm64.apk
+            web/src-tauri/gen/android/release-assets/unirhy-v${{ needs.prepare-release.outputs.version }}-android-arm64.aab
+          if-no-files-found: error
+
   build-jar:
     name: 构建 JAR 包
     needs:
@@ -310,6 +399,7 @@ jobs:
       - prepare-release
       - create-draft-release
       - build-desktop-macos
+      - build-android-arm64
     runs-on: ubuntu-latest
     steps:
       - name: 下载 JAR 产物
@@ -324,6 +414,12 @@ jobs:
           name: desktop-macos
           path: dist
 
+      - name: 下载 Android 产物
+        uses: actions/download-artifact@v4
+        with:
+          name: android-arm64
+          path: dist
+
       - name: 上传到 Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -335,6 +431,8 @@ jobs:
           gh release upload "$VERSION" \
             "dist/unirhy-v${VERSION}.jar" \
             "dist/unirhy-v${VERSION}-macos-arm64.dmg" \
+            "dist/unirhy-v${VERSION}-android-arm64.apk" \
+            "dist/unirhy-v${VERSION}-android-arm64.aab" \
             --clobber
 
   build-docker-for-jvm:
