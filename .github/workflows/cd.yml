@@ -300,7 +300,7 @@ jobs:
         run: |
           yarn --version
           yarn install --immutable
-          yarn tauri android build --target aarch64 --split-per-abi --apk --aab --ci --config "{\"version\":\"${VERSION}\",\"build\":{\"beforeBuildCommand\":\"yarn build\"}}"
+          yarn tauri android build --target aarch64 --split-per-abi --apk --ci --config "{\"version\":\"${VERSION}\",\"build\":{\"beforeBuildCommand\":\"yarn build\"}}"
 
       - name: 整理 Android 产物
         env:
@@ -309,11 +309,8 @@ jobs:
           set -euo pipefail
           mkdir -p src-tauri/gen/android/release-assets
           APK_FILE="$(find src-tauri/gen/android/app/build/outputs -type f -name '*.apk' ! -name '*-unsigned.apk' | head -n 1)"
-          AAB_FILE="$(find src-tauri/gen/android/app/build/outputs -type f -name '*.aab' | head -n 1)"
           test -n "$APK_FILE"
-          test -n "$AAB_FILE"
           cp "$APK_FILE" "src-tauri/gen/android/release-assets/unirhy-v${VERSION}-android-arm64.apk"
-          cp "$AAB_FILE" "src-tauri/gen/android/release-assets/unirhy-v${VERSION}-android-arm64.aab"
           ls -al src-tauri/gen/android/release-assets
 
       - name: 上传 Android 产物
@@ -322,7 +319,6 @@ jobs:
           name: android-arm64
           path: |
             web/src-tauri/gen/android/release-assets/unirhy-v${{ needs.prepare-release.outputs.version }}-android-arm64.apk
-            web/src-tauri/gen/android/release-assets/unirhy-v${{ needs.prepare-release.outputs.version }}-android-arm64.aab
           if-no-files-found: error
 
   build-jar:
@@ -445,7 +441,6 @@ jobs:
             "dist/unirhy-v${VERSION}.jar" \
             "dist/unirhy-v${VERSION}-macos-arm64.dmg" \
             "dist/unirhy-v${VERSION}-android-arm64.apk" \
-            "dist/unirhy-v${VERSION}-android-arm64.aab" \
             --clobber
 
   build-docker-for-jvm:
