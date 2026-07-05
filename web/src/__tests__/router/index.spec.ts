@@ -72,7 +72,16 @@ describe('router auth persistence', () => {
         expect(router.currentRoute.value.fullPath).toBe('/login')
     })
 
-    it('keeps initialization routing ahead of auth routing', async () => {
+    it('routes unauthenticated protected routes to login before initialization checks', async () => {
+        const router = await loadRouter()
+
+        await router.push('/')
+
+        expect(router.currentRoute.value.fullPath).toBe('/login')
+        expect(isInitializedMock).not.toHaveBeenCalled()
+    })
+
+    it('keeps authenticated users on initialization when the system is not initialized', async () => {
         getAuthTokenMock.mockReturnValue('persisted-token')
         isInitializedMock.mockResolvedValue({ initialized: false })
         const router = await loadRouter()
@@ -80,6 +89,16 @@ describe('router auth persistence', () => {
         await router.push('/')
 
         expect(router.currentRoute.value.fullPath).toBe('/init')
+    })
+
+    it('keeps unauthenticated protected routes on login when initialization check fails', async () => {
+        isInitializedMock.mockRejectedValue(new Error('error sending request for url'))
+        const router = await loadRouter()
+
+        await router.push('/')
+
+        expect(router.currentRoute.value.fullPath).toBe('/login')
+        expect(isInitializedMock).not.toHaveBeenCalled()
     })
 
     it('checks initialization status only once across route changes', async () => {

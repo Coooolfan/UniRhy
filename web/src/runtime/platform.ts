@@ -27,6 +27,14 @@ export function getPlatformRuntime(): PlatformRuntime {
     }
 }
 
+export function setPlatformApiBaseUrl(apiBaseUrl: string): void {
+    const current = getPlatformRuntime()
+    Reflect.set(window, '__UNIRHY_RUNTIME__', {
+        ...current,
+        apiBaseUrl,
+    })
+}
+
 export function buildApiUrl(path: string): string {
     return `${getPlatformRuntime().apiBaseUrl}${path}`
 }

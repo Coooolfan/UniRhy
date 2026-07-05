@@ -1,4 +1,6 @@
 .idea
+.zed
+.wrangler
 .DS_Store
 .claude
 .codex
@@ -14,6 +16,7 @@ server/api-e2e/build
 server/data/
 server/tmp/
 server/test-output/
+server/src/main/resources
 !server/gradle/wrapper/gradle-wrapper.jar
 
 website/.vscode

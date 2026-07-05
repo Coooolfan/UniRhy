@@ -4,8 +4,7 @@
     >
         <!-- Main Container -->
         <div
-            class="relative z-10 mx-auto w-full max-w-sm perspective-1000 md:translate-x-64 md:max-w-100"
-            :class="showBackendEndpoint ? 'h-[32.5rem]' : 'h-125'"
+            class="relative z-10 mx-auto h-125 w-full max-w-sm perspective-1000 md:translate-x-64 md:max-w-100"
         >
             <div class="deco-circle circle-1"></div>
             <div class="deco-circle circle-2"></div>
@@ -82,6 +81,7 @@
                     </h1>
 
                     <form
+                        v-if="!isEditingBackendUrl"
                         @submit.prevent="handleLogin"
                         class="flex-1 flex flex-col justify-center space-y-6 sm:space-y-8"
                     >
@@ -97,6 +97,7 @@
                                 required
                                 class="peer w-full bg-transparent border-b border-[#d6d0c4] focus:border-[#d98c28] outline-none py-2 text-[#2c2825] placeholder-transparent transition-colors"
                                 placeholder="Email"
+                                @input="clearLoginError"
                             />
                             <label
                                 for="login-email"
@@ -116,6 +117,7 @@
                                 required
                                 class="peer w-full bg-transparent border-b border-[#d6d0c4] focus:border-[#d98c28] outline-none py-2 text-[#2c2825] placeholder-transparent transition-colors"
                                 placeholder="Password"
+                                @input="clearLoginError"
                             />
                             <label
                                 for="login-password"
@@ -125,7 +127,11 @@
                             </label>
                         </div>
 
-                        <div class="pt-8 text-center">
+                        <div class="min-h-5 text-center text-sm text-[#c4563a]">
+                            {{ loginError }}
+                        </div>
+
+                        <div class="text-center">
                             <button
                                 type="submit"
                                 class="outline-button px-8 py-2 font-bold tracking-widest transition-all duration-300 transform active:scale-95"
@@ -135,7 +141,42 @@
                         </div>
                     </form>
 
-                    <div class="text-center mt-6 px-2">
+                    <form
+                        v-else
+                        class="flex-1 flex flex-col justify-center space-y-8"
+                        @submit.prevent="saveBackendUrl"
+                    >
+                        <div class="group relative">
+                            <input
+                                id="backend-url"
+                                v-model="backendUrl"
+                                type="text"
+                                placeholder="http://localhost:8654"
+                                class="peer w-full bg-transparent border-b border-[#d6d0c4] focus:border-[#d98c28] outline-none py-2 text-[#2c2825] placeholder-transparent transition-colors"
+                            />
+                            <label
+                                for="backend-url"
+                                class="absolute left-0 -top-3.5 text-[#8a817c] text-sm transition-all peer-placeholder-shown:text-base peer-placeholder-shown:text-[#b0a8a0] peer-placeholder-shown:top-2 peer-focus:-top-3.5 peer-focus:text-[#2c2825] peer-focus:text-sm cursor-text"
+                            >
+                                服务端地址
+                            </label>
+                        </div>
+
+                        <p v-if="backendUrlError" class="text-center text-sm text-[#c4563a]">
+                            {{ backendUrlError }}
+                        </p>
+
+                        <div class="text-center">
+                            <button
+                                type="submit"
+                                class="outline-button px-8 py-2 font-bold tracking-widest transition-all duration-300 transform active:scale-95"
+                            >
+                                保 存
+                            </button>
+                        </div>
+                    </form>
+
+                    <div v-if="!isEditingBackendUrl" class="text-center mt-6 px-2">
                         <button
                             @click.stop="switchToRegister"
                             class="text-sm text-[#8a817c] hover:text-[#d98c28] decoration-dotted hover:underline underline-offset-4 transition-colors"
@@ -144,27 +185,18 @@
                         </button>
                     </div>
 
-                    <!-- Backend endpoint config (Tauri only) -->
                     <div
-                        v-if="showBackendEndpoint"
-                        class="mt-4 mb-2 border-t border-[#e6dcc8] pt-3 pb-1"
+                        v-if="showBackendEndpoint && !isEditingBackendUrl"
+                        class="mt-4 border-t border-[#e6dcc8] pt-3 text-left text-xs text-[#8a817c]"
                     >
-                        <label class="text-xs text-[#8a817c] mb-2 block">服务端地址</label>
-                        <div class="flex gap-2">
-                            <input
-                                v-model="backendUrl"
-                                type="text"
-                                placeholder="http://localhost:8654"
-                                class="flex-1 bg-transparent border-b border-[#d6d0c4] focus:border-[#d98c28] outline-none py-1 text-sm text-[#2c2825] transition-colors"
-                            />
-                            <button
-                                type="button"
-                                @click.stop="saveBackendUrl"
-                                class="text-xs px-3 py-1 border border-[#d6d0c4] hover:border-[#d98c28] hover:text-[#d98c28] text-[#8a817c] transition-colors rounded-xs"
-                            >
-                                保存
-                            </button>
-                        </div>
+                        <span>已连接至：</span>
+                        <button
+                            type="button"
+                            class="break-all text-[#2c2825] underline decoration-dotted underline-offset-4 transition-colors hover:text-[#d98c28]"
+                            @click="startEditingBackendUrl"
+                        >
+                            {{ backendUrl }}
+                        </button>
                     </div>
                 </div>
 
@@ -184,12 +216,16 @@
 import { onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { api, normalizeApiError, saveAuthToken } from '@/ApiInstance'
-import { getPlatformRuntime } from '@/runtime/platform'
+import { getPlatformRuntime, setPlatformApiBaseUrl } from '@/runtime/platform'
+import { getInitializationStatus, resetInitializationStatus } from '@/services/systemInitialization'
 
 const router = useRouter()
 const isLoginMode = ref(true)
 const showBackendEndpoint = getPlatformRuntime().platform !== 'web'
 const backendUrl = ref('')
+const isEditingBackendUrl = ref(false)
+const backendUrlError = ref('')
+const loginError = ref('')
 
 const loginForm = reactive({
     email: '',
@@ -204,29 +240,59 @@ onMounted(async () => {
 })
 
 const saveBackendUrl = async () => {
+    backendUrlError.value = ''
     try {
         const { invoke } = await import('@tauri-apps/api/core')
         const normalized = await invoke<string>('set_backend_url', { url: backendUrl.value })
         backendUrl.value = normalized
-        window.location.reload()
+        setPlatformApiBaseUrl(normalized)
+        resetInitializationStatus()
+        const status = await getInitializationStatus()
+        if (!status.initialized) {
+            await router.push('/init')
+            return
+        }
+        isEditingBackendUrl.value = false
     } catch (error) {
-        alert(typeof error === 'string' ? error : '保存失败')
+        backendUrlError.value = normalizeApiError(error).message ?? '保存失败'
     }
+}
+
+const startEditingBackendUrl = () => {
+    backendUrlError.value = ''
+    isEditingBackendUrl.value = true
 }
 
 const switchToRegister = () => {
     if (isLoginMode.value) {
+        loginError.value = ''
         isLoginMode.value = false
     }
 }
 
 const switchToLogin = () => {
     if (!isLoginMode.value) {
+        loginError.value = ''
         isLoginMode.value = true
     }
 }
 
+const clearLoginError = () => {
+    loginError.value = ''
+}
+
+const getLoginErrorMessage = (error: unknown) => {
+    const normalizedError = normalizeApiError(error, 'tokenController', 'login')
+
+    if (normalizedError.code === 'AUTHENTICATION_FAILED' || normalizedError.status === 401) {
+        return '邮箱或密码不正确'
+    }
+
+    return normalizedError.message || '登录失败，请检查服务端连接后重试'
+}
+
 const handleLogin = async () => {
+    loginError.value = ''
     try {
         const result = await api.tokenController.login({
             body: {
@@ -236,8 +302,7 @@ const handleLogin = async () => {
         })
         saveAuthToken(result.token)
     } catch (error) {
-        const normalizedError = normalizeApiError(error, 'tokenController', 'login')
-        alert(normalizedError.message || '登录失败')
+        loginError.value = getLoginErrorMessage(error)
         return
     }
     window.location.assign(router.resolve('/').href)

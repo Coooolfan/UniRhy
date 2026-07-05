@@ -86,9 +86,22 @@ const router = createRouter({
 })
 
 router.beforeEach(async (to) => {
+    const isAuthenticated = hasPersistedAuthToken()
+
+    if (!isAuthenticated && to.path === '/login') {
+        return true
+    }
+
+    if (!isAuthenticated && to.matched.some((record) => record.meta.requiresAuth)) {
+        return '/login'
+    }
+
+    if (isAuthenticated && to.path === '/login') {
+        return '/'
+    }
+
     try {
         const status = await getInitializationStatus()
-        const isAuthenticated = hasPersistedAuthToken()
 
         if (status.initialized) {
             if (to.path === '/init') {
@@ -96,14 +109,6 @@ router.beforeEach(async (to) => {
             }
         } else if (to.path !== '/init') {
             return '/init'
-        }
-
-        if (isAuthenticated && to.path === '/login') {
-            return '/'
-        }
-
-        if (!isAuthenticated && to.matched.some((record) => record.meta.requiresAuth)) {
-            return '/login'
         }
 
         return true
