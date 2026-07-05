@@ -29,7 +29,6 @@ jimmer:
     enable: ${JIMMER_CLIENT_ENABLE:false}
     openapi:
       path: ${JIMMER_OPENAPI_YML_PATH:/api/openapi.yml}
-      ui-path: ${JIMMER_OPENAPI_UI_PATH:/api/openapi.html}
       properties:
         info:
           title: UniRhy API
