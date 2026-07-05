@@ -5,6 +5,9 @@
 .claude
 .codex
 *.pyc
+*.jks
+*.keystore
+*.p12
 
 AGENTS.local.md
 
