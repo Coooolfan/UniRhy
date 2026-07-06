@@ -224,6 +224,77 @@ jobs:
           path: web/src-tauri/target/release/bundle/dmg/unirhy-v${{ needs.prepare-release.outputs.version }}-macos-arm64.dmg
           if-no-files-found: error
 
+  build-desktop-windows:
+    name: 构建 Windows 桌面应用
+    needs: prepare-release
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: ./web
+        shell: bash
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.prepare-release.outputs.target_sha }}
+
+      - name: 设置 Node 环境
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: 启用 Corepack 并激活 Yarn
+        run: |
+          corepack enable
+          corepack prepare yarn@${{ env.YARN_VERSION }} --activate
+
+      - name: 缓存 Yarn 包缓存
+        uses: actions/cache@v4
+        with:
+          path: web/.yarn/cache
+          key: ${{ runner.os }}-yarn-web-${{ hashFiles('web/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-yarn-web-
+
+      - name: 设置 Rust 工具链
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: 缓存 Cargo 依赖
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            web/src-tauri/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('web/src-tauri/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: 构建 Tauri 应用
+        env:
+          VERSION: ${{ needs.prepare-release.outputs.version }}
+        run: |
+          yarn --version
+          yarn install --immutable
+          yarn tauri build --bundles nsis --config "{\"version\":\"${VERSION}\",\"build\":{\"beforeBuildCommand\":\"yarn build\"}}"
+
+      - name: 整理 NSIS 产物
+        env:
+          VERSION: ${{ needs.prepare-release.outputs.version }}
+        run: |
+          set -euo pipefail
+          EXE_FILE="$(ls src-tauri/target/release/bundle/nsis/*.exe | head -n 1)"
+          test -n "$EXE_FILE"
+          mv "$EXE_FILE" "src-tauri/target/release/bundle/nsis/unirhy-v${VERSION}-windows-x64-setup.exe"
+          ls -al "src-tauri/target/release/bundle/nsis/unirhy-v${VERSION}-windows-x64-setup.exe"
+
+      - name: 上传 Windows 产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-windows
+          path: web/src-tauri/target/release/bundle/nsis/unirhy-v${{ needs.prepare-release.outputs.version }}-windows-x64-setup.exe
+          if-no-files-found: error
+
   build-android-arm64:
     name: 构建 Android arm64 应用
     needs: prepare-release
@@ -408,6 +479,7 @@ jobs:
       - prepare-release
       - create-draft-release
       - build-desktop-macos
+      - build-desktop-windows
       - build-android-arm64
     runs-on: ubuntu-latest
     steps:
@@ -421,6 +493,12 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: desktop-macos
+          path: dist
+
+      - name: 下载 Windows 产物
+        uses: actions/download-artifact@v4
+        with:
+          name: desktop-windows
           path: dist
 
       - name: 下载 Android 产物
@@ -440,6 +518,7 @@ jobs:
           gh release upload "$VERSION" \
             "dist/unirhy-v${VERSION}.jar" \
             "dist/unirhy-v${VERSION}-macos-arm64.dmg" \
+            "dist/unirhy-v${VERSION}-windows-x64-setup.exe" \
             "dist/unirhy-v${VERSION}-android-arm64.apk" \
             --clobber
 
