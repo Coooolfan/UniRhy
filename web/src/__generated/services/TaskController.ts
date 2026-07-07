@@ -118,17 +118,50 @@ export class TaskController {
     /**
      * 将 FAILED / COMPLETED 状态的任务重置为 PENDING，让 worker 重新执行
      * 
-     * @parameter {TaskControllerOptions['resetTaskLog']} options
-     * - id 任务日志 ID
+     * 按 ids / taskType / statuses 的交集选中记录：
+     * - 三个参数均可选，但至少需要提供一个
+     * - 无论传入 statuses 是什么，服务端只会真正重置 FAILED / COMPLETED 记录
+     * - 前端约定：单条按 ids=1；一键按 taskType=X&statuses=FAILED
+     * 
+     * @parameter {TaskControllerOptions['resetTaskLogs']} options
+     * - ids 目标任务 ID 列表
+     * - taskType 任务类型过滤
+     * - statuses 状态过滤
+     * @return 实际被重置的行数
      * 
      */
-    readonly resetTaskLog: (options: TaskControllerOptions['resetTaskLog']) => Promise<
-        void
+    readonly resetTaskLogs: (options: TaskControllerOptions['resetTaskLogs']) => Promise<
+        number
     > = async(options) => {
-        let _uri = '/api/tasks/logs/';
-        _uri += encodeURIComponent(options.id);
-        _uri += '/reset';
-        return (await this.executor({uri: _uri, method: 'POST'})) as Promise<void>;
+        let _uri = '/api/tasks/logs';
+        let _separator = _uri.indexOf('?') === -1 ? '?' : '&';
+        let _value: any = undefined;
+        _value = options.ids;
+        if (_value !== undefined && _value !== null) {
+            for (const _item of _value) {
+                _uri += _separator
+                _uri += 'ids='
+                _uri += encodeURIComponent(_item);
+                _separator = '&';
+            }
+        }
+        _value = options.taskType;
+        if (_value !== undefined && _value !== null) {
+            _uri += _separator
+            _uri += 'taskType='
+            _uri += encodeURIComponent(_value);
+            _separator = '&';
+        }
+        _value = options.statuses;
+        if (_value !== undefined && _value !== null) {
+            for (const _item of _value) {
+                _uri += _separator
+                _uri += 'statuses='
+                _uri += encodeURIComponent(_item);
+                _separator = '&';
+            }
+        }
+        return (await this.executor({uri: _uri, method: 'PATCH'})) as Promise<number>;
     }
 }
 
@@ -166,11 +199,18 @@ export type TaskControllerOptions = {
          */
         readonly pageSize?: number | undefined
     }, 
-    'resetTaskLog': {
+    'resetTaskLogs': {
         /**
-         * 任务日志 ID
-         * 
+         * 目标任务 ID 列表
          */
-        readonly id: number
+        readonly ids?: ReadonlyArray<number> | undefined, 
+        /**
+         * 任务类型过滤
+         */
+        readonly taskType?: TaskType | undefined, 
+        /**
+         * 状态过滤
+         */
+        readonly statuses?: ReadonlyArray<TaskStatus> | undefined
     }
 }

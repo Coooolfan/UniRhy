@@ -165,7 +165,7 @@ const resetTask = async (row: TaskLog) => {
     resettingId.value = row.id
     error.value = ''
     try {
-        await api.taskController.resetTaskLog({ id: row.id })
+        await api.taskController.resetTaskLogs({ ids: [row.id] })
         emit('resetSuccess')
         await fetchLogs()
     } catch (err) {
