@@ -3,7 +3,14 @@ package com.coooolfan.unirhy.controller
 import cn.dev33.satoken.annotation.SaCheckLogin
 import cn.dev33.satoken.annotation.SaCheckRole
 import com.coooolfan.unirhy.config.ROLE_ADMIN
+import com.coooolfan.unirhy.model.AsyncTaskLog
+import com.coooolfan.unirhy.model.by
 import com.coooolfan.unirhy.service.task.*
+import com.coooolfan.unirhy.service.task.common.TaskStatus
+import com.coooolfan.unirhy.service.task.common.TaskType
+import org.babyfish.jimmer.Page
+import org.babyfish.jimmer.client.FetchBy
+import org.babyfish.jimmer.sql.kt.fetcher.newFetcher
 import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.*
 
@@ -74,5 +81,54 @@ class TaskController(
     @GetMapping("/log-counts")
     fun listTaskLogs(): List<AsyncTaskLogCountRow> {
         return asyncTaskLogService.listCounts()
+    }
+
+    /**
+     * 按任务类型 + 状态集合分页查询任务日志明细
+     *
+     * @param taskType 任务类型
+     * @param statuses 任务状态集合（允许多值）
+     * @param pageIndex 页码（从 0 开始）
+     * @param pageSize 每页条数
+     * @return Page<AsyncTaskLog> 分页结果
+     *
+     * @api GET /api/tasks/logs
+     * @permission 需要登录认证
+     */
+    @GetMapping("/logs")
+    fun listTaskLogDetails(
+        @RequestParam taskType: TaskType,
+        @RequestParam(required = false) statuses: List<TaskStatus>?,
+        @RequestParam(required = false) pageIndex: Int?,
+        @RequestParam(required = false) pageSize: Int?,
+    ): Page<@FetchBy("DEFAULT_TASK_LOG_FETCHER") AsyncTaskLog> {
+        return asyncTaskLogService.listByTypeAndStatuses(
+            taskType = taskType,
+            statuses = statuses ?: emptyList(),
+            pageIndex = pageIndex ?: 0,
+            pageSize = pageSize ?: 20,
+            fetcher = DEFAULT_TASK_LOG_FETCHER,
+        )
+    }
+
+    /**
+     * 将 FAILED / COMPLETED 状态的任务重置为 PENDING，让 worker 重新执行
+     *
+     * @param id 任务日志 ID
+     *
+     * @api POST /api/tasks/logs/{id}/reset
+     * @permission 需要管理员权限
+     */
+    @PostMapping("/logs/{id}/reset")
+    @SaCheckRole(ROLE_ADMIN)
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    fun resetTaskLog(@PathVariable id: Long) {
+        asyncTaskLogService.resetToPending(id)
+    }
+
+    companion object {
+        val DEFAULT_TASK_LOG_FETCHER = newFetcher(AsyncTaskLog::class).by {
+            allScalarFields()
+        }
     }
 }
