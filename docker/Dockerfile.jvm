@@ -1,5 +1,8 @@
 FROM eclipse-temurin:25-jre-noble
 WORKDIR /app
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
 ARG JAR_FILE=app.jar
 COPY ${JAR_FILE} app.jar
 EXPOSE 8654
