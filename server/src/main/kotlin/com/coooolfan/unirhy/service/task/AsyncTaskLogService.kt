@@ -43,22 +43,38 @@ class AsyncTaskLogService(
         }.fetchPage(pageIndex, pageSize)
     }
 
+    /**
+     * 按 ids / taskType / statuses 的交集重置任务为 PENDING。
+     *
+     * - 三个过滤条件均可选，但至少提供一个；否则视为误操作拒绝
+     * - 状态过滤规则：caller 显式传入 statuses 时按 caller 意愿执行；未传时
+     *   服务端兜底只匹配 FAILED / COMPLETED，避免 `?ids=` 路径把正在被 worker
+     *   处理的 RUNNING 记录拽回 PENDING 造成 double-run
+     * - 返回实际被重置的行数
+     */
     @Transactional
-    fun resetToPending(id: Long) {
-        val existing = sql.findById(AsyncTaskLog::class, id)
-            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "task log not found")
-        if (existing.status != TaskStatus.FAILED && existing.status != TaskStatus.COMPLETED) {
+    fun resetToPending(
+        ids: List<Long>,
+        taskType: TaskType?,
+        statuses: List<TaskStatus>,
+    ): Int {
+        if (ids.isEmpty() && taskType == null && statuses.isEmpty()) {
             throw ResponseStatusException(
                 HttpStatus.BAD_REQUEST,
-                "only FAILED or COMPLETED tasks can be reset, current status: ${existing.status}",
+                "at least one of ids / taskType / statuses must be provided",
             )
         }
-        sql.createUpdate(AsyncTaskLog::class) {
+        val effectiveStatuses = statuses.ifEmpty {
+            listOf(TaskStatus.FAILED, TaskStatus.COMPLETED)
+        }
+        return sql.createUpdate(AsyncTaskLog::class) {
+            if (ids.isNotEmpty()) where(table.id valueIn ids)
+            if (taskType != null) where(table.taskType eq taskType)
+            where(table.status valueIn effectiveStatuses)
             set(table.status, TaskStatus.PENDING)
             set(table.startedAt, null)
             set(table.completedAt, null)
             set(table.completedReason, null)
-            where(table.id eq id)
         }.execute()
     }
 }

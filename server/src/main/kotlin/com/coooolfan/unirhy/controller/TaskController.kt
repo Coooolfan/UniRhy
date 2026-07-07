@@ -114,16 +114,31 @@ class TaskController(
     /**
      * 将 FAILED / COMPLETED 状态的任务重置为 PENDING，让 worker 重新执行
      *
-     * @param id 任务日志 ID
+     * 按 ids / taskType / statuses 的交集选中记录：
+     * - 三个参数均可选，但至少需要提供一个
+     * - 无论传入 statuses 是什么，服务端只会真正重置 FAILED / COMPLETED 记录
+     * - 前端约定：单条按 ids=1；一键按 taskType=X&statuses=FAILED
      *
-     * @api POST /api/tasks/logs/{id}/reset
+     * @param ids 目标任务 ID 列表
+     * @param taskType 任务类型过滤
+     * @param statuses 状态过滤
+     * @return 实际被重置的行数
+     *
+     * @api PATCH /api/tasks/logs
      * @permission 需要管理员权限
      */
-    @PostMapping("/logs/{id}/reset")
+    @PatchMapping("/logs")
     @SaCheckRole(ROLE_ADMIN)
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    fun resetTaskLog(@PathVariable id: Long) {
-        asyncTaskLogService.resetToPending(id)
+    fun resetTaskLogs(
+        @RequestParam(required = false) ids: List<Long>?,
+        @RequestParam(required = false) taskType: TaskType?,
+        @RequestParam(required = false) statuses: List<TaskStatus>?,
+    ): Int {
+        return asyncTaskLogService.resetToPending(
+            ids = ids ?: emptyList(),
+            taskType = taskType,
+            statuses = statuses ?: emptyList(),
+        )
     }
 
     companion object {
