@@ -3,7 +3,10 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import DashboardTopBar from '@/components/dashboard/DashboardTopBar.vue'
 import { useModal } from '@/composables/useModal'
 import TaskSubmissionModal from '@/components/tasks/TaskSubmissionModal.vue'
+import SideDrawer from '@/components/SideDrawer.vue'
+import TaskLogDrawerContent from '@/components/tasks/TaskLogDrawerContent.vue'
 import type { TaskStatus } from '@/__generated/model/enums/TaskStatus'
+import type { TaskType } from '@/__generated/model/enums/TaskType'
 import type { ScanTaskRequest, TranscodeTaskRequest } from '@/__generated/model/static'
 import { BUILTIN_TASK_TYPE_LABEL_MAP, useTaskManagement } from '@/composables/useTaskManagement'
 import {
@@ -319,6 +322,31 @@ const openTaskModal = async () => {
 const refreshAll = () => {
     refreshTaskCounts()
 }
+
+const isLogDrawerOpen = ref(false)
+const drawerTaskType = ref<TaskType>('METADATA_PARSE')
+const drawerStatuses = ref<TaskStatus[]>(['PENDING'])
+
+const drawerTaskOptions = computed(() =>
+    taskSummaryRows.value.map((row) => ({
+        taskType: row.taskType as TaskType,
+        taskName: row.taskName,
+    })),
+)
+
+const drawerTaskName = computed(
+    () =>
+        drawerTaskOptions.value.find((option) => option.taskType === drawerTaskType.value)
+            ?.taskName ?? drawerTaskType.value,
+)
+
+const openLogDrawer = (taskType: string, statuses: TaskStatus[]) => {
+    drawerTaskType.value = taskType as TaskType
+    drawerStatuses.value = [...statuses]
+    isLogDrawerOpen.value = true
+}
+
+const drawerTitle = computed(() => drawerTaskName.value)
 </script>
 
 <template>
@@ -497,10 +525,19 @@ const refreshAll = () => {
                                 </div>
                             </div>
 
-                            <div class="flex items-end gap-3">
-                                <span
-                                    class="font-serif text-4xl text-[#E3D8CB] transition-colors duration-500 group-hover:text-[#2B221B]"
-                                >
+                            <button
+                                type="button"
+                                class="flex items-end gap-3 text-left"
+                                @click="
+                                    openLogDrawer(row.taskType, [
+                                        'PENDING',
+                                        'RUNNING',
+                                        'COMPLETED',
+                                        'FAILED',
+                                    ])
+                                "
+                            >
+                                <span class="font-serif text-4xl text-[#E3D8CB]">
                                     {{ row.totalCount }}
                                 </span>
                                 <span
@@ -508,13 +545,17 @@ const refreshAll = () => {
                                 >
                                     Total
                                 </span>
-                            </div>
+                            </button>
                         </div>
 
                         <div class="mt-5 h-px bg-[#E8DFD2]"></div>
 
                         <div class="mt-6 grid gap-5 md:grid-cols-3">
-                            <div class="space-y-2">
+                            <button
+                                type="button"
+                                class="space-y-2 rounded-sm text-left"
+                                @click="openLogDrawer(row.taskType, ['COMPLETED'])"
+                            >
                                 <div
                                     class="flex items-center justify-between text-xs text-[#83796D]"
                                 >
@@ -538,18 +579,34 @@ const refreshAll = () => {
                                         }"
                                     />
                                 </div>
-                            </div>
+                            </button>
 
                             <div class="space-y-2">
                                 <div
-                                    class="flex items-center justify-between text-xs text-[#83796D]"
+                                    class="flex items-center justify-between gap-2 text-xs text-[#83796D]"
                                 >
                                     <span class="text-[10px] uppercase tracking-[0.24em]">
                                         Active
                                     </span>
-                                    <span class="font-mono text-[11px] text-[#4A4A4A]">
-                                        {{ row.activeCount }}
-                                    </span>
+                                    <div class="flex items-center gap-2 font-mono text-[11px]">
+                                        <button
+                                            type="button"
+                                            class="text-[#B86134]"
+                                            :title="`执行中：${row.runningCount}`"
+                                            @click="openLogDrawer(row.taskType, ['RUNNING'])"
+                                        >
+                                            {{ row.runningCount }}
+                                        </button>
+                                        <span class="text-[#C7BEB2]">/</span>
+                                        <button
+                                            type="button"
+                                            class="text-[#4A4A4A]"
+                                            :title="`待处理：${row.pendingCount}`"
+                                            @click="openLogDrawer(row.taskType, ['PENDING'])"
+                                        >
+                                            {{ row.pendingCount }}
+                                        </button>
+                                    </div>
                                 </div>
                                 <div
                                     class="flex h-1.5 w-full overflow-hidden rounded-full bg-[#E8DFD2]/60"
@@ -569,7 +626,11 @@ const refreshAll = () => {
                                 </div>
                             </div>
 
-                            <div class="space-y-2">
+                            <button
+                                type="button"
+                                class="space-y-2 rounded-sm text-left"
+                                @click="openLogDrawer(row.taskType, ['FAILED'])"
+                            >
                                 <div
                                     class="flex items-center justify-between text-xs text-[#83796D]"
                                 >
@@ -590,12 +651,22 @@ const refreshAll = () => {
                                         }"
                                     />
                                 </div>
-                            </div>
+                            </button>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
+
+        <SideDrawer v-model:open="isLogDrawerOpen" :title="drawerTitle" width="34rem">
+            <TaskLogDrawerContent
+                v-if="isLogDrawerOpen"
+                v-model:task-type="drawerTaskType"
+                v-model:statuses="drawerStatuses"
+                :tasks="drawerTaskOptions"
+                @reset-success="refreshTaskCounts"
+            />
+        </SideDrawer>
     </div>
 </template>
 
