@@ -9,7 +9,8 @@
 *.keystore
 *.p12
 
-AGENTS.local.md
+*.local.md
+*.override.md
 
 server/.gradle
 server/build
