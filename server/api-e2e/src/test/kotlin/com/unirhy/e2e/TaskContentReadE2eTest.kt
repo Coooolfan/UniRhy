@@ -388,11 +388,12 @@ class TaskContentReadE2eTest {
             if (pending > baselinePending) {
                 observedPending = true
             }
-            if (completed > baselineCompleted || failed > baselineFailed) {
+            val terminalDelta = (completed - baselineCompleted) + (failed - baselineFailed)
+            if (terminalDelta > 0) {
                 observedCompletion = true
             }
 
-            if (pending <= baselinePending && observedCompletion) {
+            if (pending <= baselinePending && terminalDelta >= expectedTaskCount) {
                 break
             }
 
