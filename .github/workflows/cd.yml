@@ -214,8 +214,14 @@ jobs:
           set -euo pipefail
           DMG_FILE="$(ls src-tauri/target/release/bundle/dmg/*.dmg | head -n 1)"
           test -n "$DMG_FILE"
-          mv "$DMG_FILE" "src-tauri/target/release/bundle/dmg/unirhy-v${VERSION}-macos-arm64.dmg"
-          ls -al "src-tauri/target/release/bundle/dmg/unirhy-v${VERSION}-macos-arm64.dmg"
+          OUT_DMG="src-tauri/target/release/bundle/dmg/unirhy-v${VERSION}-macos-arm64.dmg"
+          mv "$DMG_FILE" "$OUT_DMG"
+
+          # 用硬盘造型图标替换 DMG 卷图标（详见脚本内说明）
+          DMG_FILE="$OUT_DMG" ICNS_FILE="src-tauri/icons/dmg-volume.icns" \
+            bash "$GITHUB_WORKSPACE/.github/scripts/release/apply-dmg-volume-icon.sh"
+
+          ls -al "$OUT_DMG"
 
       - name: 上传桌面产物
         uses: actions/upload-artifact@v4

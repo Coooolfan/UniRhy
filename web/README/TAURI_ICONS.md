@@ -6,6 +6,8 @@ Tauri currently consumes flattened icon files for desktop bundles, so `web/src-t
 
 `web/src-tauri/dmg-volume-icon.svg` is the source for the DMG file and mounted volume icon. It is intentionally separate from the app icon so the installer image can use a disk-shaped metaphor while `UniRhy.app` keeps the branded app icon.
 
+Tauri's DMG bundler has no option to set the volume icon separately and always reuses the app icon (tauri-apps/tauri#9253). To work around this, the CD workflow runs `.github/scripts/release/apply-dmg-volume-icon.sh` after building the DMG: it mounts the image, replaces `.VolumeIcon.icns` with `web/src-tauri/icons/dmg-volume.icns`, sets the custom-icon flag, and recompresses the image. Only the DMG volume icon changes, so `UniRhy.app` and its code signature are untouched. Keep `dmg-volume.icns` committed and up to date with the SVG source.
+
 Regenerate the Tauri icon outputs from the Icon Composer source on macOS:
 
 ```sh
