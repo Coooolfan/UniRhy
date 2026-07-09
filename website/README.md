@@ -40,3 +40,33 @@ yarn dev
 ```sh
 yarn build
 ```
+
+### Lint and Type Check
+
+```sh
+yarn lint          # Run linter
+yarn lint:fix      # Run linter with auto-fix
+yarn typecheck     # Run type checker
+yarn verify        # Run both lint and typecheck
+```
+
+### Format Code
+
+```sh
+yarn format        # Format code
+yarn format:check  # Check code formatting
+```
+
+### Preview Production Build
+
+```sh
+yarn preview
+```
+
+### Individual Build Steps
+
+```sh
+yarn build:client      # Build client-side only
+yarn build:server      # Build SSR server only
+yarn build:prerender   # Run prerender only
+```

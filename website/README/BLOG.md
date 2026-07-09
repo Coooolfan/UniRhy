@@ -2,23 +2,33 @@
 
 ## 概述
 
-博客基于 Markdown 文件驱动，构建时由 Vite 插件将 `.md` 文件编译为静态内容，最终产物为纯前端静态站点，部署只需 nginx。
+博客基于 Markdown 文件驱动，构建时由 Vite 插件将 `.md` 文件编译为静态内容，采用 SSR + 预渲染混合架构。
 
 支持中英双语，每篇文章需同时提供中文和英文两份 `.md` 文件。
 
 ## 目录结构
 
 ```
-content/blog/
-├── zh/                  # 中文文章
-│   ├── hello-world.md
-│   └── my-post.md
-└── en/                  # 英文文章
-    ├── hello-world.md
-    └── my-post.md
+content/
+├── blog/                # 博客文章
+│   ├── zh/              # 中文文章
+│   │   ├── hello-world.md
+│   │   └── my-post.md
+│   └── en/              # 英文文章
+│       ├── hello-world.md
+│       └── my-post.md
+└── docs/                # 文档页面
+    ├── zh/              # 中文文档
+    │   ├── intro/
+    │   ├── install/
+    │   └── usage/
+    └── en/              # 英文文档
+        ├── intro/
+        ├── install/
+        └── usage/
 ```
 
-同一篇文章在 `zh/` 和 `en/` 下使用 **相同的文件名**（即 slug），用户可在页面上切换语言。
+同一篇文章/文档在 `zh/` 和 `en/` 下使用 **相同的文件名**（即 slug），用户可在页面上切换语言。
 
 ## 编写文章
 
@@ -89,9 +99,23 @@ yarn dev
 yarn build
 ```
 
-产物输出到 `dist/` 目录。
+构建流程包含：
+
+1. **类型检查** (`type-check`)
+2. **客户端构建** (`build:client`) - 生成浏览器端资源
+3. **服务端构建** (`build:server`) - 生成 SSR 服务端入口
+4. **预渲染** (`build:prerender`) - 静态化常见页面
+
+产物输出到 `dist/` 目录，包含 `dist/client/` 和 `dist/server/`。
 
 ## 部署
+
+项目采用 **SSR + 预渲染** 混合架构：
+
+- **预渲染页面**：常见路由（首页、博客列表等）在构建时静态化，可直接用 nginx 托管
+- **动态页面**：其他路由通过 SSR 服务端渲染
+
+### 纯静态部署（仅预渲染页面）
 
 将 `dist/` 目录部署到 nginx，配置 SPA 路由回退：
 
@@ -107,6 +131,10 @@ server {
     }
 }
 ```
+
+### 完整 SSR 部署
+
+需要 Node.js 运行时，使用 `dist/server/entry-server.js` 启动 SSR 服务。
 
 ## 草稿
 
