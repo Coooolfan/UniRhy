@@ -78,18 +78,12 @@ private fun executeScanAndPreparePlaybackData(
     )
     E2eAssert.status(submitResponse, 202, "[prepare] playback scan task should be accepted")
 
-    awaitScanTaskFinished(
+    val recordingIds = awaitPlayableRecordings(
         state = state,
+        minRecordingCount = minRecordingCount,
         baselinePending = baselinePending,
         baselineCompleted = baselineCompleted,
         baselineFailed = baselineFailed,
-    )
-
-    val works = listWorks(state, "[prepare] list works after playback scan")
-    val recordingIds = collectRecordingIds(works).distinct()
-    assertTrue(
-        recordingIds.size >= minRecordingCount,
-        "[prepare] expected at least $minRecordingCount playable recordings after scan",
     )
 
     val albumSearchResponse = state.api.get(
@@ -156,35 +150,61 @@ private fun taskCount(
     }?.path("count")?.longValue() ?: 0L
 }
 
-private fun awaitScanTaskFinished(
+/**
+ * 轮询已入库的可播放 recording，直到数量达到阈值。
+ *
+ * 扫描会一次性 claim 多个 METADATA_PARSE 任务，PENDING 计数会瞬间回落到基线，
+ * 且 RUNNING 因事务隔离总为 0，因此不能以“首个任务完成”或“pending 回落”作为结束信号
+ * （此前的实现会在仅落库 1 条 recording 时提前返回，在 CI 全新库上间歇性失败）。
+ *
+ * 这里直接以 recording 数量为准：一旦达到阈值即返回；若终态计数（completed+failed）
+ * 在 pending 回落后连续多次保持不变，说明调度器已停止推进，此时仍不足则快速失败。
+ */
+private fun awaitPlayableRecordings(
     state: E2eAdminSession,
+    minRecordingCount: Int,
     baselinePending: Long,
     baselineCompleted: Long,
     baselineFailed: Long,
-) {
+): List<Long> {
     val deadline = System.currentTimeMillis() + scanWaitTimeoutMillis()
     var observedPending = false
+    var lastTerminal = -1L
+    var stableCount = 0
 
     while (System.currentTimeMillis() <= deadline) {
+        // 先读任务统计，再读 works。completeTask 与 saveScannedRecording 处于同一事务，
+        // 先统计后 works 可保证已计入 completed 的 recording 一定可见。
         val statsRows = fetchTaskStats(state, "[prepare] playback scan task stats")
         val pending = taskCount(statsRows, "METADATA_PARSE", "PENDING")
-        val completed = taskCount(statsRows, "METADATA_PARSE", "COMPLETED")
-        val failed = taskCount(statsRows, "METADATA_PARSE", "FAILED")
-
+        val terminal = taskCount(statsRows, "METADATA_PARSE", "COMPLETED") +
+            taskCount(statsRows, "METADATA_PARSE", "FAILED")
         if (pending > baselinePending) {
             observedPending = true
         }
-        if (pending <= baselinePending && (completed > baselineCompleted || failed > baselineFailed)) {
-            assertTrue(
-                observedPending || completed > baselineCompleted,
-                "[prepare] playback scan task stats should advance before finishing",
-            )
-            return
+
+        val works = listWorks(state, "[prepare] list works during playback scan")
+        val recordingIds = collectRecordingIds(works).distinct()
+        if (recordingIds.size >= minRecordingCount) {
+            return recordingIds
+        }
+
+        // 终态计数在 pending 回落后连续保持不变，视为调度器已排空。
+        if (observedPending && pending <= baselinePending && terminal > baselineCompleted + baselineFailed) {
+            stableCount = if (terminal == lastTerminal) stableCount + 1 else 0
+            lastTerminal = terminal
+            if (stableCount >= DRAIN_STABLE_POLLS) {
+                fail(
+                    "[prepare] scan drained with only ${recordingIds.size} playable recordings, " +
+                        "expected at least $minRecordingCount " +
+                        "(terminal delta=${terminal - baselineCompleted - baselineFailed})",
+                )
+            }
         }
         Thread.sleep(POLL_INTERVAL_MILLIS)
     }
 
-    fail("[prepare] playback scan task did not finish within timeout ${scanWaitTimeoutMillis()} ms")
+    fail("[prepare] playback scan did not produce $minRecordingCount recordings within timeout ${scanWaitTimeoutMillis()} ms")
 }
 
 private fun preparePlaybackFixture(
@@ -247,3 +267,4 @@ private data class PlaybackFixtureInfo(
 private const val SCAN_WAIT_TIMEOUT_ENV = "E2E_SCAN_WAIT_TIMEOUT_MILLIS"
 private const val DEFAULT_SCAN_WAIT_TIMEOUT_MILLIS = 120_000L
 private const val POLL_INTERVAL_MILLIS = 150L
+private const val DRAIN_STABLE_POLLS = 5
