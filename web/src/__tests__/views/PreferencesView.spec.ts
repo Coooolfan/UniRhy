@@ -58,10 +58,10 @@ describe('PreferencesView', () => {
         const updateUserSpy = vi.spyOn(userStore, 'updateUser')
 
         const wrapper = mount(PreferencesView)
-        await wrapper.get('[data-test="playback-mode-select"]').setValue('INDEPENDENT')
+        await wrapper.get('[data-test="playback-mode-select"]').setValue('SYNC')
 
-        expect(window.localStorage.getItem(PLAYBACK_MODE_STORAGE_KEY)).toBe('INDEPENDENT')
-        expect(useClientPreferencesStore().playbackMode).toBe('INDEPENDENT')
+        expect(window.localStorage.getItem(PLAYBACK_MODE_STORAGE_KEY)).toBe('SYNC')
+        expect(useClientPreferencesStore().playbackMode).toBe('SYNC')
         expect(updateUserSpy).not.toHaveBeenCalled()
     })
 
@@ -96,13 +96,13 @@ describe('PreferencesView', () => {
         expect(androidPlaybackMocks.openBatterySettings).toHaveBeenCalledTimes(1)
     })
 
-    it('falls back to sync mode when local playback mode is invalid', () => {
+    it('falls back to independent mode when local playback mode is invalid', () => {
         window.localStorage.setItem(PLAYBACK_MODE_STORAGE_KEY, 'UNKNOWN')
 
         const wrapper = mount(PreferencesView)
 
-        expect(useClientPreferencesStore().playbackMode).toBe('SYNC')
+        expect(useClientPreferencesStore().playbackMode).toBe('INDEPENDENT')
         const select = wrapper.get<HTMLSelectElement>('[data-test="playback-mode-select"]')
-        expect(select.element.value).toBe('SYNC')
+        expect(select.element.value).toBe('INDEPENDENT')
     })
 })

@@ -588,6 +588,7 @@ describe('audio store', () => {
         setActivePinia(createPinia())
         resetRecordingPlaybackResolverCaches()
         window.localStorage.clear()
+        window.localStorage.setItem(PLAYBACK_MODE_STORAGE_KEY, 'SYNC')
         Reflect.deleteProperty(window, '__UNIRHY_RUNTIME__')
         setPreferredAssetFormat('audio/opus')
         playbackSyncMockState.clients.length = 0

@@ -4,7 +4,7 @@ import { defineStore } from 'pinia'
 export const PLAYBACK_MODES = ['SYNC', 'INDEPENDENT'] as const
 export type PlaybackMode = (typeof PLAYBACK_MODES)[number]
 
-export const DEFAULT_PLAYBACK_MODE: PlaybackMode = 'SYNC'
+export const DEFAULT_PLAYBACK_MODE: PlaybackMode = 'INDEPENDENT'
 export const PLAYBACK_MODE_STORAGE_KEY = 'unirhy.playback.mode'
 
 const isPlaybackMode = (value: string | null): value is PlaybackMode => {
