@@ -31,6 +31,7 @@ const isSignedMediaUrl = (url: string) => {
 }
 
 const defaultIndependentPlaybackModeGetter = () => false
+const noopProgressUpdates = () => undefined
 
 type UseAudioEngineOptions = {
     currentTrack: Ref<AudioTrack | null>
@@ -93,6 +94,7 @@ export const useAudioEngine = (options: UseAudioEngineOptions) => {
     const playbackStartContextTime = shallowRef(0)
     const playbackOffsetSec = shallowRef(0)
     const rafId = shallowRef<number | null>(null)
+    const backgroundProgressIntervalId = shallowRef<number | null>(null)
     const activeLoad = shallowRef<BufferLoadState | null>(null)
 
     const liveSourceNodes = new Set<AudioBufferSourceNode>()
@@ -101,6 +103,8 @@ export const useAudioEngine = (options: UseAudioEngineOptions) => {
 
     let scheduledPauseTimer: number | null = null
     let scheduledStopTimer: number | null = null
+    let visibilityListenerAttached = false
+    let restartProgressUpdates = noopProgressUpdates
 
     let volumeValue = 0
 
@@ -121,13 +125,34 @@ export const useAudioEngine = (options: UseAudioEngineOptions) => {
         }
     }
 
-    const stopAnimationLoop = () => {
-        if (rafId.value === null || typeof cancelAnimationFrame === 'undefined') {
+    const attachVisibilityListener = () => {
+        if (visibilityListenerAttached || typeof document === 'undefined') {
             return
         }
+        document.addEventListener('visibilitychange', restartProgressUpdates)
+        visibilityListenerAttached = true
+    }
 
-        cancelAnimationFrame(rafId.value)
-        rafId.value = null
+    const detachVisibilityListener = () => {
+        if (!visibilityListenerAttached || typeof document === 'undefined') {
+            return
+        }
+        document.removeEventListener('visibilitychange', restartProgressUpdates)
+        visibilityListenerAttached = false
+    }
+
+    const stopAnimationLoop = () => {
+        if (rafId.value !== null && typeof cancelAnimationFrame !== 'undefined') {
+            cancelAnimationFrame(rafId.value)
+            rafId.value = null
+        }
+
+        if (backgroundProgressIntervalId.value !== null) {
+            window.clearInterval(backgroundProgressIntervalId.value)
+            backgroundProgressIntervalId.value = null
+        }
+
+        detachVisibilityListener()
     }
 
     const updatePausedTime = (time: number) => {
@@ -155,12 +180,25 @@ export const useAudioEngine = (options: UseAudioEngineOptions) => {
     const startAnimationLoop = () => {
         stopAnimationLoop()
 
-        if (
-            typeof requestAnimationFrame === 'undefined' ||
-            !isPlaying.value ||
-            !audioContext.value ||
-            !currentBuffer.value
-        ) {
+        if (!isPlaying.value || !audioContext.value || !currentBuffer.value) {
+            return
+        }
+
+        attachVisibilityListener()
+        syncCurrentTime()
+
+        if (globalThis.document?.hidden) {
+            backgroundProgressIntervalId.value = window.setInterval(() => {
+                if (!isPlaying.value || !audioContext.value || !currentBuffer.value) {
+                    stopAnimationLoop()
+                    return
+                }
+                syncCurrentTime()
+            }, 1_000)
+            return
+        }
+
+        if (typeof requestAnimationFrame === 'undefined') {
             return
         }
 
@@ -174,8 +212,13 @@ export const useAudioEngine = (options: UseAudioEngineOptions) => {
             rafId.value = requestAnimationFrame(tick)
         }
 
-        syncCurrentTime()
         rafId.value = requestAnimationFrame(tick)
+    }
+
+    restartProgressUpdates = () => {
+        if (isPlaying.value && audioContext.value && currentBuffer.value) {
+            startAnimationLoop()
+        }
     }
 
     const ensureAudioContext = () => {

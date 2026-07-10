@@ -1,0 +1,65 @@
+import { getPlatformRuntime } from '@/runtime/platform'
+
+export type AndroidPlaybackSystemStatus = {
+    notificationPermissionGranted: boolean
+    batteryOptimizationEnabled: boolean
+}
+
+const createPlaybackServiceConfig = () => ({
+    serviceLabel: '音乐播放进行中',
+    foregroundServiceType: 'mediaPlayback',
+})
+
+export const isAndroidRuntime = () => getPlatformRuntime().platform === 'android'
+
+export const getAndroidNotificationPermission = async () => {
+    const { isPermissionGranted } = await import('@tauri-apps/plugin-notification')
+    return isPermissionGranted()
+}
+
+export const requestAndroidNotificationPermission = async () => {
+    const { requestPermission } = await import('@tauri-apps/plugin-notification')
+    return requestPermission()
+}
+
+export const startAndroidPlaybackService = async () => {
+    const { configureRecovery, isServiceRunning, startService } =
+        await import('tauri-plugin-background-service')
+    const config = createPlaybackServiceConfig()
+
+    if (!(await isServiceRunning())) {
+        await startService(config)
+    }
+    await configureRecovery({ enabled: true, config })
+}
+
+export const stopAndroidPlaybackService = async () => {
+    const { configureRecovery, isServiceRunning, stopService } =
+        await import('tauri-plugin-background-service')
+
+    if (await isServiceRunning()) {
+        await stopService()
+    }
+    await configureRecovery({ enabled: false })
+}
+
+export const getAndroidPlaybackSystemStatus = async (): Promise<AndroidPlaybackSystemStatus> => {
+    const [{ isPermissionGranted }, { checkBatteryOptimizationStatus }] = await Promise.all([
+        import('@tauri-apps/plugin-notification'),
+        import('tauri-plugin-android-battery-optimization-api'),
+    ])
+    const [notificationPermissionGranted, batteryStatus] = await Promise.all([
+        isPermissionGranted(),
+        checkBatteryOptimizationStatus(),
+    ])
+
+    return {
+        notificationPermissionGranted,
+        batteryOptimizationEnabled: batteryStatus.isOptimized,
+    }
+}
+
+export const openAndroidBatterySettings = async () => {
+    const { openBatterySettings } = await import('tauri-plugin-android-battery-optimization-api')
+    await openBatterySettings()
+}

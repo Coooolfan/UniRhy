@@ -689,6 +689,52 @@ describe('audio store', () => {
         expect(playNextInCurrentQueueMock).not.toHaveBeenCalled()
     })
 
+    it('switches progress updates between a background interval and animation frames', async () => {
+        setIndependentPlaybackMode()
+        fetchMock.mockResolvedValue(createResponse(44))
+
+        const hiddenSpy = vi.spyOn(document, 'hidden', 'get').mockReturnValue(true)
+        const addEventListenerSpy = vi.spyOn(document, 'addEventListener')
+        const setIntervalSpy = vi.spyOn(window, 'setInterval')
+        const clearIntervalSpy = vi.spyOn(window, 'clearInterval')
+
+        const audioStore = useAudioStore()
+        await audioStore.replaceQueueAndPlay([buildTrack(1)], 0)
+        await flushPromises(12)
+
+        expect(setIntervalSpy).toHaveBeenCalledWith(expect.any(Function), 1_000)
+        expect(animationFrameCallbacks).toHaveLength(0)
+
+        const backgroundTick = setIntervalSpy.mock.calls[0]?.[0]
+        expect(backgroundTick).toBeTypeOf('function')
+        const context = MockAudioContext.instances[0]
+        expect(context).toBeDefined()
+        if (!context) {
+            throw new Error('AudioContext was not created')
+        }
+        context.currentTime = 7
+        if (typeof backgroundTick === 'function') {
+            backgroundTick()
+        }
+        expect(audioStore.currentTime).toBe(7)
+
+        hiddenSpy.mockReturnValue(false)
+        const visibilityListener = addEventListenerSpy.mock.calls.find(
+            ([eventName]) => eventName === 'visibilitychange',
+        )?.[1]
+        expect(visibilityListener).toBeTypeOf('function')
+        if (typeof visibilityListener === 'function') {
+            visibilityListener(new Event('visibilitychange'))
+        }
+
+        const backgroundIntervalId = setIntervalSpy.mock.results[0]?.value
+        expect(clearIntervalSpy).toHaveBeenCalledWith(backgroundIntervalId)
+        expect(animationFrameCallbacks).toHaveLength(1)
+
+        audioStore.pause()
+        expect(animationFrameCallbacks).toHaveLength(0)
+    })
+
     it('keeps independent queue mutations local', async () => {
         setIndependentPlaybackMode()
 

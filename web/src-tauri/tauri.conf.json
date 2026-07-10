@@ -8,6 +8,19 @@
     "beforeBuildCommand": "npm run build",
     "frontendDist": "../dist"
   },
+  "plugins": {
+    "background-service": {
+      "androidForegroundServiceTypes": ["mediaPlayback"],
+      "androidValidateForegroundServiceType": true,
+      "androidOnTimeout": "notifyUser",
+      "androidNotificationChannelId": "unirhy_playback",
+      "androidNotificationChannelName": "音乐播放",
+      "androidNotificationId": 9001,
+      "androidNotificationSmallIcon": "ic_notification",
+      "androidShowStopAction": true,
+      "androidRequestNotificationPermissionOnLoad": false
+    }
+  },
   "bundle": {
     "icon": [
       "icons/32x32.png",
