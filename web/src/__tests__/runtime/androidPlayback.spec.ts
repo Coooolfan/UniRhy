@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
     getAndroidPlaybackSystemStatus,
+    isAndroidPlaybackServiceRunning,
     listenForAndroidPlaybackStop,
     openAndroidBatterySettings,
     startAndroidPlaybackService,
@@ -65,6 +66,12 @@ describe('Android playback runtime', () => {
             isIgnoringOptimizations: true,
         })
         pluginMocks.openBatterySettings.mockReset().mockResolvedValue(undefined)
+    })
+
+    it('reports whether the media playback service is running', async () => {
+        pluginMocks.isServiceRunning.mockResolvedValue(true)
+
+        await expect(isAndroidPlaybackServiceRunning()).resolves.toBe(true)
     })
 
     it('starts a media playback service without enabling recovery', async () => {

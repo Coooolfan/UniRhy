@@ -27,6 +27,11 @@ export const requestAndroidNotificationPermission = async () => {
     return requestPermission()
 }
 
+export const isAndroidPlaybackServiceRunning = async () => {
+    const { isServiceRunning } = await import('tauri-plugin-background-service')
+    return isServiceRunning()
+}
+
 export const startAndroidPlaybackService = async () => {
     const { isServiceRunning, startService } = await import('tauri-plugin-background-service')
     const config = createPlaybackServiceConfig()

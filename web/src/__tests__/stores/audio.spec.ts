@@ -1304,6 +1304,69 @@ describe('audio store', () => {
         })
     })
 
+    it('defers remote playback until foreground protection becomes available', async () => {
+        getRecordingMock.mockResolvedValue(buildRecordingMetadata(5))
+        fetchMock.mockResolvedValue(createResponse(90))
+        const playbackProtectionGuard = vi.fn<() => Promise<boolean>>()
+        playbackProtectionGuard.mockResolvedValueOnce(false).mockResolvedValue(true)
+
+        const audioStore = useAudioStore()
+        audioStore.setPlaybackProtectionGuard(playbackProtectionGuard)
+        audioStore.connectPlaybackSync()
+        const client = latestClient()
+        client.setState({
+            phase: 'ready',
+            clockOffsetMs: 0,
+            roundTripEstimateMs: 10,
+        })
+
+        const nowMs = nowClientMs()
+        client.emitMessage({
+            type: 'SCHEDULED_ACTION',
+            payload: {
+                commandId: 'remote-play-background',
+                serverTimeToExecuteMs: nowMs,
+                scheduledAction: {
+                    action: 'PLAY',
+                    status: 'PLAYING',
+                    currentIndex: 0,
+                    positionSeconds: 12,
+                    version: 2,
+                },
+            },
+        } satisfies ScheduledActionMessage)
+        await flushPromises(12)
+
+        expect(playbackProtectionGuard).toHaveBeenCalledTimes(1)
+        expect(audioStore.isPlaying).toBe(false)
+        expect(audioStore.currentTime).toBe(12)
+        expect(MockAudioContext.instances[0]?.sourceNodes).toHaveLength(0)
+
+        audioStore.recoverPlaybackAfterForeground()
+        expect(client.requestSync).toHaveBeenCalledTimes(1)
+        expect(audioStore.playbackSyncDebugSnapshot.awaitingSyncRecovery).toBe(true)
+
+        client.emitMessage({
+            type: 'SCHEDULED_ACTION',
+            payload: {
+                commandId: 'sync-after-foreground',
+                serverTimeToExecuteMs: nowClientMs(),
+                scheduledAction: {
+                    action: 'PLAY',
+                    status: 'PLAYING',
+                    currentIndex: 0,
+                    positionSeconds: 20,
+                    version: 2,
+                },
+            },
+        } satisfies ScheduledActionMessage)
+        await flushPromises(12)
+
+        expect(playbackProtectionGuard).toHaveBeenCalledTimes(2)
+        expect(audioStore.isPlaying).toBe(true)
+        expect(MockAudioContext.instances[0]?.sourceNodes[0]?.start).toHaveBeenCalled()
+    })
+
     it('ignores stale scheduled actions with a lower version', async () => {
         getRecordingMock.mockResolvedValueOnce(buildRecordingMetadata(5))
         fetchMock.mockResolvedValue(createResponse(90))

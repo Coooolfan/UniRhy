@@ -31,7 +31,10 @@ const isSignedMediaUrl = (url: string) => {
 }
 
 const defaultIndependentPlaybackModeGetter = () => false
+const defaultPlaybackActivationGuard = () => true
 const noopProgressUpdates = () => undefined
+
+export type PlaybackActivationGuard = () => boolean | Promise<boolean>
 
 type UseAudioEngineOptions = {
     currentTrack: Ref<AudioTrack | null>
@@ -110,8 +113,12 @@ export const useAudioEngine = (options: UseAudioEngineOptions) => {
 
     // 独立播放模式判定由上层注入：结束回调需据此决定自动续播路径
     let isIndependentPlaybackMode: () => boolean = defaultIndependentPlaybackModeGetter
+    let playbackActivationGuard: PlaybackActivationGuard = defaultPlaybackActivationGuard
     const setIndependentPlaybackModeGetter = (getter: () => boolean) => {
         isIndependentPlaybackMode = getter
+    }
+    const setPlaybackActivationGuard = (guard: PlaybackActivationGuard | null) => {
+        playbackActivationGuard = guard ?? defaultPlaybackActivationGuard
     }
 
     const clearScheduledTimers = () => {
@@ -591,6 +598,11 @@ export const useAudioEngine = (options: UseAudioEngineOptions) => {
             return
         }
 
+        if (!(await playbackActivationGuard()) || actionToken !== lastAppliedVersion.value) {
+            applyPausedState(track, payload.scheduledAction.positionSeconds)
+            return
+        }
+
         const estimatedServerNowMs = getEstimatedServerNowMs()
         const lateSeconds = payload.skipLateCompensation
             ? 0
@@ -667,6 +679,12 @@ export const useAudioEngine = (options: UseAudioEngineOptions) => {
             return
         }
 
+        if (!(await playbackActivationGuard())) {
+            applyPausedState(track, positionSeconds)
+            updateLocalQueuePlaybackState('PAUSED', positionSeconds)
+            return
+        }
+
         const nextTime = clampTime(positionSeconds, buffer.duration)
         stopAllSourceNodes()
         const nextNode = createSourceNode(buffer)
@@ -739,6 +757,7 @@ export const useAudioEngine = (options: UseAudioEngineOptions) => {
             volumeValue = value
         },
         setIndependentPlaybackModeGetter,
+        setPlaybackActivationGuard,
         ensureAudioContextResumed,
         isSameBufferTrack,
         stopAllSourceNodes,

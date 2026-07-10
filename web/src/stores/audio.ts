@@ -32,7 +32,7 @@ import {
 } from '@/stores/audioShared'
 import { useAudioTrackCatalog } from '@/stores/audioTrackCatalog'
 import { useAudioLocalQueue } from '@/stores/audioLocalQueue'
-import { useAudioEngine } from '@/stores/audioEngine'
+import { useAudioEngine, type PlaybackActivationGuard } from '@/stores/audioEngine'
 import {
     usePlaybackSyncSession,
     type QueuedPlayIntent,
@@ -177,6 +177,7 @@ export const useAudioStore = defineStore('audio', () => {
     })
     const {
         activeLoad,
+        setPlaybackActivationGuard,
         ensureAudioContextResumed,
         getCurrentPlaybackTime,
         isSameBufferTrack,
@@ -806,6 +807,29 @@ export const useAudioStore = defineStore('audio', () => {
         })
     }
 
+    function pauseForPlaybackProtection() {
+        if (!currentTrack.value || !isPlaying.value) {
+            return
+        }
+
+        const pausedAt = getCurrentPlaybackTime()
+        applyPausedState(currentTrack.value, pausedAt)
+        if (isIndependentPlaybackMode.value) {
+            updateLocalQueuePlaybackState('PAUSED', pausedAt)
+        }
+    }
+
+    function setPlaybackProtectionGuard(guard: PlaybackActivationGuard | null) {
+        setPlaybackActivationGuard(guard)
+    }
+
+    function recoverPlaybackAfterForeground() {
+        if (isIndependentPlaybackMode.value || !playbackSyncClient.value) {
+            return
+        }
+        requestSyncRecovery()
+    }
+
     async function play(track: AudioTrack) {
         await replaceQueueAndPlay([track], 0)
     }
@@ -991,6 +1015,9 @@ export const useAudioStore = defineStore('audio', () => {
         clearQueue,
         pause,
         pauseFromSystem,
+        pauseForPlaybackProtection,
+        setPlaybackProtectionGuard,
+        recoverPlaybackAfterForeground,
         resume,
         stop,
         hidePlayer,

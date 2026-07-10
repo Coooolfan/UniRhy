@@ -1,6 +1,7 @@
 import { onScopeDispose, watch } from 'vue'
 import {
     getAndroidNotificationPermission,
+    isAndroidPlaybackServiceRunning,
     isAndroidRuntime,
     listenForAndroidPlaybackStop,
     requestAndroidNotificationPermission,
@@ -14,6 +15,9 @@ type AndroidPlaybackAudioStore = {
     } | null
     isPlaying: boolean
     pauseFromSystem: () => void
+    pauseForPlaybackProtection: () => void
+    recoverPlaybackAfterForeground: () => void
+    setPlaybackProtectionGuard: (guard: (() => boolean | Promise<boolean>) | null) => void
 }
 
 export const useAndroidPlaybackService = (audioStore: AndroidPlaybackAudioStore) => {
@@ -23,9 +27,12 @@ export const useAndroidPlaybackService = (audioStore: AndroidPlaybackAudioStore)
 
     let desiredPlaybackActive = false
     let notificationPermissionRequested = false
+    let playbackRecoveryPending = false
+    let serviceKnownActive = false
     let disposed = false
     let stopNativeListener: (() => void) | null = null
     let operation = listenForAndroidPlaybackStop(() => {
+        serviceKnownActive = false
         audioStore.pauseFromSystem()
     })
         .then((stopListener) => {
@@ -39,6 +46,15 @@ export const useAndroidPlaybackService = (audioStore: AndroidPlaybackAudioStore)
             console.error('Failed to listen for Android playback stop', error)
         })
 
+    const enqueueServiceOperation = <T>(task: () => Promise<T>) => {
+        const result = operation.then(task)
+        operation = result.then(
+            () => undefined,
+            () => undefined,
+        )
+        return result
+    }
+
     const ensureNotificationPermission = async () => {
         if (notificationPermissionRequested || (await getAndroidNotificationPermission())) {
             return
@@ -51,32 +67,86 @@ export const useAndroidPlaybackService = (audioStore: AndroidPlaybackAudioStore)
         }
     }
 
-    const reconcileService = () => {
-        operation = operation
-            .then(async () => {
-                if (!desiredPlaybackActive) {
-                    await stopAndroidPlaybackService()
-                    return
+    const ensurePlaybackService = async (requireDesiredPlayback = false) => {
+        try {
+            return await enqueueServiceOperation(async () => {
+                if (disposed || (requireDesiredPlayback && !desiredPlaybackActive)) {
+                    return false
+                }
+
+                if (serviceKnownActive || (await isAndroidPlaybackServiceRunning())) {
+                    serviceKnownActive = true
+                    return true
+                }
+
+                if (document.hidden) {
+                    playbackRecoveryPending = true
+                    return false
                 }
 
                 await ensureNotificationPermission()
-                if (!desiredPlaybackActive) {
-                    await stopAndroidPlaybackService()
-                    return
+                if (disposed || (requireDesiredPlayback && !desiredPlaybackActive)) {
+                    return false
+                }
+                if (document.hidden) {
+                    playbackRecoveryPending = true
+                    return false
                 }
 
                 await startAndroidPlaybackService()
+                serviceKnownActive = true
+                return true
             })
-            .catch((error: unknown) => {
-                console.error('Failed to reconcile Android playback service', error)
-            })
+        } catch (error: unknown) {
+            playbackRecoveryPending = true
+            console.error('Failed to start Android playback service', error)
+            return false
+        }
     }
 
+    const stopPlaybackService = () => {
+        void enqueueServiceOperation(async () => {
+            if (desiredPlaybackActive) {
+                return
+            }
+
+            await stopAndroidPlaybackService()
+            serviceKnownActive = false
+        }).catch((error: unknown) => {
+            serviceKnownActive = false
+            console.error('Failed to stop Android playback service', error)
+        })
+    }
+
+    const handleVisibilityChange = () => {
+        if (
+            document.hidden ||
+            (!playbackRecoveryPending && (audioStore.isPlaying || audioStore.currentTrack === null))
+        ) {
+            return
+        }
+
+        playbackRecoveryPending = false
+        audioStore.recoverPlaybackAfterForeground()
+    }
+
+    audioStore.setPlaybackProtectionGuard(() => ensurePlaybackService())
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
     const stopWatcher = watch(
-        () => [audioStore.isPlaying, audioStore.currentTrack] as const,
-        ([isPlaying, track]) => {
-            desiredPlaybackActive = isPlaying && track !== null
-            reconcileService()
+        () => audioStore.isPlaying,
+        (isPlaying) => {
+            desiredPlaybackActive = isPlaying && audioStore.currentTrack !== null
+            if (!desiredPlaybackActive) {
+                stopPlaybackService()
+                return
+            }
+
+            void ensurePlaybackService(true).then((playbackProtected) => {
+                if (!playbackProtected && desiredPlaybackActive) {
+                    audioStore.pauseForPlaybackProtection()
+                }
+            })
         },
         { immediate: true },
     )
@@ -84,10 +154,12 @@ export const useAndroidPlaybackService = (audioStore: AndroidPlaybackAudioStore)
     onScopeDispose(() => {
         disposed = true
         stopWatcher()
+        document.removeEventListener('visibilitychange', handleVisibilityChange)
+        audioStore.setPlaybackProtectionGuard(null)
         stopNativeListener?.()
         stopNativeListener = null
         desiredPlaybackActive = false
-        reconcileService()
+        stopPlaybackService()
     })
 
     return {

@@ -6,6 +6,7 @@ const androidPlaybackMocks = vi.hoisted(() => ({
     isAndroid: true,
     getNotificationPermission: vi.fn<() => Promise<boolean>>(),
     requestNotificationPermission: vi.fn<() => Promise<NotificationPermission>>(),
+    isServiceRunning: vi.fn<() => Promise<boolean>>(),
     listenForStop: vi.fn<(handler: () => void) => Promise<() => void>>(),
     nativeStopHandler: undefined as (() => void) | undefined,
     stopNativeListener: vi.fn(),
@@ -17,17 +18,29 @@ vi.mock('@/runtime/androidPlayback', () => ({
     isAndroidRuntime: () => androidPlaybackMocks.isAndroid,
     getAndroidNotificationPermission: androidPlaybackMocks.getNotificationPermission,
     requestAndroidNotificationPermission: androidPlaybackMocks.requestNotificationPermission,
+    isAndroidPlaybackServiceRunning: androidPlaybackMocks.isServiceRunning,
     listenForAndroidPlaybackStop: androidPlaybackMocks.listenForStop,
     startAndroidPlaybackService: androidPlaybackMocks.startService,
     stopAndroidPlaybackService: androidPlaybackMocks.stopService,
 }))
 
-const createAudioStore = () =>
-    reactive({
+type PlaybackProtectionGuard = (() => boolean | Promise<boolean>) | null
+
+const createAudioStore = () => {
+    const audioStore = reactive({
         currentTrack: null as { title: string } | null,
         isPlaying: false,
+        playbackProtectionGuard: null as PlaybackProtectionGuard,
         pauseFromSystem: vi.fn(),
+        pauseForPlaybackProtection: vi.fn(),
+        recoverPlaybackAfterForeground: vi.fn(),
+        setPlaybackProtectionGuard: vi.fn<(guard: PlaybackProtectionGuard) => void>(),
     })
+    audioStore.setPlaybackProtectionGuard.mockImplementation((guard) => {
+        audioStore.playbackProtectionGuard = guard
+    })
+    return audioStore
+}
 
 const flushController = async (
     controller: ReturnType<typeof useAndroidPlaybackService> | undefined,
@@ -36,12 +49,21 @@ const flushController = async (
     await controller?.whenSettled()
 }
 
+const setDocumentHidden = (hidden: boolean) => {
+    Object.defineProperty(document, 'hidden', {
+        configurable: true,
+        value: hidden,
+    })
+}
+
 describe('useAndroidPlaybackService', () => {
     beforeEach(() => {
         vi.restoreAllMocks()
+        setDocumentHidden(false)
         androidPlaybackMocks.isAndroid = true
         androidPlaybackMocks.getNotificationPermission.mockReset().mockResolvedValue(true)
         androidPlaybackMocks.requestNotificationPermission.mockReset().mockResolvedValue('granted')
+        androidPlaybackMocks.isServiceRunning.mockReset().mockResolvedValue(false)
         androidPlaybackMocks.nativeStopHandler = undefined
         androidPlaybackMocks.stopNativeListener.mockReset()
         androidPlaybackMocks.listenForStop.mockReset().mockImplementation((handler) => {
@@ -76,6 +98,93 @@ describe('useAndroidPlaybackService', () => {
         scope.stop()
     })
 
+    it('blocks a new background playback and requests recovery when visible again', async () => {
+        const audioStore = createAudioStore()
+        const scope = effectScope()
+        const controller = scope.run(() => useAndroidPlaybackService(audioStore))
+        await flushController(controller)
+        androidPlaybackMocks.startService.mockClear()
+
+        setDocumentHidden(true)
+        await expect(audioStore.playbackProtectionGuard?.()).resolves.toBe(false)
+
+        expect(androidPlaybackMocks.startService).not.toHaveBeenCalled()
+        expect(audioStore.recoverPlaybackAfterForeground).not.toHaveBeenCalled()
+
+        setDocumentHidden(false)
+        document.dispatchEvent(new Event('visibilitychange'))
+
+        expect(audioStore.recoverPlaybackAfterForeground).toHaveBeenCalledTimes(1)
+        scope.stop()
+    })
+
+    it('resynchronizes a paused track when the app becomes visible', async () => {
+        const audioStore = createAudioStore()
+        audioStore.currentTrack = { title: 'Deferred Track' }
+        const scope = effectScope()
+        const controller = scope.run(() => useAndroidPlaybackService(audioStore))
+        await flushController(controller)
+
+        setDocumentHidden(true)
+        document.dispatchEvent(new Event('visibilitychange'))
+        setDocumentHidden(false)
+        document.dispatchEvent(new Event('visibilitychange'))
+
+        expect(audioStore.recoverPlaybackAfterForeground).toHaveBeenCalledTimes(1)
+        scope.stop()
+    })
+
+    it('allows background continuation when the playback service is already running', async () => {
+        androidPlaybackMocks.isServiceRunning.mockResolvedValue(true)
+        setDocumentHidden(true)
+        const audioStore = createAudioStore()
+        audioStore.currentTrack = { title: 'Track Two' }
+        audioStore.isPlaying = true
+        const scope = effectScope()
+        const controller = scope.run(() => useAndroidPlaybackService(audioStore))
+        await flushController(controller)
+
+        await expect(audioStore.playbackProtectionGuard?.()).resolves.toBe(true)
+
+        expect(androidPlaybackMocks.startService).not.toHaveBeenCalled()
+        setDocumentHidden(false)
+        document.dispatchEvent(new Event('visibilitychange'))
+        expect(audioStore.recoverPlaybackAfterForeground).not.toHaveBeenCalled()
+        scope.stop()
+    })
+
+    it('rejects playback when foreground service startup fails', async () => {
+        androidPlaybackMocks.startService.mockRejectedValue(new Error('background start denied'))
+        const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+        const audioStore = createAudioStore()
+        const scope = effectScope()
+        const controller = scope.run(() => useAndroidPlaybackService(audioStore))
+        await flushController(controller)
+
+        await expect(audioStore.playbackProtectionGuard?.()).resolves.toBe(false)
+        expect(consoleError).toHaveBeenCalledWith(
+            'Failed to start Android playback service',
+            expect.any(Error),
+        )
+        scope.stop()
+    })
+
+    it('pauses unprotected playback when fallback service startup fails', async () => {
+        androidPlaybackMocks.startService.mockRejectedValue(new Error('start denied'))
+        vi.spyOn(console, 'error').mockImplementation(() => undefined)
+        const audioStore = createAudioStore()
+        const scope = effectScope()
+        const controller = scope.run(() => useAndroidPlaybackService(audioStore))
+        await flushController(controller)
+
+        audioStore.currentTrack = { title: 'Track Two' }
+        audioStore.isPlaying = true
+        await flushController(controller)
+
+        expect(audioStore.pauseForPlaybackProtection).toHaveBeenCalledTimes(1)
+        scope.stop()
+    })
+
     it('pauses playback for the native notification stop action and removes the listener', async () => {
         const audioStore = createAudioStore()
         const scope = effectScope()
@@ -86,6 +195,7 @@ describe('useAndroidPlaybackService', () => {
 
         expect(audioStore.pauseFromSystem).toHaveBeenCalledTimes(1)
         scope.stop()
+        expect(audioStore.setPlaybackProtectionGuard).toHaveBeenLastCalledWith(null)
         expect(androidPlaybackMocks.stopNativeListener).toHaveBeenCalledTimes(1)
     })
 
@@ -100,7 +210,7 @@ describe('useAndroidPlaybackService', () => {
         )
 
         const audioStore = createAudioStore()
-        audioStore.currentTrack = { title: 'Track Two' }
+        audioStore.currentTrack = { title: 'Track Three' }
         audioStore.isPlaying = true
         const scope = effectScope()
         const controller = scope.run(() => useAndroidPlaybackService(audioStore))
@@ -119,12 +229,13 @@ describe('useAndroidPlaybackService', () => {
     it('does nothing outside the Android runtime', () => {
         androidPlaybackMocks.isAndroid = false
         const audioStore = createAudioStore()
-        audioStore.currentTrack = { title: 'Track Three' }
+        audioStore.currentTrack = { title: 'Track Four' }
         audioStore.isPlaying = true
 
         const controller = useAndroidPlaybackService(audioStore)
 
         expect(controller).toBeNull()
+        expect(audioStore.setPlaybackProtectionGuard).not.toHaveBeenCalled()
         expect(androidPlaybackMocks.startService).not.toHaveBeenCalled()
     })
 })
