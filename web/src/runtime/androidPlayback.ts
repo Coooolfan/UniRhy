@@ -5,6 +5,11 @@ export type AndroidPlaybackSystemStatus = {
     batteryOptimizationEnabled: boolean
 }
 
+type AndroidPlaybackNativeLifecycleEvent = {
+    type: 'androidNotificationStop' | 'androidTimeout'
+    fgsType?: string
+}
+
 const createPlaybackServiceConfig = () => ({
     serviceLabel: '音乐播放进行中',
     foregroundServiceType: 'mediaPlayback',
@@ -23,24 +28,44 @@ export const requestAndroidNotificationPermission = async () => {
 }
 
 export const startAndroidPlaybackService = async () => {
-    const { configureRecovery, isServiceRunning, startService } =
-        await import('tauri-plugin-background-service')
+    const { isServiceRunning, startService } = await import('tauri-plugin-background-service')
     const config = createPlaybackServiceConfig()
 
     if (!(await isServiceRunning())) {
         await startService(config)
     }
-    await configureRecovery({ enabled: true, config })
 }
 
 export const stopAndroidPlaybackService = async () => {
-    const { configureRecovery, isServiceRunning, stopService } =
-        await import('tauri-plugin-background-service')
+    const { isServiceRunning, stopService } = await import('tauri-plugin-background-service')
 
     if (await isServiceRunning()) {
         await stopService()
     }
-    await configureRecovery({ enabled: false })
+}
+
+export const listenForAndroidPlaybackStop = async (onStop: () => void) => {
+    const { addPluginListener, invoke } = await import('@tauri-apps/api/core')
+    const listener = await addPluginListener<AndroidPlaybackNativeLifecycleEvent>(
+        'background-service',
+        'native-lifecycle-event',
+        (event) => {
+            if (event.type !== 'androidNotificationStop') {
+                return
+            }
+
+            onStop()
+            void invoke('plugin:background-service|native_lifecycle_event', { event }).catch(
+                (error: unknown) => {
+                    console.error('Failed to reconcile native Android playback stop', error)
+                },
+            )
+        },
+    )
+
+    return () => {
+        void listener.unregister()
+    }
 }
 
 export const getAndroidPlaybackSystemStatus = async (): Promise<AndroidPlaybackSystemStatus> => {

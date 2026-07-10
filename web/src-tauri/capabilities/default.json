@@ -16,7 +16,7 @@
     "background-service:allow-start",
     "background-service:allow-stop",
     "background-service:allow-is-running",
-    "background-service:allow-configure-recovery",
+    "background-service:allow-native-lifecycle-event",
     "notification:allow-is-permission-granted",
     "notification:allow-request-permission",
     "android-battery-optimization:allow-check-battery-optimization-status",

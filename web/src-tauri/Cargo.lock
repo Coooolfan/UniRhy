@@ -3801,8 +3801,6 @@ dependencies = [
 [[package]]
 name = "tauri-plugin-background-service"
 version = "0.7.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "75bf40b9f09a0917c6874d1612c5169a25dff8895c012ee48bc1690101a90531"
 dependencies = [
  "async-trait",
  "libc",

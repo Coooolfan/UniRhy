@@ -689,6 +689,30 @@ describe('audio store', () => {
         expect(playNextInCurrentQueueMock).not.toHaveBeenCalled()
     })
 
+    it('pauses local playback from a system control without clearing its queue', async () => {
+        setIndependentPlaybackMode()
+        fetchMock.mockResolvedValue(createResponse(44))
+
+        const audioStore = useAudioStore()
+        await audioStore.replaceQueueAndPlay([buildTrack(1), buildTrack(2)], 0)
+        await flushPromises(12)
+
+        const context = MockAudioContext.instances[0]
+        expect(context).toBeDefined()
+        if (!context) {
+            throw new Error('AudioContext was not created')
+        }
+        context.currentTime = 9
+
+        audioStore.pauseFromSystem()
+
+        expect(audioStore.isPlaying).toBe(false)
+        expect(audioStore.currentTime).toBe(9)
+        expect(audioStore.currentTrack?.id).toBe(1)
+        expect(audioStore.currentQueueIndex).toBe(0)
+        expect(audioStore.queueEntries.map((entry) => entry.recordingId)).toEqual([1, 2])
+    })
+
     it('switches progress updates between a background interval and animation frames', async () => {
         setIndependentPlaybackMode()
         fetchMock.mockResolvedValue(createResponse(44))
@@ -1632,6 +1656,47 @@ describe('audio store', () => {
             expect.objectContaining({
                 currentIndex: 0,
                 version: 9,
+            }),
+        )
+    })
+
+    it('sends a system pause with the current synchronized queue version', async () => {
+        const audioStore = useAudioStore()
+        audioStore.connectPlaybackSync()
+        const client = latestClient()
+        client.setState({
+            phase: 'ready',
+            clockOffsetMs: 0,
+            roundTripEstimateMs: 10,
+        })
+
+        client.emitMessage({
+            type: 'SNAPSHOT',
+            payload: {
+                state: {
+                    status: 'PAUSED',
+                    currentIndex: 0,
+                    positionSeconds: 12,
+                    serverTimeToExecuteMs: nowClientMs(),
+                    version: 8,
+                    updatedAtMs: nowClientMs(),
+                },
+                queue: buildQueue([buildTrack(6)], 0),
+                serverNowMs: nowClientMs(),
+            },
+        })
+        await flushPromises(12)
+
+        audioStore.pauseFromSystem()
+
+        expect(audioStore.currentTrack?.id).toBe(6)
+        expect(audioStore.queueEntries.map((entry) => entry.recordingId)).toEqual([6])
+        expect(client.sendPause).toHaveBeenLastCalledWith(
+            expect.objectContaining({
+                commandId: expect.stringMatching(/^system-pause-/u),
+                currentIndex: 0,
+                positionSeconds: 12,
+                version: 8,
             }),
         )
     })

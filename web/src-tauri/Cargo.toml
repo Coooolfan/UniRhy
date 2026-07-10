@@ -19,5 +19,5 @@ tauri-plugin-http = { version = "2", features = ["unsafe-headers"] }
 tauri-plugin-websocket = "2"
 async-trait = "0.1"
 tauri-plugin-notification = "2.3.3"
-tauri-plugin-background-service = "0.7.1"
+tauri-plugin-background-service = { path = "vendor/tauri-plugin-background-service" }
 tauri-plugin-android-battery-optimization = "0.1.4"

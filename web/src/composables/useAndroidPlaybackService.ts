@@ -2,6 +2,7 @@ import { onScopeDispose, watch } from 'vue'
 import {
     getAndroidNotificationPermission,
     isAndroidRuntime,
+    listenForAndroidPlaybackStop,
     requestAndroidNotificationPermission,
     startAndroidPlaybackService,
     stopAndroidPlaybackService,
@@ -12,6 +13,7 @@ type AndroidPlaybackAudioStore = {
         title: string
     } | null
     isPlaying: boolean
+    pauseFromSystem: () => void
 }
 
 export const useAndroidPlaybackService = (audioStore: AndroidPlaybackAudioStore) => {
@@ -21,7 +23,21 @@ export const useAndroidPlaybackService = (audioStore: AndroidPlaybackAudioStore)
 
     let desiredPlaybackActive = false
     let notificationPermissionRequested = false
-    let operation = Promise.resolve()
+    let disposed = false
+    let stopNativeListener: (() => void) | null = null
+    let operation = listenForAndroidPlaybackStop(() => {
+        audioStore.pauseFromSystem()
+    })
+        .then((stopListener) => {
+            if (disposed) {
+                stopListener()
+                return
+            }
+            stopNativeListener = stopListener
+        })
+        .catch((error: unknown) => {
+            console.error('Failed to listen for Android playback stop', error)
+        })
 
     const ensureNotificationPermission = async () => {
         if (notificationPermissionRequested || (await getAndroidNotificationPermission())) {
@@ -66,7 +82,10 @@ export const useAndroidPlaybackService = (audioStore: AndroidPlaybackAudioStore)
     )
 
     onScopeDispose(() => {
+        disposed = true
         stopWatcher()
+        stopNativeListener?.()
+        stopNativeListener = null
         desiredPlaybackActive = false
         reconcileService()
     })

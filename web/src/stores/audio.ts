@@ -173,6 +173,7 @@ export const useAudioStore = defineStore('audio', () => {
     const {
         activeLoad,
         ensureAudioContextResumed,
+        getCurrentPlaybackTime,
         isSameBufferTrack,
         ensureTrackBuffer,
         updatePausedTime,
@@ -772,6 +773,33 @@ export const useAudioStore = defineStore('audio', () => {
         })
     }
 
+    function pauseFromSystem() {
+        const track = currentTrack.value
+        if (!track) {
+            return
+        }
+
+        if (isIndependentPlaybackMode.value) {
+            pauseLocalPlayback()
+            return
+        }
+
+        const pausedAt = getCurrentPlaybackTime()
+        applyPausedState(track, pausedAt)
+
+        const controlContext = getCurrentQueueControlContext()
+        if (!canSendRealtimeControl.value || !controlContext) {
+            return
+        }
+
+        ensureSyncClient().sendPause({
+            commandId: nextCommandId('system-pause'),
+            currentIndex: controlContext.currentIndex,
+            positionSeconds: pausedAt,
+            version: controlContext.version,
+        })
+    }
+
     async function play(track: AudioTrack) {
         await replaceQueueAndPlay([track], 0)
     }
@@ -954,6 +982,7 @@ export const useAudioStore = defineStore('audio', () => {
         removeQueueEntry,
         clearQueue,
         pause,
+        pauseFromSystem,
         resume,
         stop,
         hidePlayer,
