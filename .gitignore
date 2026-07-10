@@ -2,7 +2,8 @@
 .zed
 .wrangler
 .DS_Store
-.claude
+.claude/*
+!.claude/skills
 .codex
 *.pyc
 *.jks
