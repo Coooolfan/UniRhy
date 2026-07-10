@@ -604,6 +604,7 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           wranglerVersion: "4.107.0"
+          workingDirectory: website
           command: versions upload --tag ${{ needs.prepare-release.outputs.version }} --message "Release ${{ needs.prepare-release.outputs.version }}"
 
       - name: 部署到生产（上传并切 100% 流量）
@@ -613,6 +614,7 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           wranglerVersion: "4.107.0"
+          workingDirectory: website
           command: deploy
 
   publish-release:

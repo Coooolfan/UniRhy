@@ -1,0 +1,11 @@
+{
+  "name": "unirhy-website",
+  "compatibility_date": "2025-09-27",
+  "observability": {
+    "enabled": true,
+  },
+  "assets": {
+    "directory": "dist",
+  },
+  "compatibility_flags": ["nodejs_compat"],
+}
