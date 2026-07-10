@@ -1424,19 +1424,19 @@ mod tests {
     #[tokio::test]
     async fn generation_guard_prevents_stale_cleanup() {
         // First start with FailingInit (generation 1) — clears its own token.
-        // Second start with ImmediateSuccess (generation 2) — should succeed
-        // because the old task's cleanup shouldn't corrupt the new state.
+        // Second start with BlockingService (generation 2) — should remain active
+        // because the old task's cleanup must not corrupt the new state.
         let call_count = Arc::new(AtomicU8::new(0));
         let call_count_clone = call_count.clone();
 
         let handle = setup_manager_with_factory(Box::new(move || {
             let cc = call_count_clone.clone();
-            // First call: FailingInit. Second call: ImmediateSuccess.
+            // First call: FailingInit. Second call: BlockingService.
             // Use AtomicU8 to track which invocation this is.
             if cc.fetch_add(1, Ordering::AcqRel) == 0 {
                 Box::new(FailingInitService) as Box<dyn BackgroundService<tauri::test::MockRuntime>>
             } else {
-                Box::new(ImmediateSuccessService)
+                Box::new(BlockingService)
             }
         }));
         let app = tauri::test::mock_app();

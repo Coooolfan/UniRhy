@@ -71,10 +71,6 @@ crate-type = [
 ]
 path = "src/lib.rs"
 
-[[test]]
-name = "integration"
-path = "tests/integration.rs"
-
 [dependencies.async-trait]
 version = "0.1"
 

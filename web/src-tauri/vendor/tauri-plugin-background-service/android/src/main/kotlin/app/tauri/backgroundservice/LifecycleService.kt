@@ -57,6 +57,12 @@ class LifecycleService : Service() {
                 lastPlatformError = "FGS timeout (type: $serviceType)",
             )
         }
+
+        internal fun startMode(restartOnProcessDeath: Boolean): Int =
+            if (restartOnProcessDeath) START_STICKY else START_NOT_STICKY
+
+        internal fun nativeStopEventType(action: String?): String? =
+            if (action == ACTION_NOTIFICATION_STOP) "androidNotificationStop" else null
     }
 
     private val restartTimeoutHandler = Handler(Looper.getMainLooper())
@@ -65,10 +71,8 @@ class LifecycleService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val action = intent?.action
         if (action == ACTION_APP_STOP || action == ACTION_NOTIFICATION_STOP) {
-            if (action == ACTION_NOTIFICATION_STOP) {
-                BackgroundServicePlugin.onNativeLifecycleEvent?.invoke(
-                    "androidNotificationStop", null
-                )
+            nativeStopEventType(action)?.let { eventType ->
+                BackgroundServicePlugin.onNativeLifecycleEvent?.invoke(eventType, null)
             }
             getSharedPreferences("bg_service", Context.MODE_PRIVATE).edit()
                 .remove("bg_service_label")
@@ -127,7 +131,7 @@ class LifecycleService : Service() {
             buildStartState(label, serviceType, DurableState.load(this), restartOnProcessDeath),
         )
 
-        return if (restartOnProcessDeath) START_STICKY else START_NOT_STICKY
+        return startMode(restartOnProcessDeath)
     }
 
     override fun onDestroy() {

@@ -459,26 +459,26 @@ mod tests {
         assert_eq!(caps.survives_app_close, LifecycleGuarantee::Unsupported);
     }
 
-    // --- detect_platform (runs on Linux) ---
+    // --- detect_platform (runs on the current desktop platform) ---
 
     #[test]
     fn detect_platform_desktop_default_is_in_process() {
         let (platform, mode) = CapabilityProvider::detect_platform(None);
-        assert_eq!(platform, Platform::Linux);
+        assert_eq!(platform, CapabilityProvider::desktop_platform());
         assert_eq!(mode, LifecycleMode::DesktopInProcess);
     }
 
     #[test]
     fn detect_platform_desktop_os_service_mode() {
         let (platform, mode) = CapabilityProvider::detect_platform(Some("osService"));
-        assert_eq!(platform, Platform::Linux);
+        assert_eq!(platform, CapabilityProvider::desktop_platform());
         assert_eq!(mode, LifecycleMode::DesktopOsService);
     }
 
     #[test]
     fn detect_platform_desktop_in_process_explicit() {
         let (platform, mode) = CapabilityProvider::detect_platform(Some("inProcess"));
-        assert_eq!(platform, Platform::Linux);
+        assert_eq!(platform, CapabilityProvider::desktop_platform());
         assert_eq!(mode, LifecycleMode::DesktopInProcess);
     }
 }

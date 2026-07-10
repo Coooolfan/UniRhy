@@ -33,7 +33,11 @@ import {
 import { useAudioTrackCatalog } from '@/stores/audioTrackCatalog'
 import { useAudioLocalQueue } from '@/stores/audioLocalQueue'
 import { useAudioEngine } from '@/stores/audioEngine'
-import { usePlaybackSyncSession, type QueuedPlayIntent } from '@/stores/audioSyncSession'
+import {
+    usePlaybackSyncSession,
+    type QueuedPlayIntent,
+    type QueuedSystemPauseIntent,
+} from '@/stores/audioSyncSession'
 import { nowClientMs } from '@/utils/time'
 
 export type {
@@ -72,6 +76,7 @@ export const useAudioStore = defineStore('audio', () => {
     const latestSnapshotReceivedAtMs = ref<number | null>(null)
     const lastAppliedVersion = ref(0)
     const queuedPlayIntent = ref<QueuedPlayIntent | null>(null)
+    const queuedSystemPauseIntent = ref<QueuedSystemPauseIntent | null>(null)
     const awaitingSyncRecovery = ref(false)
     const audioUnlockRequired = ref(false)
     const clientDiagnostics = shallowRef<PlaybackSyncClientDiagnosticsSnapshot | null>(null)
@@ -201,6 +206,7 @@ export const useAudioStore = defineStore('audio', () => {
         latestSnapshotReceivedAtMs,
         lastAppliedVersion,
         queuedPlayIntent,
+        queuedSystemPauseIntent,
         awaitingSyncRecovery,
         audioUnlockRequired,
         clientDiagnostics,
@@ -236,6 +242,7 @@ export const useAudioStore = defineStore('audio', () => {
         flushQueuedPlayIntent,
         ensureSyncClient,
         queuePlay,
+        queueSystemPause,
         sendPlayCommand,
     } = sync
 
@@ -788,15 +795,14 @@ export const useAudioStore = defineStore('audio', () => {
         applyPausedState(track, pausedAt)
 
         const controlContext = getCurrentQueueControlContext()
-        if (!canSendRealtimeControl.value || !controlContext) {
+        if (!controlContext) {
             return
         }
 
-        ensureSyncClient().sendPause({
-            commandId: nextCommandId('system-pause'),
+        queueSystemPause({
+            recordingId: track.id,
             currentIndex: controlContext.currentIndex,
             positionSeconds: pausedAt,
-            version: controlContext.version,
         })
     }
 
@@ -837,6 +843,7 @@ export const useAudioStore = defineStore('audio', () => {
 
     function stop() {
         queuedPlayIntent.value = null
+        queuedSystemPauseIntent.value = null
         awaitingSyncRecovery.value = false
 
         if (isIndependentPlaybackMode.value) {
@@ -920,6 +927,7 @@ export const useAudioStore = defineStore('audio', () => {
         playbackSyncClient.value = null
         clientDiagnostics.value = null
         queuedPlayIntent.value = null
+        queuedSystemPauseIntent.value = null
         latestSnapshot.value = null
         latestSnapshotReceivedAtMs.value = null
         lastScheduledAction.value = null

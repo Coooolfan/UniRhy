@@ -28,6 +28,19 @@ export type QueuedPlayIntent = {
     positionSeconds: number
 }
 
+export type QueuedSystemPauseIntent = {
+    recordingId: number
+    currentIndex: number
+    positionSeconds: number
+    commandId?: string
+}
+
+const queuedSystemPauseMatches = (
+    intent: QueuedSystemPauseIntent,
+    currentIndex: number | null,
+    recordingId: number | null,
+) => intent.currentIndex === currentIndex && intent.recordingId === recordingId
+
 type UsePlaybackSyncSessionOptions = {
     playbackSyncClient: ShallowRef<PlaybackSyncClient | null>
     clientPhase: Ref<PlaybackSyncClientPhase>
@@ -37,6 +50,7 @@ type UsePlaybackSyncSessionOptions = {
     latestSnapshotReceivedAtMs: Ref<number | null>
     lastAppliedVersion: Ref<number>
     queuedPlayIntent: Ref<QueuedPlayIntent | null>
+    queuedSystemPauseIntent: Ref<QueuedSystemPauseIntent | null>
     awaitingSyncRecovery: Ref<boolean>
     audioUnlockRequired: Ref<boolean>
     clientDiagnostics: ShallowRef<PlaybackSyncClientDiagnosticsSnapshot | null>
@@ -92,6 +106,7 @@ export const usePlaybackSyncSession = (options: UsePlaybackSyncSessionOptions) =
         latestSnapshotReceivedAtMs,
         lastAppliedVersion,
         queuedPlayIntent,
+        queuedSystemPauseIntent,
         awaitingSyncRecovery,
         audioUnlockRequired,
         clientDiagnostics,
@@ -137,6 +152,41 @@ export const usePlaybackSyncSession = (options: UsePlaybackSyncSessionOptions) =
         playbackSyncClient.value.requestSync()
     }
 
+    const flushQueuedSystemPauseIntent = () => {
+        const queued = queuedSystemPauseIntent.value
+        const client = playbackSyncClient.value
+        if (!queued || !client || clientPhase.value !== 'ready') {
+            return false
+        }
+
+        const controlContext = getCurrentQueueControlContext()
+        if (!controlContext) {
+            queuedSystemPauseIntent.value = null
+            return false
+        }
+
+        const recordingId = getQueueRecordingId(controlContext.currentIndex)
+        if (!queuedSystemPauseMatches(queued, controlContext.currentIndex, recordingId)) {
+            queuedSystemPauseIntent.value = null
+            return false
+        }
+
+        if (queued.commandId) {
+            return true
+        }
+
+        const commandId = nextCommandId('system-pause')
+        queuedSystemPauseIntent.value = { ...queued, commandId }
+        awaitingSyncRecovery.value = false
+        client.sendPause({
+            commandId,
+            currentIndex: controlContext.currentIndex,
+            positionSeconds: queued.positionSeconds,
+            version: controlContext.version,
+        })
+        return true
+    }
+
     const flushQueuedPlayIntent = () => {
         const queued = queuedPlayIntent.value
         if (!queued || !playbackSyncClient.value) {
@@ -158,6 +208,10 @@ export const usePlaybackSyncSession = (options: UsePlaybackSyncSessionOptions) =
     }
 
     const handleClientReady = () => {
+        if (flushQueuedSystemPauseIntent()) {
+            return
+        }
+
         if (audioUnlockRequired.value) {
             return
         }
@@ -219,6 +273,14 @@ export const usePlaybackSyncSession = (options: UsePlaybackSyncSessionOptions) =
         syncQueuePlaybackState(payload.state)
 
         const snapshotRecordingId = getQueueRecordingId(payload.state.currentIndex)
+        const queuedSystemPause = queuedSystemPauseIntent.value
+        const retainsQueuedSystemPause =
+            queuedSystemPause !== null &&
+            payload.state.status === 'PLAYING' &&
+            queuedSystemPauseMatches(queuedSystemPause, snapshotCurrentIndex, snapshotRecordingId)
+        if (queuedSystemPause && !retainsQueuedSystemPause) {
+            queuedSystemPauseIntent.value = null
+        }
         if (isNil(snapshotCurrentIndex) || isNil(snapshotRecordingId)) {
             if (!isPlaying.value) {
                 applyPausedState(null, 0)
@@ -240,11 +302,13 @@ export const usePlaybackSyncSession = (options: UsePlaybackSyncSessionOptions) =
         cacheTrack(track)
         currentTrack.value = cloneTrack(track)
 
-        const recoveredPosition =
-            payload.state.status === 'PLAYING'
-                ? payload.state.positionSeconds +
-                  Math.max(0, payload.serverNowMs - payload.state.serverTimeToExecuteMs) / 1_000
-                : payload.state.positionSeconds
+        let recoveredPosition = payload.state.positionSeconds
+        if (retainsQueuedSystemPause) {
+            recoveredPosition = queuedSystemPause.positionSeconds
+        } else if (payload.state.status === 'PLAYING') {
+            recoveredPosition +=
+                Math.max(0, payload.serverNowMs - payload.state.serverTimeToExecuteMs) / 1_000
+        }
         updatePausedTime(recoveredPosition)
 
         if (isSameBufferTrack(track)) {
@@ -282,6 +346,22 @@ export const usePlaybackSyncSession = (options: UsePlaybackSyncSessionOptions) =
         const actionToken = scheduledAction.version
         const scheduledRecordingId =
             getQueueRecordingId(scheduledAction.currentIndex) ?? scheduledAction.currentIndex
+        const queuedSystemPause = queuedSystemPauseIntent.value
+        if (queuedSystemPause) {
+            const matchesQueuedPause = queuedSystemPauseMatches(
+                queuedSystemPause,
+                scheduledAction.currentIndex,
+                scheduledRecordingId,
+            )
+            if (scheduledAction.action === 'PAUSE' && matchesQueuedPause) {
+                queuedSystemPauseIntent.value = null
+            } else if (matchesQueuedPause) {
+                flushQueuedSystemPauseIntent()
+                return
+            } else {
+                queuedSystemPauseIntent.value = null
+            }
+        }
 
         const cached = preloadedTrackForCommand.value
         const shellTrack =
@@ -362,6 +442,13 @@ export const usePlaybackSyncSession = (options: UsePlaybackSyncSessionOptions) =
                 break
             case 'ERROR':
                 error.value = message.payload.message
+                if (message.payload.code === 'VERSION_CONFLICT' && queuedSystemPauseIntent.value) {
+                    queuedSystemPauseIntent.value = {
+                        ...queuedSystemPauseIntent.value,
+                        commandId: undefined,
+                    }
+                    requestSyncRecovery()
+                }
                 break
             default:
                 break
@@ -371,6 +458,10 @@ export const usePlaybackSyncSession = (options: UsePlaybackSyncSessionOptions) =
     const updateClientState = (phase: PlaybackSyncClientPhase, offsetMs: number, rttMs: number) => {
         const previousPhase = clientPhase.value
         clientPhase.value = phase
+        const queuedSystemPause = queuedSystemPauseIntent.value
+        if (phase !== 'ready' && queuedSystemPause?.commandId) {
+            queuedSystemPauseIntent.value = { ...queuedSystemPause, commandId: undefined }
+        }
         clockOffsetMs.value = offsetMs
         roundTripEstimateMs.value = rttMs
 
@@ -408,6 +499,7 @@ export const usePlaybackSyncSession = (options: UsePlaybackSyncSessionOptions) =
 
     const queuePlay = (track: AudioTrack, positionSeconds: number) => {
         primeTrackState(track, positionSeconds)
+        queuedSystemPauseIntent.value = null
         queuedPlayIntent.value = {
             track: cloneTrack(track),
             positionSeconds,
@@ -422,6 +514,7 @@ export const usePlaybackSyncSession = (options: UsePlaybackSyncSessionOptions) =
         }
         primeTrackState(track, positionSeconds)
         queuedPlayIntent.value = null
+        queuedSystemPauseIntent.value = null
         awaitingSyncRecovery.value = false
         ensureSyncClient().sendPlay({
             commandId: nextCommandId('play'),
@@ -431,12 +524,19 @@ export const usePlaybackSyncSession = (options: UsePlaybackSyncSessionOptions) =
         })
     }
 
+    const queueSystemPause = (intent: QueuedSystemPauseIntent) => {
+        queuedPlayIntent.value = null
+        queuedSystemPauseIntent.value = intent
+        flushQueuedSystemPauseIntent()
+    }
+
     return {
         nextCommandId,
         requestSyncRecovery,
         flushQueuedPlayIntent,
         ensureSyncClient,
         queuePlay,
+        queueSystemPause,
         sendPlayCommand,
     }
 }
