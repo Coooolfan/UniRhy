@@ -1,8 +1,15 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
-import { FileAudio, Radio } from 'lucide-vue-next'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { BatteryCharging, Bell, ExternalLink, FileAudio, Radio } from 'lucide-vue-next'
 import DashboardTopBar from '@/components/dashboard/DashboardTopBar.vue'
 import { normalizeApiError } from '@/ApiInstance'
+import {
+    type AndroidPlaybackSystemStatus,
+    getAndroidPlaybackSystemStatus,
+    isAndroidRuntime,
+    openAndroidBatterySettings,
+    requestAndroidNotificationPermission,
+} from '@/runtime/androidPlayback'
 import { useClientPreferencesStore, type PlaybackMode } from '@/stores/clientPreferences'
 import { useUserStore } from '@/stores/user'
 
@@ -28,6 +35,10 @@ const clientPreferencesStore = useClientPreferencesStore()
 const isSubmitting = ref(false)
 const errorMessage = ref('')
 const successMessage = ref('')
+const isAndroid = isAndroidRuntime()
+const androidSystemStatus = ref<AndroidPlaybackSystemStatus | null>(null)
+const isLoadingAndroidStatus = ref(false)
+const androidStatusError = ref('')
 
 const selectedPreset = ref<string>(CUSTOM_SENTINEL)
 const customValue = ref<string>('')
@@ -61,11 +72,43 @@ const pendingFormat = computed(() => {
 const isDirty = computed(() => pendingFormat.value !== currentFormat.value)
 const canSubmit = computed(() => pendingFormat.value.length > 0 && isDirty.value)
 
+const refreshAndroidSystemStatus = async () => {
+    if (!isAndroid || isLoadingAndroidStatus.value) {
+        return
+    }
+
+    isLoadingAndroidStatus.value = true
+    androidStatusError.value = ''
+    try {
+        androidSystemStatus.value = await getAndroidPlaybackSystemStatus()
+    } catch (error) {
+        console.error('Failed to load Android playback settings', error)
+        androidStatusError.value = '无法读取 Android 系统设置'
+    } finally {
+        isLoadingAndroidStatus.value = false
+    }
+}
+
+const handleVisibilityChange = () => {
+    if (!document.hidden) {
+        void refreshAndroidSystemStatus()
+    }
+}
+
 onMounted(async () => {
     if (!userStore.user) {
         await userStore.fetchUser()
     }
     applyFromStore()
+
+    if (isAndroid) {
+        document.addEventListener('visibilitychange', handleVisibilityChange)
+        await refreshAndroidSystemStatus()
+    }
+})
+
+onUnmounted(() => {
+    document.removeEventListener('visibilitychange', handleVisibilityChange)
 })
 
 watch(currentFormat, () => {
@@ -97,6 +140,27 @@ const handlePlaybackModeChange = (event: Event) => {
     clientPreferencesStore.setPlaybackMode(
         (event.target as HTMLSelectElement).value as PlaybackMode,
     )
+}
+
+const handleRequestNotificationPermission = async () => {
+    androidStatusError.value = ''
+    try {
+        await requestAndroidNotificationPermission()
+        await refreshAndroidSystemStatus()
+    } catch (error) {
+        console.error('Failed to request Android notification permission', error)
+        androidStatusError.value = '无法请求通知权限'
+    }
+}
+
+const handleOpenBatterySettings = async () => {
+    androidStatusError.value = ''
+    try {
+        await openAndroidBatterySettings()
+    } catch (error) {
+        console.error('Failed to open Android battery settings', error)
+        androidStatusError.value = '无法打开电池设置'
+    }
 }
 </script>
 
@@ -143,6 +207,90 @@ const handlePlaybackModeChange = (event: Event) => {
                     <p class="ml-1 text-xs text-[#B8B0A3]">
                         独立模式下播放队列和控制只保存在当前客户端，不连接同步至其他设备
                     </p>
+                </div>
+            </section>
+
+            <section
+                v-if="isAndroid"
+                class="border border-[#EAE6DE] bg-white p-6 sm:p-8"
+                data-test="android-playback-settings"
+            >
+                <div class="mb-6 flex items-center gap-3">
+                    <div
+                        class="flex h-10 w-10 items-center justify-center rounded-full bg-[#F7F5F0] text-[#8C857B]"
+                    >
+                        <BatteryCharging :size="18" />
+                    </div>
+                    <div>
+                        <h2 class="font-serif text-xl text-[#2B221B]">Android 后台播放</h2>
+                        <p class="text-xs text-[#8C857B]">系统通知与后台用电状态</p>
+                    </div>
+                </div>
+
+                <div
+                    v-if="androidStatusError"
+                    class="mb-4 border border-[#ffe0e0] bg-[#fff5f5] p-3 text-sm text-[#B95D5D]"
+                >
+                    {{ androidStatusError }}
+                </div>
+
+                <div class="divide-y divide-[#EEEAE2] border-y border-[#EEEAE2]">
+                    <div class="flex flex-wrap items-center justify-between gap-4 py-4">
+                        <div class="flex min-w-0 items-center gap-3">
+                            <Bell :size="17" class="shrink-0 text-[#8C857B]" />
+                            <div>
+                                <p class="text-sm font-medium text-[#3D3833]">通知权限</p>
+                                <p class="text-xs text-[#9C968B]" data-test="notification-status">
+                                    {{
+                                        androidSystemStatus === null
+                                            ? '检查中'
+                                            : androidSystemStatus.notificationPermissionGranted
+                                              ? '已允许'
+                                              : '未允许'
+                                    }}
+                                </p>
+                            </div>
+                        </div>
+                        <button
+                            v-if="!androidSystemStatus?.notificationPermissionGranted"
+                            type="button"
+                            data-test="request-notification-permission"
+                            :disabled="isLoadingAndroidStatus"
+                            class="inline-flex items-center gap-2 border border-[#D6D1C4] bg-white px-4 py-2 text-sm text-[#4C4640] transition-colors hover:bg-[#F7F5F0] disabled:cursor-not-allowed disabled:opacity-60"
+                            @click="handleRequestNotificationPermission"
+                        >
+                            <Bell :size="15" />
+                            允许通知
+                        </button>
+                    </div>
+
+                    <div class="flex flex-wrap items-center justify-between gap-4 py-4">
+                        <div class="flex min-w-0 items-center gap-3">
+                            <BatteryCharging :size="17" class="shrink-0 text-[#8C857B]" />
+                            <div>
+                                <p class="text-sm font-medium text-[#3D3833]">后台用电</p>
+                                <p class="text-xs text-[#9C968B]" data-test="battery-status">
+                                    {{
+                                        androidSystemStatus === null
+                                            ? '检查中'
+                                            : androidSystemStatus.batteryOptimizationEnabled
+                                              ? '系统优化中'
+                                              : '不受限制'
+                                    }}
+                                </p>
+                            </div>
+                        </div>
+                        <button
+                            type="button"
+                            data-test="open-battery-settings"
+                            :disabled="isLoadingAndroidStatus"
+                            class="inline-flex items-center gap-2 border border-[#D6D1C4] bg-white px-4 py-2 text-sm text-[#4C4640] transition-colors hover:bg-[#F7F5F0] disabled:cursor-not-allowed disabled:opacity-60"
+                            @click="handleOpenBatterySettings"
+                        >
+                            <ExternalLink :size="15" />
+                            系统设置
+                        </button>
+                    </div>
                 </div>
             </section>
 

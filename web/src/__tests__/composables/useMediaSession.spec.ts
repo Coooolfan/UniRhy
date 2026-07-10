@@ -141,6 +141,19 @@ describe('useMediaSession', () => {
             playbackRate: 1,
             position: 45,
         })
+        const initialUpdateCount = mediaSession.setPositionState.mock.calls.length
+
+        audioStore.currentTime = 45.5
+        await nextTick()
+        expect(mediaSession.setPositionState).toHaveBeenCalledTimes(initialUpdateCount)
+
+        audioStore.currentTime = 46
+        await nextTick()
+        expect(mediaSession.setPositionState).toHaveBeenLastCalledWith({
+            duration: 120,
+            playbackRate: 1,
+            position: 46,
+        })
 
         audioStore.currentTime = 240
         await nextTick()

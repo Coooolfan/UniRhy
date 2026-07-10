@@ -689,6 +689,76 @@ describe('audio store', () => {
         expect(playNextInCurrentQueueMock).not.toHaveBeenCalled()
     })
 
+    it('pauses local playback from a system control without clearing its queue', async () => {
+        setIndependentPlaybackMode()
+        fetchMock.mockResolvedValue(createResponse(44))
+
+        const audioStore = useAudioStore()
+        await audioStore.replaceQueueAndPlay([buildTrack(1), buildTrack(2)], 0)
+        await flushPromises(12)
+
+        const context = MockAudioContext.instances[0]
+        expect(context).toBeDefined()
+        if (!context) {
+            throw new Error('AudioContext was not created')
+        }
+        context.currentTime = 9
+
+        audioStore.pauseFromSystem()
+
+        expect(audioStore.isPlaying).toBe(false)
+        expect(audioStore.currentTime).toBe(9)
+        expect(audioStore.currentTrack?.id).toBe(1)
+        expect(audioStore.currentQueueIndex).toBe(0)
+        expect(audioStore.queueEntries.map((entry) => entry.recordingId)).toEqual([1, 2])
+    })
+
+    it('switches progress updates between a background interval and animation frames', async () => {
+        setIndependentPlaybackMode()
+        fetchMock.mockResolvedValue(createResponse(44))
+
+        const hiddenSpy = vi.spyOn(document, 'hidden', 'get').mockReturnValue(true)
+        const addEventListenerSpy = vi.spyOn(document, 'addEventListener')
+        const setIntervalSpy = vi.spyOn(window, 'setInterval')
+        const clearIntervalSpy = vi.spyOn(window, 'clearInterval')
+
+        const audioStore = useAudioStore()
+        await audioStore.replaceQueueAndPlay([buildTrack(1)], 0)
+        await flushPromises(12)
+
+        expect(setIntervalSpy).toHaveBeenCalledWith(expect.any(Function), 1_000)
+        expect(animationFrameCallbacks).toHaveLength(0)
+
+        const backgroundTick = setIntervalSpy.mock.calls[0]?.[0]
+        expect(backgroundTick).toBeTypeOf('function')
+        const context = MockAudioContext.instances[0]
+        expect(context).toBeDefined()
+        if (!context) {
+            throw new Error('AudioContext was not created')
+        }
+        context.currentTime = 7
+        if (typeof backgroundTick === 'function') {
+            backgroundTick()
+        }
+        expect(audioStore.currentTime).toBe(7)
+
+        hiddenSpy.mockReturnValue(false)
+        const visibilityListener = addEventListenerSpy.mock.calls.find(
+            ([eventName]) => eventName === 'visibilitychange',
+        )?.[1]
+        expect(visibilityListener).toBeTypeOf('function')
+        if (typeof visibilityListener === 'function') {
+            visibilityListener(new Event('visibilitychange'))
+        }
+
+        const backgroundIntervalId = setIntervalSpy.mock.results[0]?.value
+        expect(clearIntervalSpy).toHaveBeenCalledWith(backgroundIntervalId)
+        expect(animationFrameCallbacks).toHaveLength(1)
+
+        audioStore.pause()
+        expect(animationFrameCallbacks).toHaveLength(0)
+    })
+
     it('keeps independent queue mutations local', async () => {
         setIndependentPlaybackMode()
 
@@ -1234,6 +1304,69 @@ describe('audio store', () => {
         })
     })
 
+    it('defers remote playback until foreground protection becomes available', async () => {
+        getRecordingMock.mockResolvedValue(buildRecordingMetadata(5))
+        fetchMock.mockResolvedValue(createResponse(90))
+        const playbackProtectionGuard = vi.fn<() => Promise<boolean>>()
+        playbackProtectionGuard.mockResolvedValueOnce(false).mockResolvedValue(true)
+
+        const audioStore = useAudioStore()
+        audioStore.setPlaybackProtectionGuard(playbackProtectionGuard)
+        audioStore.connectPlaybackSync()
+        const client = latestClient()
+        client.setState({
+            phase: 'ready',
+            clockOffsetMs: 0,
+            roundTripEstimateMs: 10,
+        })
+
+        const nowMs = nowClientMs()
+        client.emitMessage({
+            type: 'SCHEDULED_ACTION',
+            payload: {
+                commandId: 'remote-play-background',
+                serverTimeToExecuteMs: nowMs,
+                scheduledAction: {
+                    action: 'PLAY',
+                    status: 'PLAYING',
+                    currentIndex: 0,
+                    positionSeconds: 12,
+                    version: 2,
+                },
+            },
+        } satisfies ScheduledActionMessage)
+        await flushPromises(12)
+
+        expect(playbackProtectionGuard).toHaveBeenCalledTimes(1)
+        expect(audioStore.isPlaying).toBe(false)
+        expect(audioStore.currentTime).toBe(12)
+        expect(MockAudioContext.instances[0]?.sourceNodes).toHaveLength(0)
+
+        audioStore.recoverPlaybackAfterForeground()
+        expect(client.requestSync).toHaveBeenCalledTimes(1)
+        expect(audioStore.playbackSyncDebugSnapshot.awaitingSyncRecovery).toBe(true)
+
+        client.emitMessage({
+            type: 'SCHEDULED_ACTION',
+            payload: {
+                commandId: 'sync-after-foreground',
+                serverTimeToExecuteMs: nowClientMs(),
+                scheduledAction: {
+                    action: 'PLAY',
+                    status: 'PLAYING',
+                    currentIndex: 0,
+                    positionSeconds: 20,
+                    version: 2,
+                },
+            },
+        } satisfies ScheduledActionMessage)
+        await flushPromises(12)
+
+        expect(playbackProtectionGuard).toHaveBeenCalledTimes(2)
+        expect(audioStore.isPlaying).toBe(true)
+        expect(MockAudioContext.instances[0]?.sourceNodes[0]?.start).toHaveBeenCalled()
+    })
+
     it('ignores stale scheduled actions with a lower version', async () => {
         getRecordingMock.mockResolvedValueOnce(buildRecordingMetadata(5))
         fetchMock.mockResolvedValue(createResponse(90))
@@ -1588,6 +1721,224 @@ describe('audio store', () => {
                 version: 9,
             }),
         )
+    })
+
+    it('sends a system pause with the current synchronized queue version', async () => {
+        const audioStore = useAudioStore()
+        audioStore.connectPlaybackSync()
+        const client = latestClient()
+        client.setState({
+            phase: 'ready',
+            clockOffsetMs: 0,
+            roundTripEstimateMs: 10,
+        })
+
+        client.emitMessage({
+            type: 'SNAPSHOT',
+            payload: {
+                state: {
+                    status: 'PAUSED',
+                    currentIndex: 0,
+                    positionSeconds: 12,
+                    serverTimeToExecuteMs: nowClientMs(),
+                    version: 8,
+                    updatedAtMs: nowClientMs(),
+                },
+                queue: buildQueue([buildTrack(6)], 0),
+                serverNowMs: nowClientMs(),
+            },
+        })
+        await flushPromises(12)
+
+        audioStore.pauseFromSystem()
+
+        expect(audioStore.currentTrack?.id).toBe(6)
+        expect(audioStore.queueEntries.map((entry) => entry.recordingId)).toEqual([6])
+        expect(client.sendPause).toHaveBeenLastCalledWith(
+            expect.objectContaining({
+                commandId: expect.stringMatching(/^system-pause-/u),
+                currentIndex: 0,
+                positionSeconds: 12,
+                version: 8,
+            }),
+        )
+    })
+
+    it('retries a notification pause with the latest queue version after reconnecting', async () => {
+        const audioStore = useAudioStore()
+        audioStore.connectPlaybackSync()
+        const client = latestClient()
+
+        client.emitMessage({
+            type: 'SNAPSHOT',
+            payload: {
+                state: {
+                    status: 'PLAYING',
+                    currentIndex: 0,
+                    positionSeconds: 12,
+                    serverTimeToExecuteMs: nowClientMs(),
+                    version: 8,
+                    updatedAtMs: nowClientMs(),
+                },
+                queue: buildQueue([buildTrack(6)], 0),
+                serverNowMs: nowClientMs(),
+            },
+        })
+        await flushPromises(12)
+
+        const pausedAt = audioStore.currentTime
+        client.setState({ phase: 'reconnecting' })
+        audioStore.pauseFromSystem()
+
+        expect(audioStore.isPlaying).toBe(false)
+        expect(audioStore.currentTime).toBe(pausedAt)
+        expect(client.sendPause).not.toHaveBeenCalled()
+
+        client.emitMessage({
+            type: 'SCHEDULED_ACTION',
+            payload: {
+                commandId: 'remote-play-during-reconnect',
+                serverTimeToExecuteMs: nowClientMs(),
+                scheduledAction: {
+                    action: 'PLAY',
+                    status: 'PLAYING',
+                    currentIndex: 0,
+                    positionSeconds: 20,
+                    version: 9,
+                },
+            },
+        } satisfies ScheduledActionMessage)
+        await flushPromises()
+
+        expect(audioStore.isPlaying).toBe(false)
+        expect(audioStore.currentTime).toBe(pausedAt)
+
+        client.emitMessage({
+            type: 'SNAPSHOT',
+            payload: {
+                state: {
+                    status: 'PLAYING',
+                    currentIndex: 0,
+                    positionSeconds: 24,
+                    serverTimeToExecuteMs: nowClientMs(),
+                    version: 10,
+                    updatedAtMs: nowClientMs(),
+                },
+                queue: { ...buildQueue([buildTrack(6)], 0), version: 10 },
+                serverNowMs: nowClientMs(),
+            },
+        })
+        await flushPromises(12)
+
+        expect(audioStore.currentTime).toBe(pausedAt)
+
+        client.setState({
+            phase: 'ready',
+            clockOffsetMs: 0,
+            roundTripEstimateMs: 10,
+        })
+        await flushPromises()
+
+        expect(client.sendPause).toHaveBeenCalledWith(
+            expect.objectContaining({
+                commandId: expect.stringMatching(/^system-pause-/u),
+                currentIndex: 0,
+                positionSeconds: pausedAt,
+                version: 10,
+            }),
+        )
+        expect(client.requestSync).not.toHaveBeenCalled()
+
+        client.emitMessage({
+            type: 'ERROR',
+            payload: {
+                code: 'VERSION_CONFLICT',
+                message: 'queue changed before pause was accepted',
+            },
+        })
+        await flushPromises()
+
+        expect(client.requestSync).toHaveBeenCalledTimes(1)
+
+        client.emitMessage({
+            type: 'SCHEDULED_ACTION',
+            payload: {
+                commandId: 'sync-after-pause-conflict',
+                serverTimeToExecuteMs: nowClientMs(),
+                scheduledAction: {
+                    action: 'PLAY',
+                    status: 'PLAYING',
+                    currentIndex: 0,
+                    positionSeconds: 26,
+                    version: 11,
+                },
+            },
+        } satisfies ScheduledActionMessage)
+        await flushPromises()
+
+        expect(audioStore.isPlaying).toBe(false)
+        expect(audioStore.currentTime).toBe(pausedAt)
+        expect(client.sendPause).toHaveBeenCalledTimes(2)
+        expect(client.sendPause).toHaveBeenLastCalledWith(
+            expect.objectContaining({
+                positionSeconds: pausedAt,
+                version: 11,
+            }),
+        )
+    })
+
+    it('drops a queued notification pause when the current queue entry changed remotely', async () => {
+        const audioStore = useAudioStore()
+        audioStore.connectPlaybackSync()
+        const client = latestClient()
+
+        client.emitMessage({
+            type: 'SNAPSHOT',
+            payload: {
+                state: {
+                    status: 'PLAYING',
+                    currentIndex: 0,
+                    positionSeconds: 12,
+                    serverTimeToExecuteMs: nowClientMs(),
+                    version: 8,
+                    updatedAtMs: nowClientMs(),
+                },
+                queue: buildQueue([buildTrack(6)], 0),
+                serverNowMs: nowClientMs(),
+            },
+        })
+        await flushPromises(12)
+
+        client.setState({ phase: 'reconnecting' })
+        audioStore.pauseFromSystem()
+
+        client.emitMessage({
+            type: 'SNAPSHOT',
+            payload: {
+                state: {
+                    status: 'PLAYING',
+                    currentIndex: 0,
+                    positionSeconds: 4,
+                    serverTimeToExecuteMs: nowClientMs(),
+                    version: 9,
+                    updatedAtMs: nowClientMs(),
+                },
+                queue: { ...buildQueue([buildTrack(7)], 0), version: 9 },
+                serverNowMs: nowClientMs(),
+            },
+        })
+        await flushPromises(12)
+
+        client.setState({
+            phase: 'ready',
+            clockOffsetMs: 0,
+            roundTripEstimateMs: 10,
+        })
+        await flushPromises()
+
+        expect(audioStore.currentTrack?.id).toBe(7)
+        expect(client.sendPause).not.toHaveBeenCalled()
+        expect(client.requestSync).toHaveBeenCalledTimes(1)
     })
 
     it('reflects queued play and disconnect in the debug snapshot', async () => {

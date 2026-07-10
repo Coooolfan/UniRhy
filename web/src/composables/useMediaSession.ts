@@ -128,6 +128,9 @@ export const useMediaSession = (audioStore: MediaSessionAudioStore) => {
         return
     }
 
+    let lastPositionSecond: number | null = null
+    let lastPositionDuration: number | null = null
+
     const applyHandlers = () => {
         if (!audioStore.currentTrack) {
             clearActionHandlers(mediaSession)
@@ -183,6 +186,8 @@ export const useMediaSession = (audioStore: MediaSessionAudioStore) => {
     watch(
         () => [audioStore.currentTrack, audioStore.isPlaying] as const,
         ([track, isPlaying]) => {
+            lastPositionSecond = null
+            lastPositionDuration = null
             updateMetadata(mediaSession, track)
             updatePlaybackState(mediaSession, isPlaying, track !== null)
 
@@ -213,7 +218,15 @@ export const useMediaSession = (audioStore: MediaSessionAudioStore) => {
             if (!audioStore.currentTrack) {
                 return
             }
+
+            const positionSecond = Math.floor(currentTime)
+            if (positionSecond === lastPositionSecond && duration === lastPositionDuration) {
+                return
+            }
+
             updatePositionState(mediaSession, currentTime, duration)
+            lastPositionSecond = positionSecond
+            lastPositionDuration = duration
         },
         { immediate: true },
     )

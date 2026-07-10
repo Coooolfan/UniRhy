@@ -4,14 +4,17 @@
 
 ## 生产依赖 (dependencies)
 
-| 依赖库            | 版本     | 开源协议 | 描述                   |
-| ----------------- | -------- | -------- | ---------------------- |
-| @tailwindcss/vite | ^4.1.18  | MIT      | Tailwind CSS Vite 插件 |
-| lucide-vue-next   | ^0.562.0 | ISC      | 图标库 Vue 组件        |
-| pinia             | ^3.0.4   | MIT      | Vue 状态管理库         |
-| tailwindcss       | ^4.1.18  | MIT      | 原子化 CSS 框架        |
-| vue               | ^3.5.26  | MIT      | Vue.js 框架            |
-| vue-router        | ^4.6.4   | MIT      | Vue 官方路由库         |
+| 依赖库                                        | 版本     | 开源协议          | 描述                       |
+| --------------------------------------------- | -------- | ----------------- | -------------------------- |
+| @tailwindcss/vite                             | ^4.1.18  | MIT               | Tailwind CSS Vite 插件     |
+| @tauri-apps/plugin-notification               | 2.3.3    | MIT OR Apache-2.0 | 系统通知与通知权限         |
+| lucide-vue-next                               | ^0.562.0 | ISC               | 图标库 Vue 组件            |
+| pinia                                         | ^3.0.4   | MIT               | Vue 状态管理库             |
+| tailwindcss                                   | ^4.1.18  | MIT               | 原子化 CSS 框架            |
+| tauri-plugin-android-battery-optimization-api | 0.1.0    | MIT               | Android 电池优化设置 API   |
+| tauri-plugin-background-service               | 0.7.1    | MIT OR Apache-2.0 | Tauri 后台服务生命周期 API |
+| vue                                           | ^3.5.26  | MIT               | Vue.js 框架                |
+| vue-router                                    | ^4.6.4   | MIT               | Vue 官方路由库             |
 
 ## 开发依赖 (devDependencies)
 

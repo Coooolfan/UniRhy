@@ -31,6 +31,10 @@ const isSignedMediaUrl = (url: string) => {
 }
 
 const defaultIndependentPlaybackModeGetter = () => false
+const defaultPlaybackActivationGuard = () => true
+const noopProgressUpdates = () => undefined
+
+export type PlaybackActivationGuard = () => boolean | Promise<boolean>
 
 type UseAudioEngineOptions = {
     currentTrack: Ref<AudioTrack | null>
@@ -93,6 +97,7 @@ export const useAudioEngine = (options: UseAudioEngineOptions) => {
     const playbackStartContextTime = shallowRef(0)
     const playbackOffsetSec = shallowRef(0)
     const rafId = shallowRef<number | null>(null)
+    const backgroundProgressIntervalId = shallowRef<number | null>(null)
     const activeLoad = shallowRef<BufferLoadState | null>(null)
 
     const liveSourceNodes = new Set<AudioBufferSourceNode>()
@@ -101,13 +106,19 @@ export const useAudioEngine = (options: UseAudioEngineOptions) => {
 
     let scheduledPauseTimer: number | null = null
     let scheduledStopTimer: number | null = null
+    let visibilityListenerAttached = false
+    let restartProgressUpdates = noopProgressUpdates
 
     let volumeValue = 0
 
     // 独立播放模式判定由上层注入：结束回调需据此决定自动续播路径
     let isIndependentPlaybackMode: () => boolean = defaultIndependentPlaybackModeGetter
+    let playbackActivationGuard: PlaybackActivationGuard = defaultPlaybackActivationGuard
     const setIndependentPlaybackModeGetter = (getter: () => boolean) => {
         isIndependentPlaybackMode = getter
+    }
+    const setPlaybackActivationGuard = (guard: PlaybackActivationGuard | null) => {
+        playbackActivationGuard = guard ?? defaultPlaybackActivationGuard
     }
 
     const clearScheduledTimers = () => {
@@ -121,13 +132,34 @@ export const useAudioEngine = (options: UseAudioEngineOptions) => {
         }
     }
 
-    const stopAnimationLoop = () => {
-        if (rafId.value === null || typeof cancelAnimationFrame === 'undefined') {
+    const attachVisibilityListener = () => {
+        if (visibilityListenerAttached || typeof document === 'undefined') {
             return
         }
+        document.addEventListener('visibilitychange', restartProgressUpdates)
+        visibilityListenerAttached = true
+    }
 
-        cancelAnimationFrame(rafId.value)
-        rafId.value = null
+    const detachVisibilityListener = () => {
+        if (!visibilityListenerAttached || typeof document === 'undefined') {
+            return
+        }
+        document.removeEventListener('visibilitychange', restartProgressUpdates)
+        visibilityListenerAttached = false
+    }
+
+    const stopAnimationLoop = () => {
+        if (rafId.value !== null && typeof cancelAnimationFrame !== 'undefined') {
+            cancelAnimationFrame(rafId.value)
+            rafId.value = null
+        }
+
+        if (backgroundProgressIntervalId.value !== null) {
+            window.clearInterval(backgroundProgressIntervalId.value)
+            backgroundProgressIntervalId.value = null
+        }
+
+        detachVisibilityListener()
     }
 
     const updatePausedTime = (time: number) => {
@@ -155,12 +187,25 @@ export const useAudioEngine = (options: UseAudioEngineOptions) => {
     const startAnimationLoop = () => {
         stopAnimationLoop()
 
-        if (
-            typeof requestAnimationFrame === 'undefined' ||
-            !isPlaying.value ||
-            !audioContext.value ||
-            !currentBuffer.value
-        ) {
+        if (!isPlaying.value || !audioContext.value || !currentBuffer.value) {
+            return
+        }
+
+        attachVisibilityListener()
+        syncCurrentTime()
+
+        if (globalThis.document?.hidden) {
+            backgroundProgressIntervalId.value = window.setInterval(() => {
+                if (!isPlaying.value || !audioContext.value || !currentBuffer.value) {
+                    stopAnimationLoop()
+                    return
+                }
+                syncCurrentTime()
+            }, 1_000)
+            return
+        }
+
+        if (typeof requestAnimationFrame === 'undefined') {
             return
         }
 
@@ -174,8 +219,13 @@ export const useAudioEngine = (options: UseAudioEngineOptions) => {
             rafId.value = requestAnimationFrame(tick)
         }
 
-        syncCurrentTime()
         rafId.value = requestAnimationFrame(tick)
+    }
+
+    restartProgressUpdates = () => {
+        if (isPlaying.value && audioContext.value && currentBuffer.value) {
+            startAnimationLoop()
+        }
     }
 
     const ensureAudioContext = () => {
@@ -548,6 +598,11 @@ export const useAudioEngine = (options: UseAudioEngineOptions) => {
             return
         }
 
+        if (!(await playbackActivationGuard()) || actionToken !== lastAppliedVersion.value) {
+            applyPausedState(track, payload.scheduledAction.positionSeconds)
+            return
+        }
+
         const estimatedServerNowMs = getEstimatedServerNowMs()
         const lateSeconds = payload.skipLateCompensation
             ? 0
@@ -624,6 +679,12 @@ export const useAudioEngine = (options: UseAudioEngineOptions) => {
             return
         }
 
+        if (!(await playbackActivationGuard())) {
+            applyPausedState(track, positionSeconds)
+            updateLocalQueuePlaybackState('PAUSED', positionSeconds)
+            return
+        }
+
         const nextTime = clampTime(positionSeconds, buffer.duration)
         stopAllSourceNodes()
         const nextNode = createSourceNode(buffer)
@@ -696,6 +757,7 @@ export const useAudioEngine = (options: UseAudioEngineOptions) => {
             volumeValue = value
         },
         setIndependentPlaybackModeGetter,
+        setPlaybackActivationGuard,
         ensureAudioContextResumed,
         isSameBufferTrack,
         stopAllSourceNodes,
