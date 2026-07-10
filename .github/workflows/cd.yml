@@ -584,6 +584,9 @@ jobs:
     needs:
       - prepare-release
       - create-draft-release
+    concurrency:
+      group: deploy-unirhy-website
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     steps:
       - name: 检出代码

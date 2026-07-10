@@ -1,0 +1,64 @@
+name: UniRhy Website Deploy
+run-name: Deploy website from ${{ github.ref_name }}
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-unirhy-website
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: "24"
+  YARN_VERSION: "4.12.0"
+
+jobs:
+  deploy-website:
+    name: 构建并发布官网
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./website
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v5
+
+      - name: 设置 Node 环境
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: 启用 Corepack 并激活 Yarn
+        run: |
+          corepack enable
+          corepack prepare yarn@${{ env.YARN_VERSION }} --activate
+
+      - name: 缓存 Yarn 包缓存
+        uses: actions/cache@v4
+        with:
+          path: website/.yarn/cache
+          key: ${{ runner.os }}-yarn-website-${{ hashFiles('website/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-yarn-website-
+
+      - name: 安装依赖
+        run: yarn install --immutable
+
+      - name: Lint、类型检查与格式检查
+        run: yarn verify && yarn format:check
+
+      - name: 构建官网
+        run: yarn build
+
+      - name: 部署到生产
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          wranglerVersion: "4.107.0"
+          workingDirectory: website
+          command: deploy
