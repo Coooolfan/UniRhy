@@ -59,7 +59,7 @@ export const DOCS_SECTIONS: readonly DocsSection[] = [
       },
       {
         slug: 'data-model',
-        title: { zh: '作品与版本', en: 'Works & Renditions' },
+        title: { zh: '作品与曲目', en: 'Works & Tracks' },
       },
       {
         slug: 'storage-nodes',

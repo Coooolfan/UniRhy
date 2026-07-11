@@ -3,11 +3,11 @@ title: First Run
 description: Initialize the instance — create the admin account and system storage node.
 ---
 
-After starting the server, open `http://<your-host>:8654` (the port and host match the mapping declared in `compose.yml`). When the database has not been initialized, the frontend redirects to `/init` and enters a two-step wizard.
+After starting the server, open `http://<your-host>:8654` (the port and host match the mapping declared in `compose.yml`). When the database has not been initialized, the frontend redirects to `/init` — a single page with two sections you fill in and submit together to initialize the instance.
 
-## Step 1: Create the admin account
+## Part 1: Create the admin account
 
-The first step creates the unique admin account. This account holds full control of the instance — every later operation (creating other accounts, configuring storage, installing plugins) goes through it.
+This part creates the unique admin account. This account holds full control of the instance — every later operation (creating other accounts, configuring storage, installing plugins) goes through it.
 
 | Field    | Description                                                                                                |
 | -------- | ---------------------------------------------------------------------------------------------------------- |
@@ -17,9 +17,9 @@ The first step creates the unique admin account. This account holds full control
 
 > The current release has no UI for resetting the admin password — store it safely.
 
-## Step 2: System storage node
+## Part 2: System storage node
 
-The second step sets a root path that serves as the default destination when the system itself writes data.
+This part sets a root path that serves as the default destination when the system itself writes data.
 
 > To avoid cluttering your existing music library folder, set the system storage node to an **empty folder** and add your music library folder as a separate storage node later in the settings.
 
@@ -28,7 +28,7 @@ The second step sets a root path that serves as the default destination when the
 
 This path is registered as the initial **system storage node** — see [Storage Nodes](/en/docs/usage/storage-nodes) for its role and constraints. More local or S3-compatible OSS nodes can be added later under _Settings → Storage Nodes_; UniRhy supports scanning multiple storage nodes in parallel.
 
-## Finishing the wizard
+## Finishing initialization
 
 Clicking _Initialize_ redirects to `/login`. Sign in with the admin account to reach the main UI.
 

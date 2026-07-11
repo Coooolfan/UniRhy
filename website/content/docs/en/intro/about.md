@@ -15,7 +15,7 @@ UniRhy is a **self-hosted music streaming platform**. It lets you run your own p
 
 ## How it fits together
 
-A UniRhy deployment consists of two services, both orchestrated in the provided `compose.yml` and shipped as Docker images:
+A UniRhy deployment consists of two services, both orchestrated in the `compose.yml` from the Docker guide and shipped as Docker images:
 
 - **Server**: hosts the frontend static assets and the backend, handling library management, audio delivery and cross-device sync, and managing local audio files.
 - **Database**: handles data persistence.
