@@ -53,6 +53,13 @@ const featuredActionLabel = computed(() => {
     return '加载中'
 })
 
+const compactFeaturedActionLabel = computed(() => {
+    if (featuredStatus.value === 'ready') {
+        return isFeaturedPlaying.value ? '暂停' : '播放'
+    }
+    return featuredActionLabel.value
+})
+
 const isFeaturedActionDisabled = computed(() => featuredStatus.value === 'loading')
 const showFeaturedAction = computed(
     () =>
@@ -147,10 +154,10 @@ watch(
 </script>
 
 <template>
-    <div class="relative mb-12 px-1 sm:px-2">
+    <div class="relative mb-8 px-1 sm:px-2 md:mb-12">
         <h2 class="mb-5 text-lg font-serif text-[#2C2C2C] sm:mb-6 sm:text-xl">今日推荐</h2>
 
-        <div class="relative min-h-[34rem] w-full md:h-80 md:min-h-0">
+        <div class="relative h-[10.5rem] w-full md:h-80">
             <!-- Bottom Stack Layers -->
             <div
                 class="absolute top-3 left-3 -right-1.5 -bottom-1.5 rounded-sm border border-[#E6E1D8] bg-[#F0EBE3] shadow-sm rotate-1 sm:top-4 sm:left-4 sm:-right-2.5 sm:-bottom-2.5"
@@ -161,11 +168,11 @@ watch(
 
             <!-- Top Card -->
             <div
-                class="absolute inset-0 flex flex-col overflow-hidden rounded-sm border border-white bg-[#FCFBF9] shadow-[0_10px_30px_-10px_rgba(168,160,149,0.4)] md:flex-row"
+                class="absolute inset-0 flex flex-row items-center overflow-hidden rounded-sm border border-white bg-[#FCFBF9] shadow-[0_10px_30px_-10px_rgba(168,160,149,0.4)] md:items-stretch"
             >
                 <!-- Album Cover -->
                 <div
-                    class="relative flex h-48 w-full shrink-0 items-center justify-center overflow-hidden bg-[#D6D2C9] md:h-full md:w-auto md:aspect-square md:border-r md:border-[#EBE7E0]"
+                    class="relative flex h-full w-auto aspect-square shrink-0 items-center justify-center overflow-hidden bg-[#D6D2C9] md:border-r md:border-[#EBE7E0]"
                     :class="{ 'group cursor-pointer': featuredStatus === 'ready' }"
                     @click="handleFeaturedAction"
                 >
@@ -178,7 +185,7 @@ watch(
 
                         <!-- Play Overlay -->
                         <div
-                            class="absolute inset-0 flex items-center justify-center bg-black/40 opacity-100 transition-opacity duration-500 ease-out md:opacity-0 md:group-hover:opacity-100"
+                            class="absolute inset-0 hidden items-center justify-center bg-black/40 opacity-0 transition-opacity duration-500 ease-out md:flex md:group-hover:opacity-100"
                         >
                             <div
                                 class="flex h-12 w-12 items-center justify-center rounded-full bg-[#F5F2EB] shadow-lg transition-all duration-300 md:h-14 md:w-14 md:translate-y-4 md:group-hover:translate-y-0"
@@ -209,7 +216,7 @@ watch(
 
                 <!-- Content -->
                 <div
-                    class="relative flex flex-1 flex-col justify-center overflow-hidden bg-[url('https://www.transparenttextures.com/patterns/cream-paper.png')] p-6 sm:p-8 md:p-12"
+                    class="relative flex h-full min-w-0 flex-1 flex-col justify-center overflow-hidden bg-[url('https://www.transparenttextures.com/patterns/cream-paper.png')] p-4 md:p-12"
                 >
                     <!-- Background Decoration -->
                     <div
@@ -238,49 +245,66 @@ watch(
                     <div class="relative z-10">
                         <template v-if="featuredStatus === 'ready' && album">
                             <div
-                                class="mb-3 text-[11px] font-medium uppercase tracking-widest text-[#9C968B] md:mb-4"
+                                class="mb-3 hidden text-[11px] font-medium uppercase tracking-widest text-[#9C968B] md:mb-4 md:block"
                             >
                                 今日推荐
                             </div>
                             <h3
-                                class="mb-3 font-serif text-3xl leading-tight tracking-tight text-[#2C2C2C] sm:text-4xl md:mb-4 md:text-5xl"
+                                class="mb-2 line-clamp-2 font-serif text-2xl leading-tight tracking-tight text-[#2C2C2C] md:mb-4 md:line-clamp-none md:text-5xl"
                             >
                                 {{ album.title }}
                             </h3>
                             <p
-                                class="mb-6 flex items-center text-base font-serif italic text-[#8A857D] sm:text-lg md:mb-10"
+                                class="mb-3 flex min-w-0 items-center text-sm font-serif italic text-[#8A857D] md:mb-10 md:text-lg"
                             >
-                                <span class="w-8 h-px bg-[#C27E46] mr-3 inline-block"></span>
-                                {{ album.recording.artist }}
+                                <span
+                                    class="mr-2 inline-block h-px w-5 shrink-0 bg-[#C27E46] md:mr-3 md:w-8"
+                                ></span>
+                                <span class="truncate">{{ album.recording.artist }}</span>
                             </p>
                         </template>
                         <template v-else>
                             <div
-                                class="mb-3 text-[11px] font-medium uppercase tracking-widest text-[#9C968B] md:mb-4"
+                                class="mb-3 hidden text-[11px] font-medium uppercase tracking-widest text-[#9C968B] md:mb-4 md:block"
                             >
                                 今日推荐
                             </div>
                             <h3
-                                class="mb-3 font-serif text-3xl leading-tight tracking-tight text-[#2C2C2C] sm:text-4xl md:mb-4"
+                                class="mb-2 line-clamp-2 font-serif text-2xl leading-tight tracking-tight text-[#2C2C2C] md:mb-4 md:line-clamp-none md:text-3xl"
                             >
                                 旋律不可调
                             </h3>
                             <p
-                                class="mb-6 text-base font-serif italic text-[#8A857D] sm:text-lg md:mb-10"
+                                class="mb-3 line-clamp-2 text-sm font-serif italic text-[#8A857D] md:mb-10 md:line-clamp-none md:text-lg"
                             >
                                 资料库中未能发现可用旋律
                             </p>
                         </template>
-                        <div v-if="showFeaturedAction" class="flex items-center">
+                        <div
+                            v-if="showFeaturedAction"
+                            class="flex translate-y-2 items-center md:translate-y-0"
+                        >
                             <button
-                                class="w-full rounded-sm border border-[#C27E46] px-6 py-3 text-sm font-medium tracking-wide text-[#C27E46] uppercase transition-all duration-500 hover:bg-[#C27E46] hover:text-white disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-[#C27E46] sm:w-auto sm:px-8"
+                                class="inline-flex w-auto items-center gap-1.5 rounded-sm border border-[#C27E46] px-4 py-2 text-xs font-medium tracking-wide text-[#C27E46] uppercase transition-all duration-500 hover:bg-[#C27E46] hover:text-white disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-[#C27E46] md:px-8 md:py-3 md:text-sm"
                                 :disabled="
                                     isFeaturedActionDisabled ||
                                     (featuredStatus === 'ready' && !hasPlayableFeatured)
                                 "
                                 @click="handleFeaturedAction"
                             >
-                                {{ featuredActionLabel }}
+                                <Pause
+                                    v-if="featuredStatus === 'ready' && isFeaturedPlaying"
+                                    :size="14"
+                                    class="md:hidden"
+                                />
+                                <Play
+                                    v-else-if="featuredStatus === 'ready'"
+                                    :size="14"
+                                    fill="currentColor"
+                                    class="md:hidden"
+                                />
+                                <span class="md:hidden">{{ compactFeaturedActionLabel }}</span>
+                                <span class="hidden md:inline">{{ featuredActionLabel }}</span>
                             </button>
                         </div>
                     </div>
