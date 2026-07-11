@@ -33,6 +33,7 @@ export type QueuedSystemPauseIntent = {
     currentIndex: number
     positionSeconds: number
     commandId?: string
+    conflictRecoveryAttempted?: boolean
 }
 
 const queuedSystemPauseMatches = (
@@ -138,6 +139,7 @@ export const usePlaybackSyncSession = (options: UsePlaybackSyncSessionOptions) =
     } = options
 
     let commandSequence = 0
+    let applyNextSnapshotPlaybackState = false
 
     const nextCommandId = (prefix: string) => {
         commandSequence += 1
@@ -145,7 +147,7 @@ export const usePlaybackSyncSession = (options: UsePlaybackSyncSessionOptions) =
     }
 
     const requestSyncRecovery = () => {
-        if (!playbackSyncClient.value) {
+        if (!playbackSyncClient.value || awaitingSyncRecovery.value) {
             return
         }
         awaitingSyncRecovery.value = true
@@ -262,6 +264,7 @@ export const usePlaybackSyncSession = (options: UsePlaybackSyncSessionOptions) =
     }
 
     const handleSnapshot = async (payload: SnapshotPayload) => {
+        awaitingSyncRecovery.value = false
         const snapshotVersion = payload.state.version
         const snapshotCurrentIndex = payload.state.currentIndex
         latestSnapshotReceivedAtMs.value = nowClientMs()
@@ -281,7 +284,15 @@ export const usePlaybackSyncSession = (options: UsePlaybackSyncSessionOptions) =
         if (queuedSystemPause && !retainsQueuedSystemPause) {
             queuedSystemPauseIntent.value = null
         }
+        if (retainsQueuedSystemPause && queuedSystemPause.conflictRecoveryAttempted) {
+            flushQueuedSystemPauseIntent()
+        }
         if (isNil(snapshotCurrentIndex) || isNil(snapshotRecordingId)) {
+            if (applyNextSnapshotPlaybackState) {
+                applyNextSnapshotPlaybackState = false
+                applyPausedState(null, 0)
+                return
+            }
             if (!isPlaying.value) {
                 applyPausedState(null, 0)
             }
@@ -299,6 +310,9 @@ export const usePlaybackSyncSession = (options: UsePlaybackSyncSessionOptions) =
             return
         }
 
+        const shouldApplyPlaybackState = applyNextSnapshotPlaybackState
+        applyNextSnapshotPlaybackState = false
+
         cacheTrack(track)
         currentTrack.value = cloneTrack(track)
 
@@ -310,6 +324,29 @@ export const usePlaybackSyncSession = (options: UsePlaybackSyncSessionOptions) =
                 Math.max(0, payload.serverNowMs - payload.state.serverTimeToExecuteMs) / 1_000
         }
         updatePausedTime(recoveredPosition)
+
+        if (shouldApplyPlaybackState) {
+            if (payload.state.status === 'PAUSED') {
+                applyPausedState(track, recoveredPosition)
+            } else {
+                await schedulePlayExecution(
+                    {
+                        commandId: nextCommandId('snapshot-recovery'),
+                        serverTimeToExecuteMs: payload.serverNowMs,
+                        scheduledAction: {
+                            action: 'PLAY',
+                            status: 'PLAYING',
+                            currentIndex: snapshotCurrentIndex,
+                            positionSeconds: recoveredPosition,
+                            version: snapshotVersion,
+                        },
+                        skipLateCompensation: true,
+                    },
+                    track,
+                    snapshotVersion,
+                )
+            }
+        }
 
         if (isSameBufferTrack(track)) {
             duration.value = currentBuffer.value!.duration
@@ -442,11 +479,18 @@ export const usePlaybackSyncSession = (options: UsePlaybackSyncSessionOptions) =
                 break
             case 'ERROR':
                 error.value = message.payload.message
-                if (message.payload.code === 'VERSION_CONFLICT' && queuedSystemPauseIntent.value) {
-                    queuedSystemPauseIntent.value = {
-                        ...queuedSystemPauseIntent.value,
-                        commandId: undefined,
-                    }
+                if (message.payload.code === 'VERSION_CONFLICT') {
+                    const queuedSystemPause = queuedSystemPauseIntent.value
+                    applyNextSnapshotPlaybackState =
+                        queuedSystemPause?.conflictRecoveryAttempted === true
+                    queuedSystemPauseIntent.value =
+                        queuedSystemPause && !queuedSystemPause.conflictRecoveryAttempted
+                            ? {
+                                  ...queuedSystemPause,
+                                  commandId: undefined,
+                                  conflictRecoveryAttempted: true,
+                              }
+                            : null
                     requestSyncRecovery()
                 }
                 break
@@ -530,6 +574,10 @@ export const usePlaybackSyncSession = (options: UsePlaybackSyncSessionOptions) =
         flushQueuedSystemPauseIntent()
     }
 
+    const resetSyncRecoveryState = () => {
+        applyNextSnapshotPlaybackState = false
+    }
+
     return {
         nextCommandId,
         requestSyncRecovery,
@@ -538,5 +586,6 @@ export const usePlaybackSyncSession = (options: UsePlaybackSyncSessionOptions) =
         queuePlay,
         queueSystemPause,
         sendPlayCommand,
+        resetSyncRecoveryState,
     }
 }

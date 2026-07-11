@@ -1125,6 +1125,79 @@ describe('audio store', () => {
         expect(client.sendPlay).not.toHaveBeenCalled()
     })
 
+    it('refreshes the remote queue without retrying after a queue version conflict', async () => {
+        const audioStore = useAudioStore()
+        audioStore.connectPlaybackSync()
+        const client = latestClient()
+        client.setState({ phase: 'ready' })
+        client.emitMessage({
+            type: 'SNAPSHOT',
+            payload: {
+                state: {
+                    status: 'PAUSED',
+                    currentIndex: 0,
+                    positionSeconds: 0,
+                    serverTimeToExecuteMs: nowClientMs(),
+                    version: 5,
+                    updatedAtMs: nowClientMs(),
+                },
+                queue: { ...buildQueue([buildTrack(1)], 0), version: 5 },
+                serverNowMs: nowClientMs(),
+            },
+        })
+        await flushPromises()
+        client.requestSync.mockClear()
+        appendToCurrentQueueMock.mockRejectedValue({
+            status: 409,
+            detail: 'Queue version conflict',
+        })
+        reorderCurrentQueueMock.mockRejectedValue({
+            status: 409,
+            detail: 'Queue version conflict',
+        })
+
+        await expect(audioStore.appendToQueue([buildTrack(2)])).resolves.toBeUndefined()
+        await expect(audioStore.reorderQueue([1], 0)).resolves.toBeUndefined()
+
+        expect(appendToCurrentQueueMock).toHaveBeenCalledTimes(1)
+        expect(reorderCurrentQueueMock).toHaveBeenCalledTimes(1)
+        expect(client.requestSync).toHaveBeenCalledTimes(1)
+        expect(audioStore.playbackSyncDebugSnapshot.awaitingSyncRecovery).toBe(true)
+
+        client.emitMessage({
+            type: 'SNAPSHOT',
+            payload: {
+                state: {
+                    status: 'PAUSED',
+                    currentIndex: 1,
+                    positionSeconds: 0,
+                    serverTimeToExecuteMs: nowClientMs(),
+                    version: 6,
+                    updatedAtMs: nowClientMs(),
+                },
+                queue: { ...buildQueue([buildTrack(3), buildTrack(1)], 1), version: 6 },
+                serverNowMs: nowClientMs(),
+            },
+        })
+        await flushPromises()
+
+        expect(audioStore.queueEntries.map((entry) => entry.recordingId)).toEqual([3, 1])
+        expect(audioStore.playbackSyncDebugSnapshot.awaitingSyncRecovery).toBe(false)
+    })
+
+    it('does not swallow a non-version queue conflict', async () => {
+        appendToCurrentQueueMock.mockRejectedValue({
+            status: 409,
+            detail: 'Recording 2 not found',
+        })
+        const audioStore = useAudioStore()
+
+        await expect(audioStore.appendToQueue([buildTrack(2)])).rejects.toEqual({
+            status: 409,
+            detail: 'Recording 2 not found',
+        })
+    })
+
     it('updates queue strategies through the server current queue API', async () => {
         updateCurrentQueueStrategyMock.mockResolvedValueOnce({
             ...buildQueue([buildTrack(7)], 0),
@@ -1765,7 +1838,9 @@ describe('audio store', () => {
         )
     })
 
-    it('retries a notification pause with the latest queue version after reconnecting', async () => {
+    it('retries a notification pause once after refreshing a version conflict', async () => {
+        getRecordingMock.mockResolvedValue(buildRecordingMetadata(6))
+        fetchMock.mockResolvedValue(createResponse(90))
         const audioStore = useAudioStore()
         audioStore.connectPlaybackSync()
         const client = latestClient()
@@ -1862,19 +1937,20 @@ describe('audio store', () => {
         expect(client.requestSync).toHaveBeenCalledTimes(1)
 
         client.emitMessage({
-            type: 'SCHEDULED_ACTION',
+            type: 'SNAPSHOT',
             payload: {
-                commandId: 'sync-after-pause-conflict',
-                serverTimeToExecuteMs: nowClientMs(),
-                scheduledAction: {
-                    action: 'PLAY',
+                state: {
                     status: 'PLAYING',
                     currentIndex: 0,
                     positionSeconds: 26,
+                    serverTimeToExecuteMs: nowClientMs(),
                     version: 11,
+                    updatedAtMs: nowClientMs(),
                 },
+                queue: { ...buildQueue([buildTrack(6)], 0), version: 11 },
+                serverNowMs: nowClientMs(),
             },
-        } satisfies ScheduledActionMessage)
+        })
         await flushPromises()
 
         expect(audioStore.isPlaying).toBe(false)
@@ -1886,6 +1962,107 @@ describe('audio store', () => {
                 version: 11,
             }),
         )
+        expect(audioStore.playbackSyncDebugSnapshot.awaitingSyncRecovery).toBe(false)
+
+        client.emitMessage({
+            type: 'ERROR',
+            payload: {
+                code: 'VERSION_CONFLICT',
+                message: 'queue changed again before pause was accepted',
+            },
+        })
+        const staleRecording = createDeferred<ReturnType<typeof buildRecordingMetadata>>()
+        getRecordingMock.mockImplementation(({ id }: { id: number }) => {
+            return id === 7 ? staleRecording.promise : Promise.resolve(buildRecordingMetadata(id))
+        })
+        client.emitMessage({
+            type: 'SNAPSHOT',
+            payload: {
+                state: {
+                    status: 'PLAYING',
+                    currentIndex: 0,
+                    positionSeconds: 28,
+                    serverTimeToExecuteMs: nowClientMs(),
+                    version: 12,
+                    updatedAtMs: nowClientMs(),
+                },
+                queue: { ...buildQueue([buildTrack(7)], 0), version: 12 },
+                serverNowMs: nowClientMs(),
+            },
+        })
+        await flushPromises()
+        client.emitMessage({
+            type: 'SNAPSHOT',
+            payload: {
+                state: {
+                    status: 'PLAYING',
+                    currentIndex: 0,
+                    positionSeconds: 30,
+                    serverTimeToExecuteMs: nowClientMs(),
+                    version: 13,
+                    updatedAtMs: nowClientMs(),
+                },
+                queue: { ...buildQueue([buildTrack(8)], 0), version: 13 },
+                serverNowMs: nowClientMs(),
+            },
+        })
+        await flushPromises()
+        staleRecording.resolve(buildRecordingMetadata(7))
+        await flushPromises()
+
+        expect(client.sendPause).toHaveBeenCalledTimes(2)
+        expect(audioStore.isPlaying).toBe(true)
+        expect(audioStore.currentTrack?.id).toBe(8)
+        expect(audioStore.currentTime).toBeGreaterThanOrEqual(30)
+
+        audioStore.pauseFromSystem()
+        client.emitMessage({
+            type: 'ERROR',
+            payload: { code: 'VERSION_CONFLICT', message: 'pause conflict before disconnect' },
+        })
+        client.emitMessage({
+            type: 'SNAPSHOT',
+            payload: {
+                state: {
+                    status: 'PLAYING',
+                    currentIndex: 0,
+                    positionSeconds: 32,
+                    serverTimeToExecuteMs: nowClientMs(),
+                    version: 14,
+                    updatedAtMs: nowClientMs(),
+                },
+                queue: { ...buildQueue([buildTrack(8)], 0), version: 14 },
+                serverNowMs: nowClientMs(),
+            },
+        })
+        await flushPromises()
+        client.emitMessage({
+            type: 'ERROR',
+            payload: { code: 'VERSION_CONFLICT', message: 'second conflict before disconnect' },
+        })
+
+        audioStore.disconnectPlaybackSync()
+        audioStore.connectPlaybackSync()
+        const reconnectedClient = latestClient()
+        reconnectedClient.emitMessage({
+            type: 'SNAPSHOT',
+            payload: {
+                state: {
+                    status: 'PLAYING',
+                    currentIndex: 0,
+                    positionSeconds: 5,
+                    serverTimeToExecuteMs: nowClientMs(),
+                    version: 1,
+                    updatedAtMs: nowClientMs(),
+                },
+                queue: { ...buildQueue([buildTrack(9)], 0), version: 1 },
+                serverNowMs: nowClientMs(),
+            },
+        })
+        await flushPromises()
+
+        expect(audioStore.isPlaying).toBe(false)
+        expect(audioStore.currentTrack?.id).toBe(9)
     })
 
     it('drops a queued notification pause when the current queue entry changed remotely', async () => {

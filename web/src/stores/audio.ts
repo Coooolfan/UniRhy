@@ -50,6 +50,20 @@ export type {
 } from '@/stores/audioShared'
 
 const noop = () => undefined
+const QUEUE_VERSION_CONFLICT_DETAIL = 'Queue version conflict'
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+    typeof value === 'object' && value !== null
+
+const isQueueVersionConflict = (value: unknown) => {
+    if (!isRecord(value)) {
+        return false
+    }
+
+    const status = value.status ?? value.statusCode
+    const detail = value.detail ?? value.message
+    return status === 409 && detail === QUEUE_VERSION_CONFLICT_DETAIL
+}
 
 export const useAudioStore = defineStore('audio', () => {
     // ── 共享响应式状态（各分层通过依赖注入读写）─────────────────────────────
@@ -245,7 +259,21 @@ export const useAudioStore = defineStore('audio', () => {
         queuePlay,
         queueSystemPause,
         sendPlayCommand,
+        resetSyncRecoveryState,
     } = sync
+
+    const executeRemoteQueueMutation = async <T>(mutation: () => Promise<T>) => {
+        try {
+            return await mutation()
+        } catch (mutationError: unknown) {
+            if (!isQueueVersionConflict(mutationError)) {
+                throw mutationError
+            }
+
+            requestSyncRecovery()
+            return null
+        }
+    }
 
     watch(
         () => userStore.preferredAssetFormat,
@@ -521,9 +549,14 @@ export const useAudioStore = defineStore('audio', () => {
                 return
             }
             if (currentQueue.value.currentIndex !== currentIndex) {
-                const queueSnapshot = await api.playbackQueueController.setCurrentIndex({
-                    body: { currentIndex, version: getCurrentQueueVersion() },
-                })
+                const queueSnapshot = await executeRemoteQueueMutation(() =>
+                    api.playbackQueueController.setCurrentIndex({
+                        body: { currentIndex, version: getCurrentQueueVersion() },
+                    }),
+                )
+                if (!queueSnapshot) {
+                    return
+                }
                 applyApiQueueSnapshot(queueSnapshot)
                 await requestPlay(targetTrack, 0)
                 return
@@ -548,13 +581,18 @@ export const useAudioStore = defineStore('audio', () => {
             }
         }
 
-        const queueSnapshot = await api.playbackQueueController.replaceCurrentQueue({
-            body: {
-                recordingIds,
-                currentIndex,
-                version: getCurrentQueueVersion(),
-            },
-        })
+        const queueSnapshot = await executeRemoteQueueMutation(() =>
+            api.playbackQueueController.replaceCurrentQueue({
+                body: {
+                    recordingIds,
+                    currentIndex,
+                    version: getCurrentQueueVersion(),
+                },
+            }),
+        )
+        if (!queueSnapshot) {
+            return
+        }
         applyApiQueueSnapshot(queueSnapshot)
         await requestPlay(targetTrack, 0)
     }
@@ -585,12 +623,17 @@ export const useAudioStore = defineStore('audio', () => {
             return
         }
 
-        const queueSnapshot = await api.playbackQueueController.appendToCurrentQueue({
-            body: {
-                recordingIds: tracks.map((track) => track.id),
-                version: getCurrentQueueVersion(),
-            },
-        })
+        const queueSnapshot = await executeRemoteQueueMutation(() =>
+            api.playbackQueueController.appendToCurrentQueue({
+                body: {
+                    recordingIds: tracks.map((track) => track.id),
+                    version: getCurrentQueueVersion(),
+                },
+            }),
+        )
+        if (!queueSnapshot) {
+            return
+        }
         applyApiQueueSnapshot(queueSnapshot)
     }
 
@@ -616,9 +659,14 @@ export const useAudioStore = defineStore('audio', () => {
             return
         }
 
-        const queueSnapshot = await api.playbackQueueController.reorderCurrentQueue({
-            body: { recordingIds, currentIndex, version: getCurrentQueueVersion() },
-        })
+        const queueSnapshot = await executeRemoteQueueMutation(() =>
+            api.playbackQueueController.reorderCurrentQueue({
+                body: { recordingIds, currentIndex, version: getCurrentQueueVersion() },
+            }),
+        )
+        if (!queueSnapshot) {
+            return
+        }
         applyApiQueueSnapshot(queueSnapshot)
     }
 
@@ -628,9 +676,14 @@ export const useAudioStore = defineStore('audio', () => {
             return
         }
 
-        const queueSnapshot = await api.playbackQueueController.setCurrentIndex({
-            body: { currentIndex, version: getCurrentQueueVersion() },
-        })
+        const queueSnapshot = await executeRemoteQueueMutation(() =>
+            api.playbackQueueController.setCurrentIndex({
+                body: { currentIndex, version: getCurrentQueueVersion() },
+            }),
+        )
+        if (!queueSnapshot) {
+            return
+        }
         const normalizedQueue = applyApiQueueSnapshot(queueSnapshot)
         const currentItem = normalizedQueue.items[normalizedQueue.currentIndex]
         if (!currentItem) {
@@ -653,9 +706,14 @@ export const useAudioStore = defineStore('audio', () => {
             return
         }
 
-        const queueSnapshot = await api.playbackQueueController.playNextInCurrentQueue({
-            body: { version: getCurrentQueueVersion() },
-        })
+        const queueSnapshot = await executeRemoteQueueMutation(() =>
+            api.playbackQueueController.playNextInCurrentQueue({
+                body: { version: getCurrentQueueVersion() },
+            }),
+        )
+        if (!queueSnapshot) {
+            return
+        }
         applyApiQueueSnapshot(queueSnapshot)
     }
 
@@ -676,9 +734,14 @@ export const useAudioStore = defineStore('audio', () => {
             return
         }
 
-        const queueSnapshot = await api.playbackQueueController.playPreviousInCurrentQueue({
-            body: { version: getCurrentQueueVersion() },
-        })
+        const queueSnapshot = await executeRemoteQueueMutation(() =>
+            api.playbackQueueController.playPreviousInCurrentQueue({
+                body: { version: getCurrentQueueVersion() },
+            }),
+        )
+        if (!queueSnapshot) {
+            return
+        }
         applyApiQueueSnapshot(queueSnapshot)
     }
 
@@ -697,13 +760,18 @@ export const useAudioStore = defineStore('audio', () => {
             return
         }
 
-        const queueSnapshot = await api.playbackQueueController.updateCurrentQueueStrategy({
-            body: {
-                playbackStrategy: nextPlaybackStrategy,
-                stopStrategy: nextStopStrategy,
-                version: getCurrentQueueVersion(),
-            },
-        })
+        const queueSnapshot = await executeRemoteQueueMutation(() =>
+            api.playbackQueueController.updateCurrentQueueStrategy({
+                body: {
+                    playbackStrategy: nextPlaybackStrategy,
+                    stopStrategy: nextStopStrategy,
+                    version: getCurrentQueueVersion(),
+                },
+            }),
+        )
+        if (!queueSnapshot) {
+            return
+        }
         applyApiQueueSnapshot(queueSnapshot)
     }
 
@@ -743,9 +811,14 @@ export const useAudioStore = defineStore('audio', () => {
             return
         }
 
-        const queueSnapshot = await api.playbackQueueController.removeCurrentQueueEntry({
-            body: { index, version: getCurrentQueueVersion() },
-        })
+        const queueSnapshot = await executeRemoteQueueMutation(() =>
+            api.playbackQueueController.removeCurrentQueueEntry({
+                body: { index, version: getCurrentQueueVersion() },
+            }),
+        )
+        if (!queueSnapshot) {
+            return
+        }
         applyApiQueueSnapshot(queueSnapshot)
     }
 
@@ -756,9 +829,14 @@ export const useAudioStore = defineStore('audio', () => {
             return
         }
 
-        const queueSnapshot = await api.playbackQueueController.clearCurrentQueue({
-            body: { version: getCurrentQueueVersion() },
-        })
+        const queueSnapshot = await executeRemoteQueueMutation(() =>
+            api.playbackQueueController.clearCurrentQueue({
+                body: { version: getCurrentQueueVersion() },
+            }),
+        )
+        if (!queueSnapshot) {
+            return
+        }
         applyApiQueueSnapshot(queueSnapshot)
     }
 
@@ -947,6 +1025,7 @@ export const useAudioStore = defineStore('audio', () => {
 
     function disconnectPlaybackSync(options: { preservePlayback?: boolean } = {}) {
         const preservePlayback = options.preservePlayback ?? false
+        resetSyncRecoveryState()
         playbackSyncClient.value?.disconnect()
         playbackSyncClient.value = null
         clientDiagnostics.value = null
