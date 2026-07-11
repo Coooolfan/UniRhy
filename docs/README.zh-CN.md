@@ -7,6 +7,17 @@ UniRhy（独一律）是一个私有化的音乐流媒体平台，采用 monorep
 > [!NOTE]
 > 项目仍处于极早期阶段，我们欢迎各种形式的反馈与贡献。不排除对现有功能进行大规模调整的可能。
 
+## 界面预览
+
+<table align="center">
+  <tr>
+    <td><img src="screenshots/home-playing-mobile.webp" alt="移动版首页" height="330" /></td>
+    <td><img src="screenshots/home-playing-desktop.webp" alt="桌面版首页" height="330" /></td>
+  </tr>
+</table>
+
+<sub>截图中的专辑封面均为公有领域素材（CC0 / Public Domain Mark，来自 The Met Open Access 与 Internet Archive netlabels），专辑、艺术家与曲目名称均为虚构演示数据。</sub>
+
 ## 功能特性
 
 - 私有化部署，无外部依赖。

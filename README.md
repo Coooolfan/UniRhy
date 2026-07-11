@@ -7,6 +7,17 @@ English | [简体中文](docs/README.zh-CN.md)
 > [!NOTE]
 > This project is still in a very early stage. Feedback and contributions of all kinds are welcome, and existing features may still change significantly.
 
+## Screenshots
+
+<table align="center">
+  <tr>
+    <td><img src="docs/screenshots/home-playing-mobile.webp" alt="Home page on mobile" height="330" /></td>
+    <td><img src="docs/screenshots/home-playing-desktop.webp" alt="Home page on desktop" height="330" /></td>
+  </tr>
+</table>
+
+<sub>All album covers shown are public domain (CC0 / Public Domain Mark) artworks from The Met Open Access and Internet Archive netlabels. Album, artist, and track names are fictional demo data.</sub>
+
 ## Features
 
 - Self-hosted deployment with no external service dependency.
