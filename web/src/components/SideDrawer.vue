@@ -6,6 +6,7 @@ const props = defineProps<{
     open: boolean
     title?: string
     width?: string
+    maxWidth?: string
 }>()
 
 const emit = defineEmits<{
@@ -62,10 +63,10 @@ onBeforeUnmount(() => {
             <aside
                 v-if="open"
                 class="fixed top-0 right-0 bottom-0 z-[61] flex flex-col border-l border-[#EAE6DE] bg-[#FFFCF5] shadow-[0_8px_30px_rgba(0,0,0,0.18)]"
-                :style="{ width: width ?? '32rem', maxWidth: '95vw' }"
+                :style="{ width: width ?? '32rem', maxWidth: maxWidth ?? '95vw' }"
             >
                 <header
-                    class="flex items-center justify-between border-b border-[#EAE6DE] px-6 py-4"
+                    class="flex items-center justify-between border-b border-[#EAE6DE] px-4 py-4 sm:px-6"
                 >
                     <h3 class="font-serif text-xl text-[#2B221B]">
                         {{ title }}

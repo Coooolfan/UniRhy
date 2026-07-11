@@ -96,7 +96,7 @@ onMounted(() => {
         <DashboardTopBar />
 
         <div class="mx-auto max-w-5xl px-4 pt-4 sm:px-6 sm:pt-6 lg:px-8">
-            <header class="mb-10 sm:mb-12">
+            <header class="mb-6 sm:mb-12">
                 <h1 class="mb-2 font-serif text-3xl tracking-tight text-[#2B221B]">系统设置</h1>
                 <p class="font-serif text-sm italic text-[#8A8A8A]">
                     管理实例级配置、存储节点与插件
@@ -104,7 +104,7 @@ onMounted(() => {
             </header>
         </div>
 
-        <div class="mx-auto mt-10 max-w-5xl px-8">
+        <div class="mx-auto mt-6 max-w-5xl px-4 sm:mt-10 sm:px-8">
             <!-- <SystemStatusSection
                 :active-storage-label="activeStorageLabel"
                 :system-config="systemConfig"
@@ -114,7 +114,7 @@ onMounted(() => {
             /> -->
 
             <StorageNodesSection
-                class="mt-16"
+                class="mt-8 sm:mt-16"
                 :storage-nodes="storageNodes"
                 :system-config="systemConfig"
                 :is-loading="isLoadingStorage"
@@ -129,7 +129,7 @@ onMounted(() => {
 
             <AccountsSection
                 v-if="userStore.isAdmin"
-                class="mt-16"
+                class="mt-8 sm:mt-16"
                 :accounts="accounts"
                 :current-account-id="userStore.user?.id ?? null"
                 :is-loading="isLoadingAccounts"
@@ -142,7 +142,7 @@ onMounted(() => {
             />
 
             <PluginsSection
-                class="mt-16"
+                class="mt-8 sm:mt-16"
                 :plugins="plugins"
                 :is-loading="isLoadingPlugins"
                 :is-uploading="isUploading"

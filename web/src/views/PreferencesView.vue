@@ -169,17 +169,17 @@ const handleOpenBatterySettings = async () => {
         <DashboardTopBar />
 
         <div class="mx-auto max-w-5xl px-4 pt-4 sm:px-6 sm:pt-6 lg:px-8">
-            <header class="mb-10 sm:mb-12">
+            <header class="mb-6 sm:mb-12">
                 <h1 class="mb-2 font-serif text-3xl tracking-tight text-[#2B221B]">个人偏好</h1>
                 <p class="font-serif text-sm italic text-[#8A8A8A]">客户端播放与体验偏好</p>
             </header>
         </div>
 
-        <div class="mx-auto mt-10 max-w-5xl space-y-6 px-8">
-            <section class="border border-[#EAE6DE] bg-white p-6 sm:p-8">
-                <div class="mb-6 flex items-center gap-3">
+        <div class="mx-auto mt-6 max-w-5xl space-y-4 px-4 sm:mt-10 sm:space-y-6 sm:px-8">
+            <section class="border border-[#EAE6DE] bg-white p-4 sm:p-8">
+                <div class="mb-4 flex items-center gap-3 sm:mb-6">
                     <div
-                        class="flex h-10 w-10 items-center justify-center rounded-full bg-[#F7F5F0] text-[#8C857B]"
+                        class="flex h-9 w-9 items-center justify-center rounded-full bg-[#F7F5F0] text-[#8C857B] sm:h-10 sm:w-10"
                     >
                         <Radio :size="18" />
                     </div>
@@ -212,12 +212,12 @@ const handleOpenBatterySettings = async () => {
 
             <section
                 v-if="isAndroid"
-                class="border border-[#EAE6DE] bg-white p-6 sm:p-8"
+                class="border border-[#EAE6DE] bg-white p-4 sm:p-8"
                 data-test="android-playback-settings"
             >
-                <div class="mb-6 flex items-center gap-3">
+                <div class="mb-4 flex items-center gap-3 sm:mb-6">
                     <div
-                        class="flex h-10 w-10 items-center justify-center rounded-full bg-[#F7F5F0] text-[#8C857B]"
+                        class="flex h-9 w-9 items-center justify-center rounded-full bg-[#F7F5F0] text-[#8C857B] sm:h-10 sm:w-10"
                     >
                         <BatteryCharging :size="18" />
                     </div>
@@ -294,10 +294,10 @@ const handleOpenBatterySettings = async () => {
                 </div>
             </section>
 
-            <section class="border border-[#EAE6DE] bg-white p-6 sm:p-8">
-                <div class="mb-6 flex items-center gap-3">
+            <section class="border border-[#EAE6DE] bg-white p-4 sm:p-8">
+                <div class="mb-4 flex items-center gap-3 sm:mb-6">
                     <div
-                        class="flex h-10 w-10 items-center justify-center rounded-full bg-[#F7F5F0] text-[#8C857B]"
+                        class="flex h-9 w-9 items-center justify-center rounded-full bg-[#F7F5F0] text-[#8C857B] sm:h-10 sm:w-10"
                     >
                         <FileAudio :size="18" />
                     </div>

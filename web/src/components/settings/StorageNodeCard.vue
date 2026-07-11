@@ -42,16 +42,16 @@ const nodePathLabel = computed(() => {
     >
         <div class="flex h-full flex-col sm:flex-row">
             <div
-                class="relative flex h-20 items-center justify-center overflow-hidden border-b border-[#D6D1C4]/30 bg-[#EAE6D9] text-[#8A8A8A] transition-colors duration-300 group-hover:text-[#C67C4E] sm:h-auto sm:w-24 sm:border-b-0 sm:border-r"
+                class="relative flex h-12 items-center justify-center overflow-hidden border-b border-[#D6D1C4]/30 bg-[#EAE6D9] text-[#8A8A8A] transition-colors duration-300 group-hover:text-[#C67C4E] sm:h-auto sm:w-24 sm:border-b-0 sm:border-r"
             >
                 <component :is="nodeIcon" :size="32" stroke-width="1.5" />
             </div>
 
-            <div class="min-w-0 flex-1 p-6 flex flex-col">
+            <div class="flex min-w-0 flex-1 flex-col p-4 sm:p-6">
                 <div class="flex justify-between items-start gap-4 mb-2">
                     <div class="min-w-0">
                         <h3
-                            class="truncate text-xl font-medium group-hover:text-[#C67C4E] transition-colors duration-300"
+                            class="truncate text-lg font-medium transition-colors duration-300 group-hover:text-[#C67C4E] sm:text-xl"
                             :title="node.name"
                         >
                             {{ node.name }}
@@ -80,7 +80,7 @@ const nodePathLabel = computed(() => {
                 </div>
 
                 <div
-                    class="min-w-0 flex items-center gap-2 text-[#7A756D] text-sm font-mono bg-[#EAE6D9]/50 p-2 rounded-sm mt-auto"
+                    class="mt-auto flex min-w-0 items-center gap-2 rounded-sm bg-[#EAE6D9]/50 p-1.5 font-mono text-sm text-[#7A756D] sm:p-2"
                 >
                     <FolderOpen :size="14" class="shrink-0 text-[#C67C4E]" />
                     <span class="min-w-0 truncate" :title="nodePathLabel">

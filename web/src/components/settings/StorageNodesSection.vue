@@ -129,12 +129,12 @@ const confirmSetSystemStorageNode = async (node: StorageNode) => {
 <template>
     <section class="animate-in fade-in duration-500 font-serif">
         <div
-            class="mb-6 flex flex-col gap-4 border-b border-[#E0Dcd0] pb-3 sm:flex-row sm:items-center sm:justify-between sm:pb-2"
+            class="mb-4 flex items-center justify-between gap-3 border-b border-[#E0Dcd0] pb-2 sm:mb-6"
         >
             <h2 class="text-2xl font-serif text-[#4A3B32] tracking-wide">存储节点</h2>
             <button
                 v-if="canManage"
-                class="group flex w-full items-center justify-center gap-2 bg-[#C67C4E] px-6 py-2 text-[#F7F5F0] transition-all duration-300 shadow-md hover:bg-[#A6633C] hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto sm:justify-start"
+                class="group flex w-auto shrink-0 items-center justify-center gap-2 bg-[#C67C4E] px-3 py-2 text-sm text-[#F7F5F0] shadow-md transition-all duration-300 hover:bg-[#A6633C] hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50 sm:px-6 sm:text-base"
                 :disabled="isSaving"
                 @click="openCreateStorageNodeModal"
             >

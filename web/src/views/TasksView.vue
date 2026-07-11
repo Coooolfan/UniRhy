@@ -353,9 +353,9 @@ const drawerTitle = computed(() => drawerTaskName.value)
     <div class="pb-32 font-sans text-[#5A524A] selection:bg-[#C67C4E] selection:text-white">
         <DashboardTopBar />
 
-        <div class="mx-auto w-full max-w-5xl px-4 pt-4 sm:px-6 sm:pt-6 lg:px-8">
+        <div class="mx-auto w-full max-w-5xl px-6 pt-4 sm:pt-6 lg:px-8">
             <div
-                class="mb-8 flex flex-col gap-4 border-b border-[#EAE6DE] pb-4 sm:flex-row sm:items-end sm:justify-between"
+                class="flex items-start justify-between gap-3 border-b border-[#EAE6DE] pb-3 sm:mb-8 sm:items-end sm:pb-4"
             >
                 <div>
                     <h2 class="mb-1 font-serif text-3xl text-[#2B221B]">任务管理</h2>
@@ -372,7 +372,7 @@ const drawerTitle = computed(() => drawerTaskName.value)
             </div>
         </div>
 
-        <div class="mx-auto mt-10 w-full max-w-5xl px-4 sm:px-6 lg:px-8">
+        <div class="mx-auto mt-6 w-full max-w-5xl px-6 sm:mt-10 lg:px-8">
             <div
                 v-if="taskError"
                 class="mb-6 flex items-center border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700"
@@ -381,8 +381,10 @@ const drawerTitle = computed(() => drawerTaskName.value)
                 <span>{{ taskError }}</span>
             </div>
 
-            <div class="mb-10 grid grid-cols-1 gap-8 lg:grid-cols-3">
-                <div class="border border-[#EAE6DE] bg-[#FFFCF5] p-6 shadow-sm lg:col-span-1">
+            <div class="mb-7 grid grid-cols-1 gap-3 sm:mb-10 sm:gap-8 lg:grid-cols-3">
+                <div
+                    class="border border-[#EAE6DE] bg-[#FFFCF5] p-4 shadow-sm sm:p-6 lg:col-span-1"
+                >
                     <h3 class="font-serif text-2xl text-[#2B221B]">异步任务</h3>
                     <p class="mt-2 text-sm leading-relaxed text-[#6B635B]">
                         元数据解析、转码等长耗时任务
@@ -392,7 +394,7 @@ const drawerTitle = computed(() => drawerTaskName.value)
                         v-if="userStore.isAdmin"
                         type="button"
                         data-test="open-task-button"
-                        class="relative mt-6 flex w-full items-center justify-center gap-2 overflow-hidden bg-[#C67C4E] px-4 py-3 text-sm uppercase tracking-[0.18em] text-[#F7F5F0] shadow-md transition-colors hover:bg-[#B46B3A] disabled:cursor-not-allowed"
+                        class="relative mt-3 flex w-full items-center justify-center gap-2 overflow-hidden bg-[#C67C4E] px-4 py-2.5 text-sm uppercase tracking-[0.18em] text-[#F7F5F0] shadow-md transition-colors hover:bg-[#B46B3A] disabled:cursor-not-allowed sm:mt-6 sm:py-3"
                         :class="{
                             'opacity-60': isSubmitting && submitFeedbackStatus !== 'success',
                             'hover:bg-[#C67C4E]': submitFeedbackStatus === 'success',
@@ -416,13 +418,13 @@ const drawerTitle = computed(() => drawerTaskName.value)
                 </div>
 
                 <div
-                    class="relative min-h-[196px] overflow-hidden border border-[#EAE6DE] bg-gradient-to-br from-[#F8F5EE] to-white p-6 shadow-sm lg:col-span-2"
+                    class="relative min-h-28 overflow-hidden border border-[#EAE6DE] bg-gradient-to-br from-[#F8F5EE] to-white p-4 shadow-sm sm:min-h-[196px] sm:p-6 lg:col-span-2"
                 >
-                    <div class="absolute top-0 right-0 p-8 opacity-5">
-                        <FileMusic class="h-32 w-32" />
+                    <div class="absolute top-0 right-0 p-4 opacity-5 sm:p-8">
+                        <FileMusic class="h-24 w-24 sm:h-32 sm:w-32" />
                     </div>
 
-                    <div class="relative z-10 pt-3">
+                    <div class="relative z-10 sm:pt-3">
                         <div
                             v-if="isLoadingTaskCounts"
                             class="mb-2 flex items-center text-[#C67C4E]"
@@ -451,8 +453,8 @@ const drawerTitle = computed(() => drawerTaskName.value)
                 </div>
             </div>
 
-            <div class="mb-16">
-                <div class="mb-8 flex items-center justify-between px-1">
+            <div class="mb-9 sm:mb-16">
+                <div class="mb-4 flex items-center justify-between px-1 sm:mb-8">
                     <h3 class="text-lg font-medium text-[#2B221B]">状态概览</h3>
                     <span v-if="lastRefreshedText" class="font-serif text-xs text-[#8A8A8A]">{{
                         lastRefreshedText
@@ -504,17 +506,15 @@ const drawerTitle = computed(() => drawerTaskName.value)
 
                 <div class="space-y-12">
                     <div v-for="(row, index) in taskSummaryRows" :key="row.taskType" class="group">
-                        <div
-                            class="flex flex-col gap-4 md:flex-row md:items-end md:justify-between"
-                        >
-                            <div class="flex items-center gap-4">
-                                <span class="font-mono text-sm text-[#BEB1A3]">
+                        <div class="flex items-end justify-between gap-3">
+                            <div class="flex min-w-0 items-center gap-3 sm:gap-4">
+                                <span class="shrink-0 font-mono text-sm text-[#BEB1A3]">
                                     {{ String(index + 1).padStart(2, '0') }}
                                 </span>
-                                <div>
+                                <div class="min-w-0">
                                     <div class="flex flex-wrap items-center gap-3">
                                         <h4
-                                            class="font-serif text-2xl text-[#2B221B] transition-colors duration-500 group-hover:text-[#B86134]"
+                                            class="truncate font-serif text-xl text-[#2B221B] transition-colors duration-500 group-hover:text-[#B86134] sm:text-2xl"
                                         >
                                             {{ row.taskName }}
                                         </h4>
@@ -527,7 +527,7 @@ const drawerTitle = computed(() => drawerTaskName.value)
 
                             <button
                                 type="button"
-                                class="flex items-end gap-3 text-left"
+                                class="flex shrink-0 items-end gap-2 text-left sm:gap-3"
                                 @click="
                                     openLogDrawer(row.taskType, [
                                         'PENDING',
@@ -537,7 +537,7 @@ const drawerTitle = computed(() => drawerTaskName.value)
                                     ])
                                 "
                             >
-                                <span class="font-serif text-4xl text-[#E3D8CB]">
+                                <span class="whitespace-nowrap font-serif text-4xl text-[#E3D8CB]">
                                     {{ row.totalCount }}
                                 </span>
                                 <span
@@ -658,7 +658,12 @@ const drawerTitle = computed(() => drawerTaskName.value)
             </div>
         </div>
 
-        <SideDrawer v-model:open="isLogDrawerOpen" :title="drawerTitle" width="34rem">
+        <SideDrawer
+            v-model:open="isLogDrawerOpen"
+            :title="drawerTitle"
+            width="34rem"
+            max-width="calc(100vw - 2rem)"
+        >
             <TaskLogDrawerContent
                 v-if="isLogDrawerOpen"
                 v-model:task-type="drawerTaskType"

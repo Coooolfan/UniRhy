@@ -178,7 +178,7 @@ const resetTask = async (row: TaskLog) => {
 
 <template>
     <div class="flex h-full flex-col">
-        <div class="space-y-3 border-b border-[#EAE6DE] px-6 py-4">
+        <div class="space-y-3 border-b border-[#EAE6DE] px-4 py-4 sm:px-6">
             <label class="block">
                 <span class="mb-1.5 block text-[10px] uppercase tracking-[0.24em] text-[#8A8177]">
                     任务类型
@@ -221,7 +221,7 @@ const resetTask = async (row: TaskLog) => {
             <div class="text-xs text-[#8A8177]">共 {{ totalRowCount }} 条</div>
         </div>
 
-        <div class="min-h-0 flex-1 overflow-y-auto px-6 py-4">
+        <div class="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6">
             <div
                 v-if="error"
                 class="mb-4 border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700"
@@ -248,22 +248,28 @@ const resetTask = async (row: TaskLog) => {
                 <li
                     v-for="row in rows"
                     :key="row.id"
-                    class="border border-[#EAE6DE] bg-white/60 p-4"
+                    class="border border-[#EAE6DE] bg-white/60 p-3 sm:p-4"
                 >
-                    <div class="flex items-start justify-between gap-3">
+                    <div class="flex items-start justify-between gap-2 sm:gap-3">
                         <div class="min-w-0 flex-1">
-                            <div class="flex items-center gap-2 text-xs text-[#8A8177]">
+                            <div
+                                class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[#8A8177]"
+                            >
                                 <span class="font-mono text-[#2B221B]">#{{ row.id }}</span>
                                 <span
-                                    class="inline-flex items-center border px-1.5 py-0.5 text-[10px] uppercase tracking-[0.2em]"
+                                    class="inline-flex shrink-0 items-center whitespace-nowrap border px-1.5 py-0.5 text-[10px] uppercase tracking-[0.2em]"
                                     :class="STATUS_BADGE_CLASS"
                                 >
                                     {{ STATUS_LABEL_MAP[row.status] }}
                                 </span>
-                                <span>·</span>
-                                <span>创建 {{ formatTime(row.createdAt) }}</span>
+                                <span class="hidden sm:inline">·</span>
+                                <span class="basis-full sm:basis-auto">
+                                    创建 {{ formatTime(row.createdAt) }}
+                                </span>
                             </div>
-                            <div class="mt-1 grid grid-cols-2 gap-x-3 text-[11px] text-[#8A8177]">
+                            <div
+                                class="mt-1 grid grid-cols-1 gap-x-3 text-[11px] text-[#8A8177] sm:grid-cols-2"
+                            >
                                 <span>开始 {{ formatTime(row.startedAt) }}</span>
                                 <span>结束 {{ formatTime(row.completedAt) }}</span>
                             </div>
@@ -304,7 +310,7 @@ const resetTask = async (row: TaskLog) => {
         </div>
 
         <footer
-            class="flex items-center justify-between border-t border-[#EAE6DE] px-6 py-3 text-xs text-[#6B635B]"
+            class="flex items-center justify-between border-t border-[#EAE6DE] px-4 py-3 text-xs text-[#6B635B] sm:px-6"
         >
             <span>
                 第 {{ totalPageCount === 0 ? 0 : pageIndex + 1 }} / {{ totalPageCount }} 页
