@@ -25,10 +25,10 @@ const emit = defineEmits<{
 
 <template>
     <div
-        class="group mb-12 mt-6 flex flex-col items-center gap-8 md:mb-16 md:mt-8 md:flex-row md:items-end md:gap-12"
+        class="group mb-7 mt-5 flex flex-col items-center gap-4 sm:mb-12 sm:mt-6 sm:gap-8 md:mb-16 md:mt-8 md:flex-row md:items-end md:gap-12"
     >
         <div
-            class="relative z-0 group h-56 w-56 shrink-0 select-none perspective-1000 sm:h-64 sm:w-64 md:h-80 md:w-80"
+            class="group perspective-1000 relative z-0 h-44 w-44 shrink-0 select-none sm:h-64 sm:w-64 md:h-80 md:w-80"
         >
             <div
                 class="absolute top-2 right-2 bottom-2 left-2 bg-linear-to-tr from-gray-200 to-gray-100 rounded-full shadow-lg flex items-center justify-center transition-transform duration-2000 ease-out z-0"
@@ -62,9 +62,11 @@ const emit = defineEmits<{
             </div>
         </div>
 
-        <div class="relative z-10 flex w-full flex-col gap-4 pb-2 text-center md:text-left">
+        <div
+            class="relative z-10 flex w-full flex-col gap-2 pb-0 text-center sm:gap-4 sm:pb-2 md:text-left"
+        >
             <div
-                class="flex flex-wrap items-center justify-center gap-3 text-sm tracking-wider uppercase text-[#8C857B] md:justify-start"
+                class="flex flex-wrap items-center justify-center gap-3 text-[11px] tracking-wider uppercase text-[#8C857B] sm:text-sm md:justify-start"
             >
                 <span v-if="albumData.year">{{ albumData.year }}</span>
                 <button
@@ -77,21 +79,23 @@ const emit = defineEmits<{
                 </button>
             </div>
 
-            <h1 class="font-serif text-4xl leading-tight text-[#2C2420] sm:text-5xl md:text-7xl">
+            <h1 class="font-serif text-3xl leading-tight text-[#2C2420] sm:text-5xl md:text-7xl">
                 {{ albumData.title }}
             </h1>
 
-            <div class="mb-2 font-serif text-lg italic text-[#5E564D] sm:text-xl">
+            <div class="font-serif text-[15px] italic text-[#5E564D] sm:mb-2 sm:text-xl">
                 By {{ albumData.artist }}
             </div>
 
-            <p class="mx-auto max-w-2xl text-sm text-[#8C857B] line-clamp-3 md:mx-0">
+            <p
+                class="mx-auto line-clamp-2 max-w-2xl text-xs text-[#8C857B] sm:line-clamp-3 sm:text-sm md:mx-0"
+            >
                 {{ albumData.description }}
             </p>
 
-            <div class="mt-4 flex items-center justify-center gap-4 md:justify-start">
+            <div class="mt-1 flex items-center justify-center gap-4 sm:mt-4 md:justify-start">
                 <button
-                    class="flex w-full items-center justify-center gap-2 rounded-sm border border-[#C17D46] px-6 py-3 text-sm font-medium tracking-widest text-[#C17D46] uppercase transition-all duration-300 hover:bg-[#C17D46] hover:text-white disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-[#C17D46] sm:w-auto sm:px-8"
+                    class="flex w-auto items-center justify-center gap-2 rounded-sm border border-[#C17D46] px-4 py-2 text-xs font-medium tracking-widest text-[#C17D46] uppercase transition-all duration-300 hover:bg-[#C17D46] hover:text-white disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-[#C17D46] sm:px-8 sm:py-3 sm:text-sm"
                     :disabled="!hasPlayableRecording"
                     @click="emit('play')"
                 >
