@@ -105,9 +105,9 @@ const submitError = ref('')
 
 const pluginTaskOptions = computed<TaskDefinition[]>(() =>
     props.plugins
-        .filter((p) => p.isAvailable)
+        .filter((p) => p.isAvailable && p.taskType !== undefined)
         .map((p) => ({
-            id: p.taskType,
+            id: p.taskType!,
             name: p.name ?? p.id,
             desc: `插件 ${p.id} v${p.version}`,
             icon: Puzzle,

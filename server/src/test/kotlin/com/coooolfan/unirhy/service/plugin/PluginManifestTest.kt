@@ -15,7 +15,7 @@ class PluginManifestTest {
         val path = createTempFile(suffix = ".yml")
         path.writeText(
             """
-                id: com.example.artist-normalizer
+                id: com.example.task-plugin
                 version: 1.0.0
                 runtime:
                   type: wasm
@@ -23,8 +23,8 @@ class PluginManifestTest {
                   wasi: none
                   abi: unirhy-wasm-abi-v1
                 tasks:
-                  - type: ARTIST_NORMALIZATION
-                    extension: metadata.artists_normalization@1
+                  - type: METADATA_PARSE
+                    extension: metadata.scan@1
                 permissions:
                   network:
                     allow:
@@ -34,13 +34,13 @@ class PluginManifestTest {
         )
 
         val manifest = assertNotNull(loadPluginManifest(path))
-        assertEquals("com.example.artist-normalizer", manifest.id)
+        assertEquals("com.example.task-plugin", manifest.id)
         assertEquals("1.0.0", manifest.version)
         assertEquals("wasm", manifest.runtime.type)
         assertEquals(UNIRHY_WASM_ABI_V1, manifest.runtime.abi)
         assertEquals(1, manifest.tasks.size)
-        assertEquals(TaskType.ARTIST_NORMALIZATION, manifest.tasks.single().type)
-        assertEquals(ARTIST_NORMALIZATION_EXTENSION, manifest.tasks.single().extension)
+        assertEquals(TaskType.METADATA_PARSE, manifest.tasks.single().type)
+        assertEquals("metadata.scan@1", manifest.tasks.single().extension)
         assertEquals(setOf("example.com", "api.example.com"), manifest.networkAllowHosts())
     }
 
@@ -55,8 +55,8 @@ class PluginManifestTest {
                   type: wasm
                   abi: unirhy-wasm-abi-v999
                 tasks:
-                  - type: ARTIST_NORMALIZATION
-                    extension: metadata.artists_normalization@1
+                  - type: METADATA_PARSE
+                    extension: metadata.scan@1
             """.trimIndent()
         )
         assertNull(loadPluginManifest(path))
@@ -73,8 +73,8 @@ class PluginManifestTest {
                   type: jvm
                   abi: unirhy-wasm-abi-v1
                 tasks:
-                  - type: ARTIST_NORMALIZATION
-                    extension: metadata.artists_normalization@1
+                  - type: METADATA_PARSE
+                    extension: metadata.scan@1
             """.trimIndent()
         )
         assertNull(loadPluginManifest(path))

@@ -163,7 +163,7 @@ class AuthGuardE2eTest {
             ProtectedEndpoint("PUT", "/api/plugins/1/enabled-state"),
             ProtectedEndpoint("DELETE", "/api/plugins/1"),
             ProtectedEndpoint("GET", "/api/plugins/1/package"),
-            ProtectedEndpoint("POST", "/api/plugin-task-submissions/ARTIST_NORMALIZATION"),
+            ProtectedEndpoint("POST", "/api/plugin-task-submissions/METADATA_PARSE"),
         )
 
         @JvmStatic

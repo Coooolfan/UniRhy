@@ -10,7 +10,6 @@ import java.nio.file.Files
 import java.nio.file.Path
 
 const val UNIRHY_WASM_ABI_V1 = "unirhy-wasm-abi-v1"
-const val ARTIST_NORMALIZATION_EXTENSION = "metadata.artists_normalization@1"
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 data class PluginManifest(

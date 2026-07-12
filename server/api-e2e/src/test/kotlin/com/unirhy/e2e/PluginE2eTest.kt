@@ -98,7 +98,7 @@ class PluginE2eTest {
         assertTrue(enabled.path("isAvailable").asBoolean(), "[plugins] enabled wasm should be loaded")
 
         val submitResponse = state.api.post(
-            path = "/api/plugin-task-submissions/ARTIST_NORMALIZATION",
+            path = "/api/plugin-task-submissions/METADATA_PARSE",
             json = emptyMap<String, String>(),
         )
         E2eAssert.status(submitResponse, 202, "[plugins] submit should accept loaded plugin task")
@@ -110,7 +110,7 @@ class PluginE2eTest {
         E2eAssert.status(disableResponse, 204, "[plugins] disable should succeed")
 
         val submitAfterDisableResponse = state.api.post(
-            path = "/api/plugin-task-submissions/ARTIST_NORMALIZATION",
+            path = "/api/plugin-task-submissions/METADATA_PARSE",
             json = emptyMap<String, String>(),
         )
         E2eAssert.status(submitAfterDisableResponse, 400, "[plugins] submit without loaded plugin should fail")
@@ -177,8 +177,8 @@ class PluginE2eTest {
                 .addValue("name", "Invalid form metadata")
                 .addValue("version", "0.0.1")
                 .addValue("abi", "unirhy-wasm-abi-v1")
-                .addValue("taskType", "ARTIST_NORMALIZATION")
-                .addValue("extension", "metadata.artists_normalization@1")
+                .addValue("taskType", "METADATA_PARSE")
+                .addValue("extension", "metadata.scan@1")
                 .addValue("networkAllow", emptyArray<String>())
                 .addValue("formFields", "{not-json")
                 .addValue("wasm", minimalPlanningWasm()),
@@ -218,8 +218,8 @@ class PluginE2eTest {
               type: wasm
               abi: unirhy-wasm-abi-v1
             tasks:
-              - type: ARTIST_NORMALIZATION
-                extension: metadata.artists_normalization@1
+              - type: METADATA_PARSE
+                extension: metadata.scan@1
             form:
               fields:
                 - name: dryRun
@@ -241,8 +241,8 @@ class PluginE2eTest {
                   type: wasm
                   abi: unirhy-wasm-abi-v1
                 tasks:
-                  - type: ARTIST_NORMALIZATION
-                    extension: metadata.artists_normalization@1
+                  - type: METADATA_PARSE
+                    extension: metadata.scan@1
             """.trimIndent().toByteArray(),
         )
     }
