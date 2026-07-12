@@ -14,9 +14,15 @@ export type ApiCurrentQueueDto = Omit<CurrentQueueDto, 'playbackStrategy'> & {
     playbackStrategy: string
 }
 
+const KNOWN_PLAYBACK_STRATEGIES = ['SEQUENTIAL', 'SHUFFLE', 'SINGLE', 'RADIO'] as const
+
+const normalizePlaybackStrategy = (value: string): CurrentQueueDto['playbackStrategy'] => {
+    return KNOWN_PLAYBACK_STRATEGIES.find((strategy) => strategy === value) ?? 'SEQUENTIAL'
+}
+
 export const normalizeApiQueueSnapshot = (queue: ApiCurrentQueueDto): CurrentQueueDto => ({
     ...queue,
-    playbackStrategy: queue.playbackStrategy === 'SHUFFLE' ? 'SHUFFLE' : 'SEQUENTIAL',
+    playbackStrategy: normalizePlaybackStrategy(queue.playbackStrategy),
 })
 
 type UseAudioLocalQueueOptions = {

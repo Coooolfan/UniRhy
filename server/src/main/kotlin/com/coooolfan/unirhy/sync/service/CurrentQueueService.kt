@@ -13,7 +13,9 @@ import com.coooolfan.unirhy.sync.protocol.PlaybackStatus
 import com.coooolfan.unirhy.sync.protocol.PlaybackStrategy
 import com.coooolfan.unirhy.sync.protocol.StopStrategy
 import org.babyfish.jimmer.sql.kt.KSqlClient
+import org.babyfish.jimmer.sql.kt.ast.expression.sql
 import org.babyfish.jimmer.sql.kt.ast.expression.valueIn
+import org.babyfish.jimmer.sql.kt.ast.expression.valueNotIn
 import org.babyfish.jimmer.sql.kt.fetcher.newFetcher
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Component
@@ -194,6 +196,10 @@ class CurrentQueueService(
             val nextState = context.nextState
             nextState.playbackStrategy = playbackStrategy
             nextState.stopStrategy = stopStrategy
+            if (playbackStrategy == PlaybackStrategy.RADIO) {
+                nextState.stopStrategy = StopStrategy.NEVER
+                refillRadioQueueLocked(nextState)
+            }
             rebuildShuffleOrderLocked(nextState)
             buildPersistedChangeResult(context, nowMs)
         }
@@ -221,6 +227,10 @@ class CurrentQueueService(
             val changed = when (nextState.playbackStrategy) {
                 PlaybackStrategy.SEQUENTIAL, PlaybackStrategy.SINGLE -> moveSequentialLocked(nextState, step)
                 PlaybackStrategy.SHUFFLE -> moveShuffleLocked(nextState, step)
+                PlaybackStrategy.RADIO -> {
+                    refillRadioQueueLocked(nextState)
+                    moveSequentialLocked(nextState, step)
+                }
             }
             if (!changed) {
                 return@withMutationContext buildNoopChangeResult(currentState)
@@ -242,7 +252,7 @@ class CurrentQueueService(
             }
 
             nextState.currentIndex = when (nextState.playbackStrategy) {
-                PlaybackStrategy.SEQUENTIAL, PlaybackStrategy.SINGLE -> 0
+                PlaybackStrategy.SEQUENTIAL, PlaybackStrategy.SINGLE, PlaybackStrategy.RADIO -> 0
                 PlaybackStrategy.SHUFFLE -> {
                     rebuildShuffleOrderLocked(nextState, anchorIndex = null)
                     nextState.shuffleIndices.firstOrNull() ?: 0
@@ -457,6 +467,29 @@ class CurrentQueueService(
         }
         state.currentIndex = state.shuffleIndices[nextPosition]
         return true
+    }
+
+    /**
+     * 电台模式的队列维护：接近尾部时从整库随机补充，同时裁剪超出保留数的历史头部，
+     * 使队列长度始终有界且 currentIndex 与内容保持一致。
+     */
+    private fun refillRadioQueueLocked(state: AccountPlayQueueState) {
+        if (state.playbackStrategy != PlaybackStrategy.RADIO) {
+            return
+        }
+        val remaining = state.recordingIds.size - state.currentIndex - 1
+        if (remaining < RADIO_REFILL_THRESHOLD) {
+            val supplement = recordingCatalog.randomRecordingIds(
+                count = RADIO_REFILL_BATCH,
+                excluding = state.recordingIds.toSet(),
+            )
+            state.recordingIds += supplement
+        }
+        val dropCount = state.currentIndex - RADIO_HISTORY_KEEP
+        if (dropCount > 0) {
+            state.recordingIds.subList(0, dropCount).clear()
+            state.currentIndex -= dropCount
+        }
     }
 
     private fun resetStrategiesLocked(state: AccountPlayQueueState) {
@@ -799,6 +832,15 @@ class CurrentQueueService(
 
     companion object {
         const val VERSION_CONFLICT_REASON: String = "Queue version conflict"
+
+        /** 电台模式下队尾剩余曲目少于该值时触发补充 */
+        const val RADIO_REFILL_THRESHOLD: Int = 5
+
+        /** 电台模式单次补充的曲目数量 */
+        const val RADIO_REFILL_BATCH: Int = 20
+
+        /** 电台模式保留在 currentIndex 之前的历史曲目上限 */
+        const val RADIO_HISTORY_KEEP: Int = 50
     }
 }
 
@@ -806,6 +848,8 @@ interface CurrentQueueRecordingCatalog {
     fun getExistingRecordingIds(recordingIds: Set<Long>): Set<Long>
 
     fun loadResolvedRecordings(recordingIds: Set<Long>): List<ResolvedQueueRecording>
+
+    fun randomRecordingIds(count: Int, excluding: Set<Long>): List<Long>
 }
 
 @Component
@@ -848,6 +892,19 @@ class JimmerCurrentQueueRecordingCatalog(
                 durationMs = recording.durationMs,
             )
         }
+    }
+
+    override fun randomRecordingIds(count: Int, excluding: Set<Long>): List<Long> {
+        if (count <= 0) {
+            return emptyList()
+        }
+        return sql.createQuery(Recording::class) {
+            if (excluding.isNotEmpty()) {
+                where(table.id valueNotIn excluding)
+            }
+            orderBy(sql(Double::class, "random()"))
+            select(table.id)
+        }.limit(count).execute()
     }
 
     private companion object {

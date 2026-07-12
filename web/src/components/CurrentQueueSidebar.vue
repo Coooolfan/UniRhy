@@ -18,10 +18,14 @@ const strategyDisabled = computed(() => {
     return audioStore.queueEntries.length === 0 || !audioStore.canSendRealtimeControl
 })
 
+// 电台模式依赖服务端从整库补曲，独立播放模式下不可用
+const isRadioUnavailable = computed(() => audioStore.syncState === 'independent')
+
 const playbackStrategyOptions = [
     { value: 'SEQUENTIAL', label: '顺序' },
     { value: 'SHUFFLE', label: '随机' },
     { value: 'SINGLE', label: '单曲' },
+    { value: 'RADIO', label: '电台' },
 ] as const
 
 const stopStrategyOptions = [
@@ -80,7 +84,7 @@ const removeQueueEntry = (queueIndex: number) => {
     void audioStore.removeQueueEntry(queueIndex)
 }
 
-const updatePlaybackStrategy = (value: 'SEQUENTIAL' | 'SHUFFLE' | 'SINGLE') => {
+const updatePlaybackStrategy = (value: 'SEQUENTIAL' | 'SHUFFLE' | 'SINGLE' | 'RADIO') => {
     void audioStore.updateQueueStrategies(value, audioStore.stopStrategy)
 }
 
@@ -135,7 +139,8 @@ const updateStopStrategy = (value: 'TRACK' | 'LIST' | 'NEVER') => {
                                         ($event.target as HTMLSelectElement).value as
                                             | 'SEQUENTIAL'
                                             | 'SHUFFLE'
-                                            | 'SINGLE',
+                                            | 'SINGLE'
+                                            | 'RADIO',
                                     )
                                 "
                             >
@@ -143,6 +148,7 @@ const updateStopStrategy = (value: 'TRACK' | 'LIST' | 'NEVER') => {
                                     v-for="option in playbackStrategyOptions"
                                     :key="option.value"
                                     :value="option.value"
+                                    :disabled="option.value === 'RADIO' && isRadioUnavailable"
                                 >
                                     {{ option.label }}
                                 </option>

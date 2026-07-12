@@ -236,6 +236,151 @@ class CurrentQueueServiceTest {
         assertEquals(PlaybackStatus.PAUSED, queue.playbackStatus)
     }
 
+    @Test
+    fun `switching to radio forces never stop strategy and refills queue`() {
+        val catalog = RadioCatalog((1L..200L).toList())
+        val svc = newService(catalog)
+        val initial = svc.replaceQueue(
+            accountId = 10L,
+            recordingIds = listOf(1L, 2L, 3L),
+            currentIndex = 0,
+            expectedVersion = 0L,
+        ).queue
+
+        val radio = svc.updateStrategies(
+            accountId = 10L,
+            playbackStrategy = PlaybackStrategy.RADIO,
+            stopStrategy = StopStrategy.LIST,
+            expectedVersion = initial.version,
+        ).queue
+
+        assertEquals(PlaybackStrategy.RADIO, radio.playbackStrategy)
+        assertEquals(StopStrategy.NEVER, radio.stopStrategy)
+        assertEquals(23, radio.recordingIds.size)
+        assertEquals(listOf(1L, 2L, 3L), radio.recordingIds.take(3))
+        assertEquals(0, radio.currentIndex)
+    }
+
+    @Test
+    fun `radio refill excludes recordings already in queue`() {
+        val catalog = RadioCatalog((1L..200L).toList())
+        val svc = newService(catalog)
+        val initial = svc.replaceQueue(
+            accountId = 11L,
+            recordingIds = listOf(1L, 2L, 3L),
+            currentIndex = 0,
+            expectedVersion = 0L,
+        ).queue
+
+        val radio = svc.updateStrategies(
+            accountId = 11L,
+            playbackStrategy = PlaybackStrategy.RADIO,
+            stopStrategy = StopStrategy.NEVER,
+            expectedVersion = initial.version,
+        ).queue
+
+        assertEquals(setOf(1L, 2L, 3L), catalog.lastExcluding)
+        assertEquals(radio.recordingIds.size, radio.recordingIds.distinct().size)
+    }
+
+    @Test
+    fun `radio navigation near tail refills before advancing`() {
+        val catalog = RadioCatalog((1L..200L).toList())
+        val svc = newService(catalog)
+        val initial = svc.replaceQueue(
+            accountId = 12L,
+            recordingIds = (1L..6L).toList(),
+            currentIndex = 0,
+            expectedVersion = 0L,
+        ).queue
+        var version = svc.updateStrategies(
+            accountId = 12L,
+            playbackStrategy = PlaybackStrategy.RADIO,
+            stopStrategy = StopStrategy.NEVER,
+            expectedVersion = initial.version,
+        ).queue.version
+
+        repeat(10) {
+            val advanced = svc.navigateToNext(accountId = 12L, expectedVersion = version)
+            assertTrue(advanced.changed)
+            version = advanced.queue.version
+        }
+
+        val queue = svc.getQueue(12L)
+        assertEquals(10, queue.currentIndex)
+        assertTrue(queue.recordingIds.size > 6)
+    }
+
+    @Test
+    fun `radio with empty library degrades to noop`() {
+        val svc = newService(RadioCatalog(emptyList()))
+
+        val radio = svc.updateStrategies(
+            accountId = 13L,
+            playbackStrategy = PlaybackStrategy.RADIO,
+            stopStrategy = StopStrategy.NEVER,
+            expectedVersion = 0L,
+        ).queue
+        val advanced = svc.navigateToNext(accountId = 13L, expectedVersion = radio.version)
+
+        assertTrue(radio.recordingIds.isEmpty())
+        assertFalse(advanced.changed)
+    }
+
+    @Test
+    fun `radio trims history beyond keep limit`() {
+        val catalog = RadioCatalog((1L..200L).toList())
+        val svc = newService(catalog)
+        val initial = svc.replaceQueue(
+            accountId = 14L,
+            recordingIds = (1L..60L).toList(),
+            currentIndex = 59,
+            expectedVersion = 0L,
+        ).queue
+
+        val radio = svc.updateStrategies(
+            accountId = 14L,
+            playbackStrategy = PlaybackStrategy.RADIO,
+            stopStrategy = StopStrategy.NEVER,
+            expectedVersion = initial.version,
+        ).queue
+
+        assertEquals(50, radio.currentIndex)
+        assertEquals(60L, radio.recordingIds[radio.currentIndex])
+        assertEquals(10L, radio.recordingIds.first())
+        assertEquals(71, radio.recordingIds.size)
+    }
+
+    private fun newService(catalog: CurrentQueueRecordingCatalog): CurrentQueueService {
+        return CurrentQueueService(
+            lockManager = PlaybackAccountLockManager(),
+            recordingCatalog = catalog,
+            timeProvider = timeProvider,
+            urlSigner = MediaUrlSigner("test-signing-key", 3600),
+            stateStore = stateStore,
+        )
+    }
+
+    private class RadioCatalog(libraryIds: List<Long>) : CurrentQueueRecordingCatalog {
+        private val library = libraryIds.toList()
+        var lastExcluding: Set<Long>? = null
+
+        override fun getExistingRecordingIds(recordingIds: Set<Long>): Set<Long> {
+            return library.filterTo(mutableSetOf()) { it in recordingIds }
+        }
+
+        override fun loadResolvedRecordings(recordingIds: Set<Long>): List<ResolvedQueueRecording> {
+            return library.filter { it in recordingIds }.map { recordingId ->
+                ResolvedQueueRecording(recordingId, recordingId, "Track $recordingId", "Artist $recordingId", null, 180_000)
+            }
+        }
+
+        override fun randomRecordingIds(count: Int, excluding: Set<Long>): List<Long> {
+            lastExcluding = excluding
+            return library.asSequence().filterNot { it in excluding }.take(count).toList()
+        }
+    }
+
     private class MutableCatalog : CurrentQueueRecordingCatalog {
         private val recordings = linkedMapOf(
             1001L to ResolvedQueueRecording(1001L, 3001L, "Track 1", "Artist 1", null, 180_000),
@@ -254,6 +399,10 @@ class CurrentQueueServiceTest {
         override fun loadResolvedRecordings(recordingIds: Set<Long>): List<ResolvedQueueRecording> {
             return recordingIds.mapNotNull(recordings::get)
         }
+
+        override fun randomRecordingIds(count: Int, excluding: Set<Long>): List<Long> {
+            return recordings.keys.filterNot { it in excluding }.take(count)
+        }
     }
 
     private class FakeCatalog : CurrentQueueRecordingCatalog {
@@ -269,6 +418,10 @@ class CurrentQueueServiceTest {
 
         override fun loadResolvedRecordings(recordingIds: Set<Long>): List<ResolvedQueueRecording> {
             return recordingIds.mapNotNull(recordings::get)
+        }
+
+        override fun randomRecordingIds(count: Int, excluding: Set<Long>): List<Long> {
+            return recordings.keys.filterNot { it in excluding }.take(count)
         }
     }
 }

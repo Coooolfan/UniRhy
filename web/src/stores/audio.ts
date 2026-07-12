@@ -752,7 +752,9 @@ export const useAudioStore = defineStore('audio', () => {
         if (isIndependentPlaybackMode.value) {
             currentQueue.value = {
                 ...currentQueue.value,
-                playbackStrategy: nextPlaybackStrategy,
+                // 电台模式依赖服务端补曲，独立模式下不可用
+                playbackStrategy:
+                    nextPlaybackStrategy === 'RADIO' ? 'SEQUENTIAL' : nextPlaybackStrategy,
                 stopStrategy: nextStopStrategy,
                 version: nextLocalQueueVersion(),
                 updatedAtMs: nowClientMs(),
@@ -1058,6 +1060,14 @@ export const useAudioStore = defineStore('audio', () => {
     watch(isIndependentPlaybackMode, (isIndependent) => {
         if (isIndependent) {
             disconnectPlaybackSync({ preservePlayback: true })
+            if (currentQueue.value.playbackStrategy === 'RADIO') {
+                currentQueue.value = {
+                    ...currentQueue.value,
+                    playbackStrategy: 'SEQUENTIAL',
+                    version: nextLocalQueueVersion(),
+                    updatedAtMs: nowClientMs(),
+                }
+            }
         }
     })
 

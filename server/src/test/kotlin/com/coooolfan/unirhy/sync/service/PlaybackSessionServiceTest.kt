@@ -132,4 +132,6 @@ private class FakePlaybackQueueRecordingCatalog : CurrentQueueRecordingCatalog {
             )
         }
     }
+
+    override fun randomRecordingIds(count: Int, excluding: Set<Long>): List<Long> = emptyList()
 }

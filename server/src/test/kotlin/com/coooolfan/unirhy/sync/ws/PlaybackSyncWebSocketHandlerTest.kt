@@ -253,6 +253,8 @@ private class FakeCurrentQueueRecordingCatalog : CurrentQueueRecordingCatalog {
             )
         }
     }
+
+    override fun randomRecordingIds(count: Int, excluding: Set<Long>): List<Long> = emptyList()
 }
 
 private class FakePlaybackSyncHandlerAuthenticator(

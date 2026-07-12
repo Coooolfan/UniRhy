@@ -4,6 +4,7 @@ enum class PlaybackStrategy {
     SEQUENTIAL,
     SHUFFLE,
     SINGLE,
+    RADIO,
 }
 
 enum class StopStrategy {

@@ -226,6 +226,56 @@ class PlaybackQueueE2eTest {
         E2eAssert.status(invalidRecordingResponse, 409, "[error] unknown recording in replace should return conflict")
     }
 
+    @Test
+    fun `radio strategy should persist and auto refill from library`() {
+        val state = bootstrapAdminSession(baseUrl())
+        val prepared = ensurePreparedPlaybackData(state, minRecordingCount = 3)
+
+        val initial = resetQueue(state)
+        val replaceResponse = state.api.put(
+            path = "/api/playback-queues/current",
+            json = mapOf(
+                "recordingIds" to listOf(prepared.recordingIds[0]),
+                "currentIndex" to 0,
+                "version" to readVersion(initial),
+            ),
+        )
+        E2eAssert.status(replaceResponse, 200, "[radio] replace queue should succeed")
+        val persistedAfterReplace = fetchQueue(state.api)
+
+        val radioResponse = state.api.put(
+            path = "/api/playback-queues/current/strategies",
+            json = mapOf(
+                "playbackStrategy" to PlaybackStrategy.RADIO.name,
+                "stopStrategy" to StopStrategy.LIST.name,
+                "version" to readVersion(persistedAfterReplace),
+            ),
+        )
+        E2eAssert.status(radioResponse, 200, "[radio] switching to radio should succeed")
+        val radioQueue = readJson(radioResponse.body())
+        assertEquals(PlaybackStrategy.RADIO.name, radioQueue.path("playbackStrategy").asString(), "[radio] strategy should be RADIO")
+        assertEquals(StopStrategy.NEVER.name, radioQueue.path("stopStrategy").asString(), "[radio] radio should force NEVER stop strategy")
+        val radioRecordingIds = recordingIdsOf(radioQueue)
+        assertTrue(radioRecordingIds.size > 1, "[radio] switching to radio should refill queue from library")
+        assertEquals(radioRecordingIds.distinct(), radioRecordingIds, "[radio] refill should not duplicate recordings")
+
+        val persistedRadio = fetchQueue(state.api)
+        assertEquals(
+            PlaybackStrategy.RADIO.name,
+            persistedRadio.path("playbackStrategy").asString(),
+            "[radio] RADIO strategy should survive persistence round-trip",
+        )
+
+        val nextResponse = state.api.post(
+            path = "/api/playback-queues/current/next-navigation-requests",
+            json = mapOf("version" to readVersion(persistedRadio)),
+        )
+        E2eAssert.status(nextResponse, 200, "[radio] navigate next should succeed")
+        val nextQueue = readJson(nextResponse.body())
+        assertEquals(1, readCurrentIndex(nextQueue), "[radio] navigate next should advance current index")
+        assertVersionAdvanced(persistedRadio, nextQueue, "[radio] navigate next should increment version")
+    }
+
     private fun resetQueue(state: E2eAdminSession): JsonNode {
         val queue = fetchQueue(state.api)
         if (recordingIdsOf(queue).isEmpty()) {
