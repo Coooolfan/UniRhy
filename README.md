@@ -33,7 +33,6 @@ English | [简体中文](docs/README.zh-CN.md)
 - `website/`: Project website based on Vue, TypeScript, and Vite.
 - `docker/`: Containerization files.
 - `docs/`: Project-level supplementary documentation, including release notes under `docs/release_notes/`.
-- `skills/`: Development helper skills and domain-specific conventions.
 
 ## Requirements
 
@@ -71,9 +70,7 @@ yarn dev
 
 - [Terminology Dictionary](docs/TERMINOLOGY.md)
 - [Backend Testing Guide](server/README/TESTING.md)
-- [Playback Sync Protocol](server/README/PLAYBACK_SYNC_PROTOCOL.md)
-- [Playback Sync Plan](server/README/PLAYBACK_SYNC_PLAN.md)
-- [Playback Sync Logging](server/README/PLAYBACK_SYNC_LOGGING.md)
+- [Playback Sync](server/README/PLAYBACK_SYNC.md)
 - [Backend Dependencies](server/README/DEPENDENCIES.md)
 - [Frontend Dependencies](web/README/DEPENDENCIES.md)
 

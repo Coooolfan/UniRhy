@@ -33,7 +33,6 @@ UniRhy（独一律）是一个私有化的音乐流媒体平台，采用 monorep
 - `website/`：项目官网，基于 Vue、TypeScript 与 Vite。
 - `docker/`：容器化部署相关文件。
 - `docs/`：项目级补充文档，发行说明位于 `docs/release_notes/`。
-- `skills/`：开发辅助技能与领域约定文档。
 
 ## 环境要求
 
@@ -71,9 +70,7 @@ yarn dev
 
 - [术语规范词典（中英双语）](TERMINOLOGY.md)
 - [后端测试约定](../server/README/TESTING.md)
-- [播放同步协议](../server/README/PLAYBACK_SYNC_PROTOCOL.md)
-- [播放同步计划](../server/README/PLAYBACK_SYNC_PLAN.md)
-- [播放同步日志](../server/README/PLAYBACK_SYNC_LOGGING.md)
+- [播放同步](../server/README/PLAYBACK_SYNC.md)
 - [后端依赖说明](../server/README/DEPENDENCIES.md)
 - [前端依赖说明](../web/README/DEPENDENCIES.md)
 
