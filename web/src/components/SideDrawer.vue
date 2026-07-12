@@ -66,7 +66,7 @@ onBeforeUnmount(() => {
                 :style="{ width: width ?? '32rem', maxWidth: maxWidth ?? '95vw' }"
             >
                 <header
-                    class="flex items-center justify-between border-b border-[#EAE6DE] px-4 py-4 sm:px-6"
+                    class="flex items-center justify-between border-b border-[#EAE6DE] px-4 pb-4 pt-[max(2rem,env(safe-area-inset-top))] sm:px-6"
                 >
                     <h3 class="font-serif text-xl text-[#2B221B]">
                         {{ title }}
