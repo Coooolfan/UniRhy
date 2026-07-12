@@ -103,7 +103,7 @@ const titleClass = computed(() => (props.tone === 'danger' ? 'text-[#2B221B]' : 
 const bodyClass = computed(() =>
     props.bodyPadding
         ? 'modal-body min-h-0 flex-1 overflow-y-auto px-8 py-8'
-        : 'modal-body min-h-0 flex-1 overflow-y-auto',
+        : 'flex min-h-0 flex-1 overflow-hidden',
 )
 
 const rootStyle = computed(() => ({

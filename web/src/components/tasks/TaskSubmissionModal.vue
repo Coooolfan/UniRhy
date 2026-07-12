@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch, type Component } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch, type Component } from 'vue'
 import { useRouter } from 'vue-router'
 import {
     ArrowRight,
     ChevronDown,
+    ChevronLeft,
     Cloud,
     FileAudio,
     FolderSearch,
@@ -85,6 +86,13 @@ const modal = useModalContext<boolean>()
 const router = useRouter()
 
 const activeTaskId = ref<string>('METADATA_PARSE')
+const mobileStep = ref<'select-type' | 'fill-form'>('select-type')
+const isMobile = ref(false)
+let mobileMediaQuery: MediaQueryList | null = null
+
+const syncMobileViewport = (event?: MediaQueryListEvent) => {
+    isMobile.value = event?.matches ?? mobileMediaQuery?.matches ?? false
+}
 const metadataParseProviderValue = ref('')
 const transcodeSourceProviderValue = ref('')
 const transcodeDestinationProviderValue = ref('')
@@ -287,8 +295,22 @@ const loadProviders = async () => {
 }
 
 onMounted(() => {
+    mobileMediaQuery = window.matchMedia('(max-width: 1023px)')
+    syncMobileViewport()
+    mobileMediaQuery.addEventListener('change', syncMobileViewport)
     void loadProviders()
 })
+
+onUnmounted(() => {
+    mobileMediaQuery?.removeEventListener('change', syncMobileViewport)
+})
+
+const selectTask = (taskId: string) => {
+    activeTaskId.value = taskId
+    if (isMobile.value) {
+        mobileStep.value = 'fill-form'
+    }
+}
 
 const submit = async () => {
     if (!canSubmit.value || isSubmitting.value) return
@@ -331,9 +353,15 @@ const submit = async () => {
 <template>
     <div
         data-test="task-modal"
-        class="flex max-h-[75vh] flex-col overflow-hidden lg:grid lg:min-h-[620px] lg:grid-cols-[280px_minmax(0,1fr)]"
+        class="flex min-h-0 w-full flex-col overflow-hidden lg:grid lg:h-auto lg:min-h-[620px] lg:grid-cols-[280px_minmax(0,1fr)]"
+        :class="
+            isMobile && mobileStep === 'select-type' ? 'h-auto' : 'h-[min(calc(85dvh-2px),718px)]'
+        "
     >
-        <aside class="flex flex-col bg-[#EBE7E0] py-7 text-[#2C2C2C] lg:py-8">
+        <aside
+            v-if="!isMobile || mobileStep === 'select-type'"
+            class="flex min-h-0 shrink-0 flex-col overflow-y-auto bg-[#EBE7E0] py-5 text-[#2C2C2C] lg:py-8"
+        >
             <div class="px-6 lg:px-8">
                 <div class="text-[11px] uppercase tracking-[0.32em] text-[#9C968B]">
                     Task Center
@@ -360,7 +388,7 @@ const submit = async () => {
                                 : 'border-transparent text-[#6B635B] hover:bg-[#F2EFE9]/80 hover:text-[#2C2C2C]'
                         "
                         :disabled="isSubmitting"
-                        @click="activeTaskId = task.id"
+                        @click="selectTask(task.id)"
                     >
                         <component
                             :is="task.icon"
@@ -377,22 +405,34 @@ const submit = async () => {
             </div>
         </aside>
 
-        <section class="flex min-h-0 flex-col bg-[#F2EFE9] px-6 py-7 lg:px-8 lg:py-8">
-            <div class="flex items-start justify-between">
-                <div>
+        <section
+            v-if="!isMobile || mobileStep === 'fill-form'"
+            class="flex min-h-0 flex-1 flex-col bg-[#F2EFE9] px-5 py-5 lg:px-8 lg:py-8"
+        >
+            <div class="min-w-0 shrink-0">
+                <div class="flex items-center gap-3">
+                    <button
+                        v-if="isMobile"
+                        type="button"
+                        aria-label="返回任务类型"
+                        class="-ml-1 shrink-0 p-1 text-[#8A8A8A] transition-colors hover:text-[#C27E46] lg:hidden"
+                        @click="mobileStep = 'select-type'"
+                    >
+                        <ChevronLeft class="h-5 w-5" />
+                    </button>
                     <div class="text-[11px] uppercase tracking-[0.32em] text-[#9C968B]">
                         Task Submission
                     </div>
-                    <h2 class="mt-3 font-serif text-3xl text-[#2C2C2C]">
-                        {{ activeTaskOption.name }}
-                    </h2>
-                    <p class="mt-3 max-w-2xl text-sm leading-relaxed text-[#6B635B]">
-                        {{ activeTaskOption.desc }}
-                    </p>
                 </div>
+                <h2 class="mt-3 font-serif text-2xl text-[#2C2C2C] lg:text-3xl">
+                    {{ activeTaskOption.name }}
+                </h2>
+                <p class="mt-3 max-w-2xl text-sm leading-relaxed text-[#6B635B]">
+                    {{ activeTaskOption.desc }}
+                </p>
             </div>
 
-            <div class="flex-1 overflow-y-auto pt-8">
+            <div class="task-form-scroll flex-1 overflow-y-auto pt-8">
                 <div
                     v-if="submitError"
                     class="mb-6 border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700"
@@ -724,10 +764,10 @@ const submit = async () => {
                 </div>
             </div>
 
-            <footer class="flex flex-col gap-4 pt-8 lg:flex-row lg:items-center lg:justify-end">
+            <footer class="flex flex-row items-center justify-end gap-3 pt-6 lg:gap-4 lg:pt-8">
                 <button
                     type="button"
-                    class="px-4 py-2.5 text-sm uppercase tracking-wide text-[#8A8A8A] transition-colors hover:bg-[#F5F2EB] hover:text-[#2C2C2C] disabled:cursor-not-allowed disabled:opacity-60"
+                    class="w-20 shrink-0 px-3 py-2.5 text-sm uppercase tracking-wide text-[#8A8A8A] transition-colors hover:bg-[#F5F2EB] hover:text-[#2C2C2C] disabled:cursor-not-allowed disabled:opacity-60 lg:w-auto lg:px-4"
                     :disabled="isSubmitting"
                     @click="closeModal"
                 >
@@ -736,7 +776,7 @@ const submit = async () => {
                 <button
                     data-test="task-submit-button"
                     type="button"
-                    class="flex items-center gap-2 bg-[#C27E46] px-5 py-3 text-sm uppercase tracking-[0.18em] text-[#F8F5EF] shadow-md transition-colors hover:bg-[#B36F38] disabled:cursor-not-allowed disabled:opacity-60"
+                    class="flex min-w-0 flex-1 items-center justify-center gap-2 whitespace-nowrap bg-[#C27E46] px-4 py-3 text-sm uppercase tracking-wide text-[#F8F5EF] shadow-md transition-colors hover:bg-[#B36F38] disabled:cursor-not-allowed disabled:opacity-60 lg:flex-initial lg:px-5 lg:tracking-[0.18em]"
                     :disabled="!canSubmit || isSubmitting"
                     @click="submit"
                 >
@@ -753,3 +793,26 @@ const submit = async () => {
         </section>
     </div>
 </template>
+
+<style scoped>
+.task-form-scroll {
+    scrollbar-color: #d6d1c4 transparent;
+}
+
+.task-form-scroll::-webkit-scrollbar {
+    width: 6px;
+}
+
+.task-form-scroll::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.task-form-scroll::-webkit-scrollbar-thumb {
+    border-radius: 3px;
+    background-color: #d6d1c4;
+}
+
+.task-form-scroll::-webkit-scrollbar-thumb:hover {
+    background-color: #c0bab0;
+}
+</style>
