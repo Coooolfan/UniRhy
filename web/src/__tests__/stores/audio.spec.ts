@@ -744,13 +744,15 @@ describe('audio store', () => {
         expect(audioStore.currentTime).toBe(7)
 
         hiddenSpy.mockReturnValue(false)
-        const visibilityListener = addEventListenerSpy.mock.calls.find(
-            ([eventName]) => eventName === 'visibilitychange',
-        )?.[1]
-        expect(visibilityListener).toBeTypeOf('function')
-        if (typeof visibilityListener === 'function') {
-            visibilityListener(new Event('visibilitychange'))
-        }
+        const visibilityListeners = addEventListenerSpy.mock.calls
+            .filter(([eventName]) => eventName === 'visibilitychange')
+            .map(([, listener]) => listener)
+        expect(visibilityListeners.length).toBeGreaterThan(0)
+        visibilityListeners.forEach((listener) => {
+            if (typeof listener === 'function') {
+                listener(new Event('visibilitychange'))
+            }
+        })
 
         const backgroundIntervalId = setIntervalSpy.mock.results[0]?.value
         expect(clearIntervalSpy).toHaveBeenCalledWith(backgroundIntervalId)

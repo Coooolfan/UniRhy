@@ -270,6 +270,13 @@ export const useAudioStore = defineStore('audio', () => {
                 throw mutationError
             }
 
+            // 版本冲突说明本地队列已过期：直接走 HTTP 拉取最新队列快照，
+            // 不依赖 WS 是否存活；播放态恢复仍通过 SYNC 请求
+            try {
+                applyApiQueueSnapshot(await api.playbackQueueController.getCurrentQueue())
+            } catch {
+                // 拉取失败不阻塞恢复流程，交由 SYNC 响应的快照兜底
+            }
             requestSyncRecovery()
             return null
         }
@@ -1055,6 +1062,16 @@ export const useAudioStore = defineStore('audio', () => {
         resetTrackCatalog()
         clearTrackState()
         destroyAudioContext()
+    }
+
+    // 回前台时校验同步连接健康：后台节流期间 socket 可能已半死而客户端无从感知
+    if (typeof document !== 'undefined') {
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState !== 'visible' || isIndependentPlaybackMode.value) {
+                return
+            }
+            playbackSyncClient.value?.verifyConnectionHealth()
+        })
     }
 
     watch(isIndependentPlaybackMode, (isIndependent) => {

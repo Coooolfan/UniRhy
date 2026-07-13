@@ -376,4 +376,61 @@ describe('playbackSyncClient', () => {
         vi.advanceTimersByTime(1)
         expect(MockWebSocket.instances).toHaveLength(2)
     })
+
+    it('requestSync reports failure when the socket is not open', () => {
+        const client = new PlaybackSyncClient()
+        client.connect()
+
+        expect(client.requestSync()).toBe(false)
+
+        MockWebSocket.instances[0]?.emitOpen()
+        expect(client.requestSync()).toBe(true)
+    })
+
+    it('verifyConnectionHealth rebuilds a silently dead socket immediately', () => {
+        const client = new PlaybackSyncClient()
+        client.connect()
+
+        const socket = MockWebSocket.instances[0]
+        socket?.emitOpen()
+        // 模拟半死连接：底层已关闭但从未派发 close 事件
+        if (socket) {
+            socket.readyState = MockWebSocket.CLOSED
+        }
+
+        client.verifyConnectionHealth()
+
+        expect(MockWebSocket.instances).toHaveLength(2)
+    })
+
+    it('verifyConnectionHealth probes an open socket and reconnects only on probe timeout', () => {
+        const client = new PlaybackSyncClient()
+        client.connect()
+
+        const socket = MockWebSocket.instances[0]
+        socket?.emitOpen()
+
+        const sentCountBeforeProbe = socket?.sentMessages.length ?? 0
+        client.verifyConnectionHealth()
+        const probeRequest = JSON.parse(socket?.sentMessages[sentCountBeforeProbe] ?? 'null')
+        expect(probeRequest?.type).toBe('NTP_REQUEST')
+
+        vi.advanceTimersByTime(10)
+        socket?.emitMessage(
+            JSON.stringify({
+                type: 'NTP_RESPONSE',
+                payload: {
+                    t0: probeRequest.payload.t0,
+                    t1: probeRequest.payload.t0 + 5,
+                    t2: probeRequest.payload.t0 + 6,
+                },
+            }),
+        )
+        vi.advanceTimersByTime(5_000)
+        expect(MockWebSocket.instances).toHaveLength(1)
+
+        client.verifyConnectionHealth()
+        vi.advanceTimersByTime(5_000)
+        expect(MockWebSocket.instances).toHaveLength(2)
+    })
 })
