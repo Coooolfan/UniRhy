@@ -1,24 +1,49 @@
 package app.unirhy.playback
 
+import android.content.Context
+import android.content.Intent
+import android.os.Handler
+import android.os.Looper
 import android.os.SystemClock
+import android.util.Log
+import androidx.media3.common.MediaMetadata
+import androidx.media3.common.util.UnstableApi
+import app.unirhy.playback.queue.QueueHttpApi
 import app.unirhy.playback.queue.QueueState
+import app.unirhy.playback.sync.CurrentQueueItemDto
 import app.unirhy.playback.sync.NtpClock
+import app.unirhy.playback.sync.PlaybackStateDto
+import app.unirhy.playback.sync.PlaybackStatus
 import app.unirhy.playback.sync.PlaybackSyncJson
+import app.unirhy.playback.sync.ScheduledActionPayload
+import app.unirhy.playback.sync.ScheduledActionType
 import app.unirhy.playback.sync.ServerMessage
 import app.unirhy.playback.sync.SyncProtocolClient
+import java.util.UUID
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
+import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
+import kotlin.math.max
 import okhttp3.OkHttpClient
 
 /**
- * 原生播放内核的进程级单例：持有同步协议客户端、校时器与权威队列态。
- * 插件（UI 桥）与前台服务共享此实例，事件经 [eventSink] 回传 WebView。
+ * 原生播放内核的进程级单例：持有同步协议客户端、校时器、权威队列态与 ExoPlayer 执行器。
+ * 插件（UI 桥）与前台服务（PlaybackService）共享此实例，事件经 [eventSink] 回传 WebView。
  *
  * 事件面（type 字段）：sync-state / queue-changed / state-changed / position / auth-required，
  * 均携带单调递增 seq，供 TS 侧丢弃乱序的过期事件。
+ *
+ * 线程模型：协议与调度决策在单线程 executor；ExoPlayer 操作经 PlayerEngine 投递主线程。
  */
+@UnstableApi
 object PlaybackController {
+    private const val TAG = "UnirhyPlayback"
+    private const val POSITION_HEARTBEAT_MS = 1_000L
+    private const val MODE_SYNC = "sync"
+    private const val MODE_INDEPENDENT = "independent"
+
     data class SessionConfig(
         val apiBaseUrl: String,
         val token: String?,
@@ -34,6 +59,9 @@ object PlaybackController {
     @Volatile
     var sessionConfig: SessionConfig? = null
         private set
+
+    @Volatile
+    private var appContext: Context? = null
 
     val queueState = QueueState()
 
@@ -53,13 +81,81 @@ object PlaybackController {
         wallNowMs = { System.currentTimeMillis() },
     )
 
+    private val queueHttpApi by lazy { QueueHttpApi(okHttpClient) }
+
     private val eventSeq = AtomicLong(0)
 
     @Volatile
     private var syncClient: SyncProtocolClient? = null
 
+    @Volatile
+    private var playerEngine: PlayerEngine? = null
+
+    // ---------- 播放态镜像（供事件与 getPlaybackState） ----------
+
+    @Volatile
+    var isPlaying: Boolean = false
+        private set
+
+    @Volatile
+    var durationSeconds: Double = 0.0
+        private set
+
+    @Volatile
+    var isLoading: Boolean = false
+        private set
+
+    @Volatile
+    var lastError: String? = null
+        private set
+
+    /** 最近一次可用的播放态版本号（SNAPSHOT / SCHEDULED_ACTION / 队列事件的最大值）。 */
+    @Volatile
+    private var lastKnownVersion: Long = 0
+
+    /** 校时未就绪时暂存的快照状态，READY 后统一应用。 */
+    private var pendingSnapshotState: PlaybackStateDto? = null
+
+    private var positionHeartbeatFuture: ScheduledFuture<*>? = null
+
+    // ---------- 独立模式本地队列 ----------
+
+    data class LocalQueueItem(
+        val recordingId: Long,
+        val mediaFileId: Long,
+        val title: String,
+        val artistLabel: String,
+        val coverUrl: String?,
+        val durationMs: Long,
+    )
+
+    @Volatile
+    private var localQueue: List<LocalQueueItem> = emptyList()
+
+    @Volatile
+    var localCurrentIndex: Int = 0
+        private set
+
     val syncPhase: SyncProtocolClient.Phase
         get() = syncClient?.phase ?: SyncProtocolClient.Phase.STOPPED
+
+    val currentPositionSeconds: Double
+        get() = playerEngine?.currentPositionSeconds ?: 0.0
+
+    val currentIndex: Int?
+        get() = if (isIndependentMode()) {
+            localCurrentIndex.takeIf { localQueue.isNotEmpty() }
+        } else {
+            queueState.queue?.currentIndex?.takeIf { queueState.queue?.items?.isNotEmpty() == true }
+        }
+
+    private fun isIndependentMode() = sessionConfig?.mode == MODE_INDEPENDENT
+
+    // ---------- 配置与生命周期 ----------
+
+    fun attachContext(context: Context) {
+        appContext = context.applicationContext
+    }
 
     fun configure(config: SessionConfig) {
         sessionConfig = config
@@ -73,6 +169,7 @@ object PlaybackController {
 
     fun connectSync(): Boolean {
         val config = sessionConfig ?: return false
+        ensureServiceStarted()
         val client = syncClient ?: createSyncClient().also { syncClient = it }
         client.connect(
             SyncProtocolClient.Config(
@@ -88,11 +185,93 @@ object PlaybackController {
     fun disconnectSync() {
         syncClient?.disconnect()
         queueState.clear()
+        pendingSnapshotState = null
+        playerEngine?.stop()
+        stopService()
     }
 
     fun requestSyncRecovery(): Boolean {
         return syncClient?.requestSync() ?: false
     }
+
+    fun setVolume(volume: Double) {
+        playerEngine?.setVolume(volume)
+    }
+
+    /** 由 PlaybackService.onCreate（主线程）或 executor 调用，惰性构建 ExoPlayer。 */
+    fun ensurePlayerEngine(context: Context): PlayerEngine {
+        attachContext(context)
+        playerEngine?.let { return it }
+        synchronized(this) {
+            playerEngine?.let { return it }
+            val engine = createEngineOnMainThread(context.applicationContext)
+            playerEngine = engine
+            return engine
+        }
+    }
+
+    private fun createEngineOnMainThread(context: Context): PlayerEngine {
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            return createEngine(context)
+        }
+        var created: PlayerEngine? = null
+        val latch = CountDownLatch(1)
+        Handler(Looper.getMainLooper()).post {
+            created = createEngine(context)
+            latch.countDown()
+        }
+        latch.await(5, TimeUnit.SECONDS)
+        return created ?: error("failed to create player engine on main thread")
+    }
+
+    private fun createEngine(context: Context): PlayerEngine {
+        return PlayerEngine(
+            context = context,
+            okHttpClient = okHttpClient,
+            tokenProvider = { sessionConfig?.token },
+            listener = object : PlayerEngine.Listener {
+                override fun onIsPlayingChanged(isPlaying: Boolean) {
+                    this@PlaybackController.isPlaying = isPlaying
+                    if (isPlaying) startPositionHeartbeat() else stopPositionHeartbeat()
+                    emitStateChanged()
+                }
+
+                override fun onDurationKnown(durationSeconds: Double) {
+                    this@PlaybackController.durationSeconds = durationSeconds
+                    emitStateChanged()
+                }
+
+                override fun onPlaybackEnded() {
+                    executor.execute { handlePlaybackEnded() }
+                }
+
+                override fun onSystemInducedPause(positionSeconds: Double) {
+                    executor.execute { handleSystemInducedPause(positionSeconds) }
+                }
+
+                override fun onPlayerError(message: String) {
+                    lastError = message
+                    emitStateChanged()
+                }
+            },
+        )
+    }
+
+    private fun ensureServiceStarted() {
+        val context = appContext ?: return
+        runCatching {
+            context.startService(Intent(context, PlaybackService::class.java))
+        }.onFailure { Log.w(TAG, "failed to start playback service: ${it.message}") }
+    }
+
+    private fun stopService() {
+        val context = appContext ?: return
+        runCatching {
+            context.stopService(Intent(context, PlaybackService::class.java))
+        }
+    }
+
+    // ---------- 同步协议：消息路由与调度执行 ----------
 
     private fun createSyncClient(): SyncProtocolClient {
         return SyncProtocolClient(
@@ -113,6 +292,9 @@ object PlaybackController {
                             "roundTripEstimateMs" to roundTripEstimateMs,
                         ),
                     )
+                    if (phase == SyncProtocolClient.Phase.READY) {
+                        executor.execute { applyPendingSnapshotState() }
+                    }
                 }
 
                 override fun onServerMessage(message: ServerMessage) {
@@ -125,20 +307,385 @@ object PlaybackController {
     private fun handleServerMessage(message: ServerMessage) {
         when (message) {
             is ServerMessage.Snapshot -> {
+                lastKnownVersion = max(lastKnownVersion, message.payload.state.version)
                 if (queueState.apply(message.payload.queue)) {
                     emitQueueChanged()
+                }
+                pendingSnapshotState = message.payload.state
+                if (syncPhase == SyncProtocolClient.Phase.READY) {
+                    applyPendingSnapshotState()
                 }
             }
             is ServerMessage.QueueChange -> {
+                lastKnownVersion = max(lastKnownVersion, message.payload.queue.version)
                 if (queueState.apply(message.payload.queue)) {
                     emitQueueChanged()
                 }
             }
-            else -> {
-                // LOAD_AUDIO_SOURCE / SCHEDULED_ACTION / ERROR 的播放执行分支由
-                // PlaybackExecutor 接管（实施路线阶段 5）。
+            is ServerMessage.LoadAudioSource -> handleLoadAudioSource(
+                commandId = message.payload.commandId,
+                currentIndex = message.payload.currentIndex,
+                recordingId = message.payload.recordingId,
+            )
+            is ServerMessage.ScheduledAction -> handleScheduledAction(message.payload)
+            is ServerMessage.ProtocolError -> handleProtocolError(
+                code = message.payload.code,
+                errorMessage = message.payload.message,
+            )
+            else -> Unit
+        }
+    }
+
+    private fun handleLoadAudioSource(commandId: String, currentIndex: Int, recordingId: Long) {
+        val item = queueState.itemAt(currentIndex)
+        val mediaFileId = item?.mediaFileId
+        if (item == null || mediaFileId == null) {
+            Log.w(TAG, "load_audio_source: no playable media for index=$currentIndex")
+            lastError = "曲目缺少可播放音源"
+            emitStateChanged()
+            return
+        }
+        isLoading = true
+        emitStateChanged()
+        preloadQueueItem(item, positionSeconds = 0.0) {
+            executor.execute {
+                isLoading = false
+                emitStateChanged()
+                syncClient?.sendAudioSourceLoaded(
+                    commandId = commandId,
+                    currentIndex = currentIndex,
+                    recordingId = recordingId,
+                )
             }
         }
+    }
+
+    private fun handleScheduledAction(payload: ScheduledActionPayload) {
+        lastKnownVersion = max(lastKnownVersion, payload.scheduledAction.version)
+        val engine = playerEngine ?: return
+        val action = payload.scheduledAction
+        val delayMs = payload.serverTimeToExecuteMs - clock.estimatedServerNowMs()
+        val executeAtElapsedMs = SystemClock.elapsedRealtime() + delayMs
+
+        when (action.action) {
+            ScheduledActionType.PLAY -> {
+                val index = action.currentIndex ?: return
+                val item = queueState.itemAt(index) ?: return
+                var position = action.positionSeconds
+                if (delayMs < 0 && !payload.skipLateCompensation) {
+                    position += -delayMs / 1_000.0
+                }
+                preloadQueueItem(item, positionSeconds = position) {
+                    engine.playAt(executeAtElapsedMs)
+                }
+            }
+            ScheduledActionType.PAUSE -> {
+                if (action.currentIndex == null) {
+                    engine.stop()
+                    isPlaying = false
+                    emitStateChanged()
+                } else {
+                    engine.pauseAt(executeAtElapsedMs, action.positionSeconds)
+                }
+            }
+            ScheduledActionType.SEEK -> {
+                engine.seekAt(
+                    executeAtElapsedMs,
+                    action.positionSeconds,
+                    resumePlaying = action.status == PlaybackStatus.PLAYING,
+                )
+            }
+        }
+    }
+
+    /** 快照恢复：校时就绪后按权威态定位/续播（重连、晚加入与 SYNC 响应共用此路径）。 */
+    private fun applyPendingSnapshotState() {
+        val state = pendingSnapshotState ?: return
+        pendingSnapshotState = null
+        val engine = playerEngine ?: return
+
+        val index = state.currentIndex
+        if (index == null) {
+            engine.stop()
+            return
+        }
+        val item = queueState.itemAt(index) ?: return
+        when (state.status) {
+            PlaybackStatus.PLAYING -> {
+                val elapsedSec =
+                    max(0L, clock.estimatedServerNowMs() - state.serverTimeToExecuteMs) / 1_000.0
+                preloadQueueItem(item, positionSeconds = state.positionSeconds + elapsedSec) {
+                    engine.playAt(SystemClock.elapsedRealtime())
+                }
+            }
+            PlaybackStatus.PAUSED -> {
+                preloadQueueItem(item, positionSeconds = state.positionSeconds) {}
+            }
+        }
+    }
+
+    private fun handleProtocolError(code: String, errorMessage: String) {
+        Log.w(TAG, "protocol error: $code $errorMessage")
+        when (code) {
+            "VERSION_CONFLICT" -> syncClient?.requestSync()
+            else -> {
+                lastError = errorMessage
+                emitStateChanged()
+            }
+        }
+    }
+
+    private fun preloadQueueItem(
+        item: CurrentQueueItemDto,
+        positionSeconds: Double,
+        onReady: () -> Unit,
+    ) {
+        val config = sessionConfig ?: return
+        val engine = playerEngine ?: return
+        val mediaFileId = item.mediaFileId ?: return
+        engine.preload(
+            url = "${config.apiBaseUrl}/api/media-files/$mediaFileId",
+            source = PlayerEngine.LoadedSource(
+                mediaFileId = mediaFileId,
+                recordingId = item.recordingId,
+            ),
+            positionSeconds = positionSeconds,
+            metadata = buildMetadata(item),
+            onReady = onReady,
+        )
+    }
+
+    private fun buildMetadata(item: CurrentQueueItemDto): MediaMetadata {
+        val builder = MediaMetadata.Builder()
+            .setTitle(item.title)
+            .setArtist(item.artistLabel)
+        val coverUrl = item.coverUrl
+        val config = sessionConfig
+        if (coverUrl != null && config != null) {
+            val absolute = if (coverUrl.startsWith("http")) coverUrl else config.apiBaseUrl + coverUrl
+            builder.setArtworkUri(android.net.Uri.parse(absolute))
+        }
+        return builder.build()
+    }
+
+    // ---------- 用户命令（MediaSession 系统控件 / TS 桥） ----------
+
+    fun onUserPlay(positionSeconds: Double?) {
+        executor.execute {
+            if (isIndependentMode()) {
+                playerEngine?.let { engine ->
+                    engine.runOnPlayerThread { engine.player.play() }
+                }
+                return@execute
+            }
+            val index = queueState.queue?.currentIndex ?: return@execute
+            syncClient?.sendControl(
+                type = "PLAY",
+                commandId = newCommandId(),
+                currentIndex = index,
+                positionSeconds = positionSeconds ?: currentPositionSeconds,
+                version = lastKnownVersion,
+            )
+        }
+    }
+
+    fun onUserPause() {
+        executor.execute {
+            if (isIndependentMode()) {
+                playerEngine?.let { engine ->
+                    engine.runOnPlayerThread { engine.player.pause() }
+                }
+                emitStateChanged()
+                return@execute
+            }
+            val index = queueState.queue?.currentIndex ?: return@execute
+            syncClient?.sendControl(
+                type = "PAUSE",
+                commandId = newCommandId(),
+                currentIndex = index,
+                positionSeconds = currentPositionSeconds,
+                version = lastKnownVersion,
+            )
+        }
+    }
+
+    fun onUserSeek(positionSeconds: Double) {
+        executor.execute {
+            if (isIndependentMode()) {
+                playerEngine?.let { engine ->
+                    engine.runOnPlayerThread {
+                        engine.player.seekTo((positionSeconds * 1_000).toLong())
+                    }
+                }
+                return@execute
+            }
+            val index = queueState.queue?.currentIndex ?: return@execute
+            syncClient?.sendControl(
+                type = "SEEK",
+                commandId = newCommandId(),
+                currentIndex = index,
+                positionSeconds = positionSeconds,
+                version = lastKnownVersion,
+            )
+        }
+    }
+
+    fun onUserNext() {
+        executor.execute {
+            if (isIndependentMode()) {
+                localNavigate(step = 1)
+                return@execute
+            }
+            navigateQueue { apiBaseUrl, token, version ->
+                queueHttpApi.navigateNext(apiBaseUrl, token, version)
+            }
+        }
+    }
+
+    fun onUserPrevious() {
+        executor.execute {
+            if (isIndependentMode()) {
+                localNavigate(step = -1)
+                return@execute
+            }
+            navigateQueue { apiBaseUrl, token, version ->
+                queueHttpApi.navigatePrevious(apiBaseUrl, token, version)
+            }
+        }
+    }
+
+    private fun navigateQueue(
+        call: (apiBaseUrl: String, token: String?, version: Long) -> QueueHttpApi.NavigationResult,
+    ) {
+        val config = sessionConfig ?: return
+        val version = queueState.version() ?: return
+        when (val result = call(config.apiBaseUrl, config.token, version)) {
+            is QueueHttpApi.NavigationResult.Ok -> Unit
+            is QueueHttpApi.NavigationResult.VersionConflict -> syncClient?.requestSync()
+            is QueueHttpApi.NavigationResult.Failed ->
+                Log.w(TAG, "queue navigation failed: ${result.message}")
+        }
+    }
+
+    private fun handleSystemInducedPause(positionSeconds: Double) {
+        if (isIndependentMode()) {
+            emitStateChanged()
+            return
+        }
+        val index = queueState.queue?.currentIndex ?: return
+        syncClient?.sendControl(
+            type = "PAUSE",
+            commandId = newCommandId(),
+            currentIndex = index,
+            positionSeconds = positionSeconds,
+            version = lastKnownVersion,
+        )
+    }
+
+    private fun handlePlaybackEnded() {
+        if (isIndependentMode()) {
+            localNavigate(step = 1)
+        }
+        // 同步模式下由服务端 auto-advance 驱动切歌，客户端不主动动作
+    }
+
+    // ---------- 独立模式本地控制 ----------
+
+    fun localSetQueue(items: List<LocalQueueItem>, currentIndex: Int) {
+        executor.execute {
+            localQueue = items
+            localCurrentIndex = currentIndex.coerceIn(0, (items.size - 1).coerceAtLeast(0))
+        }
+    }
+
+    fun localPlay(currentIndex: Int, positionSeconds: Double) {
+        executor.execute {
+            ensureServiceStarted()
+            val item = localQueue.getOrNull(currentIndex) ?: return@execute
+            localCurrentIndex = currentIndex
+            preloadLocalItem(item, positionSeconds) {
+                playerEngine?.playAt(SystemClock.elapsedRealtime())
+            }
+            emitStateChanged()
+        }
+    }
+
+    fun localPause() {
+        executor.execute {
+            playerEngine?.let { engine ->
+                engine.runOnPlayerThread { engine.player.pause() }
+            }
+        }
+    }
+
+    fun localSeek(positionSeconds: Double) {
+        executor.execute {
+            playerEngine?.let { engine ->
+                engine.runOnPlayerThread {
+                    engine.player.seekTo((positionSeconds * 1_000).toLong())
+                }
+            }
+        }
+    }
+
+    private fun localNavigate(step: Int) {
+        val nextIndex = localCurrentIndex + step
+        val item = localQueue.getOrNull(nextIndex)
+        if (item == null) {
+            playerEngine?.stop()
+            isPlaying = false
+            emitStateChanged()
+            return
+        }
+        localCurrentIndex = nextIndex
+        preloadLocalItem(item, positionSeconds = 0.0) {
+            playerEngine?.playAt(SystemClock.elapsedRealtime())
+        }
+        emitStateChanged()
+    }
+
+    private fun preloadLocalItem(
+        item: LocalQueueItem,
+        positionSeconds: Double,
+        onReady: () -> Unit,
+    ) {
+        preloadQueueItem(
+            CurrentQueueItemDto(
+                recordingId = item.recordingId,
+                title = item.title,
+                artistLabel = item.artistLabel,
+                coverUrl = item.coverUrl,
+                durationMs = item.durationMs,
+                mediaFileId = item.mediaFileId,
+            ),
+            positionSeconds = positionSeconds,
+            onReady = onReady,
+        )
+    }
+
+    // ---------- 事件回传 ----------
+
+    private fun startPositionHeartbeat() {
+        stopPositionHeartbeat()
+        positionHeartbeatFuture = executor.scheduleWithFixedDelay(
+            {
+                emitEvent(
+                    mapOf(
+                        "type" to "position",
+                        "positionSeconds" to currentPositionSeconds,
+                        "isPlaying" to isPlaying,
+                    ),
+                )
+            },
+            POSITION_HEARTBEAT_MS,
+            POSITION_HEARTBEAT_MS,
+            TimeUnit.MILLISECONDS,
+        )
+    }
+
+    private fun stopPositionHeartbeat() {
+        positionHeartbeatFuture?.cancel(false)
+        positionHeartbeatFuture = null
     }
 
     private fun emitQueueChanged() {
@@ -150,10 +697,26 @@ object PlaybackController {
         )
     }
 
+    private fun emitStateChanged() {
+        emitEvent(
+            mapOf(
+                "type" to "state-changed",
+                "isPlaying" to isPlaying,
+                "currentIndex" to currentIndex,
+                "positionSeconds" to currentPositionSeconds,
+                "durationSeconds" to durationSeconds,
+                "isLoading" to isLoading,
+                "error" to lastError,
+            ),
+        )
+    }
+
     fun emitEvent(fields: Map<String, Any?>) {
         val sink = eventSink ?: return
         val event = LinkedHashMap<String, Any?>(fields)
         event["seq"] = eventSeq.incrementAndGet()
         sink(PlaybackSyncJson.mapper.writeValueAsString(event))
     }
+
+    private fun newCommandId() = "android-${UUID.randomUUID().toString().take(8)}"
 }

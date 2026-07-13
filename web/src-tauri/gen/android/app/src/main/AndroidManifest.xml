@@ -37,6 +37,16 @@
             </intent-filter>
         </activity>
 
+        <!-- 手工维护段：UniRhy 原生播放前台服务（tauri android init 重跑后需保留） -->
+        <service
+            android:name="app.unirhy.playback.PlaybackService"
+            android:exported="true"
+            android:foregroundServiceType="mediaPlayback">
+            <intent-filter>
+                <action android:name="androidx.media3.session.MediaSessionService" />
+            </intent-filter>
+        </service>
+
         <service
             android:name="app.tauri.backgroundservice.LifecycleService"
             android:exported="false"

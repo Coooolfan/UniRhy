@@ -75,6 +75,7 @@ class UnirhyPlaybackPlugin(private val activity: Activity) : Plugin(activity) {
 
     override fun load(webView: android.webkit.WebView) {
         super.load(webView)
+        PlaybackController.attachContext(activity.applicationContext)
         PlaybackController.eventSink = { eventJson ->
             trigger("playback-event", JSObject(eventJson))
         }
@@ -133,11 +134,12 @@ class UnirhyPlaybackPlugin(private val activity: Activity) : Plugin(activity) {
         val state = JSObject()
         state.put("configured", config != null)
         state.put("mode", config?.mode ?: "sync")
-        state.put("isPlaying", false)
-        state.put("currentIndex", null)
-        state.put("positionSeconds", 0.0)
-        state.put("durationSeconds", 0.0)
-        state.put("isLoading", false)
+        state.put("isPlaying", PlaybackController.isPlaying)
+        state.put("currentIndex", PlaybackController.currentIndex)
+        state.put("positionSeconds", PlaybackController.currentPositionSeconds)
+        state.put("durationSeconds", PlaybackController.durationSeconds)
+        state.put("isLoading", PlaybackController.isLoading)
+        state.put("error", PlaybackController.lastError)
         state.put("syncPhase", PlaybackController.syncPhase.name.lowercase())
         state.put("clockOffsetMs", PlaybackController.clock.clockOffsetMs)
         state.put("roundTripEstimateMs", PlaybackController.clock.roundTripEstimateMs)
@@ -155,25 +157,29 @@ class UnirhyPlaybackPlugin(private val activity: Activity) : Plugin(activity) {
 
     @Command
     fun setVolume(invoke: Invoke) {
-        invoke.parseArgs(SetVolumeArgs::class.java)
+        val args = invoke.parseArgs(SetVolumeArgs::class.java)
+        PlaybackController.setVolume(args.volume)
         invoke.resolve()
     }
 
     @Command
     fun requestPlay(invoke: Invoke) {
-        invoke.parseArgs(RequestPlayArgs::class.java)
-        invoke.reject("not implemented")
+        val args = invoke.parseArgs(RequestPlayArgs::class.java)
+        PlaybackController.onUserPlay(args.positionSeconds)
+        invoke.resolve()
     }
 
     @Command
     fun requestPause(invoke: Invoke) {
-        invoke.reject("not implemented")
+        PlaybackController.onUserPause()
+        invoke.resolve()
     }
 
     @Command
     fun requestSeek(invoke: Invoke) {
-        invoke.parseArgs(RequestSeekArgs::class.java)
-        invoke.reject("not implemented")
+        val args = invoke.parseArgs(RequestSeekArgs::class.java)
+        PlaybackController.onUserSeek(args.positionSeconds)
+        invoke.resolve()
     }
 
     @Command
@@ -184,24 +190,40 @@ class UnirhyPlaybackPlugin(private val activity: Activity) : Plugin(activity) {
 
     @Command
     fun localSetQueue(invoke: Invoke) {
-        invoke.parseArgs(LocalSetQueueArgs::class.java)
-        invoke.reject("not implemented")
+        val args = invoke.parseArgs(LocalSetQueueArgs::class.java)
+        PlaybackController.localSetQueue(
+            items = args.items.map { item ->
+                PlaybackController.LocalQueueItem(
+                    recordingId = item.recordingId,
+                    mediaFileId = item.mediaFileId,
+                    title = item.title,
+                    artistLabel = item.artistLabel,
+                    coverUrl = item.coverUrl,
+                    durationMs = item.durationMs,
+                )
+            },
+            currentIndex = args.currentIndex,
+        )
+        invoke.resolve()
     }
 
     @Command
     fun localPlay(invoke: Invoke) {
-        invoke.parseArgs(LocalPlayArgs::class.java)
-        invoke.reject("not implemented")
+        val args = invoke.parseArgs(LocalPlayArgs::class.java)
+        PlaybackController.localPlay(args.currentIndex, args.positionSeconds)
+        invoke.resolve()
     }
 
     @Command
     fun localPause(invoke: Invoke) {
-        invoke.reject("not implemented")
+        PlaybackController.localPause()
+        invoke.resolve()
     }
 
     @Command
     fun localSeek(invoke: Invoke) {
-        invoke.parseArgs(LocalSeekArgs::class.java)
-        invoke.reject("not implemented")
+        val args = invoke.parseArgs(LocalSeekArgs::class.java)
+        PlaybackController.localSeek(args.positionSeconds)
+        invoke.resolve()
     }
 }
