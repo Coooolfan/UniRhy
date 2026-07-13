@@ -33,13 +33,13 @@
                         <div class="mb-8 md:mb-12">
                             <span
                                 class="text-[10px] tracking-[0.2em] text-[#999999] uppercase font-bold block mb-2"
-                                >Part 01</span
+                                >{{ t('init.part01') }}</span
                             >
                             <h2 class="text-3xl font-serif text-[#2C2C2C] mb-3 tracking-tight">
-                                管理员档案
+                                {{ t('init.adminProfile') }}
                             </h2>
                             <p class="text-xs text-[#888888] font-light leading-relaxed max-w-xs">
-                                此账户将拥有对 UniRhy 实例的完全控制权。
+                                {{ t('init.adminDescription') }}
                             </p>
                         </div>
 
@@ -48,7 +48,7 @@
                             <div class="group">
                                 <label
                                     class="text-xs text-[#A0A0A0] uppercase tracking-wider mb-2 block"
-                                    >账号名</label
+                                    >{{ t('init.accountName') }}</label
                                 >
                                 <div
                                     class="flex items-center pb-2 border-b border-[#E0E0E0] group-focus-within:border-[#D4A373] transition-colors relative"
@@ -70,7 +70,7 @@
                             <div class="group">
                                 <label
                                     class="text-xs text-[#A0A0A0] uppercase tracking-wider mb-2 block"
-                                    >邮箱</label
+                                    >{{ t('init.email') }}</label
                                 >
                                 <div
                                     class="flex items-center pb-2 border-b border-[#E0E0E0] group-focus-within:border-[#D4A373] transition-colors relative"
@@ -92,7 +92,7 @@
                             <div class="group">
                                 <label
                                     class="text-xs text-[#A0A0A0] uppercase tracking-wider mb-2 block"
-                                    >密码</label
+                                    >{{ t('init.password') }}</label
                                 >
                                 <div
                                     class="flex items-center pb-2 border-b border-[#E0E0E0] group-focus-within:border-[#D4A373] transition-colors relative"
@@ -126,16 +126,15 @@
                             <div class="mb-8 md:mb-12">
                                 <span
                                     class="text-[10px] tracking-[0.2em] text-[#999999] uppercase font-bold block mb-2"
-                                    >Part 02</span
+                                    >{{ t('init.part02') }}</span
                                 >
                                 <h2 class="text-3xl font-serif text-[#2C2C2C] mb-3 tracking-tight">
-                                    系统存储节点
+                                    {{ t('init.storageConfig') }}
                                 </h2>
                                 <p
                                     class="text-xs text-[#888888] font-light leading-relaxed max-w-xs"
                                 >
-                                    指定媒体资源的物理存储位置。系统将在此路径下保存由 UniRhy
-                                    生成的索引文件、缓存文件等。
+                                    {{ t('init.storageDescription') }}
                                 </p>
                             </div>
 
@@ -152,10 +151,10 @@
                                     <p
                                         class="text-xs font-bold text-[#555] uppercase tracking-wider mb-1"
                                     >
-                                        本地文件系统
+                                        {{ t('init.localFileSystem') }}
                                     </p>
                                     <p class="text-[11px] text-[#999] truncate font-mono">
-                                        状态：不可观测
+                                        {{ t('init.statusNotObservable') }}
                                     </p>
                                 </div>
                                 <div class="w-2 h-2 rounded-full bg-[#D4A373] animate-pulse"></div>
@@ -165,7 +164,7 @@
                             <div class="group">
                                 <label
                                     class="text-xs text-[#A0A0A0] uppercase tracking-wider mb-2 block"
-                                    >存储节点根路径</label
+                                    >{{ t('init.storagePath') }}</label
                                 >
                                 <div
                                     class="flex items-center pb-2 border-b border-[#E0E0E0] group-focus-within:border-[#D4A373] transition-colors relative"
@@ -195,7 +194,7 @@
                                 class="group flex w-full items-center justify-center gap-2 rounded-[2px] bg-[#2C2C2C] px-8 py-3 text-[#F0ECE6] shadow-lg transition-all duration-300 hover:bg-[#D4A373] disabled:cursor-not-allowed disabled:opacity-70 sm:w-auto"
                             >
                                 <span class="font-medium tracking-widest text-xs uppercase">{{
-                                    isSubmitting ? '正在初始化...' : '初始化'
+                                    isSubmitting ? t('init.initializing') : t('init.initialize')
                                 }}</span>
                                 <ArrowRight
                                     :size="14"
@@ -211,7 +210,7 @@
         <!-- Footer Info -->
         <div class="mt-8 text-center opacity-40 hover:opacity-100 transition-opacity duration-500">
             <p class="text-[10px]">
-                UniRhy使用AGPL v3.0许可证。源代码可在
+                {{ t('init.legalNotice') }}
                 <a
                     href="https://github.com/coooolfan/unirhy"
                     target="_blank"
@@ -238,11 +237,14 @@
 <script setup lang="ts">
 import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { api } from '@/ApiInstance'
 import { resolveErrorMessage } from '@/i18n/errors'
 import BrandWatermark from '@/components/common/BrandWatermark.vue'
 import { setInitializationStatus } from '@/services/systemInitialization'
 import { User, Mail, Key, HardDrive, Database, ArrowRight } from 'lucide-vue-next'
+
+const { t } = useI18n()
 
 const router = useRouter()
 const isSubmitting = ref(false)

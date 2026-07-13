@@ -298,7 +298,7 @@ const playItem = async (item: DisplayItem) => {
                     "
                     @click="handleTabChange('Albums')"
                 >
-                    专辑
+                    {{ t('albums.title') }}
                 </button>
                 <button
                     class="text-sm tracking-wide transition-colors relative"
@@ -309,7 +309,7 @@ const playItem = async (item: DisplayItem) => {
                     "
                     @click="handleTabChange('Works')"
                 >
-                    作品
+                    {{ t('works.title') }}
                 </button>
                 <button
                     class="text-sm tracking-wide transition-colors relative"
@@ -320,7 +320,7 @@ const playItem = async (item: DisplayItem) => {
                     "
                     @click="handleTabChange('Artists')"
                 >
-                    艺术家
+                    {{ t('artists.title') }}
                 </button>
             </div>
         </div>
@@ -343,13 +343,10 @@ const playItem = async (item: DisplayItem) => {
             <div v-else :class="{ 'opacity-50 pointer-events-none': isLoading }">
                 <LibraryEmptyHint
                     v-if="displayItems.length === 0"
-                    :title="activeTab === 'Works' ? '作品库空空如也' : undefined"
+                    :title="activeTab === 'Works' ? t('works.emptyHint') : undefined"
                     :description="
                         activeTab === 'Works'
-                            ? [
-                                  '我们将旋律的不同演绎版本，称之为作品。',
-                                  '连接存储节点，发起元数据解析任务，UniRhy 将自动发现作品。',
-                              ]
+                            ? [t('works.explanation1'), t('works.explanation2')]
                             : undefined
                     "
                 />
@@ -395,9 +392,11 @@ const playItem = async (item: DisplayItem) => {
                     >
                         <div class="col-span-1">#</div>
                         <div class="col-span-5">
-                            {{ activeTab === 'Albums' ? '专辑名' : '作品名' }}
+                            {{
+                                activeTab === 'Albums' ? t('albums.albumName') : t('works.workName')
+                            }}
                         </div>
-                        <div class="col-span-4">艺术家</div>
+                        <div class="col-span-4">{{ t('artists.title') }}</div>
                     </div>
                     <div
                         v-for="(item, idx) in displayItems"
