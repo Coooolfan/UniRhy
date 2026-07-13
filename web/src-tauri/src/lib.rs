@@ -1,28 +1,12 @@
 mod config;
 
-use async_trait::async_trait;
 use serde::Serialize;
 use std::sync::Arc;
 use tauri::Manager;
-use tauri_plugin_background_service::{BackgroundService, ServiceContext, ServiceError};
 use tokio::sync::RwLock;
 
 struct AppState {
     backend_url: Arc<RwLock<String>>,
-}
-
-struct AudioPlaybackService;
-
-#[async_trait]
-impl<R: tauri::Runtime> BackgroundService<R> for AudioPlaybackService {
-    async fn init(&mut self, _ctx: &ServiceContext<R>) -> Result<(), ServiceError> {
-        Ok(())
-    }
-
-    async fn run(&mut self, ctx: &ServiceContext<R>) -> Result<(), ServiceError> {
-        ctx.shutdown.cancelled().await;
-        Ok(())
-    }
 }
 
 #[derive(Serialize)]
@@ -81,9 +65,6 @@ pub fn run() {
         .plugin(tauri_plugin_websocket::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_android_battery_optimization::init())
-        .plugin(tauri_plugin_background_service::init_with_service(|| {
-            AudioPlaybackService
-        }))
         .plugin(tauri_plugin_unirhy_playback::init())
         .setup(|app| {
             let backend_url = Arc::new(RwLock::new(config::load_backend_url(app.handle())));
