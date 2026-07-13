@@ -1,8 +1,8 @@
 import { ref } from 'vue'
 import { api } from '@/ApiInstance'
+import { i18n } from '@/i18n'
 import { resolveErrorMessage } from '@/i18n/errors'
 import { type FileProviderType } from '@/__generated/model/enums/FileProviderType'
-import type { TaskType } from '@/__generated/model/enums/TaskType'
 import type { PluginInfoResponse } from '@/__generated/model/static/PluginInfoResponse'
 import type {
     AsyncTaskLogCountRow,
@@ -18,9 +18,10 @@ export type TaskProviderOption = {
     isSystemNode: boolean
 }
 
-export const BUILTIN_TASK_TYPE_LABEL_MAP: Partial<Record<TaskType, string>> = {
-    METADATA_PARSE: '元数据解析',
-    TRANSCODE: '媒体转码',
+const builtinTaskTypeLabel = (taskType: string): string | undefined => {
+    if (taskType === 'METADATA_PARSE') return i18n.global.t('taskSubmission.metadataParse')
+    if (taskType === 'TRANSCODE') return i18n.global.t('taskSubmission.transcode')
+    return undefined
 }
 
 export const useTaskManagement = () => {
@@ -91,7 +92,7 @@ export const useTaskManagement = () => {
             fsNodes.forEach((node) => {
                 options.push({
                     id: node.id,
-                    name: `[本地] ${node.name}`,
+                    name: i18n.global.t('taskSubmission.fsProviderLabel', { name: node.name }),
                     type: 'FILE_SYSTEM',
                     readonly: node.readonly,
                     isSystemNode: node.id === systemConfig.fsProviderId,
@@ -101,7 +102,7 @@ export const useTaskManagement = () => {
             ossNodes.forEach((node) => {
                 options.push({
                     id: node.id,
-                    name: `[OSS] ${node.name}`,
+                    name: i18n.global.t('taskSubmission.ossProviderLabel', { name: node.name }),
                     type: 'OSS',
                     readonly: node.readonly,
                     isSystemNode: node.id === systemConfig.ossProviderId,
@@ -149,9 +150,7 @@ export const useTaskManagement = () => {
         executeTask(() => api.pluginController.submitPluginTask({ taskType, body: params }))
 
     const resolveTaskLabel = (taskType: string): string => {
-        const builtin = (BUILTIN_TASK_TYPE_LABEL_MAP as Record<string, string | undefined>)[
-            taskType
-        ]
+        const builtin = builtinTaskTypeLabel(taskType)
         if (builtin) return builtin
         const plugin = pluginList.value.find((p) => p.taskType === taskType)
         return plugin?.name ?? plugin?.id ?? taskType

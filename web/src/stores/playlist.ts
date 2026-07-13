@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { api } from '@/ApiInstance'
+import { i18n } from '@/i18n'
 import { resolveErrorMessage } from '@/i18n/errors'
 
 export type PlaylistListItem = {
@@ -8,7 +9,8 @@ export type PlaylistListItem = {
     name: string
 }
 
-const normalizeName = (name?: string | null) => name?.trim() || '未命名歌单'
+const normalizeName = (name?: string | null) =>
+    name?.trim() || i18n.global.t('common.untitledPlaylist')
 
 export const usePlaylistStore = defineStore('playlist', () => {
     const playlists = ref<PlaylistListItem[]>([])

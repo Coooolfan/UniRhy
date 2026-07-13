@@ -132,7 +132,7 @@ describe('usePlaylistStore', () => {
 
         expect(store.hasLoaded).toBe(false)
         expect(store.playlists).toEqual([])
-        expect(store.error).toBe('请求失败')
+        expect(store.error).toBe('歌单加载失败')
 
         const firstRequest = createDeferred<PlaylistListResponse>()
         listPlaylistsMock

@@ -27,8 +27,11 @@ const createTextResponse = (status: number, body: string) =>
         },
     })
 
-const loadApiInstance = () => {
+const loadApiInstance = async () => {
     vi.resetModules()
+    // 模块重置后 i18n 是全新实例（默认可能回退到英文），显式锁定 zh-CN 使断言按中文匹配
+    const { i18n } = await import('@/i18n')
+    i18n.global.locale.value = 'zh-CN'
     return import('@/ApiInstance')
 }
 

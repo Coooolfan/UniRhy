@@ -10,7 +10,7 @@ import TaskLogDrawerContent from '@/components/tasks/TaskLogDrawerContent.vue'
 import type { TaskStatus } from '@/__generated/model/enums/TaskStatus'
 import type { TaskType } from '@/__generated/model/enums/TaskType'
 import type { ScanTaskRequest, TranscodeTaskRequest } from '@/__generated/model/static'
-import { BUILTIN_TASK_TYPE_LABEL_MAP, useTaskManagement } from '@/composables/useTaskManagement'
+import { useTaskManagement } from '@/composables/useTaskManagement'
 import {
     AlertCircle,
     ArrowRight,

@@ -22,8 +22,11 @@ export default {
         updating: 'Updating...',
         confirmDelete: 'Confirm Delete',
         deleteFailedTitle: 'Delete Failed',
+        savingInProgress: 'A save operation is already in progress',
+        untitledPlaylist: 'Untitled Playlist',
     },
     errors: {
+        requestFailed: 'Request failed: ',
         COMMON: {
             NOT_FOUND: 'The requested resource was not found',
             AUTHENTICATION_FAILED: 'Incorrect email or password',
@@ -494,6 +497,7 @@ export default {
         deletePlugin: 'Delete plugin',
         formParams: 'Form Parameters',
         default: 'Default {value}',
+        downloadFailed: 'Download failed: {status}',
     },
     dashboardNav: {
         discover: 'Discover',
@@ -629,6 +633,8 @@ export default {
         localStorage: 'Local Storage',
         objectStorage: 'Object Storage',
         pluginDesc: 'Plugin {id} v{version}',
+        fsProviderLabel: '[FS] {name}',
+        ossProviderLabel: '[OSS] {name}',
         submitPluginTask: 'Submit {name} task',
         submitMetadataTask: 'Submit metadata parse task',
         submitTranscodeTask: 'Submit transcode task',
@@ -724,5 +730,39 @@ export default {
         mono: '1 (Mono)',
         stereo: '2 (Stereo)',
         fileSize: 'File Size',
+    },
+    validation: {
+        accountNameRequired: 'Please enter the account name',
+        emailRequired: 'Please enter the email',
+        emailInvalid: 'Invalid email format',
+        initialPasswordRequired: 'Please enter the initial password',
+        nodeNameRequired: 'Please enter the node name',
+        localPathRequired: 'Please enter the local storage root path',
+        ossFieldsRequired: 'Please fill in the object storage Endpoint, Bucket, and Access Key',
+        ossSecretKeyRequired: 'Please enter the object storage Secret Key',
+        readonlyCannotBeSystem: 'A read-only node cannot be set as the system node',
+        notSelected: 'Not selected',
+        mergeMinRecordings: 'Select at least 2 recordings before merging.',
+        mergeMissingTarget: 'Please select a target recording.',
+        mergeMissingSource: 'Please select at least one source recording.',
+    },
+    audioSync: {
+        independent: 'Independent playback',
+        connecting: 'Connecting sync',
+        calibrating: 'Calibrating sync',
+        ready: 'Sync ready',
+        reconnecting: 'Reconnecting sync',
+        audioLocked: 'Waiting to enable audio',
+        error: 'Sync connection failed',
+    },
+    trackFallback: {
+        title: 'Track #{id}',
+        unknownArtist: 'Unknown Artist',
+    },
+    auth: {
+        expired: 'Your session has expired, please log in again',
+    },
+    androidService: {
+        label: 'Music playback in progress',
     },
 }

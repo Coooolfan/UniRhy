@@ -1,4 +1,5 @@
 import { getPlatformRuntime } from '@/runtime/platform'
+import { i18n } from '@/i18n'
 
 export type AndroidPlaybackSystemStatus = {
     notificationPermissionGranted: boolean
@@ -11,7 +12,7 @@ type AndroidPlaybackNativeLifecycleEvent = {
 }
 
 const createPlaybackServiceConfig = () => ({
-    serviceLabel: '音乐播放进行中',
+    serviceLabel: i18n.global.t('androidService.label'),
     foregroundServiceType: 'mediaPlayback',
 })
 

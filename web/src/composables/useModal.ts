@@ -1,5 +1,6 @@
 import type { Component } from 'vue'
 import ModalMessageContent from '@/components/modals/ModalMessageContent.vue'
+import { i18n } from '@/i18n'
 import { useModalStore, type ModalTone, type OpenModalOptions } from '@/stores/modal'
 
 export const useModal = () => {
@@ -25,7 +26,7 @@ export const useModal = () => {
             size: 'sm',
             props: {
                 content: options.content,
-                confirmText: options.confirmText ?? '确认',
+                confirmText: options.confirmText ?? i18n.global.t('common.confirm'),
                 mode: 'alert',
             },
         })
@@ -44,8 +45,8 @@ export const useModal = () => {
             size: 'sm',
             props: {
                 content: options.content,
-                confirmText: options.confirmText ?? '确认',
-                cancelText: options.cancelText ?? '取消',
+                confirmText: options.confirmText ?? i18n.global.t('common.confirm'),
+                cancelText: options.cancelText ?? i18n.global.t('common.cancel'),
                 mode: 'confirm',
             },
         })

@@ -22,8 +22,11 @@ export default {
         updating: '更新中...',
         confirmDelete: '确认删除',
         deleteFailedTitle: '删除失败',
+        savingInProgress: '已有保存操作正在执行',
+        untitledPlaylist: '未命名歌单',
     },
     errors: {
+        requestFailed: '请求失败：',
         COMMON: {
             NOT_FOUND: '未找到请求的资源',
             AUTHENTICATION_FAILED: '邮箱或密码不正确',
@@ -475,6 +478,7 @@ export default {
         deletePlugin: '删除插件',
         formParams: '表单参数',
         default: '默认 {value}',
+        downloadFailed: '下载失败: {status}',
     },
     dashboardNav: {
         discover: '发现',
@@ -606,6 +610,8 @@ export default {
         localStorage: '本地存储',
         objectStorage: '对象存储',
         pluginDesc: '插件 {id} v{version}',
+        fsProviderLabel: '[本地] {name}',
+        ossProviderLabel: '[OSS] {name}',
         submitPluginTask: '提交{name}任务',
         submitMetadataTask: '提交元数据解析任务',
         submitTranscodeTask: '提交转码任务',
@@ -698,5 +704,39 @@ export default {
         mono: '1（单声道）',
         stereo: '2（立体声）',
         fileSize: '文件大小',
+    },
+    validation: {
+        accountNameRequired: '请填写账号名称',
+        emailRequired: '请填写邮箱',
+        emailInvalid: '邮箱格式不正确',
+        initialPasswordRequired: '请填写初始密码',
+        nodeNameRequired: '请填写节点名称',
+        localPathRequired: '请填写本地存储根路径',
+        ossFieldsRequired: '请填写对象存储 Endpoint、Bucket 与 Access Key',
+        ossSecretKeyRequired: '请填写对象存储 Secret Key',
+        readonlyCannotBeSystem: '只读节点不能设置为系统节点',
+        notSelected: '未选择',
+        mergeMinRecordings: '至少选择 2 条曲目后才能合并。',
+        mergeMissingTarget: '请选择一个目标曲目。',
+        mergeMissingSource: '请选择至少一条来源曲目。',
+    },
+    audioSync: {
+        independent: '独立播放',
+        connecting: '同步连接中',
+        calibrating: '同步校时中',
+        ready: '同步已就绪',
+        reconnecting: '同步重连中',
+        audioLocked: '等待启用音频',
+        error: '同步连接失败',
+    },
+    trackFallback: {
+        title: '曲目 #{id}',
+        unknownArtist: '未知艺术家',
+    },
+    auth: {
+        expired: '登录已过期，请重新登录',
+    },
+    androidService: {
+        label: '音乐播放进行中',
     },
 }

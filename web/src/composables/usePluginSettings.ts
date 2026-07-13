@@ -1,5 +1,6 @@
 import { ref } from 'vue'
 import { api, getAuthToken } from '@/ApiInstance'
+import { i18n } from '@/i18n'
 import { resolveErrorMessage } from '@/i18n/errors'
 import { buildApiUrl } from '@/runtime/platform'
 import { runtimeFetch } from '@/runtime/http'
@@ -69,7 +70,8 @@ export const usePluginSettings = () => {
             credentials: 'include',
             headers,
         })
-        if (!response.ok) throw new Error(`下载失败: ${response.status}`)
+        if (!response.ok)
+            throw new Error(i18n.global.t('plugins.downloadFailed', { status: response.status }))
 
         const blob = await response.blob()
         const url = URL.createObjectURL(blob)

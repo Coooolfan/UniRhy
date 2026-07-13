@@ -1,6 +1,7 @@
 import { computed, ref, shallowRef, watch } from 'vue'
 import { defineStore } from 'pinia'
 import { api } from '@/ApiInstance'
+import { i18n } from '@/i18n'
 import { useClientPreferencesStore } from '@/stores/clientPreferences'
 import { useUserStore } from '@/stores/user'
 import type {
@@ -308,21 +309,21 @@ export const useAudioStore = defineStore('audio', () => {
     const syncStatusText = computed(() => {
         switch (effectiveSyncState.value) {
             case 'independent':
-                return '独立播放'
+                return i18n.global.t('audioSync.independent')
             case 'connecting':
-                return '同步连接中'
+                return i18n.global.t('audioSync.connecting')
             case 'calibrating':
-                return '同步校时中'
+                return i18n.global.t('audioSync.calibrating')
             case 'ready':
-                return '同步已就绪'
+                return i18n.global.t('audioSync.ready')
             case 'reconnecting':
-                return '同步重连中'
+                return i18n.global.t('audioSync.reconnecting')
             case 'audio_locked':
-                return '等待启用音频'
+                return i18n.global.t('audioSync.audioLocked')
             case 'error':
-                return '同步连接失败'
+                return i18n.global.t('audioSync.error')
             default:
-                return '同步连接中'
+                return i18n.global.t('audioSync.connecting')
         }
     })
 
