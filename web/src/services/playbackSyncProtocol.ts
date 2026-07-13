@@ -85,6 +85,7 @@ export type CurrentQueueItemDto = {
     artistLabel: string
     coverUrl?: string
     durationMs: number
+    mediaFileId?: number
 }
 
 export type CurrentQueueDto = {
