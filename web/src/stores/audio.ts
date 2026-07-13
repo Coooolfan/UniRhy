@@ -38,6 +38,8 @@ import {
     type QueuedPlayIntent,
     type QueuedSystemPauseIntent,
 } from '@/stores/audioSyncSession'
+import { useAudioNativeSession } from '@/stores/audioNativeSession'
+import { getPlatformRuntime } from '@/runtime/platform'
 import { nowClientMs } from '@/utils/time'
 
 export type {
@@ -262,6 +264,30 @@ export const useAudioStore = defineStore('audio', () => {
         resetSyncRecoveryState,
     } = sync
 
+    // ── Android 原生播放后端 ───────────────────────────────────────────────
+    // Android 上播放执行与同步协议客户端下沉原生（Media3 + Kotlin），本 store 的
+    // 播放控制入口全部早退到原生命令，Web Audio 引擎与 TS 同步客户端保持休眠
+    // （不建 WS、不创建 AudioContext，避免与 ExoPlayer 抢音频焦点）。
+    const native =
+        getPlatformRuntime().platform === 'android'
+            ? useAudioNativeSession({
+                  currentTrack,
+                  currentQueue,
+                  isPlaying,
+                  currentTime,
+                  duration,
+                  isLoading,
+                  error,
+                  clientPhase,
+                  clockOffsetMs,
+                  roundTripEstimateMs,
+                  volume,
+                  isIndependentPlaybackMode: () => isIndependentPlaybackMode.value,
+                  applyQueueSnapshot,
+                  updateLocalQueueCurrentIndex,
+              })
+            : null
+
     const executeRemoteQueueMutation = async <T>(mutation: () => Promise<T>) => {
         try {
             return await mutation()
@@ -277,7 +303,11 @@ export const useAudioStore = defineStore('audio', () => {
             } catch {
                 // 拉取失败不阻塞恢复流程，交由 SYNC 响应的快照兜底
             }
-            requestSyncRecovery()
+            if (native) {
+                void native.requestSyncRecovery()
+            } else {
+                requestSyncRecovery()
+            }
             return null
         }
     }
@@ -441,6 +471,11 @@ export const useAudioStore = defineStore('audio', () => {
         }
 
         updateLocalQueueCurrentIndex(currentIndex)
+        if (native) {
+            await native.pushLocalQueueToNative()
+            await native.localPlay(currentIndex, positionSeconds)
+            return
+        }
         await startLocalPlayback(track, positionSeconds)
     }
 
@@ -484,10 +519,35 @@ export const useAudioStore = defineStore('audio', () => {
         const isSameTrack = isSameTrackRef(currentTrack.value, track)
         if (isIndependentPlaybackMode.value) {
             if (toggleIfSameTrack && isSameTrack && isPlaying.value) {
+                if (native) {
+                    void native.localPause()
+                    return
+                }
                 pauseLocalPlayback()
                 return
             }
+            if (native) {
+                const localIndex = currentQueue.value.recordingIds.indexOf(track.id)
+                await native.pushLocalQueueToNative()
+                await native.localPlay(Math.max(0, localIndex), positionSeconds)
+                return
+            }
             await startLocalPlayback(track, positionSeconds)
+            return
+        }
+
+        if (native) {
+            const controlContext = getCurrentQueueControlContext()
+            if (toggleIfSameTrack && isSameTrack && isPlaying.value) {
+                void native.requestPause(currentTime.value)
+                return
+            }
+            await native.start()
+            await native.requestPlay({
+                positionSeconds,
+                currentIndex: controlContext?.currentIndex,
+                version: controlContext?.version,
+            })
             return
         }
 
@@ -571,6 +631,10 @@ export const useAudioStore = defineStore('audio', () => {
 
             if (isSameTrackRef(currentTrack.value, targetTrack)) {
                 if (isPlaying.value) {
+                    if (native) {
+                        void native.requestPause(currentTime.value)
+                        return
+                    }
                     const controlContext = getCurrentQueueControlContext()
                     if (!controlContext) {
                         return
@@ -851,7 +915,16 @@ export const useAudioStore = defineStore('audio', () => {
 
     function pause() {
         if (isIndependentPlaybackMode.value) {
+            if (native) {
+                void native.localPause()
+                return
+            }
             pauseLocalPlayback()
+            return
+        }
+
+        if (native) {
+            void native.requestPause(currentTime.value)
             return
         }
 
@@ -871,6 +944,15 @@ export const useAudioStore = defineStore('audio', () => {
     function pauseFromSystem() {
         const track = currentTrack.value
         if (!track) {
+            return
+        }
+
+        if (native) {
+            if (isIndependentPlaybackMode.value) {
+                void native.localPause()
+            } else {
+                void native.requestPause(currentTime.value)
+            }
             return
         }
 
@@ -899,6 +981,15 @@ export const useAudioStore = defineStore('audio', () => {
             return
         }
 
+        if (native) {
+            if (isIndependentPlaybackMode.value) {
+                void native.localPause()
+            } else {
+                void native.requestPause(currentTime.value)
+            }
+            return
+        }
+
         const pausedAt = getCurrentPlaybackTime()
         applyPausedState(currentTrack.value, pausedAt)
         if (isIndependentPlaybackMode.value) {
@@ -911,6 +1002,11 @@ export const useAudioStore = defineStore('audio', () => {
     }
 
     function recoverPlaybackAfterForeground() {
+        if (native) {
+            // 原生连接活在 OkHttp 进程、不受 WebView 节流影响，回前台只需全量对齐 UI
+            void native.refreshFromNative()
+            return
+        }
         if (isIndependentPlaybackMode.value || !playbackSyncClient.value) {
             return
         }
@@ -923,6 +1019,24 @@ export const useAudioStore = defineStore('audio', () => {
 
     async function resume() {
         if (!currentTrack.value) {
+            return
+        }
+
+        if (native) {
+            if (isIndependentPlaybackMode.value) {
+                await native.localPlay(
+                    Math.max(0, currentQueue.value.currentIndex),
+                    currentTime.value,
+                )
+                return
+            }
+            const controlContext = getCurrentQueueControlContext()
+            await native.start()
+            await native.requestPlay({
+                positionSeconds: currentTime.value,
+                currentIndex: controlContext?.currentIndex,
+                version: controlContext?.version,
+            })
             return
         }
 
@@ -956,6 +1070,19 @@ export const useAudioStore = defineStore('audio', () => {
         queuedPlayIntent.value = null
         queuedSystemPauseIntent.value = null
         awaitingSyncRecovery.value = false
+
+        if (native) {
+            if (!isIndependentPlaybackMode.value && canSendRealtimeControl.value) {
+                void native.requestPause(0)
+                return
+            }
+            latestSnapshot.value = null
+            latestSnapshotReceivedAtMs.value = null
+            currentQueue.value = createEmptyQueue()
+            clearTrackState()
+            void native.localPause()
+            return
+        }
 
         if (isIndependentPlaybackMode.value) {
             latestSnapshot.value = null
@@ -997,7 +1124,16 @@ export const useAudioStore = defineStore('audio', () => {
 
     function seek(time: number) {
         if (isIndependentPlaybackMode.value) {
+            if (native) {
+                void native.localSeek(time)
+                return
+            }
             seekLocalPlayback(time)
+            return
+        }
+
+        if (native) {
+            void native.requestSeek(clampTime(time, duration.value))
             return
         }
 
@@ -1028,6 +1164,11 @@ export const useAudioStore = defineStore('audio', () => {
             return
         }
 
+        if (native) {
+            void native.start()
+            return
+        }
+
         const client = ensureSyncClient()
         client.connect()
     }
@@ -1035,6 +1176,9 @@ export const useAudioStore = defineStore('audio', () => {
     function disconnectPlaybackSync(options: { preservePlayback?: boolean } = {}) {
         const preservePlayback = options.preservePlayback ?? false
         resetSyncRecoveryState()
+        if (native) {
+            void native.stopSync()
+        }
         playbackSyncClient.value?.disconnect()
         playbackSyncClient.value = null
         clientDiagnostics.value = null
@@ -1064,10 +1208,18 @@ export const useAudioStore = defineStore('audio', () => {
         destroyAudioContext()
     }
 
-    // 回前台时校验同步连接健康：后台节流期间 socket 可能已半死而客户端无从感知
+    // 回前台时校验同步连接健康：后台节流期间 socket 可能已半死而客户端无从感知；
+    // Android 原生后端不受节流影响，回前台改为全量拉取原生状态对齐 UI
     if (typeof document !== 'undefined') {
         document.addEventListener('visibilitychange', () => {
-            if (document.visibilityState !== 'visible' || isIndependentPlaybackMode.value) {
+            if (document.visibilityState !== 'visible') {
+                return
+            }
+            if (native) {
+                void native.refreshFromNative()
+                return
+            }
+            if (isIndependentPlaybackMode.value) {
                 return
             }
             playbackSyncClient.value?.verifyConnectionHealth()
@@ -1086,7 +1238,14 @@ export const useAudioStore = defineStore('audio', () => {
                 }
             }
         }
+        if (native) {
+            void native.configure()
+        }
     })
+
+    if (native) {
+        void native.refreshFromNative()
+    }
 
     return {
         currentTrack,

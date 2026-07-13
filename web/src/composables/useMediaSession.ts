@@ -1,4 +1,5 @@
 import { onScopeDispose, watch } from 'vue'
+import { isAndroidRuntime } from '@/runtime/androidPlayback'
 
 type MediaSessionAudioStore = {
     currentTrack: {
@@ -123,6 +124,12 @@ const resolveSeekOffset = (details: MediaSessionActionDetails) => {
 }
 
 export const useMediaSession = (audioStore: MediaSessionAudioStore) => {
+    // Android 上系统媒体会话由原生 Media3 MediaSession 承载（WebView 的
+    // navigator.mediaSession 本就不与系统控件打通），避免双会话
+    if (isAndroidRuntime()) {
+        return
+    }
+
     const mediaSession = getMediaSession()
     if (!mediaSession) {
         return

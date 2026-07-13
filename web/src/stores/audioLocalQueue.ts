@@ -157,6 +157,7 @@ export const useAudioLocalQueue = (options: UseAudioLocalQueueOptions) => {
             artistLabel: track.artist,
             coverUrl: track.cover,
             durationMs: bufferedDurationMs ?? existingItem?.durationMs ?? 0,
+            mediaFileId: track.mediaFileId ?? existingItem?.mediaFileId,
         }
     }
 

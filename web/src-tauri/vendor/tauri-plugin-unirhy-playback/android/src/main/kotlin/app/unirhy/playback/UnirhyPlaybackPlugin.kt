@@ -30,6 +30,13 @@ class SetVolumeArgs {
 @InvokeArg
 class RequestPlayArgs {
     var positionSeconds: Double? = null
+    var currentIndex: Int? = null
+    var version: Long? = null
+}
+
+@InvokeArg
+class RequestPauseArgs {
+    var positionSeconds: Double? = null
 }
 
 @InvokeArg
@@ -165,13 +172,18 @@ class UnirhyPlaybackPlugin(private val activity: Activity) : Plugin(activity) {
     @Command
     fun requestPlay(invoke: Invoke) {
         val args = invoke.parseArgs(RequestPlayArgs::class.java)
-        PlaybackController.onUserPlay(args.positionSeconds)
+        PlaybackController.onUserPlay(
+            positionSeconds = args.positionSeconds,
+            currentIndexOverride = args.currentIndex,
+            versionOverride = args.version,
+        )
         invoke.resolve()
     }
 
     @Command
     fun requestPause(invoke: Invoke) {
-        PlaybackController.onUserPause()
+        val args = invoke.parseArgs(RequestPauseArgs::class.java)
+        PlaybackController.onUserPause(positionOverride = args.positionSeconds)
         invoke.resolve()
     }
 

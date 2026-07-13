@@ -470,7 +470,11 @@ object PlaybackController {
 
     // ---------- 用户命令（MediaSession 系统控件 / TS 桥） ----------
 
-    fun onUserPlay(positionSeconds: Double?) {
+    fun onUserPlay(
+        positionSeconds: Double?,
+        currentIndexOverride: Int? = null,
+        versionOverride: Long? = null,
+    ) {
         executor.execute {
             if (isIndependentMode()) {
                 playerEngine?.let { engine ->
@@ -478,18 +482,18 @@ object PlaybackController {
                 }
                 return@execute
             }
-            val index = queueState.queue?.currentIndex ?: return@execute
+            val index = currentIndexOverride ?: queueState.queue?.currentIndex ?: return@execute
             syncClient?.sendControl(
                 type = "PLAY",
                 commandId = newCommandId(),
                 currentIndex = index,
                 positionSeconds = positionSeconds ?: currentPositionSeconds,
-                version = lastKnownVersion,
+                version = versionOverride ?: lastKnownVersion,
             )
         }
     }
 
-    fun onUserPause() {
+    fun onUserPause(positionOverride: Double? = null) {
         executor.execute {
             if (isIndependentMode()) {
                 playerEngine?.let { engine ->
@@ -503,7 +507,7 @@ object PlaybackController {
                 type = "PAUSE",
                 commandId = newCommandId(),
                 currentIndex = index,
-                positionSeconds = currentPositionSeconds,
+                positionSeconds = positionOverride ?: currentPositionSeconds,
                 version = lastKnownVersion,
             )
         }

@@ -28,6 +28,7 @@ export type NativePlaybackState = {
     positionSeconds: number
     durationSeconds: number
     isLoading: boolean
+    error?: string | null
     syncPhase: NativeSyncPhase
     clockOffsetMs: number
     roundTripEstimateMs: number
@@ -81,10 +82,21 @@ export const getNativePlaybackState = () => invokePlugin<NativePlaybackState>('g
 export const setNativeVolume = (volume: number) =>
     invokeCommand('set_volume', { request: { volume } })
 
-export const requestNativePlay = (positionSeconds?: number) =>
-    invokeCommand('request_play', { request: { positionSeconds: positionSeconds ?? null } })
+export const requestNativePlay = (options?: {
+    positionSeconds?: number
+    currentIndex?: number
+    version?: number
+}) =>
+    invokeCommand('request_play', {
+        request: {
+            positionSeconds: options?.positionSeconds ?? null,
+            currentIndex: options?.currentIndex ?? null,
+            version: options?.version ?? null,
+        },
+    })
 
-export const requestNativePause = () => invokeCommand('request_pause')
+export const requestNativePause = (positionSeconds?: number) =>
+    invokeCommand('request_pause', { request: { positionSeconds: positionSeconds ?? null } })
 
 export const requestNativeSeek = (positionSeconds: number) =>
     invokeCommand('request_seek', { request: { positionSeconds } })
