@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import { Pencil, Plus, Trash2 } from 'lucide-vue-next'
 import { reactive, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { resolveErrorMessage } from '@/i18n/errors'
 import { useModalContext } from '@/components/modals/modalContext'
 import { normalizeLabels } from '@/composables/recordingMedia'
+
+const { t } = useI18n()
 
 export type ArtistEditForm = {
     displayName: string
@@ -20,8 +23,8 @@ const props = withDefaults(
         nameFailureMessage?: string
     }>(),
     {
-        submitText: '保存更改',
-        submittingText: '保存中...',
+        submitText: '',
+        submittingText: '',
         nameFailureMessage: 'errors.fallback.artistUpdate',
     },
 )
@@ -71,7 +74,7 @@ const submit = async () => {
     }
 
     if (!form.displayName.trim()) {
-        error.value = '艺术家名称不能为空'
+        error.value = t('artistEdit.nameEmpty')
         return
     }
 
@@ -98,7 +101,7 @@ const submit = async () => {
     <div class="flex flex-col space-y-5">
         <label class="block">
             <span class="mb-2 block font-serif text-xs uppercase tracking-wider text-[#8A8A8A]">
-                艺术家名称
+                {{ t('artistEdit.name') }}
             </span>
             <input
                 v-model="form.displayName"
@@ -114,7 +117,7 @@ const submit = async () => {
             <div
                 class="mb-2 flex items-center justify-between gap-3 font-serif text-xs uppercase tracking-wider text-[#8A8A8A]"
             >
-                <span>别名</span>
+                <span>{{ t('artistEdit.alias') }}</span>
             </div>
             <ul class="flex h-14 min-w-0 items-start gap-2 overflow-x-auto overflow-y-hidden pb-3">
                 <li
@@ -128,7 +131,7 @@ const submit = async () => {
                         type="text"
                         maxlength="255"
                         class="h-8 min-w-0 flex-1 truncate border-b border-[#D6D1C4] bg-transparent px-1 font-serif text-sm text-[#3D3D3D] transition-colors placeholder:text-[#BDB9AE] focus:border-[#C67C4E] focus:outline-none"
-                        placeholder="未命名别名"
+                        :placeholder="t('artistEdit.unnamedAlias')"
                         :disabled="isSaving"
                         @blur="stopEditingAlias"
                         @keydown.enter.prevent="stopEditingAlias"
@@ -138,9 +141,9 @@ const submit = async () => {
                         type="button"
                         class="h-8 max-w-[230px] truncate px-1 text-left font-serif text-sm text-[#3D3D3D] transition-colors hover:text-[#C67C4E]"
                         :disabled="isSaving"
-                        :title="form.alias[index] || '未命名别名'"
+                        :title="form.alias[index] || t('artistEdit.unnamedAlias')"
                     >
-                        {{ form.alias[index] || '未命名别名' }}
+                        {{ form.alias[index] || t('artistEdit.unnamedAlias') }}
                     </button>
                     <div
                         v-if="editingAliasIndex !== index"
@@ -150,8 +153,8 @@ const submit = async () => {
                             type="button"
                             class="inline-flex h-7 w-7 items-center justify-center rounded-sm text-[#8A8A8A] transition-colors hover:bg-[#EAE6DE] hover:text-[#C67C4E] disabled:cursor-not-allowed disabled:opacity-60"
                             :disabled="isSaving"
-                            aria-label="修改别名"
-                            title="修改"
+                            :aria-label="t('artistEdit.modifyAliasAria')"
+                            :title="t('artistEdit.modifyAlias')"
                             @click.stop="editAlias(index)"
                         >
                             <Pencil :size="13" />
@@ -160,8 +163,8 @@ const submit = async () => {
                             type="button"
                             class="inline-flex h-7 w-7 items-center justify-center rounded-sm text-[#8A8A8A] transition-colors hover:bg-[#F1E3DF] hover:text-[#B95D5D] disabled:cursor-not-allowed disabled:opacity-60"
                             :disabled="isSaving"
-                            aria-label="删除别名"
-                            title="删除"
+                            :aria-label="t('artistEdit.deleteAliasAria')"
+                            :title="t('artistEdit.deleteAlias')"
                             @click.stop="removeAlias(index)"
                         >
                             <Trash2 :size="13" />
@@ -172,7 +175,7 @@ const submit = async () => {
                     type="button"
                     class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-sm border border-[#D6D1C4] text-[#8A8A8A] transition-colors hover:border-[#C67C4E] hover:text-[#C67C4E] disabled:cursor-not-allowed disabled:opacity-60"
                     :disabled="isSaving"
-                    aria-label="添加别名"
+                    :aria-label="t('artistEdit.addAliasAria')"
                     @click="addAlias"
                 >
                     <Plus :size="14" />
@@ -182,13 +185,13 @@ const submit = async () => {
 
         <label class="flex min-h-[120px] flex-col">
             <span class="mb-2 block font-serif text-xs uppercase tracking-wider text-[#8A8A8A]">
-                描述
+                {{ t('artistEdit.description') }}
             </span>
             <textarea
                 v-model="form.comment"
                 rows="4"
                 class="flex-1 resize-none border-b border-[#D6D1C4] bg-[#F7F5F0] p-3 font-serif text-[#3D3D3D] transition-colors placeholder:text-[#BDB9AE] focus:border-[#C67C4E] focus:outline-none"
-                placeholder="添加描述..."
+                :placeholder="t('artistEdit.descriptionPlaceholder')"
                 :disabled="isSaving"
             ></textarea>
         </label>
@@ -204,7 +207,7 @@ const submit = async () => {
                 :disabled="isSaving"
                 @click="closeModal"
             >
-                取消
+                {{ t('common.cancel') }}
             </button>
             <button
                 type="button"
@@ -212,7 +215,11 @@ const submit = async () => {
                 :disabled="isSaving"
                 @click="submit"
             >
-                {{ isSaving ? submittingText : submitText }}
+                {{
+                    isSaving
+                        ? submittingText || t('common.saving')
+                        : submitText || t('common.saveChanges')
+                }}
             </button>
         </div>
     </div>

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import VChart from 'vue-echarts'
 import { use } from 'echarts/core'
 import { CanvasRenderer } from 'echarts/renderers'
@@ -60,6 +61,7 @@ const clockFormatter = new Intl.DateTimeFormat('zh-CN', {
     hour12: false,
 })
 
+const { t } = useI18n()
 const audioStore = useAudioStore()
 const nowMs = ref(nowClientMs())
 const pipelineHistory = ref<PipelinePoint[]>([])
@@ -108,39 +110,39 @@ const formatAge = (value: number | null | undefined) => {
     }
 
     const diffSeconds = Math.max(0, Math.round((nowMs.value - value) / 1_000))
-    return `${diffSeconds}秒前`
+    return t('syncDebug.secondsAgo', { seconds: diffSeconds })
 }
 
-const SOCKET_STATE_LABELS: Record<string, string> = {
-    idle: '空闲',
-    connecting: '连接中',
-    open: '已连接',
-    closing: '关闭中',
-    closed: '已关闭',
-}
+const SOCKET_STATE_LABELS = computed<Record<string, string>>(() => ({
+    idle: t('syncDebug.idle'),
+    connecting: t('syncDebug.connecting'),
+    open: t('syncDebug.open'),
+    closing: t('syncDebug.closing'),
+    closed: t('syncDebug.closed'),
+}))
 
-const ACTION_LABELS: Record<string, string> = {
-    PLAY: '播放',
-    PAUSE: '暂停',
-    SEEK: '跳转',
-}
+const ACTION_LABELS = computed<Record<string, string>>(() => ({
+    PLAY: t('syncDebug.play'),
+    PAUSE: t('syncDebug.pause'),
+    SEEK: t('syncDebug.seek'),
+}))
 
 const formatSocketStateLabel = (state: string | null | undefined) => {
     if (!state) {
         return '-'
     }
-    return SOCKET_STATE_LABELS[state] ?? state
+    return SOCKET_STATE_LABELS.value[state] ?? state
 }
 
 const formatActionLabel = (action: string | null | undefined) => {
     if (!action) {
         return '-'
     }
-    return ACTION_LABELS[action] ?? action
+    return ACTION_LABELS.value[action] ?? action
 }
 
 const formatPlaybackStatusLabel = (isPlaying: boolean) => {
-    return isPlaying ? '播放中' : '已暂停'
+    return isPlaying ? t('syncDebug.playing') : t('syncDebug.paused')
 }
 
 const summarizeEventPayload = (payload: unknown) => {
@@ -221,7 +223,7 @@ const rttAverageMs = computed(() => average(ntpMeasurements.value.map((item) => 
 const currentTrackLabel = computed(() => {
     const track = debugSnapshot.value.currentTrack
     if (!track) {
-        return '当前无曲目'
+        return t('syncDebug.noTrack')
     }
     return `${track.title} · ${track.artist}`
 })
@@ -301,7 +303,7 @@ const currentErrorMessage = computed(() => {
 
 const displayErrorMessage = computed(() => {
     if (currentErrorMessage.value === PLAYBACK_ERROR_MESSAGE) {
-        return '音频播放失败'
+        return t('syncDebug.audioPlayFailed')
     }
     return currentErrorMessage.value
 })
@@ -327,7 +329,7 @@ const latestCommandLabel = computed(() => {
     }
 
     if (latestLoad && !latestSchedule) {
-        return '加载音源'
+        return t('syncDebug.loadingSource')
     }
 
     if (!latestLoad && latestSchedule) {
@@ -335,7 +337,7 @@ const latestCommandLabel = computed(() => {
     }
 
     return latestLoad!.atMs > latestSchedule!.atMs
-        ? '加载音源'
+        ? t('syncDebug.loadingSource')
         : formatActionLabel(latestSchedule!.payload.scheduledAction.action)
 })
 
@@ -467,7 +469,7 @@ const ntpChartOption = computed(() => {
     return createChartOption(xAxisData, [
         {
             ...baseChartSeriesStyle,
-            name: '偏移',
+            name: t('syncDebug.offset'),
             type: 'line',
             step: 'end',
             data: ntpMeasurements.value.map((item) => item.offsetMs),
@@ -515,7 +517,7 @@ const pipelineChartOption = computed(() => {
     return createChartOption(xAxisData, [
         {
             ...baseChartSeriesStyle,
-            name: '调度等待',
+            name: t('syncDebug.scheduleWait'),
             type: 'line',
             data: pipelineHistory.value.map((item) => item.waitMs),
             lineStyle: {
@@ -544,7 +546,7 @@ const pipelineChartOption = computed(() => {
         },
         {
             ...baseChartSeriesStyle,
-            name: '延迟漂移',
+            name: t('syncDebug.latencyDrift'),
             type: 'line',
             data: pipelineHistory.value.map((item) => item.lateMs),
             lineStyle: {
@@ -593,10 +595,10 @@ onBeforeUnmount(() => {
                         <h1
                             class="font-serif text-[2rem] leading-none text-[#1A1917] md:text-[2.35rem]"
                         >
-                            播放时序监视
+                            {{ t('syncDebug.playbackTimingMonitor') }}
                         </h1>
                         <p class="mt-3 text-[13px] tracking-[0.14em] text-[#1A1917]/50">
-                            状态：
+                            {{ t('syncDebug.status') }}
                             <span data-test="debug-sync-status" class="font-mono text-[#1A1917]">
                                 {{ debugSnapshot.syncStatusText }}
                             </span>
@@ -606,7 +608,7 @@ onBeforeUnmount(() => {
                     <div class="flex flex-wrap gap-3 lg:justify-end">
                         <div class="border border-[#DCD9D0] bg-white px-4 py-2.5 text-right">
                             <div class="text-[9px] uppercase tracking-[0.2em] text-[#1A1917]/40">
-                                当前时钟
+                                {{ t('syncDebug.currentClock') }}
                             </div>
                             <div class="mt-1 font-mono text-base tracking-tight text-[#1A1917]">
                                 {{ formatClockTime(nowMs) }}
@@ -614,7 +616,7 @@ onBeforeUnmount(() => {
                         </div>
                         <div class="border border-[#DCD9D0] bg-white px-4 py-2.5 text-right">
                             <div class="text-[9px] uppercase tracking-[0.2em] text-[#1A1917]/40">
-                                本机设备
+                                {{ t('syncDebug.localDevice') }}
                             </div>
                             <div
                                 data-test="debug-device-id"
@@ -625,7 +627,7 @@ onBeforeUnmount(() => {
                         </div>
                         <div class="border border-[#DCD9D0] bg-white px-4 py-2.5 text-right">
                             <div class="text-[9px] uppercase tracking-[0.2em] text-[#1A1917]/40">
-                                已应用版本
+                                {{ t('syncDebug.appliedVersion') }}
                             </div>
                             <div class="mt-1 font-mono text-base tracking-tight text-[#1A1917]">
                                 {{ appliedVersionLabel }}
@@ -642,14 +644,16 @@ onBeforeUnmount(() => {
                             <div
                                 class="text-[10px] font-medium uppercase tracking-[0.12em] text-[#1A1917]/40"
                             >
-                                NTP / 时延表现
+                                {{ t('syncDebug.ntpPerformance') }}
                             </div>
-                            <h2 class="mt-1 font-serif text-[1.65rem] text-[#1A1917]">时序窗口</h2>
+                            <h2 class="mt-1 font-serif text-[1.65rem] text-[#1A1917]">
+                                {{ t('syncDebug.timingWindow') }}
+                            </h2>
                         </div>
                         <div
                             class="w-max border border-[#1A1917]/10 px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.18em] text-[#1A1917]/60"
                         >
-                            采样数：{{ ntpMeasurements.length }}
+                            {{ t('syncDebug.sampleCount', { count: ntpMeasurements.length }) }}
                         </div>
                     </div>
 
@@ -658,7 +662,7 @@ onBeforeUnmount(() => {
                     >
                         <div class="bg-white p-3">
                             <div class="text-[9px] uppercase tracking-[0.16em] text-[#1A1917]/40">
-                                偏移均值
+                                {{ t('syncDebug.offsetMean') }}
                             </div>
                             <div class="mt-1 font-mono text-lg tracking-tighter text-[#1A1917]">
                                 {{ formatNumber(offsetAverageMs) }}
@@ -667,7 +671,7 @@ onBeforeUnmount(() => {
                         </div>
                         <div class="bg-white p-3">
                             <div class="text-[9px] uppercase tracking-[0.16em] text-[#1A1917]/40">
-                                RTT 均值
+                                {{ t('syncDebug.rttMean') }}
                             </div>
                             <div class="mt-1 font-mono text-lg tracking-tighter text-[#1A1917]">
                                 {{ formatNumber(rttAverageMs) }}
@@ -676,7 +680,7 @@ onBeforeUnmount(() => {
                         </div>
                         <div class="bg-white p-3">
                             <div class="text-[9px] uppercase tracking-[0.16em] text-[#1A1917]/40">
-                                不确定性
+                                {{ t('syncDebug.uncertainty') }}
                             </div>
                             <div
                                 data-test="debug-clock-sync-uncertainty"
@@ -691,7 +695,7 @@ onBeforeUnmount(() => {
                         <div
                             class="absolute top-3 left-4 z-10 text-[9px] uppercase tracking-[0.18em] text-[#1A1917]/40"
                         >
-                            偏移与 RTT 变化
+                            {{ t('syncDebug.offsetRttChange') }}
                         </div>
                         <div ref="ntpChartViewport" class="h-[180px] w-full">
                             <VChart
@@ -706,7 +710,7 @@ onBeforeUnmount(() => {
                     <div class="mt-6 grid gap-4 border-t border-[#DCD9D0] pt-4 md:grid-cols-3">
                         <div>
                             <div class="text-[9px] uppercase tracking-[0.12em] text-[#1A1917]/40">
-                                连接
+                                {{ t('syncDebug.connection') }}
                             </div>
                             <div class="mt-1 font-mono text-sm text-[#1A1917]">
                                 {{
@@ -718,7 +722,7 @@ onBeforeUnmount(() => {
                         </div>
                         <div>
                             <div class="text-[9px] uppercase tracking-[0.12em] text-[#1A1917]/40">
-                                重连次数
+                                {{ t('syncDebug.reconnectCount') }}
                             </div>
                             <div class="mt-1 font-mono text-sm text-[#1A1917]">
                                 {{ debugSnapshot.clientDiagnostics?.reconnectAttempt ?? 0 }}
@@ -726,7 +730,7 @@ onBeforeUnmount(() => {
                         </div>
                         <div>
                             <div class="text-[9px] uppercase tracking-[0.12em] text-[#1A1917]/40">
-                                距上次响应
+                                {{ t('syncDebug.sinceLastResponse') }}
                             </div>
                             <div
                                 data-test="debug-last-response-age"
@@ -746,9 +750,11 @@ onBeforeUnmount(() => {
                             <div
                                 class="text-[10px] font-medium uppercase tracking-[0.12em] text-[#1A1917]/40"
                             >
-                                本地音频管线
+                                {{ t('syncDebug.localAudioPipeline') }}
                             </div>
-                            <h2 class="mt-1 font-serif text-[1.65rem] text-[#1A1917]">执行缓冲</h2>
+                            <h2 class="mt-1 font-serif text-[1.65rem] text-[#1A1917]">
+                                {{ t('syncDebug.executionBuffer') }}
+                            </h2>
                         </div>
                         <div
                             class="w-max border border-[#1A1917]/10 px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.18em] text-[#1A1917]/60"
@@ -762,7 +768,7 @@ onBeforeUnmount(() => {
                     >
                         <div class="bg-white p-3">
                             <div class="text-[9px] uppercase tracking-[0.16em] text-[#1A1917]/40">
-                                调度等待
+                                {{ t('syncDebug.scheduleWait') }}
                             </div>
                             <div class="mt-1 font-mono text-lg tracking-tighter text-[#1A1917]">
                                 {{
@@ -772,7 +778,7 @@ onBeforeUnmount(() => {
                         </div>
                         <div class="bg-white p-3">
                             <div class="text-[9px] uppercase tracking-[0.16em] text-[#1A1917]/40">
-                                执行漂移
+                                {{ t('syncDebug.executionDrift') }}
                             </div>
                             <div class="mt-1 font-mono text-lg tracking-tighter text-[#1A1917]">
                                 {{ formatMilliseconds(lastExecutionLateDriftMs) }}
@@ -784,7 +790,7 @@ onBeforeUnmount(() => {
                         <div
                             class="absolute top-3 left-4 z-10 text-[9px] uppercase tracking-[0.18em] text-[#1A1917]/40"
                         >
-                            执行等待与漂移
+                            {{ t('syncDebug.executionWaitDrift') }}
                         </div>
                         <div ref="pipelineChartViewport" class="h-[180px] w-full">
                             <VChart
@@ -799,7 +805,7 @@ onBeforeUnmount(() => {
                     <div class="mt-6 grid gap-4 border-t border-[#DCD9D0] pt-4 md:grid-cols-3">
                         <div>
                             <div class="text-[9px] uppercase tracking-[0.12em] text-[#1A1917]/40">
-                                当前进度
+                                {{ t('syncDebug.currentProgress') }}
                             </div>
                             <div class="mt-1 font-mono text-sm text-[#1A1917]">
                                 {{ formatSeconds(debugSnapshot.currentTime) }}/{{
@@ -809,18 +815,26 @@ onBeforeUnmount(() => {
                         </div>
                         <div>
                             <div class="text-[9px] uppercase tracking-[0.12em] text-[#1A1917]/40">
-                                同步恢复
+                                {{ t('syncDebug.syncRecovery') }}
                             </div>
                             <div class="mt-1 font-mono text-sm text-[#1A1917]">
-                                {{ debugSnapshot.awaitingSyncRecovery ? '等待中' : '空闲' }}
+                                {{
+                                    debugSnapshot.awaitingSyncRecovery
+                                        ? t('syncDebug.waiting')
+                                        : t('syncDebug.idle')
+                                }}
                             </div>
                         </div>
                         <div>
                             <div class="text-[9px] uppercase tracking-[0.12em] text-[#1A1917]/40">
-                                浏览器音频
+                                {{ t('syncDebug.browserAudio') }}
                             </div>
                             <div class="mt-1 font-mono text-sm text-[#1A1917]">
-                                {{ debugSnapshot.audioUnlockRequired ? '未启用' : '已启用' }}
+                                {{
+                                    debugSnapshot.audioUnlockRequired
+                                        ? t('syncDebug.notEnabled')
+                                        : t('syncDebug.enabled')
+                                }}
                             </div>
                         </div>
                     </div>
@@ -832,14 +846,16 @@ onBeforeUnmount(() => {
                             <div
                                 class="text-[10px] font-medium uppercase tracking-[0.12em] text-[#1A1917]/40"
                             >
-                                协议事件日志
+                                {{ t('syncDebug.protocolEventLog') }}
                             </div>
-                            <h2 class="mt-1 font-serif text-[1.65rem] text-[#1A1917]">时序流</h2>
+                            <h2 class="mt-1 font-serif text-[1.65rem] text-[#1A1917]">
+                                {{ t('syncDebug.timingStream') }}
+                            </h2>
                         </div>
                         <div
                             class="w-max bg-[#1A1917] px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.18em] text-[#F6F5F2]"
                         >
-                            实时
+                            {{ t('syncDebug.realtime') }}
                         </div>
                     </div>
 
@@ -850,22 +866,22 @@ onBeforeUnmount(() => {
                             <div
                                 class="col-span-1 text-[9px] font-medium uppercase tracking-[0.12em] text-[#1A1917]/50"
                             >
-                                方向
+                                {{ t('syncDebug.direction') }}
                             </div>
                             <div
                                 class="col-span-3 text-[9px] font-medium uppercase tracking-[0.12em] text-[#1A1917]/50"
                             >
-                                事件
+                                {{ t('syncDebug.event') }}
                             </div>
                             <div
                                 class="col-span-6 text-[9px] font-medium uppercase tracking-[0.12em] text-[#1A1917]/50"
                             >
-                                内容 / 详情
+                                {{ t('syncDebug.contentDetail') }}
                             </div>
                             <div
                                 class="col-span-2 text-right text-[9px] font-medium uppercase tracking-[0.12em] text-[#1A1917]/50"
                             >
-                                时间
+                                {{ t('syncDebug.time') }}
                             </div>
                         </div>
 
@@ -902,7 +918,7 @@ onBeforeUnmount(() => {
                                 </div>
                             </template>
                             <div v-else class="px-4 py-8 text-center text-sm text-[#1A1917]/40">
-                                暂无协议事件
+                                {{ t('syncDebug.noProtocolEvents') }}
                             </div>
                         </div>
                     </div>
@@ -918,7 +934,7 @@ onBeforeUnmount(() => {
                 >
                     <div>
                         <div class="text-[9px] uppercase tracking-[0.16em] text-[#1A1917]/40">
-                            曲目
+                            {{ t('syncDebug.track') }}
                         </div>
                         <div class="mt-2 font-serif text-lg text-[#1A1917]">
                             {{ currentTrackLabel }}
@@ -926,7 +942,7 @@ onBeforeUnmount(() => {
                     </div>
                     <div>
                         <div class="text-[9px] uppercase tracking-[0.16em] text-[#1A1917]/40">
-                            最近执行
+                            {{ t('syncDebug.recentExecution') }}
                         </div>
                         <div class="mt-2 font-mono text-sm text-[#1A1917]">
                             {{
@@ -938,7 +954,7 @@ onBeforeUnmount(() => {
                     </div>
                     <div>
                         <div class="text-[9px] uppercase tracking-[0.16em] text-[#1A1917]/40">
-                            最近动作
+                            {{ t('syncDebug.recentAction') }}
                         </div>
                         <div class="mt-2 font-mono text-sm text-[#1A1917]">
                             {{ latestCommandLabel }}
@@ -946,7 +962,7 @@ onBeforeUnmount(() => {
                     </div>
                     <div>
                         <div class="text-[9px] uppercase tracking-[0.16em] text-[#1A1917]/40">
-                            在线设备
+                            {{ t('syncDebug.onlineDevices') }}
                         </div>
                         <div class="mt-2 font-mono text-sm text-[#1A1917]">
                             {{ onlineDeviceSummary }}
@@ -956,7 +972,7 @@ onBeforeUnmount(() => {
 
                 <div v-if="displayErrorMessage" class="mt-4 border-t border-[#DCD9D0] pt-4">
                     <div class="text-[9px] uppercase tracking-[0.16em] text-[#1A1917]/40">
-                        当前错误
+                        {{ t('syncDebug.currentError') }}
                     </div>
                     <div
                         class="mt-2 break-all font-mono text-xs text-[#C85A3C]"
@@ -972,7 +988,7 @@ onBeforeUnmount(() => {
                 >
                     <div>
                         <div class="text-[9px] uppercase tracking-[0.16em] text-[#1A1917]/40">
-                            格式
+                            {{ t('syncDebug.format') }}
                         </div>
                         <div class="mt-2 font-mono text-sm text-[#1A1917]">
                             {{ audioFormat }}
@@ -980,7 +996,7 @@ onBeforeUnmount(() => {
                     </div>
                     <div>
                         <div class="text-[9px] uppercase tracking-[0.16em] text-[#1A1917]/40">
-                            码率
+                            {{ t('syncDebug.bitrate') }}
                         </div>
                         <div class="mt-2 font-mono text-sm text-[#1A1917]">
                             {{
@@ -992,7 +1008,7 @@ onBeforeUnmount(() => {
                     </div>
                     <div>
                         <div class="text-[9px] uppercase tracking-[0.16em] text-[#1A1917]/40">
-                            采样率
+                            {{ t('syncDebug.sampleRate') }}
                         </div>
                         <div class="mt-2 font-mono text-sm text-[#1A1917]">
                             {{
@@ -1004,21 +1020,21 @@ onBeforeUnmount(() => {
                     </div>
                     <div>
                         <div class="text-[9px] uppercase tracking-[0.16em] text-[#1A1917]/40">
-                            声道
+                            {{ t('syncDebug.channels') }}
                         </div>
                         <div class="mt-2 font-mono text-sm text-[#1A1917]">
                             {{
                                 debugSnapshot.currentBuffer.numberOfChannels === 1
-                                    ? '1（单声道）'
+                                    ? t('syncDebug.mono')
                                     : debugSnapshot.currentBuffer.numberOfChannels === 2
-                                      ? '2（立体声）'
+                                      ? t('syncDebug.stereo')
                                       : (debugSnapshot.currentBuffer.numberOfChannels ?? '-')
                             }}
                         </div>
                     </div>
                     <div>
                         <div class="text-[9px] uppercase tracking-[0.16em] text-[#1A1917]/40">
-                            文件大小
+                            {{ t('syncDebug.fileSize') }}
                         </div>
                         <div class="mt-2 font-mono text-sm text-[#1A1917]">
                             {{ formatFileSize(debugSnapshot.currentBuffer.fileSizeBytes) }}

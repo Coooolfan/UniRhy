@@ -18,9 +18,12 @@ import type { CodecType } from '@/__generated/model/enums/CodecType'
 import { type FileProviderType } from '@/__generated/model/enums/FileProviderType'
 import type { PluginInfoResponse } from '@/__generated/model/static/PluginInfoResponse'
 import type { TranscodeTaskRequest } from '@/__generated/model/static'
+import { useI18n } from 'vue-i18n'
 import { resolveErrorMessage } from '@/i18n/errors'
 import { useModalContext } from '@/components/modals/modalContext'
 import type { TaskProviderOption } from '@/composables/useTaskManagement'
+
+const { t } = useI18n()
 
 type BuiltinTaskKind = 'METADATA_PARSE' | 'TRANSCODE'
 
@@ -51,31 +54,31 @@ const props = defineProps<{
     submitPluginTask: (taskType: string, params: Record<string, string>) => Promise<void> | void
 }>()
 
-const BUILTIN_TASK_OPTIONS: TaskDefinition[] = [
+const BUILTIN_TASK_OPTIONS = computed<TaskDefinition[]>(() => [
     {
         id: 'METADATA_PARSE',
-        name: '元数据解析',
-        desc: '遍历存储节点，发现媒体文件并补充缺失的元数据解析',
+        name: t('taskSubmission.metadataParse'),
+        desc: t('taskSubmission.metadataParseDesc'),
         icon: FolderSearch,
         isPlugin: false,
     },
     {
         id: 'TRANSCODE',
-        name: '媒体转码',
-        desc: '遍历源存储节点中的所有已导入文件，转码为指定格式并保存到目标存储节点',
+        name: t('taskSubmission.transcode'),
+        desc: t('taskSubmission.transcodeDesc'),
         icon: FileAudio,
         isPlugin: false,
     },
-]
+])
 
-const TARGET_CODEC_OPTIONS: Array<{ value: CodecType; label: string; hint: string }> = [
-    { value: 'OPUS', label: 'Opus', hint: '现代音频编码。转码目标为128Kbps可变码率。' },
-]
+const TARGET_CODEC_OPTIONS = computed<Array<{ value: CodecType; label: string; hint: string }>>(
+    () => [{ value: 'OPUS', label: 'Opus', hint: t('taskSubmission.opusHint') }],
+)
 
-const PROVIDER_TYPE_LABEL_MAP: Record<FileProviderType, string> = {
-    FILE_SYSTEM: '本地存储',
-    OSS: '对象存储',
-}
+const PROVIDER_TYPE_LABEL_MAP = computed<Record<FileProviderType, string>>(() => ({
+    FILE_SYSTEM: t('taskSubmission.localStorage'),
+    OSS: t('taskSubmission.objectStorage'),
+}))
 
 const PROVIDER_TYPE_ICON_MAP: Record<FileProviderType, Component> = {
     FILE_SYSTEM: HardDrive,
@@ -109,19 +112,21 @@ const pluginTaskOptions = computed<TaskDefinition[]>(() =>
         .map((p) => ({
             id: p.taskType!,
             name: p.name ?? p.id,
-            desc: `插件 ${p.id} v${p.version}`,
+            desc: t('taskSubmission.pluginDesc', { id: p.id, version: p.version }),
             icon: Puzzle,
             isPlugin: true,
         })),
 )
 
 const allTaskOptions = computed<TaskDefinition[]>(() => [
-    ...BUILTIN_TASK_OPTIONS,
+    ...BUILTIN_TASK_OPTIONS.value,
     ...pluginTaskOptions.value,
 ])
 
 const activeTaskOption = computed<TaskDefinition>(
-    () => allTaskOptions.value.find((o) => o.id === activeTaskId.value) ?? BUILTIN_TASK_OPTIONS[0]!,
+    () =>
+        allTaskOptions.value.find((o) => o.id === activeTaskId.value) ??
+        BUILTIN_TASK_OPTIONS.value[0]!,
 )
 
 const activePlugin = computed<PluginInfoResponse | null>(
@@ -224,9 +229,10 @@ const canSubmit = computed(() => {
 })
 
 const submitButtonLabel = computed(() => {
-    if (activePlugin.value) return `提交${activeTaskOption.value.name}任务`
-    if (activeTaskId.value === 'METADATA_PARSE') return '提交元数据解析任务'
-    return '提交转码任务'
+    if (activePlugin.value)
+        return t('taskSubmission.submitPluginTask', { name: activeTaskOption.value.name })
+    if (activeTaskId.value === 'METADATA_PARSE') return t('taskSubmission.submitMetadataTask')
+    return t('taskSubmission.submitTranscodeTask')
 })
 
 const activeTaskAvailability = computed<TaskAvailability | null>(() => {
@@ -234,8 +240,8 @@ const activeTaskAvailability = computed<TaskAvailability | null>(() => {
 
     if (providerOptions.value.length === 0) {
         return {
-            title: '暂无可用存储节点',
-            description: '请先在系统设置中配置存储节点，再回来发起元数据解析或转码任务。',
+            title: t('taskSubmission.noStorageTitle'),
+            description: t('taskSubmission.noStorageDesc'),
             icon: HardDrive,
         }
     }
@@ -245,16 +251,16 @@ const activeTaskAvailability = computed<TaskAvailability | null>(() => {
         metadataParseProviderOptions.value.length === 0
     ) {
         return {
-            title: '暂无可解析节点',
-            description: '需要至少一个非系统存储节点作为解析来源。',
+            title: t('taskSubmission.noParseNodeTitle'),
+            description: t('taskSubmission.noParseNodeDesc'),
             icon: FolderSearch,
         }
     }
 
     if (activeTaskId.value === 'TRANSCODE' && transcodeSourceProviderOptions.value.length === 0) {
         return {
-            title: '暂无可转码源节点',
-            description: '需要至少一个非系统存储节点作为转码来源。',
+            title: t('taskSubmission.noTranscodeSourceTitle'),
+            description: t('taskSubmission.noTranscodeSourceDesc'),
             icon: FileAudio,
         }
     }
@@ -264,8 +270,8 @@ const activeTaskAvailability = computed<TaskAvailability | null>(() => {
         transcodeDestinationProviderOptions.value.length === 0
     ) {
         return {
-            title: '暂无可写目标节点',
-            description: '需要至少一个可写存储节点作为转码输出。',
+            title: t('taskSubmission.noWriteTargetTitle'),
+            description: t('taskSubmission.noWriteTargetDesc'),
             icon: HardDrive,
         }
     }
@@ -366,14 +372,16 @@ const submit = async () => {
                 <div class="text-[11px] uppercase tracking-[0.32em] text-[#9C968B]">
                     Task Center
                 </div>
-                <h3 class="mt-3 font-serif text-2xl tracking-wide">发起任务</h3>
+                <h3 class="mt-3 font-serif text-2xl tracking-wide">
+                    {{ t('taskSubmission.startTask') }}
+                </h3>
             </div>
 
             <div class="mt-6">
                 <div
                     class="mb-3 px-6 text-[11px] uppercase tracking-[0.32em] text-[#9C968B] lg:px-8"
                 >
-                    任务类型
+                    {{ t('taskSubmission.taskType') }}
                 </div>
                 <div>
                     <button
@@ -414,7 +422,7 @@ const submit = async () => {
                     <button
                         v-if="isMobile"
                         type="button"
-                        aria-label="返回任务类型"
+                        :aria-label="t('taskSubmission.backToTaskType')"
                         class="-ml-1 shrink-0 p-1 text-[#8A8A8A] transition-colors hover:text-[#C27E46] lg:hidden"
                         @click="mobileStep = 'select-type'"
                     >
@@ -445,7 +453,7 @@ const submit = async () => {
                     class="flex min-h-[280px] items-center justify-center text-sm text-[#6B635B]"
                 >
                     <Loader2 class="mr-2 h-4 w-4 animate-spin text-[#C27E46]" />
-                    正在同步可用存储节点...
+                    {{ t('taskSubmission.syncingNodes') }}
                 </div>
 
                 <div
@@ -465,7 +473,7 @@ const submit = async () => {
                         @click="navigateToSettings"
                     >
                         <Settings :size="16" />
-                        <span>前往设置</span>
+                        <span>{{ t('taskSubmission.goToSettings') }}</span>
                     </button>
                 </div>
 
@@ -511,7 +519,7 @@ const submit = async () => {
                         <div class="flex items-start gap-2 text-sm text-[#6B635B]">
                             <Puzzle class="mt-0.5 h-4 w-4 shrink-0 text-[#C27E46]" />
                             <span>
-                                任务提交后，节点将按插件逻辑处理。实际执行需要本节点加载了对应插件。
+                                {{ t('taskSubmission.pluginTaskHint') }}
                             </span>
                         </div>
                     </div>
@@ -524,7 +532,7 @@ const submit = async () => {
                             <span
                                 class="mb-2 block text-xs uppercase tracking-[0.24em] text-[#8A8A8A]"
                             >
-                                解析存储节点
+                                {{ t('taskSubmission.parseStorageNode') }}
                             </span>
                             <div class="relative">
                                 <select
@@ -552,7 +560,7 @@ const submit = async () => {
                         >
                             <div>
                                 <div class="text-[11px] uppercase tracking-[0.24em] text-[#8A8A8A]">
-                                    节点类型
+                                    {{ t('taskSubmission.nodeType') }}
                                 </div>
                                 <div class="mt-2 flex items-center gap-2 text-[#2B221B]">
                                     <component
@@ -574,7 +582,7 @@ const submit = async () => {
                             </div>
                             <div>
                                 <div class="text-[11px] uppercase tracking-[0.24em] text-[#8A8A8A]">
-                                    节点 ID
+                                    {{ t('taskSubmission.nodeId') }}
                                 </div>
                                 <div class="mt-2 font-mono text-sm text-[#2C2C2C]">
                                     #{{ selectedMetadataParseProvider.id }}
@@ -596,14 +604,16 @@ const submit = async () => {
                                 >
                                     IN
                                 </span>
-                                <span class="text-sm font-medium text-[#2C2C2C]">源节点</span>
+                                <span class="text-sm font-medium text-[#2C2C2C]">{{
+                                    t('taskSubmission.sourceNode')
+                                }}</span>
                             </div>
 
                             <label class="block">
                                 <span
                                     class="mb-2 block text-xs uppercase tracking-[0.24em] text-[#8A8A8A]"
                                 >
-                                    来源存储节点
+                                    {{ t('taskSubmission.sourceStorageNode') }}
                                 </span>
                                 <div class="relative">
                                     <select
@@ -627,7 +637,7 @@ const submit = async () => {
 
                             <div v-if="selectedTranscodeSourceProvider" class="px-1 py-1">
                                 <div class="text-[11px] uppercase tracking-[0.24em] text-[#8A8A8A]">
-                                    来源节点信息
+                                    {{ t('taskSubmission.sourceNodeInfo') }}
                                 </div>
                                 <div class="mt-3 flex items-center gap-2 text-[#2B221B]">
                                     <component
@@ -669,14 +679,16 @@ const submit = async () => {
                                 >
                                     OUT
                                 </span>
-                                <span class="text-sm font-medium text-[#C27E46]">目标节点</span>
+                                <span class="text-sm font-medium text-[#C27E46]">{{
+                                    t('taskSubmission.targetNode')
+                                }}</span>
                             </div>
 
                             <label class="block">
                                 <span
                                     class="mb-2 block text-xs uppercase tracking-[0.24em] text-[#8A8A8A]"
                                 >
-                                    输出存储节点
+                                    {{ t('taskSubmission.outputStorageNode') }}
                                 </span>
                                 <div class="relative">
                                     <select
@@ -700,7 +712,7 @@ const submit = async () => {
 
                             <div v-if="selectedTranscodeDestinationProvider" class="px-1 py-1">
                                 <div class="text-[11px] uppercase tracking-[0.24em] text-[#8A8A8A]">
-                                    输出节点信息
+                                    {{ t('taskSubmission.outputNodeInfo') }}
                                 </div>
                                 <div class="mt-3 flex items-center gap-2 text-[#2B221B]">
                                     <component
@@ -729,7 +741,7 @@ const submit = async () => {
 
                     <label class="block pt-2">
                         <span class="mb-2 block text-xs uppercase tracking-[0.24em] text-[#8A8A8A]">
-                            目标编码格式
+                            {{ t('taskSubmission.targetEncodingFormat') }}
                         </span>
                         <div class="relative">
                             <select
@@ -771,7 +783,7 @@ const submit = async () => {
                     :disabled="isSubmitting"
                     @click="closeModal"
                 >
-                    取消
+                    {{ t('common.cancel') }}
                 </button>
                 <button
                     data-test="task-submit-button"
@@ -782,7 +794,7 @@ const submit = async () => {
                 >
                     <template v-if="isSubmitting">
                         <Loader2 class="h-4 w-4 animate-spin" />
-                        <span>提交中...</span>
+                        <span>{{ t('taskSubmission.submitting') }}</span>
                     </template>
                     <template v-else>
                         <span>{{ submitButtonLabel }}</span>

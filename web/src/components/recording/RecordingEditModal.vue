@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { reactive, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Disc, FileAudio, Image as ImageIcon, Pencil, Plus, Trash2 } from 'lucide-vue-next'
 import { resolveErrorMessage } from '@/i18n/errors'
 import { useModalContext } from '@/components/modals/modalContext'
@@ -42,6 +43,7 @@ const props = withDefaults(
 )
 
 const modal = useModalContext<undefined>()
+const { t } = useI18n()
 
 const form = reactive<RecordingEditForm>({
     title: props.initialForm.title,
@@ -90,7 +92,7 @@ const submit = async () => {
     }
 
     if (!form.title.trim()) {
-        error.value = '标题不能为空'
+        error.value = t('recording.titleEmpty')
         return
     }
 
@@ -140,27 +142,29 @@ const submit = async () => {
                     <div class="min-w-0 flex-1 space-y-3 py-1">
                         <div>
                             <div class="mb-1 text-xs uppercase tracking-wider text-[#8C857B]">
-                                曲目 ID
+                                {{ t('recording.trackId') }}
                             </div>
                             <div class="font-mono text-sm text-[#5E564D]">#{{ recording.id }}</div>
                         </div>
                         <div>
                             <div class="mb-1 text-xs uppercase tracking-wider text-[#8C857B]">
-                                资产
+                                {{ t('recording.asset') }}
                             </div>
                             <div class="truncate text-[#2C2420]">
-                                已关联 {{ recording.assets.length }} 个文件
+                                {{ t('recording.assetLinked', { count: recording.assets.length }) }}
                             </div>
                         </div>
                     </div>
                 </div>
                 <div>
-                    <div class="mt-2 text-xs uppercase tracking-wider text-[#8C857B]">艺术家</div>
+                    <div class="mt-2 text-xs uppercase tracking-wider text-[#8C857B]">
+                        {{ t('recording.artist') }}
+                    </div>
                     <div class="font-medium leading-snug text-[#2C2420]">
                         {{
                             recording.rawArtists
                                 .map((artist) => artist.displayName || artist.name)
-                                .join(', ') || '未知艺术家'
+                                .join(', ') || t('common.unknownArtist')
                         }}
                     </div>
                 </div>
@@ -168,7 +172,9 @@ const submit = async () => {
                     v-if="recording.assets.length > 0"
                     class="flex-1 border-t border-[#D6D1C4] pt-4 mt-4"
                 >
-                    <div class="mb-3 text-xs uppercase tracking-wider text-[#8C857B]">资产文件</div>
+                    <div class="mb-3 text-xs uppercase tracking-wider text-[#8C857B]">
+                        {{ t('recording.assetFiles') }}
+                    </div>
                     <div class="flex flex-col gap-2">
                         <div
                             v-for="asset in recording.assets"
@@ -210,7 +216,7 @@ const submit = async () => {
                     v-else
                     class="flex flex-1 items-center justify-center text-xs italic text-[#8C857B] opacity-70"
                 >
-                    无附加音频资产
+                    {{ t('recording.noExtraAssets') }}
                 </div>
             </div>
         </div>
@@ -224,13 +230,13 @@ const submit = async () => {
                 </div>
                 <!-- 向上对齐 -->
                 <div class="flex items-start">
-                    <div class="font-serif text-lg">关于曲目</div>
+                    <div class="font-serif text-lg">{{ t('recording.title') }}</div>
                 </div>
             </div>
 
             <label class="block">
                 <span class="mb-2 block font-serif text-xs uppercase tracking-wider text-[#8A8A8A]">
-                    曲目名
+                    {{ t('recording.trackName') }}
                 </span>
                 <input
                     v-model="form.title"
@@ -246,7 +252,7 @@ const submit = async () => {
                 <div
                     class="mb-2 flex items-center justify-between gap-3 font-serif text-xs uppercase tracking-wider text-[#8A8A8A]"
                 >
-                    <span> 标签 </span>
+                    <span> {{ t('recording.label') }} </span>
                 </div>
                 <ul
                     class="label-strip flex h-14 min-w-0 items-start gap-2 overflow-x-auto overflow-y-hidden pb-3"
@@ -262,7 +268,7 @@ const submit = async () => {
                             type="text"
                             maxlength="255"
                             class="h-8 min-w-0 flex-1 truncate border-b border-[#D6D1C4] bg-transparent px-1 font-serif text-sm text-[#3D3D3D] transition-colors placeholder:text-[#BDB9AE] focus:border-[#C67C4E] focus:outline-none"
-                            placeholder="未命名标签"
+                            :placeholder="t('recording.unnamedLabel')"
                             :disabled="isSaving"
                             @blur="stopEditingLabel"
                             @keydown.enter.prevent="stopEditingLabel"
@@ -272,9 +278,9 @@ const submit = async () => {
                             type="button"
                             class="h-8 max-w-[230px] truncate px-1 text-left font-serif text-sm text-[#3D3D3D] transition-colors hover:text-[#C67C4E]"
                             :disabled="isSaving"
-                            :title="form.label[index] || '未命名标签'"
+                            :title="form.label[index] || t('recording.unnamedLabel')"
                         >
-                            {{ form.label[index] || '未命名标签' }}
+                            {{ form.label[index] || t('recording.unnamedLabel') }}
                         </button>
                         <div
                             v-if="editingLabelIndex !== index"
@@ -284,8 +290,8 @@ const submit = async () => {
                                 type="button"
                                 class="inline-flex h-7 w-7 items-center justify-center rounded-sm text-[#8A8A8A] transition-colors hover:bg-[#EAE6DE] hover:text-[#C67C4E] disabled:cursor-not-allowed disabled:opacity-60"
                                 :disabled="isSaving"
-                                aria-label="修改标签"
-                                title="修改"
+                                :aria-label="t('recording.modifyLabelAria')"
+                                :title="t('recording.modifyLabel')"
                                 @click.stop="editLabel(index)"
                             >
                                 <Pencil :size="13" />
@@ -294,8 +300,8 @@ const submit = async () => {
                                 type="button"
                                 class="inline-flex h-7 w-7 items-center justify-center rounded-sm text-[#8A8A8A] transition-colors hover:bg-[#F1E3DF] hover:text-[#B95D5D] disabled:cursor-not-allowed disabled:opacity-60"
                                 :disabled="isSaving"
-                                aria-label="删除标签"
-                                title="删除"
+                                :aria-label="t('recording.deleteLabelAria')"
+                                :title="t('recording.deleteLabel')"
                                 @click.stop="removeLabel(index)"
                             >
                                 <Trash2 :size="13" />
@@ -306,7 +312,7 @@ const submit = async () => {
                         type="button"
                         class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-sm border border-[#D6D1C4] text-[#8A8A8A] transition-colors hover:border-[#C67C4E] hover:text-[#C67C4E] disabled:cursor-not-allowed disabled:opacity-60"
                         :disabled="isSaving"
-                        aria-label="添加标签"
+                        :aria-label="t('recording.addLabelAria')"
                         @click="addLabel"
                     >
                         <Plus :size="14" />
@@ -316,12 +322,12 @@ const submit = async () => {
 
             <label class="flex min-h-[100px] flex-1 flex-col">
                 <span class="mb-2 block font-serif text-xs uppercase tracking-wider text-[#8A8A8A]">
-                    描述
+                    {{ t('recording.description') }}
                 </span>
                 <textarea
                     v-model="form.comment"
                     class="flex-1 resize-none border-b border-[#D6D1C4] bg-[#F7F5F0] p-3 font-serif text-[#3D3D3D] transition-colors placeholder:text-[#BDB9AE] focus:border-[#C67C4E] focus:outline-none"
-                    placeholder="在此添加曲目描述"
+                    :placeholder="t('recording.descriptionPlaceholder')"
                     :disabled="isSaving"
                 ></textarea>
             </label>
@@ -348,7 +354,7 @@ const submit = async () => {
                     </svg>
                 </div>
                 <span class="text-sm text-[#5E564D] transition-colors group-hover:text-[#2C2420]">
-                    作品默认曲目
+                    {{ t('recording.defaultRecording') }}
                 </span>
             </label>
 
@@ -363,7 +369,7 @@ const submit = async () => {
                     :disabled="isSaving"
                     @click="closeModal"
                 >
-                    取消
+                    {{ t('common.cancel') }}
                 </button>
                 <button
                     type="button"
@@ -371,7 +377,7 @@ const submit = async () => {
                     :disabled="isSaving"
                     @click="submit"
                 >
-                    {{ isSaving ? '保存中...' : '保存更改' }}
+                    {{ isSaving ? t('common.saving') : t('common.saveChanges') }}
                 </button>
             </div>
         </div>

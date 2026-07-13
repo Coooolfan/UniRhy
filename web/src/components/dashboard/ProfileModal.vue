@@ -5,8 +5,10 @@ import { LogOut, User, Mail, Lock, Edit2, Eye, EyeOff, SlidersHorizontal } from 
 import { useModalContext } from '@/components/modals/modalContext'
 import { useUserStore } from '@/stores/user'
 import { resolveErrorMessage } from '@/i18n/errors'
+import { useI18n } from 'vue-i18n'
 import avatarPlaceholderUrl from '@/assets/avatar-placeholder.svg'
 
+const { t } = useI18n()
 const router = useRouter()
 const modal = useModalContext<undefined>()
 const userStore = useUserStore()
@@ -86,7 +88,7 @@ const handleUpdate = async () => {
     successMessage.value = ''
 
     if (requiresCurrentPassword.value && !form.currentPassword) {
-        errorMessage.value = '修改邮箱或密码需要输入当前密码'
+        errorMessage.value = t('profile.credentialRequired')
         return
     }
 
@@ -103,7 +105,7 @@ const handleUpdate = async () => {
                 ...(passwordChanged.value ? { password: form.password } : {}),
             })
         }
-        successMessage.value = '个人信息更新成功'
+        successMessage.value = t('profile.updateSuccess')
         form.password = ''
         form.currentPassword = ''
         showPassword.value = false
@@ -192,7 +194,7 @@ onUnmounted(() => {
                             :size="16"
                             class="text-[#8C857B] transition-colors group-hover:text-[#2B221B]"
                         />
-                        编辑资料
+                        {{ t('profile.editProfile') }}
                     </button>
                     <button
                         @click="openPreferences"
@@ -202,7 +204,7 @@ onUnmounted(() => {
                             :size="16"
                             class="text-[#8C857B] transition-colors group-hover:text-[#2B221B]"
                         />
-                        个人偏好
+                        {{ t('profile.preferences') }}
                     </button>
                 </div>
 
@@ -213,7 +215,7 @@ onUnmounted(() => {
                         class="flex items-center gap-2 rounded px-4 py-2 text-sm font-medium text-[#B95D5D] transition-colors hover:bg-[#FFF5F5]"
                     >
                         <LogOut :size="16" />
-                        退出登录
+                        {{ t('profile.logout') }}
                     </button>
                 </div>
             </div>
@@ -225,7 +227,7 @@ onUnmounted(() => {
             >
                 <div class="space-y-1">
                     <label class="ml-1 text-xs font-medium uppercase tracking-wider text-[#8C857B]">
-                        用户名
+                        {{ t('profile.username') }}
                     </label>
                     <div class="group relative">
                         <div
@@ -239,14 +241,14 @@ onUnmounted(() => {
                             type="text"
                             required
                             class="w-full border border-[#D6D1C4] bg-white py-2.5 pr-4 pl-10 text-[#2C2825] outline-none transition-all placeholder-[#E0DCD6] focus:border-[#D98C28] focus:ring-1 focus:ring-[#D98C28]"
-                            placeholder="请输入用户名"
+                            :placeholder="t('profile.usernamePlaceholder')"
                         />
                     </div>
                 </div>
 
                 <div class="space-y-1">
                     <label class="ml-1 text-xs font-medium uppercase tracking-wider text-[#8C857B]">
-                        邮箱
+                        {{ t('profile.email') }}
                     </label>
                     <div class="group relative">
                         <div
@@ -259,16 +261,16 @@ onUnmounted(() => {
                             type="email"
                             required
                             class="w-full border border-[#D6D1C4] bg-white py-2.5 pr-4 pl-10 text-[#2C2825] outline-none transition-all placeholder-[#E0DCD6] focus:border-[#D98C28] focus:ring-1 focus:ring-[#D98C28]"
-                            placeholder="请输入邮箱"
+                            :placeholder="t('profile.emailPlaceholder')"
                         />
                     </div>
                 </div>
 
                 <div class="space-y-1">
                     <label class="ml-1 text-xs font-medium uppercase tracking-wider text-[#8C857B]">
-                        密码
+                        {{ t('profile.password') }}
                         <span class="normal-case tracking-normal text-[#D6D1C4]">
-                            (留空保持不变)
+                            {{ t('profile.passwordKeepHint') }}
                         </span>
                     </label>
                     <div class="group relative">
@@ -281,7 +283,7 @@ onUnmounted(() => {
                             v-model="form.password"
                             :type="showPassword ? 'text' : 'password'"
                             class="w-full border border-[#D6D1C4] bg-white py-2.5 pr-10 pl-10 text-[#2C2825] outline-none transition-all placeholder-[#E0DCD6] focus:border-[#D98C28] focus:ring-1 focus:ring-[#D98C28]"
-                            placeholder="设置新密码"
+                            :placeholder="t('profile.passwordPlaceholder')"
                         />
                         <button
                             type="button"
@@ -297,9 +299,9 @@ onUnmounted(() => {
 
                 <div v-if="requiresCurrentPassword" class="space-y-1">
                     <label class="ml-1 text-xs font-medium uppercase tracking-wider text-[#8C857B]">
-                        当前密码
+                        {{ t('profile.currentPassword') }}
                         <span class="normal-case tracking-normal text-[#B95D5D]">
-                            (修改邮箱或密码需验证)
+                            {{ t('profile.currentPasswordHint') }}
                         </span>
                     </label>
                     <div class="group relative">
@@ -313,7 +315,7 @@ onUnmounted(() => {
                             type="password"
                             autocomplete="current-password"
                             class="w-full border border-[#D6D1C4] bg-white py-2.5 pr-4 pl-10 text-[#2C2825] outline-none transition-all placeholder-[#E0DCD6] focus:border-[#D98C28] focus:ring-1 focus:ring-[#D98C28]"
-                            placeholder="请输入当前密码"
+                            :placeholder="t('profile.currentPasswordPlaceholder')"
                         />
                     </div>
                 </div>
@@ -325,14 +327,14 @@ onUnmounted(() => {
                         class="flex-1 border border-[#D6D1C4] py-2.5 text-sm uppercase tracking-wide text-[#8A8A8A] transition-colors hover:bg-[#F7F5F0] hover:text-[#5A5A5A]"
                         :disabled="isSubmitting"
                     >
-                        取消
+                        {{ t('common.cancel') }}
                     </button>
                     <button
                         type="submit"
                         class="flex-1 bg-[#2B221B] py-2.5 text-sm uppercase tracking-wide text-[#F7F5F0] shadow-md transition-colors hover:bg-[#3E3228] disabled:cursor-not-allowed disabled:opacity-60"
                         :disabled="isSubmitting"
                     >
-                        {{ isSubmitting ? '保存中...' : '保存更改' }}
+                        {{ isSubmitting ? t('common.saving') : t('common.saveChanges') }}
                     </button>
                 </div>
             </form>
@@ -347,7 +349,9 @@ onUnmounted(() => {
                     >
                         <LogOut :size="28" class="text-[#B95D5D]" />
                     </div>
-                    <h3 class="mb-2 font-serif text-2xl text-[#2B221B]">确认退出？</h3>
+                    <h3 class="mb-2 font-serif text-2xl text-[#2B221B]">
+                        {{ t('profile.logoutConfirm') }}
+                    </h3>
                 </div>
 
                 <div class="mt-6 flex gap-3">
@@ -357,7 +361,7 @@ onUnmounted(() => {
                         class="flex-1 border border-[#D6D1C4] py-2.5 text-sm uppercase tracking-wide text-[#8A8A8A] transition-colors hover:bg-[#F7F5F0] hover:text-[#5A5A5A]"
                         :disabled="isSubmitting"
                     >
-                        取消
+                        {{ t('common.cancel') }}
                     </button>
                     <button
                         type="button"
@@ -365,7 +369,7 @@ onUnmounted(() => {
                         class="flex-1 bg-[#B95D5D] py-2.5 text-sm uppercase tracking-wide text-[#FFF] shadow-md transition-colors hover:bg-[#A04545] disabled:cursor-not-allowed disabled:opacity-60"
                         :disabled="isSubmitting"
                     >
-                        {{ isSubmitting ? '退出中...' : '确认退出' }}
+                        {{ isSubmitting ? t('profile.loggingOut') : t('profile.confirmLogout') }}
                     </button>
                 </div>
             </div>
