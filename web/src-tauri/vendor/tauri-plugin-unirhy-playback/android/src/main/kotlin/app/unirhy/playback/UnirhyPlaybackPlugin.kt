@@ -68,21 +68,22 @@ class LocalSeekArgs {
  * UniRhy 原生播放内核的 Tauri 插件入口。
  *
  * 命令面与事件面见 web/src/runtime/nativePlaybackBridge.ts；
- * 播放执行与同步协议客户端由 PlaybackService 承载，本类仅做桥接。
+ * 协议客户端、校时与队列态由进程级单例 PlaybackController 承载，本类仅做桥接。
  */
 @TauriPlugin
 class UnirhyPlaybackPlugin(private val activity: Activity) : Plugin(activity) {
 
-    data class SessionConfig(
-        val apiBaseUrl: String,
-        val token: String?,
-        val deviceId: String,
-        val clientVersion: String,
-        val mode: String,
-    )
+    override fun load(webView: android.webkit.WebView) {
+        super.load(webView)
+        PlaybackController.eventSink = { eventJson ->
+            trigger("playback-event", JSObject(eventJson))
+        }
+    }
 
-    @Volatile
-    private var sessionConfig: SessionConfig? = null
+    override fun onDestroy() {
+        PlaybackController.eventSink = null
+        super.onDestroy()
+    }
 
     @Command
     fun configure(invoke: Invoke) {
@@ -91,12 +92,14 @@ class UnirhyPlaybackPlugin(private val activity: Activity) : Plugin(activity) {
             invoke.reject("apiBaseUrl and deviceId are required")
             return
         }
-        sessionConfig = SessionConfig(
-            apiBaseUrl = args.apiBaseUrl.trimEnd('/'),
-            token = args.token?.takeIf { it.isNotBlank() },
-            deviceId = args.deviceId,
-            clientVersion = args.clientVersion,
-            mode = args.mode,
+        PlaybackController.configure(
+            PlaybackController.SessionConfig(
+                apiBaseUrl = args.apiBaseUrl.trimEnd('/'),
+                token = args.token?.takeIf { it.isNotBlank() },
+                deviceId = args.deviceId,
+                clientVersion = args.clientVersion,
+                mode = args.mode,
+            ),
         )
         invoke.resolve()
     }
@@ -104,23 +107,29 @@ class UnirhyPlaybackPlugin(private val activity: Activity) : Plugin(activity) {
     @Command
     fun updateAuth(invoke: Invoke) {
         val args = invoke.parseArgs(UpdateAuthArgs::class.java)
-        sessionConfig = sessionConfig?.copy(token = args.token?.takeIf { it.isNotBlank() })
+        PlaybackController.updateToken(args.token?.takeIf { it.isNotBlank() })
         invoke.resolve()
     }
 
     @Command
     fun connectSync(invoke: Invoke) {
+        if (!PlaybackController.connectSync()) {
+            invoke.reject("configure must be called before connectSync")
+            return
+        }
         invoke.resolve()
     }
 
     @Command
     fun disconnectSync(invoke: Invoke) {
+        PlaybackController.disconnectSync()
         invoke.resolve()
     }
 
     @Command
     fun getPlaybackState(invoke: Invoke) {
-        val config = sessionConfig
+        val config = PlaybackController.sessionConfig
+        val queue = PlaybackController.queueState.queue
         val state = JSObject()
         state.put("configured", config != null)
         state.put("mode", config?.mode ?: "sync")
@@ -129,10 +138,18 @@ class UnirhyPlaybackPlugin(private val activity: Activity) : Plugin(activity) {
         state.put("positionSeconds", 0.0)
         state.put("durationSeconds", 0.0)
         state.put("isLoading", false)
-        state.put("syncPhase", "stopped")
-        state.put("clockOffsetMs", 0.0)
-        state.put("roundTripEstimateMs", 0.0)
-        state.put("queueVersion", null)
+        state.put("syncPhase", PlaybackController.syncPhase.name.lowercase())
+        state.put("clockOffsetMs", PlaybackController.clock.clockOffsetMs)
+        state.put("roundTripEstimateMs", PlaybackController.clock.roundTripEstimateMs)
+        if (queue != null) {
+            state.put(
+                "queue",
+                JSObject(app.unirhy.playback.sync.PlaybackSyncJson.mapper.writeValueAsString(queue)),
+            )
+            state.put("queueVersion", queue.version)
+        } else {
+            state.put("queueVersion", null)
+        }
         invoke.resolve(state)
     }
 
@@ -161,7 +178,8 @@ class UnirhyPlaybackPlugin(private val activity: Activity) : Plugin(activity) {
 
     @Command
     fun requestSyncRecovery(invoke: Invoke) {
-        invoke.reject("not implemented")
+        PlaybackController.requestSyncRecovery()
+        invoke.resolve()
     }
 
     @Command
