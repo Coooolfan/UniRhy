@@ -166,12 +166,12 @@ const taskSummaryRows = computed<TaskSummaryRow[]>(() => {
     const builtinOrder = ['METADATA_PARSE', 'TRANSCODE']
     const allTypes = [
         ...builtinOrder,
-        ...taskCounts.value.map((r) => r.taskType).filter((t) => !builtinOrder.includes(t)),
+        ...taskCounts.value.map((r) => r.taskType).filter((type) => !builtinOrder.includes(type)),
     ]
     return allTypes
-        .filter((t) => {
-            if (seen.has(t)) return false
-            seen.add(t)
+        .filter((type) => {
+            if (seen.has(type)) return false
+            seen.add(type)
             return true
         })
         .map((taskType) => {
@@ -309,15 +309,15 @@ const openTaskModal = async () => {
                     payload.providerType,
                     payload.providerId,
                 )
-                if (!submitOk) throw new Error(submitError.value || '提交任务失败')
+                if (!submitOk) throw new Error(submitError.value || t('tasksView.submitFailed'))
             },
             submitTranscode: async (payload: TranscodeTaskRequest) => {
                 const submitOk = await startTranscodeTask(payload)
-                if (!submitOk) throw new Error(submitError.value || '提交任务失败')
+                if (!submitOk) throw new Error(submitError.value || t('tasksView.submitFailed'))
             },
             submitPluginTask: async (taskType: string, params: Record<string, string>) => {
                 const submitOk = await startPluginTask(taskType, params)
-                if (!submitOk) throw new Error(submitError.value || '提交任务失败')
+                if (!submitOk) throw new Error(submitError.value || t('tasksView.submitFailed'))
             },
         },
     })
@@ -366,13 +366,17 @@ const drawerTitle = computed(() => drawerTaskName.value)
                 class="flex items-start justify-between gap-3 border-b border-[#EAE6DE] pb-3 sm:mb-8 sm:items-end sm:pb-4"
             >
                 <div>
-                    <h2 class="mb-1 font-serif text-3xl text-[#2B221B]">任务管理</h2>
-                    <p class="font-serif text-sm italic text-[#8A8A8A]">发起或管理后台任务队列</p>
+                    <h2 class="mb-1 font-serif text-3xl text-[#2B221B]">
+                        {{ t('tasksView.taskManagement') }}
+                    </h2>
+                    <p class="font-serif text-sm italic text-[#8A8A8A]">
+                        {{ t('tasksView.subtitle') }}
+                    </p>
                 </div>
                 <button
                     class="text-[#8A8A8A] transition-colors hover:text-[#C67C4E] disabled:opacity-50"
                     :disabled="isLoadingTaskCounts"
-                    title="刷新任务状态"
+                    :title="t('tasksView.refreshStatus')"
                     @click="refreshAll"
                 >
                     <RefreshCw class="h-5 w-5" :class="{ 'animate-spin': isLoadingTaskCounts }" />
@@ -393,9 +397,11 @@ const drawerTitle = computed(() => drawerTaskName.value)
                 <div
                     class="border border-[#EAE6DE] bg-[#FFFCF5] p-4 shadow-sm sm:p-6 lg:col-span-1"
                 >
-                    <h3 class="font-serif text-2xl text-[#2B221B]">异步任务</h3>
+                    <h3 class="font-serif text-2xl text-[#2B221B]">
+                        {{ t('tasksView.asyncTask') }}
+                    </h3>
                     <p class="mt-2 text-sm leading-relaxed text-[#6B635B]">
-                        元数据解析、转码等长耗时任务
+                        {{ t('tasksView.asyncTaskDesc') }}
                     </p>
 
                     <button
@@ -512,7 +518,9 @@ const drawerTitle = computed(() => drawerTaskName.value)
 
             <div>
                 <div class="mb-8 flex items-center justify-between px-1">
-                    <h3 class="text-lg font-medium text-[#2B221B]">任务类型分布</h3>
+                    <h3 class="text-lg font-medium text-[#2B221B]">
+                        {{ t('tasksView.taskTypeDistribution') }}
+                    </h3>
                     <BarChart3 class="h-4 w-4 text-[#8A8A8A]" />
                 </div>
 

@@ -251,8 +251,12 @@ const playItem = async (item: DisplayItem) => {
                 class="mb-8 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between sm:gap-6"
             >
                 <div>
-                    <h2 class="mb-2 text-3xl font-serif text-[#2C2420] sm:text-4xl">资料库</h2>
-                    <p class="text-[#8C857B] font-serif italic">所有旋律归于此处</p>
+                    <h2 class="mb-2 text-3xl font-serif text-[#2C2420] sm:text-4xl">
+                        {{ t('albumList.library') }}
+                    </h2>
+                    <p class="text-[#8C857B] font-serif italic">
+                        {{ t('albumList.librarySubtitle') }}
+                    </p>
                 </div>
 
                 <div
@@ -333,11 +337,13 @@ const playItem = async (item: DisplayItem) => {
                 @update:total-page-count="(value: number) => (totalPageCount = value)"
             />
             <div v-else-if="isLoading && displayItems.length === 0" class="text-[#8C857B] text-sm">
-                加载中...
+                {{ t('albumList.loading') }}
             </div>
             <div v-else-if="errorMessage" class="text-[#B75D5D] text-sm">
                 {{ errorMessage }}
-                <button class="ml-4 text-[#C27E46]" type="button" @click="fetchData">重试</button>
+                <button class="ml-4 text-[#C27E46]" type="button" @click="fetchData">
+                    {{ t('albumList.retry') }}
+                </button>
             </div>
 
             <div v-else :class="{ 'opacity-50 pointer-events-none': isLoading }">
@@ -468,7 +474,7 @@ const playItem = async (item: DisplayItem) => {
                     <ChevronLeft :size="20" />
                 </button>
                 <span class="font-serif text-sm text-[#5E5950]">
-                    第 {{ pageIndex + 1 }} / {{ totalPageCount }} 页
+                    {{ t('albumList.pageInfo', { current: pageIndex + 1, total: totalPageCount }) }}
                 </span>
                 <button
                     :disabled="pageIndex >= totalPageCount - 1 || isLoading"

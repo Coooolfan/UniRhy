@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { reactive, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { resolveErrorMessage } from '@/i18n/errors'
 import { useModalContext } from '@/components/modals/modalContext'
+
+const { t } = useI18n()
 
 export type AlbumEditForm = {
     title: string
@@ -38,7 +41,7 @@ const submit = async () => {
     }
 
     if (!form.title.trim()) {
-        error.value = '专辑名不能为空'
+        error.value = t('albumEdit.nameEmpty')
         return
     }
 
@@ -64,21 +67,21 @@ const submit = async () => {
     <div class="flex flex-col space-y-5">
         <label class="block">
             <span class="mb-2 block font-serif text-xs uppercase tracking-wider text-[#8A8A8A]">
-                专辑名
+                {{ t('albumEdit.name') }}
             </span>
             <input
                 v-model="form.title"
                 type="text"
                 maxlength="255"
                 class="w-full border-b border-[#D6D1C4] bg-[#F7F5F0] p-3 font-serif text-[#3D3D3D] transition-colors placeholder:text-[#BDB9AE] focus:border-[#C67C4E] focus:outline-none"
-                placeholder="专辑名"
+                :placeholder="t('albumEdit.namePlaceholder')"
                 :disabled="isSaving"
             />
         </label>
 
         <label class="block">
             <span class="mb-2 block font-serif text-xs uppercase tracking-wider text-[#8A8A8A]">
-                发布日期
+                {{ t('albumEdit.releaseDate') }}
             </span>
             <input
                 v-model="form.releaseDate"
@@ -90,13 +93,13 @@ const submit = async () => {
 
         <label class="flex min-h-[120px] flex-col">
             <span class="mb-2 block font-serif text-xs uppercase tracking-wider text-[#8A8A8A]">
-                描述
+                {{ t('albumEdit.description') }}
             </span>
             <textarea
                 v-model="form.comment"
                 rows="4"
                 class="flex-1 resize-none border-b border-[#D6D1C4] bg-[#F7F5F0] p-3 font-serif text-[#3D3D3D] transition-colors placeholder:text-[#BDB9AE] focus:border-[#C67C4E] focus:outline-none"
-                placeholder="添加描述..."
+                :placeholder="t('albumEdit.descriptionPlaceholder')"
                 :disabled="isSaving"
             ></textarea>
         </label>
@@ -112,7 +115,7 @@ const submit = async () => {
                 :disabled="isSaving"
                 @click="closeModal"
             >
-                取消
+                {{ t('common.cancel') }}
             </button>
             <button
                 type="button"
@@ -120,7 +123,7 @@ const submit = async () => {
                 :disabled="isSaving"
                 @click="submit"
             >
-                {{ isSaving ? '保存中...' : '保存更改' }}
+                {{ isSaving ? t('common.saving') : t('common.saveChanges') }}
             </button>
         </div>
     </div>

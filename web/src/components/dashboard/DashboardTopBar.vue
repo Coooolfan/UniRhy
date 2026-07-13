@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { Menu, Search } from 'lucide-vue-next'
 import { useModal } from '@/composables/useModal'
 import { useUserStore } from '@/stores/user'
@@ -19,6 +20,7 @@ const emit = defineEmits<{
     (event: 'update:modelValue', value: string): void
 }>()
 
+const { t } = useI18n()
 const router = useRouter()
 const modal = useModal()
 const userStore = useUserStore()
@@ -58,7 +60,7 @@ const handleSearch = () => {
 
 const openProfileModal = async () => {
     await modal.open(ProfileModal, {
-        title: '账号信息',
+        title: t('topbar.accountInfo'),
         size: 'sm',
     })
 }
@@ -86,7 +88,7 @@ const closeWindow = async () => {
         <button
             type="button"
             class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[#8C857B] transition-colors hover:bg-white/60 hover:text-[#5E5950] md:hidden"
-            aria-label="切换侧边栏"
+            :aria-label="t('topbar.toggleSidebar')"
             @click="toggleSidebar"
         >
             <Menu :size="18" />
@@ -99,7 +101,7 @@ const closeWindow = async () => {
             <input
                 type="text"
                 :value="inputValue"
-                :placeholder="placeholder ?? '搜索艺术家、作品...'"
+                :placeholder="placeholder ?? t('topbar.searchPlaceholder')"
                 class="ml-2 w-full border-none bg-transparent text-sm outline-none placeholder-[#8C857B] focus:ring-0"
                 @input="handleInput"
                 @keydown.enter="handleSearch"
@@ -112,7 +114,7 @@ const closeWindow = async () => {
             <button
                 type="button"
                 class="h-8 w-8 shrink-0 cursor-pointer overflow-hidden rounded-full bg-[#DCD6CC]"
-                aria-label="个人中心"
+                :aria-label="t('topbar.profile')"
                 @click="openProfileModal"
             >
                 <img :src="avatarPlaceholderUrl" alt="avatar" class="h-full w-full object-cover" />
@@ -121,7 +123,7 @@ const closeWindow = async () => {
                 <button
                     type="button"
                     class="flex h-8 w-9 items-center justify-center text-[#5E5950] transition-colors hover:text-[#161412]"
-                    aria-label="最小化窗口"
+                    :aria-label="t('topbar.minimize')"
                     @click="minimizeWindow"
                 >
                     <span class="h-px w-2.5 bg-current"></span>
@@ -129,7 +131,7 @@ const closeWindow = async () => {
                 <button
                     type="button"
                     class="flex h-8 w-9 items-center justify-center text-[#5E5950] transition-colors hover:text-[#161412]"
-                    aria-label="最大化窗口"
+                    :aria-label="t('topbar.maximize')"
                     @click="toggleMaximizeWindow"
                 >
                     <span class="h-2.5 w-2.5 rounded-[2px] border border-current"></span>
@@ -137,7 +139,7 @@ const closeWindow = async () => {
                 <button
                     type="button"
                     class="relative flex h-8 w-9 items-center justify-center text-[#5E5950] transition-colors hover:text-[#C65143]"
-                    aria-label="关闭窗口"
+                    :aria-label="t('topbar.close')"
                     @click="closeWindow"
                 >
                     <span class="absolute h-px w-3 rotate-45 bg-current"></span>

@@ -2,6 +2,7 @@
 import { Pause, Play } from 'lucide-vue-next'
 import { featuredAlbum as defaultFeaturedAlbum } from './data'
 import { computed, onMounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { api } from '@/ApiInstance'
 import { resolveArtistName, resolveCover, type RecordingAsset } from '@/composables/recordingMedia'
@@ -20,6 +21,7 @@ type Album = {
 
 type FeaturedStatus = 'loading' | 'ready' | 'empty'
 
+const { t } = useI18n()
 const router = useRouter()
 const album = ref<Album | null>(null)
 const featuredStatus = ref<FeaturedStatus>('loading')
@@ -45,17 +47,19 @@ const hasPlayableFeatured = computed(() => {
 
 const featuredActionLabel = computed(() => {
     if (featuredStatus.value === 'ready') {
-        return isFeaturedPlaying.value ? '暂停播放' : '立即播放'
+        return isFeaturedPlaying.value
+            ? t('dashboardHero.pausePlayback')
+            : t('dashboardHero.playNow')
     }
     if (featuredStatus.value === 'empty' && userStore.isAdmin) {
-        return '前往设置'
+        return t('dashboardHero.goToSettings')
     }
-    return '加载中'
+    return t('dashboardHero.loading')
 })
 
 const compactFeaturedActionLabel = computed(() => {
     if (featuredStatus.value === 'ready') {
-        return isFeaturedPlaying.value ? '暂停' : '播放'
+        return isFeaturedPlaying.value ? t('dashboardHero.pause') : t('dashboardHero.play')
     }
     return featuredActionLabel.value
 })
@@ -155,7 +159,9 @@ watch(
 
 <template>
     <div class="relative mb-8 px-1 sm:px-2 md:mb-12">
-        <h2 class="mb-5 text-lg font-serif text-[#2C2C2C] sm:mb-6 sm:text-xl">今日推荐</h2>
+        <h2 class="mb-5 text-lg font-serif text-[#2C2C2C] sm:mb-6 sm:text-xl">
+            {{ t('dashboardHero.todayRecommend') }}
+        </h2>
 
         <div class="relative h-[10.5rem] w-full md:h-80">
             <!-- Bottom Stack Layers -->
@@ -247,7 +253,7 @@ watch(
                             <div
                                 class="mb-3 hidden text-[11px] font-medium uppercase tracking-widest text-[#9C968B] md:mb-4 md:block"
                             >
-                                今日推荐
+                                {{ t('dashboardHero.todayRecommend') }}
                             </div>
                             <h3
                                 class="mb-2 line-clamp-2 font-serif text-2xl leading-tight tracking-tight text-[#2C2C2C] md:mb-4 md:line-clamp-none md:text-5xl"
@@ -267,17 +273,17 @@ watch(
                             <div
                                 class="mb-3 hidden text-[11px] font-medium uppercase tracking-widest text-[#9C968B] md:mb-4 md:block"
                             >
-                                今日推荐
+                                {{ t('dashboardHero.todayRecommend') }}
                             </div>
                             <h3
                                 class="mb-2 line-clamp-2 font-serif text-2xl leading-tight tracking-tight text-[#2C2C2C] md:mb-4 md:line-clamp-none md:text-3xl"
                             >
-                                旋律不可调
+                                {{ t('dashboardHero.melodyUnavailable') }}
                             </h3>
                             <p
                                 class="mb-3 line-clamp-2 text-sm font-serif italic text-[#8A857D] md:mb-10 md:line-clamp-none md:text-lg"
                             >
-                                资料库中未能发现可用旋律
+                                {{ t('dashboardHero.noMelodyFound') }}
                             </p>
                         </template>
                         <div

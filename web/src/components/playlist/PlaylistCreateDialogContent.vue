@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { resolveErrorMessage } from '@/i18n/errors'
 import { useModalContext } from '@/components/modals/modalContext'
+
+const { t } = useI18n()
 
 const props = defineProps<{
     onSubmit: (payload: { name: string; comment: string }) => Promise<void> | void
@@ -25,7 +28,7 @@ const closeModal = () => {
 const submit = async () => {
     const trimmedName = name.value.trim()
     if (!trimmedName) {
-        error.value = '请输入歌单名称'
+        error.value = t('playlistCreate.nameRequired')
         return
     }
 
@@ -54,28 +57,28 @@ const submit = async () => {
     <div class="space-y-6">
         <label class="block">
             <span class="mb-2 block font-serif text-xs uppercase tracking-wider text-[#8A8A8A]">
-                歌单名
+                {{ t('playlistCreate.name') }}
             </span>
             <input
                 v-model="name"
                 type="text"
                 maxlength="100"
                 class="w-full border-b border-[#D6D1C4] bg-[#F7F5F0] p-3 font-serif text-[#3D3D3D] transition-colors placeholder:text-[#BDB9AE] focus:border-[#C67C4E] focus:outline-none"
-                placeholder="例如：通勤日常"
+                :placeholder="t('playlistCreate.namePlaceholder')"
                 :disabled="isSubmitting"
             />
         </label>
 
         <label class="block">
             <span class="mb-2 block font-serif text-xs uppercase tracking-wider text-[#8A8A8A]">
-                歌单描述
+                {{ t('playlistCreate.description') }}
             </span>
             <textarea
                 v-model="comment"
                 rows="3"
                 maxlength="500"
                 class="w-full resize-none border-b border-[#D6D1C4] bg-[#F7F5F0] p-3 font-serif text-[#3D3D3D] transition-colors placeholder:text-[#BDB9AE] focus:border-[#C67C4E] focus:outline-none"
-                placeholder="可选的歌单描述"
+                :placeholder="t('playlistCreate.descriptionPlaceholder')"
                 :disabled="isSubmitting"
             />
         </label>
@@ -91,7 +94,7 @@ const submit = async () => {
                 :disabled="isSubmitting"
                 @click="closeModal"
             >
-                取消
+                {{ t('common.cancel') }}
             </button>
             <button
                 type="button"
@@ -99,8 +102,8 @@ const submit = async () => {
                 :disabled="isSubmitting"
                 @click="submit"
             >
-                <span v-if="isSubmitting">Creating...</span>
-                <span v-else>创建歌单</span>
+                <span v-if="isSubmitting">{{ t('common.saving') }}</span>
+                <span v-else>{{ t('playlistCreate.create') }}</span>
             </button>
         </div>
     </div>
