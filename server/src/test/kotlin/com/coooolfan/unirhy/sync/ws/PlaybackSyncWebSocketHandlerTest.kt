@@ -250,6 +250,7 @@ private class FakeCurrentQueueRecordingCatalog : CurrentQueueRecordingCatalog {
                 artistLabel = "Artist $recordingId",
                 coverMediaFileId = null,
                 durationMs = 180_000,
+                audioMediaFileId = recordingId + 4_000L,
             )
         }
     }

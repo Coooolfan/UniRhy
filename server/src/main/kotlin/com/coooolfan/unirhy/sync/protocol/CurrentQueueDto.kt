@@ -19,6 +19,7 @@ data class CurrentQueueItemDto(
     val artistLabel: String,
     val coverUrl: String? = null,
     val durationMs: Long,
+    val mediaFileId: Long? = null,
 )
 
 data class CurrentQueueDto(

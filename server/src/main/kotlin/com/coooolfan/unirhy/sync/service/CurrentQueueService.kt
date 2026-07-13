@@ -42,6 +42,7 @@ data class ResolvedQueueRecording(
     val artistLabel: String,
     val coverMediaFileId: Long?,
     val durationMs: Long,
+    val audioMediaFileId: Long?,
 )
 
 @Service
@@ -817,6 +818,7 @@ class CurrentQueueService(
             artistLabel = artistLabel,
             coverMediaFileId = coverMediaFileId,
             durationMs = durationMs,
+            audioMediaFileId = audioMediaFileId,
         )
     }
 
@@ -827,6 +829,7 @@ class CurrentQueueService(
             artistLabel = entry.artistLabel,
             coverUrl = entry.coverMediaFileId?.let(urlSigner::generatePresignedPath),
             durationMs = entry.durationMs,
+            mediaFileId = entry.audioMediaFileId,
         )
     }
 
@@ -890,6 +893,9 @@ class JimmerCurrentQueueRecordingCatalog(
                 }.joinToString(", ").ifBlank { "Unknown Artist" },
                 coverMediaFileId = recording.cover?.id,
                 durationMs = recording.durationMs,
+                audioMediaFileId = recording.assets.firstOrNull { asset ->
+                    asset.mediaFile.mimeType.trim().lowercase().startsWith("audio/")
+                }?.mediaFile?.id,
             )
         }
     }
