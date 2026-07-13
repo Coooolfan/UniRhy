@@ -116,8 +116,12 @@ export default {
         totalTasks: '累计任务',
         completed: '已完成',
         failed: '失败',
-        pending: '排队中',
+        pending: '待处理',
         running: '执行中',
+        syncingTaskStats: '正在同步后台任务统计',
+        taskQueueIdle: '任务队列空闲',
+        statusOverview: '状态概览',
+        loadingTaskStatus: '加载任务状态...',
         noTasksHint:
             '当前没有待处理任务。发起元数据解析、转码或插件任务后，这里会显示最新的队列与结果统计。',
         tasksWaitingOrRunning:
@@ -125,6 +129,11 @@ export default {
         tasksPendingCount: '当前共有 {count} 个任务在队列中等待处理。',
         tasksRunningCount: '当前共有 {count} 个任务正在后台执行。',
         tasksPendingOrRunning: '{count} 个任务待处理或执行中',
+        refreshedSecondsAgo: '{seconds} 秒前刷新',
+        refreshedMinutesAgo: '{minutes} 分钟前刷新',
+        refreshedHoursAgo: '{hours} 小时前刷新',
+        runningCount: '执行中：{count}',
+        pendingCount: '待处理：{count}',
     },
     albums: {
         title: '专辑',

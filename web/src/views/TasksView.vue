@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import DashboardTopBar from '@/components/dashboard/DashboardTopBar.vue'
 import DecorativeLabel from '@/components/common/DecorativeLabel.vue'
 import { useModal } from '@/composables/useModal'
@@ -22,6 +23,8 @@ import {
 } from 'lucide-vue-next'
 import { useUserStore } from '@/stores/user'
 
+const { t } = useI18n()
+
 type SubmitFeedbackStatus = 'idle' | 'success'
 type SummaryTone = 'idle' | 'working' | 'failed' | 'done'
 
@@ -41,10 +44,10 @@ const SUBMIT_FEEDBACK_DURATION_MS = 2000
 const TASK_AUTO_REFRESH_INTERVAL_MS = 2000
 
 const statusLabelMap: Record<TaskStatus, string> = {
-    PENDING: '待处理',
-    RUNNING: '执行中',
-    COMPLETED: '已完成',
-    FAILED: '失败',
+    PENDING: t('tasks.pending'),
+    RUNNING: t('tasks.running'),
+    COMPLETED: t('tasks.completed'),
+    FAILED: t('tasks.failed'),
 }
 
 const summaryToneClassMap: Record<SummaryTone, string> = {
@@ -87,14 +90,14 @@ let relativeTimeTimer: ReturnType<typeof setInterval> | null = null
 const lastRefreshedText = computed(() => {
     if (!lastRefreshedAt.value) return ''
     const diffSec = Math.floor((relativeTimeNow.value - lastRefreshedAt.value.getTime()) / 1000)
-    if (diffSec < 60) return `${diffSec} 秒前刷新`
+    if (diffSec < 60) return t('tasks.refreshedSecondsAgo', { seconds: diffSec })
     const diffMin = Math.floor(diffSec / 60)
-    if (diffMin < 60) return `${diffMin} 分钟前刷新`
-    return `${Math.floor(diffMin / 60)} 小时前刷新`
+    if (diffMin < 60) return t('tasks.refreshedMinutesAgo', { minutes: diffMin })
+    return t('tasks.refreshedHoursAgo', { hours: Math.floor(diffMin / 60) })
 })
 
 const taskActionButtonLabel = computed(() =>
-    submitFeedbackStatus.value === 'success' ? '任务已提交' : '发起新任务',
+    submitFeedbackStatus.value === 'success' ? t('tasks.taskSubmitted') : t('tasks.newTask'),
 )
 
 const isTaskActionButtonDisabled = computed(
@@ -147,7 +150,7 @@ const statusOverviewItems = computed(() => [
     {
         key: 'TOTAL',
         count: totalTaskCount.value,
-        label: '累计任务',
+        label: t('tasks.totalTasks'),
         eyebrow: 'Total',
         valueClass: 'text-[#B86134]',
         eyebrowClass: 'text-[#B86134]/70',
@@ -200,15 +203,19 @@ const taskSummaryRows = computed<TaskSummaryRow[]>(() => {
 
 const queueSummaryText = computed(() => {
     if (activeTaskCount.value === 0) {
-        return '当前没有待处理任务。发起元数据解析、转码或插件任务后，这里会显示最新的队列与结果统计。'
+        return t('tasks.noTasksHint')
     }
     if (pendingTaskCount.value > 0 && runningTaskCount.value > 0) {
-        return `当前共有 ${activeTaskCount.value} 个任务待处理或执行中，其中 ${pendingTaskCount.value} 个排队，${runningTaskCount.value} 个正在执行。`
+        return t('tasks.tasksWaitingOrRunning', {
+            count: activeTaskCount.value,
+            pending: pendingTaskCount.value,
+            running: runningTaskCount.value,
+        })
     }
     if (pendingTaskCount.value > 0) {
-        return `当前共有 ${pendingTaskCount.value} 个任务在队列中等待处理。`
+        return t('tasks.tasksPendingCount', { count: pendingTaskCount.value })
     }
-    return `当前共有 ${runningTaskCount.value} 个任务正在后台执行。`
+    return t('tasks.tasksRunningCount', { count: runningTaskCount.value })
 })
 
 const progressWidth = (count: number, total: number) => {
@@ -431,20 +438,22 @@ const drawerTitle = computed(() => drawerTaskName.value)
                             class="mb-2 flex items-center text-[#C67C4E]"
                         >
                             <Loader2 class="mr-2 h-5 w-5 animate-spin" />
-                            <span class="text-lg font-medium">正在同步后台任务统计</span>
+                            <span class="text-lg font-medium">{{
+                                t('tasks.syncingTaskStats')
+                            }}</span>
                         </div>
                         <div
                             v-else-if="activeTaskCount > 0"
                             class="mb-2 flex items-center text-[#C67C4E]"
                         >
                             <RefreshCw class="mr-2 h-5 w-5" />
-                            <span class="text-lg font-medium"
-                                >{{ activeTaskCount }} 个任务待处理或执行中</span
-                            >
+                            <span class="text-lg font-medium">
+                                {{ t('tasks.tasksPendingOrRunning', { count: activeTaskCount }) }}
+                            </span>
                         </div>
                         <div v-else class="mb-2 flex items-center text-emerald-600">
                             <ServerCog class="mr-2 h-5 w-5" />
-                            <span class="text-lg font-medium">任务队列空闲</span>
+                            <span class="text-lg font-medium">{{ t('tasks.taskQueueIdle') }}</span>
                         </div>
 
                         <p class="mt-2 max-w-xl text-sm leading-relaxed text-[#6B635B]">
@@ -456,7 +465,9 @@ const drawerTitle = computed(() => drawerTaskName.value)
 
             <div class="mb-9 sm:mb-16">
                 <div class="mb-4 flex items-center justify-between px-1 sm:mb-8">
-                    <h3 class="text-lg font-medium text-[#2B221B]">状态概览</h3>
+                    <h3 class="text-lg font-medium text-[#2B221B]">
+                        {{ t('tasks.statusOverview') }}
+                    </h3>
                     <span v-if="lastRefreshedText" class="font-serif text-xs text-[#8A8A8A]">{{
                         lastRefreshedText
                     }}</span>
@@ -467,7 +478,7 @@ const drawerTitle = computed(() => drawerTaskName.value)
                     class="flex items-center justify-center py-14 text-sm text-[#6B635B]"
                 >
                     <Loader2 class="mr-2 h-4 w-4 animate-spin" />
-                    加载任务状态...
+                    {{ t('tasks.loadingTaskStatus') }}
                 </div>
 
                 <div v-else class="px-2 py-4 md:px-4 md:py-5">
@@ -593,7 +604,9 @@ const drawerTitle = computed(() => drawerTaskName.value)
                                         <button
                                             type="button"
                                             class="text-[#B86134]"
-                                            :title="`执行中：${row.runningCount}`"
+                                            :title="
+                                                t('tasks.runningCount', { count: row.runningCount })
+                                            "
                                             @click="openLogDrawer(row.taskType, ['RUNNING'])"
                                         >
                                             {{ row.runningCount }}
@@ -602,7 +615,9 @@ const drawerTitle = computed(() => drawerTaskName.value)
                                         <button
                                             type="button"
                                             class="text-[#4A4A4A]"
-                                            :title="`待处理：${row.pendingCount}`"
+                                            :title="
+                                                t('tasks.pendingCount', { count: row.pendingCount })
+                                            "
                                             @click="openLogDrawer(row.taskType, ['PENDING'])"
                                         >
                                             {{ row.pendingCount }}

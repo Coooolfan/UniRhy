@@ -120,6 +120,10 @@ export default {
         failed: 'Failed',
         pending: 'Pending',
         running: 'Running',
+        syncingTaskStats: 'Syncing background task statistics',
+        taskQueueIdle: 'Task queue idle',
+        statusOverview: 'Status Overview',
+        loadingTaskStatus: 'Loading task status...',
         noTasksHint:
             'No tasks pending. Start metadata parsing, transcoding, or plugin tasks, and the latest queue and results will appear here.',
         tasksWaitingOrRunning:
@@ -127,6 +131,11 @@ export default {
         tasksPendingCount: 'There are currently {count} tasks waiting in the queue.',
         tasksRunningCount: 'There are currently {count} tasks running in the background.',
         tasksPendingOrRunning: '{count} tasks pending or in progress',
+        refreshedSecondsAgo: 'Refreshed {seconds} seconds ago',
+        refreshedMinutesAgo: 'Refreshed {minutes} minutes ago',
+        refreshedHoursAgo: 'Refreshed {hours} hours ago',
+        runningCount: 'Running: {count}',
+        pendingCount: 'Pending: {count}',
     },
     albums: {
         title: 'Albums',
