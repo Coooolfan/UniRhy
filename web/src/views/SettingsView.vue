@@ -11,6 +11,7 @@ import { useAccountSettings } from '@/composables/useAccountSettings'
 import { api } from '@/ApiInstance'
 import type { SystemStatus } from '@/__generated/model/static'
 import { useUserStore } from '@/stores/user'
+import { getClientVersion } from '@/runtime/platform'
 
 const userStore = useUserStore()
 
@@ -63,6 +64,7 @@ const activeNode = computed(
 )
 
 const buildInfo = ref<SystemStatus | null>(null)
+const clientVersion = ref<string | null>(null)
 
 const formattedBuildTime = computed(() => {
     const t = buildInfo.value?.buildTime
@@ -87,6 +89,9 @@ onMounted(() => {
     void fetchAdminAccounts()
     void api.systemConfigController.isInitialized().then((status) => {
         buildInfo.value = status
+    })
+    void getClientVersion().then((version) => {
+        clientVersion.value = version
     })
 })
 </script>
@@ -155,13 +160,14 @@ onMounted(() => {
             />
 
             <footer
-                v-if="buildInfo"
+                v-if="buildInfo || clientVersion"
                 class="mt-16 border-t border-[#E5DED5] pt-6 font-serif text-xs text-[#8A8A8A]"
             >
                 <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
-                    <span v-if="buildInfo.version">v{{ buildInfo.version }}</span>
+                    <span v-if="buildInfo?.version">服务端 v{{ buildInfo.version }}</span>
+                    <span v-if="clientVersion">客户端 v{{ clientVersion }}</span>
                     <a
-                        v-if="buildInfo.gitUrl && shortCommit"
+                        v-if="buildInfo?.gitUrl && shortCommit"
                         :href="buildInfo.gitUrl"
                         target="_blank"
                         rel="noopener noreferrer"
@@ -170,7 +176,7 @@ onMounted(() => {
                         {{ buildInfo.gitBranch ?? 'unknown' }}@{{ shortCommit }}
                     </a>
                     <span v-else-if="shortCommit">
-                        {{ buildInfo.gitBranch ?? 'unknown' }}@{{ shortCommit }}
+                        {{ buildInfo?.gitBranch ?? 'unknown' }}@{{ shortCommit }}
                     </span>
                     <span v-if="formattedBuildTime">构建于 {{ formattedBuildTime }}</span>
                 </div>

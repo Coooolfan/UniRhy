@@ -1,6 +1,6 @@
 import { PLATFORM_KINDS, type PlatformKind, type PlatformRuntime } from './platform.shared'
 
-const isTauri = () => typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
+export const isTauri = () => typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
 
 const isPlatformKind = (value: string): value is PlatformKind =>
     PLATFORM_KINDS.some((platform) => platform === value)
@@ -49,4 +49,16 @@ export function buildWebSocketUrl(path: string): string {
         return `${origin.replace(/^http/iu, 'ws')}${path}`
     }
     return `${apiBaseUrl.replace(/^http/iu, 'ws')}${path}`
+}
+
+/**
+ * 客户端自身版本号。仅在 Tauri 壳（桌面/移动端打包）中可用，
+ * 由打包流程通过 tauri.conf.json 的 version 注入；纯浏览器访问时返回 null。
+ */
+export async function getClientVersion(): Promise<string | null> {
+    if (!isTauri()) {
+        return null
+    }
+    const { getVersion } = await import('@tauri-apps/api/app')
+    return getVersion()
 }

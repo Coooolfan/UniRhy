@@ -434,9 +434,11 @@ jobs:
 
       - name: 编译 JAR 包
         working-directory: ./server
+        env:
+          VERSION: ${{ needs.prepare-release.outputs.version }}
         run: |
           chmod +x ./gradlew
-          ./gradlew :compileKotlin :test bootJar
+          ./gradlew :compileKotlin :test bootJar "-PprojectVersion=${VERSION}"
           ./gradlew --stop || true
 
       - name: 整理 JAR 产物
