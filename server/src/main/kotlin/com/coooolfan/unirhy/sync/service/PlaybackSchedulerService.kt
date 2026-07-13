@@ -95,8 +95,9 @@ class PlaybackSchedulerService(
         const val MIN_SCHEDULE_DELAY_MS = 400L
         const val MAX_SCHEDULE_DELAY_MS = 3_000L
         const val SYNC_PLAY_BUFFER_MS = 1_500L
-        const val STALE_THRESHOLD_MS = 3_750L
-        const val STALE_SWEEP_INTERVAL_MS = 1_000L
+        const val PING_INTERVAL_MS = 15_000L
+        const val PONG_TIMEOUT_MS = 60_000L
+        const val STALE_SWEEP_INTERVAL_MS = 10_000L
 
         private const val RTT_MULTIPLIER = 1.5
         private const val BASE_SCHEDULE_BUFFER_MS = 200.0

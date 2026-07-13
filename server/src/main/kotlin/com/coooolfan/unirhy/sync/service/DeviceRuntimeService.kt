@@ -57,10 +57,12 @@ class DeviceRuntimeService(
             context.clientVersion = clientVersion
             context.helloCompleted = true
 
+            val nowMs = timeProvider.nowMs()
             runtimeStateByDeviceKey[deviceKey] = DeviceRuntimeState(
                 deviceId = deviceId,
                 accountId = accountId,
-                lastSeenAtMs = timeProvider.nowMs(),
+                lastPongAtMs = nowMs,
+                lastSeenAtMs = nowMs,
             )
 
             DeviceRegistrationResult(
@@ -86,6 +88,14 @@ class DeviceRuntimeService(
     fun listHelloCompletedConnections(accountId: Long): List<PlaybackConnectionContext> {
         return lockManager.withAccountLock(accountId) {
             listHelloCompletedContextsLocked(accountId)
+        }
+    }
+
+    fun listAllHelloCompletedConnections(): List<PlaybackConnectionContext> {
+        return sessionIdsByAccountId.keys.toList().flatMap { accountId ->
+            lockManager.withAccountLock(accountId) {
+                listHelloCompletedContextsLocked(accountId)
+            }
         }
     }
 
@@ -122,6 +132,21 @@ class DeviceRuntimeService(
                 }
             }
             state
+        }
+    }
+
+    fun recordPong(
+        sessionId: String,
+        nowMs: Long,
+    ) {
+        val context = connectionContextsBySessionId[sessionId] ?: return
+        val deviceId = context.deviceId ?: return
+        lockManager.withAccountLock(context.accountId) {
+            runtimeStateByDeviceKey[PlaybackDeviceKey(accountId = context.accountId, deviceId = deviceId)]
+                ?.let { state ->
+                    state.lastPongAtMs = nowMs
+                    state.lastSeenAtMs = nowMs
+                }
         }
     }
 
@@ -162,10 +187,7 @@ class DeviceRuntimeService(
                         val runtimeState =
                             runtimeStateByDeviceKey[PlaybackDeviceKey(accountId = accountId, deviceId = deviceId)]
                                 ?: return@mapNotNull null
-                        if (runtimeState.lastNtpResponseAtMs == 0L) {
-                            return@mapNotNull null
-                        }
-                        if (nowMs - runtimeState.lastNtpResponseAtMs <= staleThresholdMs) {
+                        if (nowMs - runtimeState.lastPongAtMs <= staleThresholdMs) {
                             return@mapNotNull null
                         }
 

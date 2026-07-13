@@ -10,6 +10,7 @@ import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Component
 import org.springframework.web.server.ResponseStatusException
 import org.springframework.web.socket.CloseStatus
+import org.springframework.web.socket.PongMessage
 import org.springframework.web.socket.TextMessage
 import org.springframework.web.socket.WebSocketSession
 import org.springframework.web.socket.handler.ConcurrentWebSocketSessionDecorator
@@ -128,6 +129,16 @@ class PlaybackSyncWebSocketHandler(
                 reason = PlaybackSyncErrorReason.INTERNAL_ERROR,
             )
         }
+    }
+
+    override fun handlePongMessage(
+        session: WebSocketSession,
+        message: PongMessage,
+    ) {
+        deviceRuntimeService.recordPong(
+            sessionId = session.getPlaybackSyncSessionId(),
+            nowMs = timeProvider.nowMs(),
+        )
     }
 
     override fun afterConnectionClosed(

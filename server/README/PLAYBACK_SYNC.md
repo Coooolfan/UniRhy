@@ -91,12 +91,14 @@ data class DeviceRuntimeState(
     val accountId: Long,
     var rttEmaMs: Double,
     var lastNtpResponseAtMs: Long,
+    var lastPongAtMs: Long,
     var lastSeenAtMs: Long,
 )
 ```
 
 - `rttEmaMs` 用于计算账号级调度窗口。
-- `lastNtpResponseAtMs` 用于活跃性判断与断链清理，超过 `3750ms`（`1.5 * STEADY_STATE_INTERVAL_MS`）未响应判定为 stale。
+- `lastPongAtMs` 用于活跃性判断与断链清理：服务端每 `15s` 发送一次 WebSocket 协议层 Ping，超过 `60s` 未收到 Pong 判定为 stale。Pong 由客户端网络栈自动回复，不依赖页面 JS 运行，后台被节流的 WebView 也能响应。
+- `lastNtpResponseAtMs` 仅用于校时诊断与 `SYNC` 就绪判断（`isSyncReady`），不参与活跃性判定。
 
 ### 3.4 连接注册态
 
@@ -316,7 +318,7 @@ data class DeviceRuntimeState(
 1. 设备连接 WS，发送 `HELLO`。
 2. 服务端返回 `SNAPSHOT`（包含当前 `AccountPlaybackState`）。
 3. 客户端快速发送 NTP 采样（20~40 次，每 30ms 一次，约 1.2 秒完成）。
-4. 达到采样数后标记 `isSynced=true`，进入稳态校时（每 2500ms 一次，兼作心跳）。
+4. 达到采样数后标记 `isSynced=true`，进入稳态校时（每 2500ms 一次，仅用于校时，不承担活性检测）。
 
 ### 5.2 PLAY（切歌场景）
 
@@ -346,10 +348,11 @@ data class DeviceRuntimeState(
 
 断线重连的设备无需手动 `SYNC`，服务端在 `HELLO` 阶段自动下发 `SNAPSHOT`，客户端完成 NTP 校时后自行恢复。
 
-### 5.5 心跳与掉线
+### 5.5 活性检测与掉线
 
-- 客户端：NTP 请求超过 `3750ms` 未收到响应，判定连接 stale，主动重连。
-- 服务端：按 `lastNtpResponseAtMs` 检查，超过 `3750ms`（`1.5 * 2500ms`）清理 stale 设备。
+- 活性检测与 NTP 校时解耦：NTP 心跳停摆（如后台定时器节流）不构成掉线。
+- 服务端：每 `15s` 向所有已完成 `HELLO` 的连接发送协议层 Ping，按 `lastPongAtMs` 检查，超过 `60s` 未收到 Pong 则关闭连接（close reason `stale_connection`），清扫周期 `10s`。
+- 客户端：无活性看门狗，重连由 `close` 事件驱动；Pong 回复由网络栈/传输层自动完成，浏览器、Tauri（tungstenite）与原生客户端均无需实现。
 - 设备断开后若存在 `PendingPlayState`，从 `clientsLoaded` 移除该设备，若剩余设备全部就绪则立即触发 `executeScheduledPlay()`。
 
 ## 6. 时间与调度策略

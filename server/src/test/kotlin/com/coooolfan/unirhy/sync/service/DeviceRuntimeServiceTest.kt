@@ -50,7 +50,35 @@ class DeviceRuntimeServiceTest {
     }
 
     @Test
-    fun `cleanup stale connections removes timed out runtime state`() {
+    fun `cleanup stale connections removes runtime state after pong timeout`() {
+        registerHello(
+            accountId = 42L,
+            sessionId = "session-1",
+            deviceId = "web-a",
+        )
+        service.recordPong(
+            sessionId = "session-1",
+            nowMs = 2_000L,
+        )
+
+        val notStale = service.cleanupStaleConnections(
+            nowMs = 62_000L,
+            staleThresholdMs = 60_000L,
+        )
+        val stale = service.cleanupStaleConnections(
+            nowMs = 62_001L,
+            staleThresholdMs = 60_000L,
+        )
+
+        assertTrue(notStale.isEmpty())
+        assertEquals(1, stale.size)
+        assertEquals("web-a", stale.single().context.deviceId)
+        assertFalse(service.isSyncReady(42L, "web-a"))
+        assertTrue(service.listDeviceIds(42L).isEmpty())
+    }
+
+    @Test
+    fun `ntp responses alone do not keep connection alive`() {
         registerHello(
             accountId = 42L,
             sessionId = "session-1",
@@ -60,23 +88,37 @@ class DeviceRuntimeServiceTest {
             accountId = 42L,
             deviceId = "web-a",
             clientRttMs = 20.0,
-            nowMs = 1_000L,
+            nowMs = 61_500L,
         )
 
-        val notStale = service.cleanupStaleConnections(
-            nowMs = 4_000L,
-            staleThresholdMs = 3_750L,
-        )
         val stale = service.cleanupStaleConnections(
-            nowMs = 5_000L,
-            staleThresholdMs = 3_750L,
+            nowMs = 62_000L,
+            staleThresholdMs = 60_000L,
         )
 
-        assertTrue(notStale.isEmpty())
         assertEquals(1, stale.size)
         assertEquals("web-a", stale.single().context.deviceId)
-        assertFalse(service.isSyncReady(42L, "web-a"))
-        assertTrue(service.listDeviceIds(42L).isEmpty())
+    }
+
+    @Test
+    fun `pong keeps connection alive while ntp heartbeat is throttled`() {
+        registerHello(
+            accountId = 42L,
+            sessionId = "session-1",
+            deviceId = "web-a",
+        )
+        service.recordPong(
+            sessionId = "session-1",
+            nowMs = 61_500L,
+        )
+
+        val stale = service.cleanupStaleConnections(
+            nowMs = 62_000L,
+            staleThresholdMs = 60_000L,
+        )
+
+        assertTrue(stale.isEmpty())
+        assertEquals(listOf("web-a"), service.listDeviceIds(42L))
     }
 
     @Test
