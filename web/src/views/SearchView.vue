@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import ArtistCard from '@/components/artist/ArtistCard.vue'
 import DashboardTopBar from '@/components/dashboard/DashboardTopBar.vue'
 import LibraryEmptyHint from '@/components/dashboard/LibraryEmptyHint.vue'
@@ -20,6 +21,7 @@ import { useUserStore } from '@/stores/user'
 
 const route = useRoute()
 const router = useRouter()
+const { t } = useI18n()
 const audioStore = useAudioStore()
 const userStore = useUserStore()
 const modal = useModal()
@@ -173,7 +175,7 @@ async function performSearch(query: string) {
             id: artist.id,
             type: 'artist',
             title: artist.displayName || 'Unknown Artist',
-            subtitle: artist.alias.length > 0 ? artist.alias.join(' / ') : '艺术家',
+            subtitle: artist.alias.length > 0 ? artist.alias.join(' / ') : t('artists.fallback'),
             cover: '',
         }))
     } catch (error) {
@@ -189,19 +191,19 @@ const openMergeWorksModal = async () => {
     }
 
     await modal.open(MergeSelectModal, {
-        title: '合并作品',
+        title: t('merge.worksTitle'),
         size: 'md',
         props: {
-            description: '请选择保留的目标作品，其余已选作品将合并到该作品。',
+            description: t('merge.worksDescription'),
             options: selectedWorkOptions.value,
-            missingTargetMessage: '请选择一个目标作品。',
+            missingTargetMessage: t('merge.worksMissingTargetMessage'),
             onConfirm: async (targetId: number) => {
                 const sourceWorkIds = selectedWorkOptions.value
                     .map((work) => work.id)
                     .filter((id) => id !== targetId)
 
                 if (sourceWorkIds.length === 0) {
-                    throw new Error('请选择至少一个要合并的来源作品。')
+                    throw new Error(t('merge.worksMissingSourceMessage'))
                 }
 
                 await api.workController.mergeWork({
@@ -225,19 +227,19 @@ const openMergeArtistsModal = async () => {
     }
 
     await modal.open(MergeSelectModal, {
-        title: '合并艺术家',
+        title: t('merge.artistsTitle'),
         size: 'md',
         props: {
-            description: '请选择保留的目标艺术家，其余已选艺术家将合并到该艺术家。',
+            description: t('merge.artistsDescription'),
             options: selectedArtistOptions.value,
-            missingTargetMessage: '请选择一个目标艺术家。',
+            missingTargetMessage: t('merge.artistsMissingTargetMessage'),
             onConfirm: async (targetId: number) => {
                 const sourceArtistIds = selectedArtistOptions.value
                     .map((artist) => artist.id)
                     .filter((id) => id !== targetId)
 
                 if (sourceArtistIds.length === 0) {
-                    throw new Error('请选择至少一个要合并的来源艺术家。')
+                    throw new Error(t('merge.artistsMissingSourceMessage'))
                 }
 
                 await api.artistController.mergeArtists({
@@ -382,7 +384,9 @@ const playItem = async (item: SearchResultItem) => {
         <div class="px-4 pt-4 sm:px-6 sm:pt-6 lg:px-8">
             <div class="mb-8 flex flex-col items-start gap-4 sm:flex-row sm:justify-between">
                 <div>
-                    <h2 class="mb-2 text-3xl font-serif text-[#2C2420] sm:text-4xl">搜索结果</h2>
+                    <h2 class="mb-2 text-3xl font-serif text-[#2C2420] sm:text-4xl">
+                        {{ t('search.title') }}
+                    </h2>
                     <p class="text-[#8C857B] font-serif italic">
                         Search results for "{{ searchedQuery }}"
                     </p>
@@ -394,7 +398,7 @@ const playItem = async (item: SearchResultItem) => {
                         class="mt-1 w-full border border-[#C27E46] px-4 py-2 text-sm tracking-wide text-[#C27E46] transition-colors hover:bg-[#C27E46] hover:text-white sm:w-auto sm:shrink-0"
                         @click="openMergeArtistsModal"
                     >
-                        合并艺术家
+                        {{ t('search.mergeArtists') }}
                     </button>
                     <button
                         v-if="userStore.isAdmin && hasSelectedWorks"
@@ -402,7 +406,7 @@ const playItem = async (item: SearchResultItem) => {
                         class="mt-1 w-full border border-[#C27E46] px-4 py-2 text-sm tracking-wide text-[#C27E46] transition-colors hover:bg-[#C27E46] hover:text-white sm:w-auto sm:shrink-0"
                         @click="openMergeWorksModal"
                     >
-                        合并作品
+                        {{ t('search.mergeWorks') }}
                     </button>
                 </div>
             </div>
@@ -423,29 +427,29 @@ const playItem = async (item: SearchResultItem) => {
                 >
                     {{
                         tab === 'All'
-                            ? '全部'
+                            ? t('search.tabAll')
                             : tab === 'Albums'
-                              ? '专辑'
+                              ? t('search.tabAlbums')
                               : tab === 'Works'
-                                ? '作品'
-                                : '艺术家'
+                                ? t('search.tabWorks')
+                                : t('search.tabArtists')
                     }}
                 </button>
             </div>
 
-            <div v-if="isLoading" class="text-[#8C857B] text-sm">搜索中...</div>
+            <div v-if="isLoading" class="text-[#8C857B] text-sm">{{ t('search.searching') }}</div>
 
             <LibraryEmptyHint
                 v-else-if="!hasResults"
                 :showSettingsButton="false"
-                title="没有找到相关结果"
-                :description="['尝试调整搜索关键词']"
+                :title="t('search.noResults')"
+                :description="[t('search.tryAdjustKeywords')]"
             />
 
             <div v-else class="space-y-12">
                 <div v-if="filteredResults.artists.length > 0">
                     <h3 v-if="activeTab === 'All'" class="text-xl font-serif text-[#2C2420] mb-6">
-                        艺术家
+                        {{ t('search.tabArtists') }}
                     </h3>
                     <div
                         class="grid grid-cols-2 gap-5 sm:gap-8 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6"
@@ -465,7 +469,7 @@ const playItem = async (item: SearchResultItem) => {
 
                 <div v-if="filteredResults.albums.length > 0">
                     <h3 v-if="activeTab === 'All'" class="text-xl font-serif text-[#2C2420] mb-6">
-                        专辑
+                        {{ t('search.tabAlbums') }}
                     </h3>
                     <div
                         class="grid grid-cols-2 gap-x-5 gap-y-10 sm:gap-x-8 sm:gap-y-12 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 xl:gap-x-12 xl:gap-y-16"
@@ -486,7 +490,7 @@ const playItem = async (item: SearchResultItem) => {
 
                 <div v-if="filteredResults.works.length > 0">
                     <h3 v-if="activeTab === 'All'" class="text-xl font-serif text-[#2C2420] mb-6">
-                        作品
+                        {{ t('search.tabWorks') }}
                     </h3>
                     <div
                         class="grid grid-cols-2 gap-x-5 gap-y-10 sm:gap-x-8 sm:gap-y-12 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 xl:gap-x-12 xl:gap-y-16"
