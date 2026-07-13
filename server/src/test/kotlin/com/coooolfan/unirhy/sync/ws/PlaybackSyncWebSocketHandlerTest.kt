@@ -112,15 +112,23 @@ class PlaybackSyncWebSocketHandlerTest {
             TextMessage(playPayload(currentIndex = 1, version = queue.version)),
         )
 
-        val messages = session.serverMessages()
-        assertTrue(messages[0] is QueueChangeMessage)
-        assertTrue(messages[1] is LoadAudioSourceMessage)
-        assertTrue(messages[2] is ScheduledActionMessage)
+        val loadingMessages = session.serverMessages()
+        assertEquals(2, loadingMessages.size)
+        assertTrue(loadingMessages[0] is QueueChangeMessage)
+        assertTrue(loadingMessages[1] is LoadAudioSourceMessage)
 
-        val loadAudio = messages[1] as LoadAudioSourceMessage
-        val scheduledAction = messages[2] as ScheduledActionMessage
+        val loadAudio = loadingMessages[1] as LoadAudioSourceMessage
         assertEquals(1, loadAudio.payload.currentIndex)
         assertEquals(1002L, loadAudio.payload.recordingId)
+
+        handler.handleMessage(
+            session,
+            TextMessage(audioSourceLoadedPayload(currentIndex = 1, recordingId = 1002L)),
+        )
+
+        val messages = session.serverMessages()
+        assertEquals(3, messages.size)
+        val scheduledAction = messages[2] as ScheduledActionMessage
         assertEquals(1, scheduledAction.payload.scheduledAction.currentIndex)
     }
 
@@ -229,6 +237,21 @@ class PlaybackSyncWebSocketHandlerTest {
             "currentIndex": $currentIndex,
             "positionSeconds": 12.5,
             "version": $version
+          }
+        }
+    """.trimIndent()
+
+    private fun audioSourceLoadedPayload(
+        currentIndex: Int,
+        recordingId: Long,
+    ): String = """
+        {
+          "type": "AUDIO_SOURCE_LOADED",
+          "payload": {
+            "commandId": "cmd-play-001",
+            "deviceId": "web-7c2f",
+            "currentIndex": $currentIndex,
+            "recordingId": $recordingId
           }
         }
     """.trimIndent()

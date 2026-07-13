@@ -37,7 +37,7 @@ class PlaybackSessionService(
                 currentIndex = currentIndex,
                 recordingId = recordingId,
                 positionSeconds = positionSeconds,
-                clientsLoaded = initiatorDeviceId?.let { mutableSetOf(it) } ?: mutableSetOf(),
+                clientsLoaded = mutableSetOf(),
                 createdAtMs = nowMs,
                 timeoutAtMs = timeoutAtMs,
             )
