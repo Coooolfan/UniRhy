@@ -1,4 +1,5 @@
 const COMMANDS: &[&str] = &[
+    "register_listener",
     "configure",
     "update_auth",
     "connect_sync",

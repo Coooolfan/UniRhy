@@ -22,7 +22,7 @@ class PlaybackService : MediaSessionService() {
     override fun onCreate() {
         super.onCreate()
         val engine = PlaybackController.ensurePlayerEngine(applicationContext)
-        mediaSession = MediaSession.Builder(this, CommandRoutingPlayer(engine.player)).build()
+        mediaSession = MediaSession.Builder(this, CommandRoutingPlayer(engine.player)).build().also(::addSession)
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? {
@@ -38,7 +38,10 @@ class PlaybackService : MediaSessionService() {
     }
 
     override fun onDestroy() {
-        mediaSession?.release()
+        mediaSession?.let {
+            removeSession(it)
+            it.release()
+        }
         mediaSession = null
         super.onDestroy()
     }

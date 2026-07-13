@@ -4,6 +4,7 @@ Default permissions for the UniRhy playback plugin
 
 #### This default permission set includes the following:
 
+- `allow-register-listener`
 - `allow-configure`
 - `allow-update-auth`
 - `allow-connect-sync`
@@ -232,6 +233,32 @@ Enables the local_set_queue command without any pre-configured scope.
 <td>
 
 Denies the local_set_queue command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`unirhy-playback:allow-register-listener`
+
+</td>
+<td>
+
+Enables the register_listener command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`unirhy-playback:deny-register-listener`
+
+</td>
+<td>
+
+Denies the register_listener command without any pre-configured scope.
 
 </td>
 </tr>

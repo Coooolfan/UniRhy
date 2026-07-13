@@ -3,6 +3,7 @@
 [default]
 description = "Default permissions for the UniRhy playback plugin"
 permissions = [
+    "allow-register-listener",
     "allow-configure",
     "allow-update-auth",
     "allow-connect-sync",
