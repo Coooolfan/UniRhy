@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { Pause, Pencil, Play } from 'lucide-vue-next'
 import { api } from '@/ApiInstance'
 import { resolveErrorMessage } from '@/i18n/errors'
@@ -20,6 +21,8 @@ import { useRecordingPlayback, type PlayableRecording } from '@/composables/useR
 import { pickInitialRecordingIdFromCandidates } from '@/services/recordingPlaybackResolver'
 import { hasSameItemOrder, moveItemById, type ReorderPayload } from '@/utils/recordingOrder'
 import { usePlaylistStore } from '@/stores/playlist'
+
+const { t } = useI18n()
 
 const route = useRoute()
 const router = useRouter()
@@ -131,7 +134,7 @@ const openEditModal = async () => {
     }
 
     await modal.open(PlaylistEditModal, {
-        title: '编辑歌单',
+        title: t('playlist.editPlaylist'),
         size: 'sm',
         props: {
             initialName: playlistData.value.title,
@@ -185,7 +188,7 @@ const removeRecording = async (recording: Recording) => {
 
 const openRemoveRecordingModal = async (recording: Recording) => {
     await modal.open(PlaylistRemoveRecordingModal, {
-        title: '移除曲目',
+        title: t('playlist.removeRecording'),
         size: 'sm',
         tone: 'danger',
         props: {
@@ -294,7 +297,7 @@ watch(
                         <span>Playlist</span>
                         <button
                             class="cursor-pointer p-1 text-[#8C857B] opacity-100 transition-all hover:text-[#C17D46] md:opacity-0 md:group-hover:opacity-100"
-                            title="编辑歌单"
+                            :title="t('playlist.editPlaylist')"
                             @click="openEditModal"
                         >
                             <Pencil :size="14" />
@@ -323,15 +326,19 @@ watch(
                         >
                             <Pause v-if="isCurrentRecordingPlaying" :size="16" />
                             <Play v-else :size="16" fill="currentColor" />
-                            {{ isCurrentRecordingPlaying ? '暂停播放' : '立即播放' }}
+                            {{
+                                isCurrentRecordingPlaying
+                                    ? t('media.pausePlayback')
+                                    : t('media.playNow')
+                            }}
                         </button>
                     </div>
                 </div>
             </div>
 
             <MediaListPanel
-                title="曲目"
-                :summary="`${recordings.length} 首曲目`"
+                :title="t('media.tracks')"
+                :summary="t('media.trackCount', { count: recordings.length })"
                 :items="recordings"
                 :playing-id="playingId"
                 enable-reorder
@@ -343,10 +350,10 @@ watch(
             >
                 <template #actions>
                     <span class="text-[11px] uppercase tracking-[0.24em] text-[#B0AAA0]">
-                        {{ isReorderingRecordings ? '正在保存顺序' : '' }}
+                        {{ isReorderingRecordings ? t('recording.savingOrder') : '' }}
                     </span>
                 </template>
-                <template #empty> 前往作品或专辑详情页，将曲目添加到歌单 </template>
+                <template #empty> {{ t('playlist.emptyHint') }} </template>
 
                 <template #item="{ item }">
                     <MediaListItem

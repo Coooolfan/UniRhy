@@ -151,5 +151,80 @@ export default {
     },
     artists: {
         title: 'Artists',
+        fallback: 'Artist',
+    },
+    media: {
+        addToPlaylist: 'Add to Playlist',
+        aboutRecording: 'About Recording',
+        removeFromPlaylist: 'Remove from Playlist',
+        removing: 'Removing',
+        trackCount: '{count} tracks',
+        tracks: 'Tracks',
+        playNow: 'Play Now',
+        pausePlayback: 'Pause Playback',
+    },
+    playlist: {
+        editPlaylist: 'Edit Playlist',
+        emptyHint: 'Go to work or album details to add tracks to playlist',
+        removeRecording: 'Remove Recording',
+    },
+    album: {
+        editAlbum: 'Edit Album',
+    },
+    work: {
+        editWork: 'Edit Work',
+    },
+    search: {
+        title: 'Search Results',
+        searching: 'Searching...',
+        noResults: 'No results found',
+        tryAdjustKeywords: 'Try adjusting search keywords',
+    },
+    preferences: {
+        title: 'Preferences',
+        subtitle: 'Client playback and experience preferences',
+        playbackMode: 'Playback Mode',
+        preferredFormat: 'Preferred Asset Format',
+        androidBackgroundPlayback: 'Android Background Playback',
+        notificationPermission: 'Notification Permission',
+        backgroundBattery: 'Background Battery',
+        systemStatus: 'System notification and background battery status',
+        custom: 'Custom',
+        saving: 'Saving',
+        saveChanges: 'Save Changes',
+        androidStatusError: 'Unable to read Android system settings',
+    },
+    playbackMode: {
+        SEQUENTIAL: 'Sequential',
+        SHUFFLE: 'Shuffle',
+        SINGLE: 'Single',
+        RADIO: 'Radio',
+    },
+    playbackStop: {
+        TRACK: 'Track',
+        LIST: 'List',
+        NEVER: 'Never',
+    },
+    sync: {
+        SYNC: 'Sync',
+        INDEPENDENT: 'Independent',
+    },
+    player: {
+        toggleExpand: 'Toggle player expand state',
+        collapse: 'Collapse player',
+        openSyncDebug: 'Open sync debug page',
+        playStrategy: 'Play Strategy',
+        stopStrategy: 'Stop Strategy',
+    },
+    merge: {
+        title: 'Merge Recordings',
+        description:
+            'Please select the target recording to keep, other selected recordings will be merged into it.',
+        note: 'Audio resources, album associations, playlist associations, and artist associations of source recordings will be merged into the target recording, and source recordings will be deleted; Default marks will remain as per backend results.',
+        missingTargetMessage: 'Please select a target recording.',
+        missingSourceMessage: 'Please select at least one source recording.',
+    },
+    recording: {
+        savingOrder: 'Saving order',
     },
 }

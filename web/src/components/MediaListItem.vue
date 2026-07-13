@@ -1,5 +1,8 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import { Play, Pause, Plus, Trash2, Pencil } from 'lucide-vue-next'
+
+const { t } = useI18n()
 
 defineProps<{
     title: string
@@ -66,7 +69,7 @@ const emit = defineEmits<{
         <button
             v-if="showRemoveButton"
             class="hover:text-[#B95D5D] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-            :title="isRemoving ? '移除中' : '从歌单移除'"
+            :title="isRemoving ? t('media.removing') : t('media.removeFromPlaylist')"
             :disabled="isRemoving"
             @click.stop="emit('remove')"
         >
@@ -75,7 +78,7 @@ const emit = defineEmits<{
         <button
             v-if="showAddButton"
             class="hover:text-[#C17D46] transition-colors cursor-pointer"
-            title="添加到歌单"
+            :title="t('media.addToPlaylist')"
             @click.stop="emit('add')"
         >
             <Plus :size="16" />
@@ -83,7 +86,7 @@ const emit = defineEmits<{
         <button
             v-if="showEditButton"
             class="hover:text-[#C17D46] transition-colors cursor-pointer"
-            title="关于曲目"
+            :title="t('media.aboutRecording')"
             @click.stop="emit('edit')"
         >
             <Pencil :size="16" />
