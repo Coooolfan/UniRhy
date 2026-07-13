@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { Disc3, Settings } from 'lucide-vue-next'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { useUserStore } from '@/stores/user'
+
+const { t, tm } = useI18n()
 
 withDefaults(
     defineProps<{
@@ -12,12 +15,9 @@ withDefaults(
         showSettingsButton?: boolean
     }>(),
     {
-        title: '专辑柜空空如也',
-        description: () => [
-            '我们将旋律的有序集合，称之为专辑。',
-            '连接存储节点，发起元数据解析任务，UniRhy 将自动发现专辑。',
-        ],
-        errorText: '数据加载失败，请检查配置后重试。',
+        title: undefined,
+        description: undefined,
+        errorText: undefined,
         showSettingsButton: true,
     },
 )
@@ -43,16 +43,22 @@ const navigateToSettings = () => {
             </div>
 
             <h3 class="text-lg font-medium text-[#3D3935] tracking-wider mb-2 font-serif">
-                {{ title }}
+                {{ title ?? t('libraryEmpty.albumEmptyTitle') }}
             </h3>
             <p class="text-sm text-[#8A847A] leading-relaxed mb-8">
-                <template v-for="(line, i) in description" :key="i">
+                <template
+                    v-for="(line, i) in description ?? [
+                        t('libraryEmpty.albumExplanation1'),
+                        t('libraryEmpty.albumExplanation2'),
+                    ]"
+                    :key="i"
+                >
                     <br v-if="i > 0" />{{ line }}
                 </template>
             </p>
 
             <p v-if="hasError" class="text-xs text-[#A17855] mb-4">
-                {{ errorText }}
+                {{ errorText ?? t('libraryEmpty.errorText') }}
             </p>
 
             <button
@@ -62,7 +68,7 @@ const navigateToSettings = () => {
                 @click="navigateToSettings"
             >
                 <Settings :size="16" />
-                <span>前往设置</span>
+                <span>{{ t('libraryEmpty.goToSettings') }}</span>
             </button>
         </div>
     </div>

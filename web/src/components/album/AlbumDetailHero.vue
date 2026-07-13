@@ -1,5 +1,8 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import { Pause, Pencil, Play } from 'lucide-vue-next'
+
+const { t } = useI18n()
 
 export type AlbumHeroData = {
     title: string
@@ -72,7 +75,7 @@ const emit = defineEmits<{
                 <button
                     v-if="canEdit"
                     class="cursor-pointer p-1 text-[#8C857B] opacity-100 transition-all hover:text-[#C17D46] md:opacity-0 md:group-hover:opacity-100"
-                    title="编辑专辑"
+                    :title="t('albumHero.editAlbum')"
                     @click="emit('edit')"
                 >
                     <Pencil :size="14" />
@@ -101,7 +104,7 @@ const emit = defineEmits<{
                 >
                     <Pause v-if="isCurrentPlaying" :size="16" />
                     <Play v-else :size="16" fill="currentColor" />
-                    {{ isCurrentPlaying ? '暂停播放' : '立即播放' }}
+                    {{ isCurrentPlaying ? t('albumHero.pausePlayback') : t('albumHero.playNow') }}
                 </button>
             </div>
         </div>

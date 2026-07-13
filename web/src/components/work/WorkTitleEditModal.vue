@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { resolveErrorMessage } from '@/i18n/errors'
 import { useModalContext } from '@/components/modals/modalContext'
+
+const { t } = useI18n()
 
 const props = defineProps<{
     initialTitle: string
@@ -26,7 +29,7 @@ const submit = async () => {
     const nextTitle = title.value.trim()
 
     if (!nextTitle) {
-        error.value = '作品标题不能为空。'
+        error.value = t('workTitleEdit.titleEmpty')
         return
     }
 
@@ -75,7 +78,7 @@ const submit = async () => {
                 :disabled="isSaving"
                 @click="closeModal"
             >
-                取消
+                {{ t('common.cancel') }}
             </button>
             <button
                 type="button"
@@ -83,7 +86,7 @@ const submit = async () => {
                 :disabled="isSaving"
                 @click="submit"
             >
-                {{ isSaving ? '更新中...' : '保存更改' }}
+                {{ isSaving ? t('workTitleEdit.updating') : t('common.saveChanges') }}
             </button>
         </div>
     </div>

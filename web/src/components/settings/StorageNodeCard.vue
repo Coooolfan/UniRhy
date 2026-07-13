@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { Cloud, Edit2, FolderOpen, HardDrive, Star, Trash2 } from 'lucide-vue-next'
+import { useI18n } from 'vue-i18n'
 import type { StorageNode } from '@/composables/useStorageSettings'
+
+const { t } = useI18n()
 
 type Props = {
     node: StorageNode
@@ -57,7 +60,12 @@ const nodePathLabel = computed(() => {
                             {{ node.name }}
                         </h3>
                         <div class="text-[10px] text-[#8A8A8A] uppercase tracking-widest mt-1">
-                            {{ node.type === 'OSS' ? '对象存储' : '本地存储' }} / ID:
+                            {{
+                                node.type === 'OSS'
+                                    ? t('storageNode.objectStorage')
+                                    : t('storageNode.localStorage')
+                            }}
+                            / ID:
                             {{ node.id }}
                         </div>
                     </div>
@@ -68,13 +76,13 @@ const nodePathLabel = computed(() => {
                             v-if="node.readonly"
                             class="px-2 py-0.5 border border-[#D6D1C4] text-[10px] text-[#8A8A8A] uppercase"
                         >
-                            只读节点
+                            {{ t('storageNode.readonlyNode') }}
                         </span>
                         <span
                             v-if="isActiveNode"
                             class="px-2 py-0.5 bg-[#C67C4E] text-[10px] text-white uppercase"
                         >
-                            系统节点
+                            {{ t('storageNode.systemNode') }}
                         </span>
                     </div>
                 </div>
@@ -95,7 +103,7 @@ const nodePathLabel = computed(() => {
             >
                 <button
                     v-if="!isActiveNode"
-                    title="设为系统节点"
+                    :title="t('storageNode.setAsSystemNode')"
                     class="p-2 hover:text-[#C67C4E] transition-colors disabled:opacity-50"
                     :disabled="isSaving || node.readonly"
                     @click="emit('set-system')"
@@ -103,7 +111,7 @@ const nodePathLabel = computed(() => {
                     <Star :size="14" />
                 </button>
                 <button
-                    title="编辑"
+                    :title="t('common.edit')"
                     class="p-2 hover:text-[#C67C4E] transition-colors disabled:opacity-50"
                     :disabled="isSaving"
                     @click="emit('edit')"
@@ -111,7 +119,7 @@ const nodePathLabel = computed(() => {
                     <Edit2 :size="14" />
                 </button>
                 <button
-                    title="删除"
+                    :title="t('common.delete')"
                     class="p-2 hover:text-red-500 transition-colors disabled:opacity-50"
                     :disabled="isSaving"
                     @click="emit('delete')"

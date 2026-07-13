@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { Edit2, Mail, ShieldCheck, Trash2, User } from 'lucide-vue-next'
+import { useI18n } from 'vue-i18n'
 import type { Account } from '@/composables/useAccountSettings'
+
+const { t } = useI18n()
 
 type Props = {
     account: Account
@@ -37,7 +40,7 @@ const emit = defineEmits<{
                             {{ account.name }}
                         </h3>
                         <div class="mt-1 text-[10px] uppercase tracking-widest text-[#8A8A8A]">
-                            {{ account.admin ? '管理员' : '普通用户' }} / ID:
+                            {{ account.admin ? t('account.admin') : t('account.normalUser') }} / ID:
                             {{ account.id }}
                         </div>
                     </div>
@@ -48,7 +51,7 @@ const emit = defineEmits<{
                             v-if="isCurrent"
                             class="border border-[#D6D1C4] px-2 py-0.5 text-[10px] uppercase text-[#8A8A8A]"
                         >
-                            当前账号
+                            {{ t('account.currentAccount') }}
                         </span>
                         <span
                             v-if="account.admin"
@@ -74,7 +77,7 @@ const emit = defineEmits<{
                 class="absolute right-4 top-4 flex gap-2 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100"
             >
                 <button
-                    title="编辑账号"
+                    :title="t('account.editAccount')"
                     class="p-2 transition-colors hover:text-[#C67C4E] disabled:opacity-50"
                     :disabled="isSaving"
                     @click="emit('edit')"
@@ -82,7 +85,7 @@ const emit = defineEmits<{
                     <Edit2 :size="14" />
                 </button>
                 <button
-                    title="删除账号"
+                    :title="t('account.deleteAccount')"
                     class="p-2 transition-colors hover:text-red-500 disabled:opacity-50"
                     :disabled="isSaving || isCurrent"
                     @click="emit('delete')"

@@ -1,6 +1,9 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import { Pencil, Play, Pause } from 'lucide-vue-next'
 import StackedCovers from '@/components/StackedCovers.vue'
+
+const { t } = useI18n()
 
 export type WorkHeroData = {
     title: string
@@ -45,7 +48,7 @@ const emit = defineEmits<{
                 <button
                     v-if="canEdit"
                     class="cursor-pointer p-1 text-[#8C857B] opacity-100 transition-all hover:text-[#C17D46] md:opacity-0 md:group-hover:opacity-100"
-                    title="编辑作品"
+                    :title="t('workHero.editWork')"
                     @click="emit('edit-work')"
                 >
                     <Pencil :size="14" />
@@ -68,7 +71,7 @@ const emit = defineEmits<{
                 >
                     <Pause v-if="isCurrentPlaying" :size="16" />
                     <Play v-else :size="16" fill="currentColor" />
-                    {{ isCurrentPlaying ? '暂停播放' : '立即播放' }}
+                    {{ isCurrentPlaying ? t('workHero.pausePlayback') : t('workHero.playNow') }}
                 </button>
             </div>
         </div>

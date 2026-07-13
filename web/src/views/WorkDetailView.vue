@@ -411,7 +411,7 @@ watch(
                         class="px-3 py-1 border border-[#C27E46] text-[#C27E46] text-xs tracking-wide transition-colors hover:bg-[#C27E46] hover:text-white uppercase"
                         @click="openRecordingMergeModal"
                     >
-                        合并
+                        {{ t('workDetail.merge') }}
                     </button>
                 </template>
                 <template #item="{ item }">

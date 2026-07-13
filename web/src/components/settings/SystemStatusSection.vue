@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { Activity, Cloud, Folder, HardDrive } from 'lucide-vue-next'
+import { useI18n } from 'vue-i18n'
 import type { StorageNode, SystemConfig } from '@/composables/useStorageSettings'
+
+const { t } = useI18n()
 
 type Props = {
     activeStorageLabel: string
@@ -46,7 +49,9 @@ const nodeTypeLabel = computed(() => {
     if (props.isLoading) {
         return 'Loading'
     }
-    return props.activeNode?.type === 'OSS' ? '对象存储' : '本地存储'
+    return props.activeNode?.type === 'OSS'
+        ? t('systemStatus.objectStorage')
+        : t('systemStatus.localStorage')
 })
 
 const nodeIcon = computed(() => (props.activeNode?.type === 'OSS' ? Cloud : HardDrive))
@@ -54,7 +59,7 @@ const nodeIcon = computed(() => (props.activeNode?.type === 'OSS' ? Cloud : Hard
 
 <template>
     <section class="mb-16 animate-in fade-in duration-500">
-        <h2 class="text-2xl font-serif text-[#2C2A28] mb-2">全局状态</h2>
+        <h2 class="text-2xl font-serif text-[#2C2A28] mb-2">{{ t('systemStatus.title') }}</h2>
         <div class="h-px w-full bg-[#E8E4D9] mb-6"></div>
 
         <div
@@ -79,7 +84,9 @@ const nodeIcon = computed(() => (props.activeNode?.type === 'OSS' ? Cloud : Hard
                         ></span>
                         <span class="relative inline-flex rounded-full h-2 w-2 bg-[#B87A5B]"></span>
                     </span>
-                    <span class="text-[10px] text-[#8A857B] tracking-wider">在线</span>
+                    <span class="text-[10px] text-[#8A857B] tracking-wider">{{
+                        t('systemStatus.online')
+                    }}</span>
                 </div>
             </div>
 
@@ -90,7 +97,7 @@ const nodeIcon = computed(() => (props.activeNode?.type === 'OSS' ? Cloud : Hard
                     <div
                         class="text-[10px] tracking-[0.2em] text-[#A39E93] uppercase mb-2 font-medium"
                     >
-                        当前系统节点
+                        {{ t('systemStatus.currentSystemNode') }}
                     </div>
 
                     <div class="mb-4 flex flex-col gap-1 sm:flex-row sm:items-baseline sm:gap-4">
@@ -117,7 +124,7 @@ const nodeIcon = computed(() => (props.activeNode?.type === 'OSS' ? Cloud : Hard
                         class="bg-[#B87A5B] text-white text-[10px] tracking-widest px-3 py-1.5 rounded-sm shadow-sm flex items-center gap-1.5"
                     >
                         <Activity :size="12" stroke-width="2.5" />
-                        在线
+                        {{ t('systemStatus.online') }}
                     </div>
                 </div>
 

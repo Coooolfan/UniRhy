@@ -218,18 +218,8 @@
                     class="text-[#D4A373] hover:underline"
                     >GitHub</a
                 >
-                获取
+                {{ t('init.legalNoticeSuffix') }}
             </p>
-            <!-- <p class="text-[10px]">
-                UniRhy is AGPL v3.0 licensed. Source code available on
-                <a
-                    href="https://github.com/coooolfan/unirhy"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    class="text-[#D4A373] hover:underline"
-                    >GitHub</a
-                >
-            </p> -->
         </div>
     </div>
 </template>

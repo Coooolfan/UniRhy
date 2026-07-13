@@ -1,4 +1,8 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
+
 const props = withDefaults(
     defineProps<{
         id: number | string
@@ -102,7 +106,7 @@ const emit = defineEmits<{
             <button
                 v-if="selectable"
                 type="button"
-                aria-label="选择艺术家"
+                :aria-label="t('media.selectArtist')"
                 class="absolute left-0 top-0 z-30 h-1/2 w-1/2 cursor-pointer rounded-tl-full"
                 @click.stop="emit('toggle-select')"
             ></button>

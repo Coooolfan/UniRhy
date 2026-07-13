@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { Save } from 'lucide-vue-next'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 type Props = {
     name: string
@@ -36,9 +39,9 @@ const readOnlyModel = computed({
     <div class="p-6 border border-[#C67C4E] bg-[#fffcf5]">
         <div class="space-y-4">
             <div>
-                <label class="text-xs uppercase tracking-wider text-[#8A8A8A] font-serif"
-                    >节点名称</label
-                >
+                <label class="text-xs uppercase tracking-wider text-[#8A8A8A] font-serif">{{
+                    t('storageNode.nodeName')
+                }}</label>
                 <input
                     v-model="nameModel"
                     type="text"
@@ -47,7 +50,7 @@ const readOnlyModel = computed({
             </div>
             <div>
                 <label class="text-xs uppercase tracking-wider text-[#8A8A8A] font-serif">
-                    存储节点根路径
+                    {{ t('storageNode.storagePath') }}
                 </label>
                 <input
                     v-model="parentPathModel"
@@ -57,14 +60,14 @@ const readOnlyModel = computed({
             </div>
             <label class="flex items-center gap-2 cursor-pointer mt-2">
                 <input v-model="readOnlyModel" type="checkbox" class="accent-[#C67C4E] w-4 h-4" />
-                <span class="text-sm text-[#5A5A5A]">只读模式</span>
+                <span class="text-sm text-[#5A5A5A]">{{ t('storageNode.readonlyMode') }}</span>
             </label>
             <div class="flex gap-2 mt-4 justify-end border-t border-[#EAE6D9] pt-4">
                 <button
                     class="text-xs uppercase tracking-wide px-3 py-1 hover:text-[#C67C4E]"
                     @click="emit('cancel')"
                 >
-                    取消
+                    {{ t('common.cancel') }}
                 </button>
                 <button
                     class="flex items-center gap-1 text-xs uppercase tracking-wide px-3 py-1 bg-[#3D3D3D] text-[#F7F5F0] hover:bg-[#C67C4E] transition-colors disabled:opacity-60"
@@ -72,7 +75,7 @@ const readOnlyModel = computed({
                     @click="emit('save')"
                 >
                     <Save :size="12" />
-                    保存
+                    {{ t('common.save') }}
                 </button>
             </div>
         </div>

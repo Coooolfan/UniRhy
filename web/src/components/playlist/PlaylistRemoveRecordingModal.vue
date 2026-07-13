@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { resolveErrorMessage } from '@/i18n/errors'
 import { useModalContext } from '@/components/modals/modalContext'
+
+const { t } = useI18n()
 
 const props = defineProps<{
     recordingTitle: string
@@ -42,7 +45,9 @@ const confirm = async () => {
 
 <template>
     <div class="space-y-6">
-        <p class="text-sm text-[#8C857B]">确认从当前歌单中移除「{{ recordingTitle }}」？</p>
+        <p class="text-sm text-[#8C857B]">
+            {{ t('playlistRemove.confirmMessage', { title: recordingTitle }) }}
+        </p>
 
         <p v-if="error" class="text-sm text-[#B95D5D]">
             {{ error }}
@@ -55,7 +60,7 @@ const confirm = async () => {
                 :disabled="isRemoving"
                 @click="closeModal"
             >
-                取消
+                {{ t('common.cancel') }}
             </button>
             <button
                 type="button"
@@ -63,8 +68,8 @@ const confirm = async () => {
                 :disabled="isRemoving"
                 @click="confirm"
             >
-                <span v-if="isRemoving">移除中...</span>
-                <span v-else>确认移除</span>
+                <span v-if="isRemoving">{{ t('playlistRemove.removing') }}</span>
+                <span v-else>{{ t('playlistRemove.confirmRemove') }}</span>
             </button>
         </div>
     </div>
