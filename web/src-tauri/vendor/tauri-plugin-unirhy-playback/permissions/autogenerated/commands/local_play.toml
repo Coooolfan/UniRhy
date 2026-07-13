@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-local-play"
+description = "Enables the local_play command without any pre-configured scope."
+commands.allow = ["local_play"]
+
+[[permission]]
+identifier = "deny-local-play"
+description = "Denies the local_play command without any pre-configured scope."
+commands.deny = ["local_play"]

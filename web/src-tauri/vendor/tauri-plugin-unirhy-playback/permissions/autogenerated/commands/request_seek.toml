@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-request-seek"
+description = "Enables the request_seek command without any pre-configured scope."
+commands.allow = ["request_seek"]
+
+[[permission]]
+identifier = "deny-request-seek"
+description = "Denies the request_seek command without any pre-configured scope."
+commands.deny = ["request_seek"]

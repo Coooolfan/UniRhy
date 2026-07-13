@@ -1,0 +1,22 @@
+[package]
+name = "tauri-plugin-unirhy-playback"
+version = "0.1.0"
+edition = "2021"
+description = "UniRhy Android 原生播放内核插件：Media3 播放执行器 + 播放同步协议客户端"
+license = "MIT"
+links = "tauri-plugin-unirhy-playback"
+
+[lib]
+name = "tauri_plugin_unirhy_playback"
+crate-type = ["staticlib", "cdylib", "rlib"]
+path = "src/lib.rs"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+tauri = "2"
+log = "0.4"
+
+[build-dependencies]
+tauri-plugin = { version = "2", features = ["build"] }

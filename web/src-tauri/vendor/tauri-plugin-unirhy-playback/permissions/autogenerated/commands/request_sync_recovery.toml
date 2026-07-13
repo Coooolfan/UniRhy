@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-request-sync-recovery"
+description = "Enables the request_sync_recovery command without any pre-configured scope."
+commands.allow = ["request_sync_recovery"]
+
+[[permission]]
+identifier = "deny-request-sync-recovery"
+description = "Denies the request_sync_recovery command without any pre-configured scope."
+commands.deny = ["request_sync_recovery"]

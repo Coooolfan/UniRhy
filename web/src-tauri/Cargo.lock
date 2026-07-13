@@ -3883,6 +3883,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "tauri-plugin-unirhy-playback"
+version = "0.1.0"
+dependencies = [
+ "log",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-plugin",
+ "thiserror 2.0.18",
+]
+
+[[package]]
 name = "tauri-plugin-websocket"
 version = "2.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4538,6 +4550,7 @@ dependencies = [
  "tauri-plugin-background-service",
  "tauri-plugin-http",
  "tauri-plugin-notification",
+ "tauri-plugin-unirhy-playback",
  "tauri-plugin-websocket",
  "tokio",
 ]

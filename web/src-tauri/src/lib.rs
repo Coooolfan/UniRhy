@@ -84,6 +84,7 @@ pub fn run() {
         .plugin(tauri_plugin_background_service::init_with_service(|| {
             AudioPlaybackService
         }))
+        .plugin(tauri_plugin_unirhy_playback::init())
         .setup(|app| {
             let backend_url = Arc::new(RwLock::new(config::load_backend_url(app.handle())));
             app.manage(AppState { backend_url });

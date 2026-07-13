@@ -20,4 +20,5 @@ tauri-plugin-websocket = "2"
 async-trait = "0.1"
 tauri-plugin-notification = "2.3.3"
 tauri-plugin-background-service = { path = "vendor/tauri-plugin-background-service" }
+tauri-plugin-unirhy-playback = { path = "vendor/tauri-plugin-unirhy-playback" }
 tauri-plugin-android-battery-optimization = "0.1.4"
