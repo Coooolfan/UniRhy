@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { api, normalizeApiError } from '@/ApiInstance'
+import { api } from '@/ApiInstance'
+import { resolveErrorMessage } from '@/i18n/errors'
 
 export type PlaylistListItem = {
     id: number
@@ -28,8 +29,7 @@ export const usePlaylistStore = defineStore('playlist', () => {
             }))
             hasLoaded.value = true
         } catch (e) {
-            const normalized = normalizeApiError(e)
-            error.value = normalized.message ?? '歌单加载失败'
+            error.value = resolveErrorMessage(e, 'errors.fallback.playlistLoad')
             playlists.value = []
             hasLoaded.value = false
         } finally {

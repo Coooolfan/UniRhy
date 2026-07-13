@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { reactive, ref } from 'vue'
 import { Disc, FileAudio, Image as ImageIcon, Pencil, Plus, Trash2 } from 'lucide-vue-next'
-import { normalizeApiError } from '@/ApiInstance'
+import { resolveErrorMessage } from '@/i18n/errors'
 import { useModalContext } from '@/components/modals/modalContext'
 import { normalizeLabels } from '@/composables/recordingMedia'
 
@@ -107,7 +107,7 @@ const submit = async () => {
         })
         modal.resolve(undefined)
     } catch (submitError) {
-        error.value = normalizeApiError(submitError).message ?? '更新曲目失败'
+        error.value = resolveErrorMessage(submitError, 'errors.fallback.recordingUpdate')
     } finally {
         isSaving.value = false
     }

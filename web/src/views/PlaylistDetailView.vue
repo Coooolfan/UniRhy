@@ -2,7 +2,8 @@
 import { onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Pause, Pencil, Play } from 'lucide-vue-next'
-import { api, normalizeApiError } from '@/ApiInstance'
+import { api } from '@/ApiInstance'
+import { resolveErrorMessage } from '@/i18n/errors'
 import DashboardTopBar from '@/components/dashboard/DashboardTopBar.vue'
 import MediaListItem from '@/components/MediaListItem.vue'
 import MediaListPanel from '@/components/MediaListPanel.vue'
@@ -228,8 +229,10 @@ const handleRecordingReorder = async (payload: ReorderPayload) => {
             ...playlistData.value,
             cover: previousRecordings[0]?.cover || '',
         }
-        const normalized = normalizeApiError(error)
-        reorderRecordingError.value = normalized.message ?? '调整曲目顺序失败'
+        reorderRecordingError.value = resolveErrorMessage(
+            error,
+            'errors.fallback.reorderRecordings',
+        )
     } finally {
         isReorderingRecordings.value = false
     }

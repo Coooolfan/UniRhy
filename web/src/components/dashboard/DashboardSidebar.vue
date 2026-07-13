@@ -4,6 +4,7 @@ import { computed, onMounted, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRoute, useRouter } from 'vue-router'
 import { api, normalizeApiError } from '@/ApiInstance'
+import BrandWatermark from '@/components/common/BrandWatermark.vue'
 import PlaylistCreateDialogContent from '@/components/playlist/PlaylistCreateDialogContent.vue'
 import { useDashboardLayout } from '@/composables/useDashboardLayout'
 import { useModal } from '@/composables/useModal'
@@ -141,7 +142,7 @@ onMounted(() => {
             <div class="flex h-full min-h-0 flex-col md:pl-10 md:pr-6 md:pt-12">
                 <div class="mb-10 flex items-center justify-between md:mb-12">
                     <div class="flex select-none items-center gap-3">
-                        <h1 class="text-3xl font-serif tracking-tight text-[#2C2C2C]">UniRhy.</h1>
+                        <BrandWatermark class="text-3xl font-serif tracking-tight text-[#2C2C2C]" />
                     </div>
                     <button
                         type="button"

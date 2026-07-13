@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { api, normalizeApiError } from '@/ApiInstance'
+import { api } from '@/ApiInstance'
+import { resolveErrorMessage } from '@/i18n/errors'
 import DashboardTopBar from '@/components/dashboard/DashboardTopBar.vue'
 import MediaListPanel from '@/components/MediaListPanel.vue'
 import MediaListItem from '@/components/MediaListItem.vue'
@@ -236,8 +237,10 @@ const handleRecordingReorder = async (payload: ReorderPayload) => {
         invalidateResolvedPlayableTrack('album', albumId)
     } catch (error) {
         recordings.value = previousRecordings
-        const normalized = normalizeApiError(error)
-        reorderRecordingError.value = normalized.message ?? '调整曲目顺序失败'
+        reorderRecordingError.value = resolveErrorMessage(
+            error,
+            'errors.fallback.reorderRecordings',
+        )
     } finally {
         isReorderingRecordings.value = false
     }

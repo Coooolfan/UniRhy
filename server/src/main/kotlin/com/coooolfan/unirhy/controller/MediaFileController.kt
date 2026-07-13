@@ -2,6 +2,7 @@ package com.coooolfan.unirhy.controller
 
 import cn.dev33.satoken.stp.StpUtil
 import com.coooolfan.unirhy.controller.support.MediaFileResponseBuilder
+import com.coooolfan.unirhy.error.CommonException
 import com.coooolfan.unirhy.service.MediaFileAccessService
 import com.coooolfan.unirhy.service.MediaUrlSigner
 import org.babyfish.jimmer.client.ApiIgnore
@@ -27,9 +28,7 @@ class MediaFileController(
     private fun authenticateRequest(id: Long, sig: String?, exp: Long?) {
         if (sig != null && exp != null) {
             if (!urlSigner.verify(id, sig, exp)) {
-                throw org.springframework.web.server.ResponseStatusException(
-                    HttpStatus.FORBIDDEN, "Invalid or expired signature"
-                )
+                throw CommonException.Forbidden()
             }
             return
         }

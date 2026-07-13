@@ -1,5 +1,6 @@
 import { ref } from 'vue'
-import { api, normalizeApiError } from '@/ApiInstance'
+import { api } from '@/ApiInstance'
+import { resolveErrorMessage } from '@/i18n/errors'
 import type { AccountDto } from '@/__generated/model/dto/AccountDto'
 
 export type Account = AccountDto['AccountController/DEFAULT_ACCOUNT_FETCHER']
@@ -59,8 +60,7 @@ export const useAccountSettings = () => {
             const list = await api.accountController.list()
             accounts.value = [...list]
         } catch (e) {
-            const normalized = normalizeApiError(e)
-            error.value = normalized.message ?? '账号列表加载失败'
+            error.value = resolveErrorMessage(e, 'errors.fallback.accountList')
         } finally {
             isLoading.value = false
         }
@@ -87,8 +87,7 @@ export const useAccountSettings = () => {
             await fetchAccounts()
             return null
         } catch (e) {
-            const normalized = normalizeApiError(e)
-            return normalized.message ?? '创建失败'
+            return resolveErrorMessage(e, 'common.createFailed')
         } finally {
             isSaving.value = false
         }
@@ -129,8 +128,7 @@ export const useAccountSettings = () => {
             await fetchAccounts()
             return null
         } catch (e) {
-            const normalized = normalizeApiError(e)
-            return normalized.message ?? '更新失败'
+            return resolveErrorMessage(e, 'common.updateFailed')
         } finally {
             isSaving.value = false
         }
@@ -146,8 +144,7 @@ export const useAccountSettings = () => {
             await fetchAccounts()
             return null
         } catch (e) {
-            const normalized = normalizeApiError(e)
-            return normalized.message ?? '删除失败'
+            return resolveErrorMessage(e, 'common.deleteFailed')
         } finally {
             isSaving.value = false
         }

@@ -3,6 +3,8 @@ package com.coooolfan.unirhy.controller.storage
 import cn.dev33.satoken.annotation.SaCheckLogin
 import cn.dev33.satoken.annotation.SaCheckRole
 import com.coooolfan.unirhy.config.ROLE_ADMIN
+import com.coooolfan.unirhy.error.CommonException
+import com.coooolfan.unirhy.error.SystemException
 import com.coooolfan.unirhy.model.storage.FileProviderFileSystem
 import com.coooolfan.unirhy.model.storage.by
 import com.coooolfan.unirhy.model.storage.dto.FileProviderFileSystemCreate
@@ -38,6 +40,7 @@ class FileSystemStorageController(private val service: FileSystemStorageService)
      * @description 调用FileSystemStorageService.list()方法获取存储列表
      */
     @GetMapping
+    @Throws(CommonException.Forbidden::class)
     fun list(): List<@FetchBy("DEFAULT_FILE_SYSTEM_FETCHER") FileProviderFileSystem> {
         return service.list(DEFAULT_FILE_SYSTEM_FETCHER)
     }
@@ -56,6 +59,7 @@ class FileSystemStorageController(private val service: FileSystemStorageService)
      * @description 调用FileSystemStorageService.get()方法获取存储配置
      */
     @GetMapping("/{id}")
+    @Throws(CommonException.Forbidden::class)
     fun get(@PathVariable id: Long): @FetchBy("DEFAULT_FILE_SYSTEM_FETCHER") FileProviderFileSystem {
         return service.get(id, DEFAULT_FILE_SYSTEM_FETCHER)
     }
@@ -75,6 +79,7 @@ class FileSystemStorageController(private val service: FileSystemStorageService)
      */
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
+    @Throws(CommonException.Forbidden::class)
     fun create(@RequestBody create: FileProviderFileSystemCreate): @FetchBy("DEFAULT_FILE_SYSTEM_FETCHER") FileProviderFileSystem {
         return service.create(create, DEFAULT_FILE_SYSTEM_FETCHER)
     }
@@ -94,6 +99,7 @@ class FileSystemStorageController(private val service: FileSystemStorageService)
      * @description 调用FileSystemStorageService.update()方法更新存储配置
      */
     @PutMapping("/{id}")
+    @Throws(CommonException.Forbidden::class)
     fun update(
         @PathVariable id: Long,
         @RequestBody update: FileProviderFileSystemUpdate,
@@ -115,6 +121,7 @@ class FileSystemStorageController(private val service: FileSystemStorageService)
      */
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Throws(CommonException.Forbidden::class, SystemException.SystemStorageProviderCannotBeDeleted::class)
     fun delete(@PathVariable id: Long) {
         service.delete(id)
     }

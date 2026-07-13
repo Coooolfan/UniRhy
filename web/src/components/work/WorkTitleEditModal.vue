@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { normalizeApiError } from '@/ApiInstance'
+import { resolveErrorMessage } from '@/i18n/errors'
 import { useModalContext } from '@/components/modals/modalContext'
 
 const props = defineProps<{
@@ -41,7 +41,7 @@ const submit = async () => {
         await props.onSubmit(nextTitle)
         modal.resolve(undefined)
     } catch (submitError) {
-        error.value = normalizeApiError(submitError).message ?? '更新作品失败'
+        error.value = resolveErrorMessage(submitError, 'errors.fallback.workUpdate')
     } finally {
         isSaving.value = false
     }

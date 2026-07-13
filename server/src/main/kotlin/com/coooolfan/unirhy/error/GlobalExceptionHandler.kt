@@ -22,6 +22,9 @@ class GlobalExceptionHandler {
             CommonErrorCode.NOT_FOUND.name -> 404
             CommonErrorCode.AUTHENTICATION_FAILED.name -> 401
             CommonErrorCode.FORBIDDEN.name -> 403
+            PluginErrorCode.UNKNOWN_TASK_TYPE.name,
+            PluginErrorCode.INVALID_TASK_PARAMS.name,
+            -> 400
             else -> {
                 ex.printStackTrace()
                 500 // Internal Server Error
@@ -32,6 +35,13 @@ class GlobalExceptionHandler {
             .body(resultMap(ex))
     }
 
+    @ExceptionHandler(Exception::class)
+    fun handleUnexpected(ex: Exception): ResponseEntity<Map<String, Any>> {
+        ex.printStackTrace()
+        return ResponseEntity
+            .status(500)
+            .body(resultMap(CommonException.InternalError()))
+    }
 
     @ExceptionHandler(NotLoginException::class)
     fun handleAuthenticationFailed(): ResponseEntity<Any>? {
@@ -52,6 +62,7 @@ class GlobalExceptionHandler {
         val resultMap: MutableMap<String, Any> = LinkedHashMap()
         resultMap["family"] = ex.family
         resultMap["code"] = ex.code
+        ex.fields.forEach { (key, value) -> if (value != null) resultMap[key] = value }
         return resultMap
     }
 

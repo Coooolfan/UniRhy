@@ -1,5 +1,6 @@
 import { computed, ref } from 'vue'
-import { api, normalizeApiError } from '@/ApiInstance'
+import { api } from '@/ApiInstance'
+import { resolveErrorMessage } from '@/i18n/errors'
 import type { FileProviderType } from '@/__generated/model/enums/FileProviderType'
 import type { SystemConfigUpdate } from '@/__generated/model/static'
 
@@ -127,10 +128,9 @@ export const useStorageSettings = () => {
             systemConfig.value.fsProviderId = config.fsProviderId ?? null
             systemConfig.value.ossProviderId = config.ossProviderId ?? null
         } catch (error) {
-            const normalized = normalizeApiError(error)
             systemConfig.value.fsProviderId = null
             systemConfig.value.ossProviderId = null
-            systemError.value = normalized.message ?? '系统配置加载失败'
+            systemError.value = resolveErrorMessage(error, 'errors.fallback.systemConfigLoad')
         } finally {
             isLoadingSystem.value = false
         }
@@ -164,8 +164,7 @@ export const useStorageSettings = () => {
                 })),
             ]
         } catch (error) {
-            const normalized = normalizeApiError(error)
-            storageError.value = normalized.message ?? '存储节点加载失败'
+            storageError.value = resolveErrorMessage(error, 'errors.fallback.storageNodeLoad')
         } finally {
             isLoadingStorage.value = false
         }
@@ -210,8 +209,7 @@ export const useStorageSettings = () => {
             await fetchStorageNodes()
             return null
         } catch (error) {
-            const normalized = normalizeApiError(error)
-            return normalized.message ?? '创建失败'
+            return resolveErrorMessage(error, 'common.createFailed')
         } finally {
             isSaving.value = false
         }
@@ -254,8 +252,7 @@ export const useStorageSettings = () => {
             await fetchStorageNodes()
             return null
         } catch (error) {
-            const normalized = normalizeApiError(error)
-            return normalized.message ?? '更新失败'
+            return resolveErrorMessage(error, 'common.updateFailed')
         } finally {
             isSaving.value = false
         }
@@ -276,8 +273,7 @@ export const useStorageSettings = () => {
             await Promise.all([fetchStorageNodes(), fetchSystemConfig()])
             return null
         } catch (error) {
-            const normalized = normalizeApiError(error)
-            storageError.value = normalized.message ?? '删除失败'
+            storageError.value = resolveErrorMessage(error, 'common.deleteFailed')
             return storageError.value
         } finally {
             isSaving.value = false
@@ -308,8 +304,7 @@ export const useStorageSettings = () => {
             systemConfig.value.ossProviderId = config.ossProviderId ?? null
             return null
         } catch (error) {
-            const normalized = normalizeApiError(error)
-            systemError.value = normalized.message ?? '设置系统节点失败'
+            systemError.value = resolveErrorMessage(error, 'errors.fallback.systemNodeSet')
             return systemError.value
         } finally {
             isSaving.value = false

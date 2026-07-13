@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Pencil, Plus, Trash2 } from 'lucide-vue-next'
 import { reactive, ref } from 'vue'
-import { normalizeApiError } from '@/ApiInstance'
+import { resolveErrorMessage } from '@/i18n/errors'
 import { useModalContext } from '@/components/modals/modalContext'
 import { normalizeLabels } from '@/composables/recordingMedia'
 
@@ -22,7 +22,7 @@ const props = withDefaults(
     {
         submitText: '保存更改',
         submittingText: '保存中...',
-        nameFailureMessage: '更新艺术家失败',
+        nameFailureMessage: 'errors.fallback.artistUpdate',
     },
 )
 
@@ -87,7 +87,7 @@ const submit = async () => {
         })
         modal.resolve(undefined)
     } catch (submitError) {
-        error.value = normalizeApiError(submitError).message ?? props.nameFailureMessage
+        error.value = resolveErrorMessage(submitError, props.nameFailureMessage)
     } finally {
         isSaving.value = false
     }

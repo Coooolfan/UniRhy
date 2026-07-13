@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { api, normalizeApiError } from '@/ApiInstance'
+import { api } from '@/ApiInstance'
+import { resolveErrorMessage } from '@/i18n/errors'
 import type { AsyncTaskLogDto } from '@/__generated/model/dto'
 import type { TaskStatus } from '@/__generated/model/enums/TaskStatus'
 import type { TaskType } from '@/__generated/model/enums/TaskType'
@@ -92,7 +93,7 @@ const fetchLogs = async () => {
         totalPageCount.value = page.totalPageCount
         totalRowCount.value = page.totalRowCount
     } catch (err) {
-        error.value = normalizeApiError(err).message ?? '加载任务列表失败'
+        error.value = resolveErrorMessage(err, 'errors.fallback.taskLogLoad')
         rows.value = []
         totalPageCount.value = 0
         totalRowCount.value = 0
@@ -169,7 +170,7 @@ const resetTask = async (row: TaskLog) => {
         emit('resetSuccess')
         await fetchLogs()
     } catch (err) {
-        error.value = normalizeApiError(err).message ?? '重置任务失败'
+        error.value = resolveErrorMessage(err, 'errors.fallback.taskLogReset')
     } finally {
         resettingId.value = null
     }

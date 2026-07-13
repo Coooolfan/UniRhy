@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { Search } from 'lucide-vue-next'
-import { api, normalizeApiError } from '@/ApiInstance'
+import { api } from '@/ApiInstance'
+import { resolveErrorMessage } from '@/i18n/errors'
 import { useModalContext } from '@/components/modals/modalContext'
 
 type PlaylistOption = {
@@ -49,7 +50,7 @@ const fetchPlaylists = async () => {
             name: playlist.name?.trim() || '未命名歌单',
         }))
     } catch (fetchError) {
-        error.value = normalizeApiError(fetchError).message ?? '歌单加载失败'
+        error.value = resolveErrorMessage(fetchError, 'errors.fallback.playlistLoad')
         playlists.value = []
     } finally {
         isLoading.value = false
@@ -75,7 +76,7 @@ const addToPlaylist = async (playlist: PlaylistOption) => {
         })
         modal.resolve(undefined)
     } catch (submitError) {
-        error.value = normalizeApiError(submitError).message ?? '添加到歌单失败'
+        error.value = resolveErrorMessage(submitError, 'errors.fallback.playlistAddRecording')
     } finally {
         isSubmitting.value = false
     }

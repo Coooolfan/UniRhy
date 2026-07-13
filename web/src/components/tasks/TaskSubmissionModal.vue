@@ -18,7 +18,7 @@ import type { CodecType } from '@/__generated/model/enums/CodecType'
 import { type FileProviderType } from '@/__generated/model/enums/FileProviderType'
 import type { PluginInfoResponse } from '@/__generated/model/static/PluginInfoResponse'
 import type { TranscodeTaskRequest } from '@/__generated/model/static'
-import { normalizeApiError } from '@/ApiInstance'
+import { resolveErrorMessage } from '@/i18n/errors'
 import { useModalContext } from '@/components/modals/modalContext'
 import type { TaskProviderOption } from '@/composables/useTaskManagement'
 
@@ -343,7 +343,7 @@ const submit = async () => {
 
         modal.resolve(true)
     } catch (submitTaskError) {
-        submitError.value = normalizeApiError(submitTaskError).message ?? '提交任务失败'
+        submitError.value = resolveErrorMessage(submitTaskError, 'errors.fallback.taskSubmit')
     } finally {
         isSubmitting.value = false
     }

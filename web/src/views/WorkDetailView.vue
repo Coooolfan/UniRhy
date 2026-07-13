@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { api, normalizeApiError } from '@/ApiInstance'
+import { api } from '@/ApiInstance'
+import { resolveErrorMessage } from '@/i18n/errors'
 import DashboardTopBar from '@/components/dashboard/DashboardTopBar.vue'
 import MediaListPanel from '@/components/MediaListPanel.vue'
 import MediaListItem from '@/components/MediaListItem.vue'
@@ -174,8 +175,7 @@ const mergeState = useRecordingMergeState<Recording>({
         invalidateWorkPlaybackCache([targetId, ...sourceIds])
         await fetchWork(workId)
     },
-    parseError: (error) => normalizeApiError(error).message ?? '合并曲目失败',
-    fallbackErrorMessage: '合并曲目失败',
+    parseError: (error) => resolveErrorMessage(error, 'errors.fallback.mergeRecordings'),
 })
 
 const {

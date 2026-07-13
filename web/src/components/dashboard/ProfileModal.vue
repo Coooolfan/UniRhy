@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 import { LogOut, User, Mail, Lock, Edit2, Eye, EyeOff, SlidersHorizontal } from 'lucide-vue-next'
 import { useModalContext } from '@/components/modals/modalContext'
 import { useUserStore } from '@/stores/user'
-import { normalizeApiError } from '@/ApiInstance'
+import { resolveErrorMessage } from '@/i18n/errors'
 import avatarPlaceholderUrl from '@/assets/avatar-placeholder.svg'
 
 const router = useRouter()
@@ -112,8 +112,7 @@ const handleUpdate = async () => {
             successMessage.value = ''
         }, 1500)
     } catch (error) {
-        const normalized = normalizeApiError(error)
-        errorMessage.value = normalized.message ?? '更新失败'
+        errorMessage.value = resolveErrorMessage(error, 'common.updateFailed')
     } finally {
         isSubmitting.value = false
     }

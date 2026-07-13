@@ -117,6 +117,7 @@ class AccountController(private val service: AccountService) {
      */
     @SaCheckLogin
     @PutMapping("/{id}")
+    @Throws(CommonException.Forbidden::class)
     fun update(@PathVariable id: Long, @RequestBody update: AccountUpdate): @FetchBy("DEFAULT_ACCOUNT_FETCHER") Account {
         return service.update(update.toEntity { this.id = id }, DEFAULT_ACCOUNT_FETCHER)
     }

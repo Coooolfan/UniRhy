@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { api, normalizeApiError } from '@/ApiInstance'
+import { api } from '@/ApiInstance'
+import { resolveErrorMessage } from '@/i18n/errors'
 import ArtistCard from '@/components/artist/ArtistCard.vue'
 import ArtistEditModal, { type ArtistEditForm } from '@/components/artist/ArtistEditModal.vue'
 import LibraryEmptyHint from '@/components/dashboard/LibraryEmptyHint.vue'
@@ -59,7 +60,7 @@ const fetchArtists = async () => {
         emit('update:totalPageCount', page.totalPageCount)
         artists.value = page.rows.map((raw) => toArtistItem(raw))
     } catch (error) {
-        errorMessage.value = normalizeApiError(error).message ?? '艺术家加载失败'
+        errorMessage.value = resolveErrorMessage(error, 'errors.fallback.artistLoad')
         artists.value = []
         emit('update:totalPageCount', 0)
     } finally {
@@ -91,7 +92,6 @@ const openEditModal = async (artist: ArtistItem) => {
             },
             submitText: '保存更改',
             submittingText: '保存中...',
-            nameFailureMessage: '更新艺术家失败',
             onSubmit: async (form: ArtistEditForm) => {
                 await api.artistController.updateArtist({
                     id: artist.id,

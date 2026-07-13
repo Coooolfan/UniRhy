@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { normalizeApiError } from '@/ApiInstance'
+import { resolveErrorMessage } from '@/i18n/errors'
 import { useModalContext } from '@/components/modals/modalContext'
 
 export type MergeSelectOption = {
@@ -60,7 +60,7 @@ const submit = async () => {
         await props.onConfirm(selectedTargetId.value)
         modal.resolve(undefined)
     } catch (submitError) {
-        error.value = normalizeApiError(submitError).message ?? '合并失败'
+        error.value = resolveErrorMessage(submitError, 'errors.fallback.merge')
     } finally {
         submitting.value = false
     }

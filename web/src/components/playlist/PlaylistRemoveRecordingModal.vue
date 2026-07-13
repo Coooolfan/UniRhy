@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { normalizeApiError } from '@/ApiInstance'
+import { resolveErrorMessage } from '@/i18n/errors'
 import { useModalContext } from '@/components/modals/modalContext'
 
 const props = defineProps<{
@@ -33,7 +33,7 @@ const confirm = async () => {
         await props.onConfirm()
         modal.resolve(undefined)
     } catch (submitError) {
-        error.value = normalizeApiError(submitError).message ?? '移除曲目失败'
+        error.value = resolveErrorMessage(submitError, 'errors.fallback.playlistRemoveRecording')
     } finally {
         isRemoving.value = false
     }

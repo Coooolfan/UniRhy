@@ -3,6 +3,7 @@ package com.coooolfan.unirhy.controller
 import cn.dev33.satoken.annotation.SaCheckLogin
 import cn.dev33.satoken.annotation.SaCheckRole
 import com.coooolfan.unirhy.config.ROLE_ADMIN
+import com.coooolfan.unirhy.error.CommonException
 import com.coooolfan.unirhy.model.Recording
 import com.coooolfan.unirhy.model.by
 import com.coooolfan.unirhy.model.dto.RecordingMergeReq
@@ -60,6 +61,7 @@ class RecordingController(private val service: RecordingService) {
     @PutMapping("/{id}")
     @SaCheckRole(ROLE_ADMIN)
     @ResponseStatus(HttpStatus.OK)
+    @Throws(CommonException.Forbidden::class)
     fun updateRecording(
         @PathVariable id: Long,
         @RequestBody input: RecordingUpdate,
@@ -83,6 +85,7 @@ class RecordingController(private val service: RecordingService) {
     @PostMapping("/merge-requests")
     @SaCheckRole(ROLE_ADMIN)
     @ResponseStatus(HttpStatus.OK)
+    @Throws(CommonException.Forbidden::class)
     fun mergeRecording(@RequestBody input: RecordingMergeReq) {
         service.mergeRecording(input)
     }

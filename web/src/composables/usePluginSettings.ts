@@ -1,5 +1,6 @@
 import { ref } from 'vue'
-import { api, getAuthToken, normalizeApiError } from '@/ApiInstance'
+import { api, getAuthToken } from '@/ApiInstance'
+import { resolveErrorMessage } from '@/i18n/errors'
 import { buildApiUrl } from '@/runtime/platform'
 import { runtimeFetch } from '@/runtime/http'
 import type { PluginInfoResponse } from '@/__generated/model/static/PluginInfoResponse'
@@ -18,7 +19,7 @@ export const usePluginSettings = () => {
         try {
             plugins.value = await api.pluginController.listPlugins()
         } catch (e) {
-            error.value = normalizeApiError(e).message ?? '获取插件列表失败'
+            error.value = resolveErrorMessage(e, 'errors.fallback.pluginList')
         } finally {
             isLoading.value = false
         }
@@ -31,7 +32,7 @@ export const usePluginSettings = () => {
             await api.pluginController.upload({ body: { file } })
             await fetch()
         } catch (e) {
-            error.value = normalizeApiError(e).message ?? '上传失败'
+            error.value = resolveErrorMessage(e, 'errors.fallback.pluginUpload')
             throw e
         } finally {
             isUploading.value = false
@@ -43,7 +44,7 @@ export const usePluginSettings = () => {
             await api.pluginController.setEnabled({ id, enabled })
             await fetch()
         } catch (e) {
-            error.value = normalizeApiError(e).message ?? '操作失败'
+            error.value = resolveErrorMessage(e)
             throw e
         }
     }
@@ -53,7 +54,7 @@ export const usePluginSettings = () => {
             await api.pluginController.delete({ id })
             await fetch()
         } catch (e) {
-            error.value = normalizeApiError(e).message ?? '删除失败'
+            error.value = resolveErrorMessage(e, 'common.deleteFailed')
             throw e
         }
     }

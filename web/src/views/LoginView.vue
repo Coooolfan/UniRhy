@@ -97,6 +97,7 @@
                                 required
                                 class="peer w-full bg-transparent border-b border-[#d6d0c4] focus:border-[#d98c28] outline-none py-2 text-[#2c2825] placeholder-transparent transition-colors"
                                 placeholder="Email"
+                                data-i18n-ignore
                                 @input="clearLoginError"
                             />
                             <label
@@ -117,6 +118,7 @@
                                 required
                                 class="peer w-full bg-transparent border-b border-[#d6d0c4] focus:border-[#d98c28] outline-none py-2 text-[#2c2825] placeholder-transparent transition-colors"
                                 placeholder="Password"
+                                data-i18n-ignore
                                 @input="clearLoginError"
                             />
                             <label
@@ -215,7 +217,8 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { api, normalizeApiError, saveAuthToken } from '@/ApiInstance'
+import { api, saveAuthToken } from '@/ApiInstance'
+import { resolveErrorMessage } from '@/i18n/errors'
 import { getPlatformRuntime, setPlatformApiBaseUrl } from '@/runtime/platform'
 import { getInitializationStatus, resetInitializationStatus } from '@/services/systemInitialization'
 
@@ -254,7 +257,7 @@ const saveBackendUrl = async () => {
         }
         isEditingBackendUrl.value = false
     } catch (error) {
-        backendUrlError.value = normalizeApiError(error).message ?? '保存失败'
+        backendUrlError.value = resolveErrorMessage(error, 'errors.fallback.backendUrlSave')
     }
 }
 
@@ -281,15 +284,8 @@ const clearLoginError = () => {
     loginError.value = ''
 }
 
-const getLoginErrorMessage = (error: unknown) => {
-    const normalizedError = normalizeApiError(error, 'tokenController', 'login')
-
-    if (normalizedError.code === 'AUTHENTICATION_FAILED' || normalizedError.status === 401) {
-        return '邮箱或密码不正确'
-    }
-
-    return normalizedError.message || '登录失败，请检查服务端连接后重试'
-}
+const getLoginErrorMessage = (error: unknown) =>
+    resolveErrorMessage(error, 'errors.fallback.loginFailed')
 
 const handleLogin = async () => {
     loginError.value = ''

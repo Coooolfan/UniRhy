@@ -2,7 +2,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { BatteryCharging, Bell, ExternalLink, FileAudio, Radio } from 'lucide-vue-next'
 import DashboardTopBar from '@/components/dashboard/DashboardTopBar.vue'
-import { normalizeApiError } from '@/ApiInstance'
+import { resolveErrorMessage } from '@/i18n/errors'
 import {
     type AndroidPlaybackSystemStatus,
     getAndroidPlaybackSystemStatus,
@@ -129,8 +129,7 @@ const handleSubmit = async () => {
         })
         successMessage.value = '个人偏好已更新'
     } catch (error) {
-        const normalized = normalizeApiError(error)
-        errorMessage.value = normalized.message ?? '更新失败'
+        errorMessage.value = resolveErrorMessage(error, 'common.updateFailed')
     } finally {
         isSubmitting.value = false
     }

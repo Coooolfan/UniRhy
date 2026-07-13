@@ -1,5 +1,6 @@
 import { ref } from 'vue'
-import { api, normalizeApiError } from '@/ApiInstance'
+import { api } from '@/ApiInstance'
+import { resolveErrorMessage } from '@/i18n/errors'
 import { type FileProviderType } from '@/__generated/model/enums/FileProviderType'
 import type { TaskType } from '@/__generated/model/enums/TaskType'
 import type { PluginInfoResponse } from '@/__generated/model/static/PluginInfoResponse'
@@ -42,8 +43,7 @@ export const useTaskManagement = () => {
         try {
             taskCounts.value = await api.taskController.listTaskLogs()
         } catch (error) {
-            const normalized = normalizeApiError(error)
-            taskError.value = normalized.message ?? '获取任务状态失败'
+            taskError.value = resolveErrorMessage(error, 'errors.fallback.taskStatus')
         } finally {
             isLoadingTaskCounts.value = false
         }
@@ -63,8 +63,7 @@ export const useTaskManagement = () => {
             refreshSubmittedTaskData()
             return true
         } catch (error) {
-            const normalized = normalizeApiError(error)
-            submitError.value = normalized.message ?? '提交任务失败'
+            submitError.value = resolveErrorMessage(error, 'errors.fallback.taskSubmit')
             return false
         } finally {
             isSubmitting.value = false

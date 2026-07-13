@@ -3,11 +3,9 @@
         class="min-h-screen bg-[#F0ECE6] flex flex-col items-center justify-center p-4 md:p-8 text-[#4A4A4A] font-sans relative overflow-hidden"
     >
         <!-- Brand Watermark -->
-        <h1
+        <BrandWatermark
             class="absolute left-5 top-5 z-20 font-serif text-xl tracking-wide text-[#2C2C2C] opacity-80 sm:left-8 sm:top-8 sm:text-2xl md:left-12 md:top-12"
-        >
-            UniRhy.
-        </h1>
+        />
 
         <!-- Main Container -->
         <div class="relative w-full max-w-5xl">
@@ -240,7 +238,9 @@
 <script setup lang="ts">
 import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { api, normalizeApiError } from '@/ApiInstance'
+import { api } from '@/ApiInstance'
+import { resolveErrorMessage } from '@/i18n/errors'
+import BrandWatermark from '@/components/common/BrandWatermark.vue'
 import { setInitializationStatus } from '@/services/systemInitialization'
 import { User, Mail, Key, HardDrive, Database, ArrowRight } from 'lucide-vue-next'
 
@@ -270,8 +270,7 @@ const handleInit = async () => {
         setInitializationStatus({ initialized: true })
         router.push('/login')
     } catch (error) {
-        const normalizedError = normalizeApiError(error)
-        alert(normalizedError.message || '初始化失败')
+        alert(resolveErrorMessage(error, 'errors.fallback.systemInit'))
     } finally {
         isSubmitting.value = false
     }

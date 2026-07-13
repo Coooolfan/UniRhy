@@ -3,6 +3,7 @@ package com.coooolfan.unirhy.controller
 import cn.dev33.satoken.annotation.SaCheckLogin
 import cn.dev33.satoken.annotation.SaCheckRole
 import com.coooolfan.unirhy.config.ROLE_ADMIN
+import com.coooolfan.unirhy.error.CommonException
 import com.coooolfan.unirhy.model.AsyncTaskLog
 import com.coooolfan.unirhy.model.by
 import com.coooolfan.unirhy.service.task.*
@@ -43,6 +44,7 @@ class TaskController(
     @PostMapping("/scans")
     @SaCheckRole(ROLE_ADMIN)
     @ResponseStatus(HttpStatus.ACCEPTED)
+    @Throws(CommonException.Forbidden::class)
     fun executeScanTask(@RequestBody request: ScanTaskRequest) {
         scanTaskService.submit(request)
     }
@@ -62,6 +64,7 @@ class TaskController(
     @PostMapping("/transcodes")
     @SaCheckRole(ROLE_ADMIN)
     @ResponseStatus(HttpStatus.ACCEPTED)
+    @Throws(CommonException.Forbidden::class)
     fun executeTranscodeTask(@RequestBody request: TranscodeTaskRequest) {
         transcodeTaskService.submit(request)
     }
@@ -129,6 +132,7 @@ class TaskController(
      */
     @PatchMapping("/logs")
     @SaCheckRole(ROLE_ADMIN)
+    @Throws(CommonException.Forbidden::class)
     fun resetTaskLogs(
         @RequestParam(required = false) ids: List<Long>?,
         @RequestParam(required = false) taskType: TaskType?,

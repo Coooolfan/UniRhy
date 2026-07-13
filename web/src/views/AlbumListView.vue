@@ -14,7 +14,9 @@ import DashboardTopBar from '@/components/dashboard/DashboardTopBar.vue'
 import LibraryEmptyHint from '@/components/dashboard/LibraryEmptyHint.vue'
 import AlbumGridCard from '@/components/media/AlbumGridCard.vue'
 import WorkGridCard from '@/components/media/WorkGridCard.vue'
-import { api, normalizeApiError } from '@/ApiInstance'
+import { useI18n } from 'vue-i18n'
+import { api } from '@/ApiInstance'
+import { resolveErrorMessage } from '@/i18n/errors'
 import { type Breakpoint, useBreakpoint } from '@/composables/useBreakpoint'
 import { resolveArtistName, resolveCover } from '@/composables/recordingMedia'
 import {
@@ -35,6 +37,7 @@ type DisplayItem = {
 
 const router = useRouter()
 const route = useRoute()
+const { t } = useI18n()
 const audioStore = useAudioStore()
 const viewMode = ref<'grid' | 'list'>('grid')
 type LibraryTab = 'Albums' | 'Works' | 'Artists'
@@ -68,13 +71,12 @@ const fetchAlbums = async () => {
         displayItems.value = page.rows.map((album) => ({
             id: album.id,
             type: 'album',
-            title: album.title || 'Untitled Album',
+            title: album.title || t('common.untitledAlbum'),
             subtitle: resolveArtistName(album.recordings?.[0]?.artists),
             cover: resolveCover(album.cover),
         }))
     } catch (error) {
-        const normalized = normalizeApiError(error)
-        errorMessage.value = normalized.message ?? '专辑加载失败'
+        errorMessage.value = resolveErrorMessage(error, 'errors.fallback.albumLoad')
     } finally {
         isLoading.value = false
     }
@@ -94,12 +96,12 @@ const fetchWorks = async () => {
             const mainRecording =
                 work.recordings?.find((recording) => recording.defaultInWork) ??
                 work.recordings?.[0]
-            const artistName = mainRecording?.artists?.[0]?.displayName || 'Unknown Artist'
+            const artistName = mainRecording?.artists?.[0]?.displayName || t('common.unknownArtist')
 
             return {
                 id: work.id,
                 type: 'work',
-                title: work.title || 'Untitled Work',
+                title: work.title || t('common.untitledWork'),
                 subtitle: artistName,
                 cover: resolveCover(mainRecording?.cover),
                 stackedImages: work.recordings?.map((recording) => ({
@@ -109,8 +111,7 @@ const fetchWorks = async () => {
             }
         })
     } catch (error) {
-        const normalized = normalizeApiError(error)
-        errorMessage.value = normalized.message ?? '作品加载失败'
+        errorMessage.value = resolveErrorMessage(error, 'errors.fallback.workLoad')
     } finally {
         isLoading.value = false
     }

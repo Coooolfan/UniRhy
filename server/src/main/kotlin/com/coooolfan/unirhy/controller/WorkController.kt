@@ -77,6 +77,7 @@ class WorkController(
      * @description 调用WorkService.randomWork()方法获取时间窗口内的随机作品
      */
     @GetMapping("/random-selection")
+    @Throws(CommonException.NotFound::class)
     fun randomWork(
         @RequestParam(required = false) timestamp: Long?,
         @RequestParam(required = false) length: Long?,
@@ -115,6 +116,7 @@ class WorkController(
     @DeleteMapping("/{id}")
     @SaCheckRole(ROLE_ADMIN)
     @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Throws(CommonException.Forbidden::class)
     fun deleteWork(@PathVariable id: Long) {
         service.deleteWork(id)
     }
@@ -133,6 +135,7 @@ class WorkController(
     @PutMapping("/{id}")
     @SaCheckRole(ROLE_ADMIN)
     @ResponseStatus(HttpStatus.OK)
+    @Throws(CommonException.Forbidden::class)
     fun updateWork(
         @PathVariable id: Long,
         @RequestBody input: WorkUpdate,
@@ -155,6 +158,7 @@ class WorkController(
     @PostMapping("/merge-requests")
     @SaCheckRole(ROLE_ADMIN)
     @ResponseStatus(HttpStatus.OK)
+    @Throws(CommonException.Forbidden::class)
     fun mergeWork(@RequestBody input: WorkMergeReq) {
         service.mergeWork(input)
     }

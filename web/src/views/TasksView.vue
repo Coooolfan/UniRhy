@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import DashboardTopBar from '@/components/dashboard/DashboardTopBar.vue'
+import DecorativeLabel from '@/components/common/DecorativeLabel.vue'
 import { useModal } from '@/composables/useModal'
 import TaskSubmissionModal from '@/components/tasks/TaskSubmissionModal.vue'
 import SideDrawer from '@/components/SideDrawer.vue'
@@ -488,7 +489,7 @@ const drawerTitle = computed(() => drawerTaskName.value)
                                 class="mt-3 text-[10px] uppercase tracking-[0.28em]"
                                 :class="item.eyebrowClass"
                             >
-                                {{ item.eyebrow }}
+                                <DecorativeLabel>{{ item.eyebrow }}</DecorativeLabel>
                             </div>
                             <div class="mt-2 text-xs text-[#958A7E]">
                                 {{ item.label }}
@@ -543,7 +544,7 @@ const drawerTitle = computed(() => drawerTaskName.value)
                                 <span
                                     class="pb-1 text-[10px] uppercase tracking-[0.28em] text-[#B29A84]"
                                 >
-                                    Total
+                                    <DecorativeLabel>Total</DecorativeLabel>
                                 </span>
                             </button>
                         </div>
@@ -560,7 +561,7 @@ const drawerTitle = computed(() => drawerTaskName.value)
                                     class="flex items-center justify-between text-xs text-[#83796D]"
                                 >
                                     <span class="text-[10px] uppercase tracking-[0.24em]">
-                                        Completed
+                                        <DecorativeLabel>Completed</DecorativeLabel>
                                     </span>
                                     <span class="font-mono text-[11px] text-[#4A4A4A]">
                                         {{ row.completedCount }}
@@ -586,7 +587,7 @@ const drawerTitle = computed(() => drawerTaskName.value)
                                     class="flex items-center justify-between gap-2 text-xs text-[#83796D]"
                                 >
                                     <span class="text-[10px] uppercase tracking-[0.24em]">
-                                        Active
+                                        <DecorativeLabel>Active</DecorativeLabel>
                                     </span>
                                     <div class="flex items-center gap-2 font-mono text-[11px]">
                                         <button
@@ -635,7 +636,7 @@ const drawerTitle = computed(() => drawerTaskName.value)
                                     class="flex items-center justify-between text-xs text-[#83796D]"
                                 >
                                     <span class="text-[10px] uppercase tracking-[0.24em]">
-                                        Failed
+                                        <DecorativeLabel>Failed</DecorativeLabel>
                                     </span>
                                     <span class="font-mono text-[11px] text-[#4A4A4A]">
                                         {{ row.failedCount }}

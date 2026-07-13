@@ -1,5 +1,6 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
+import { i18n, isSupportedLocale, LOCALE_STORAGE_KEY, type SupportedLocale } from '@/i18n'
 
 export const PLAYBACK_MODES = ['SYNC', 'INDEPENDENT'] as const
 export type PlaybackMode = (typeof PLAYBACK_MODES)[number]
@@ -27,6 +28,13 @@ const persistPlaybackMode = (mode: PlaybackMode) => {
     window.localStorage.setItem(PLAYBACK_MODE_STORAGE_KEY, mode)
 }
 
+const persistLocale = (locale: SupportedLocale) => {
+    if (typeof window === 'undefined') {
+        return
+    }
+    window.localStorage.setItem(LOCALE_STORAGE_KEY, locale)
+}
+
 export const useClientPreferencesStore = defineStore('clientPreferences', () => {
     const playbackMode = ref<PlaybackMode>(readSavedPlaybackMode())
     const isIndependentPlaybackMode = computed(() => playbackMode.value === 'INDEPENDENT')
@@ -36,9 +44,23 @@ export const useClientPreferencesStore = defineStore('clientPreferences', () => 
         persistPlaybackMode(mode)
     }
 
+    // i18n 实例在 main.ts 中先于 store 创建，locale 直接以它的当前值为准，
+    // 避免和 detectInitialLocale() 的探测逻辑重复一份
+    const locale = ref<SupportedLocale>(
+        isSupportedLocale(i18n.global.locale.value) ? i18n.global.locale.value : 'zh-CN',
+    )
+
+    const setLocale = (next: SupportedLocale) => {
+        locale.value = next
+        i18n.global.locale.value = next
+        persistLocale(next)
+    }
+
     return {
         playbackMode,
         isIndependentPlaybackMode,
         setPlaybackMode,
+        locale,
+        setLocale,
     }
 })

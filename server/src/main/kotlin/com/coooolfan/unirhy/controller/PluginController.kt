@@ -3,6 +3,8 @@ package com.coooolfan.unirhy.controller
 import cn.dev33.satoken.annotation.SaCheckLogin
 import cn.dev33.satoken.annotation.SaCheckRole
 import com.coooolfan.unirhy.config.ROLE_ADMIN
+import com.coooolfan.unirhy.error.CommonException
+import com.coooolfan.unirhy.error.PluginException
 import com.coooolfan.unirhy.service.PluginService
 import com.coooolfan.unirhy.service.PluginService.Companion.resolvedTaskType
 import com.coooolfan.unirhy.service.plugin.PluginForm
@@ -23,7 +25,6 @@ import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.multipart.MultipartFile
-import org.springframework.web.server.ResponseStatusException
 
 data class PluginInfoResponse(
     val id: String,
@@ -94,6 +95,7 @@ class PluginController(
     @PostMapping("/plugins", consumes = ["multipart/form-data"])
     @SaCheckRole(ROLE_ADMIN)
     @ResponseStatus(HttpStatus.CREATED)
+    @Throws(CommonException.Forbidden::class)
     fun upload(@RequestParam("file") file: MultipartFile) {
         pluginService.upload(file)
     }
@@ -114,6 +116,7 @@ class PluginController(
     @PutMapping("/plugins/{id}/enabled-state")
     @SaCheckRole(ROLE_ADMIN)
     @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Throws(CommonException.Forbidden::class)
     fun setEnabled(@PathVariable id: String, @RequestParam enabled: Boolean) {
         pluginService.setEnabled(id, enabled)
     }
@@ -133,6 +136,7 @@ class PluginController(
     @DeleteMapping("/plugins/{id}")
     @SaCheckRole(ROLE_ADMIN)
     @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Throws(CommonException.Forbidden::class)
     fun delete(@PathVariable id: String) {
         pluginService.delete(id)
     }
@@ -152,6 +156,7 @@ class PluginController(
      */
     @GetMapping("/plugins/{id}/package")
     @SaCheckRole(ROLE_ADMIN)
+    @Throws(CommonException.Forbidden::class)
     fun download(@PathVariable id: String, response: HttpServletResponse) {
         val plugin = pluginService.getPlugin(id)
         val zipBytes = pluginService.export(id)
@@ -176,17 +181,22 @@ class PluginController(
     @PostMapping("/plugin-task-submissions/{taskType}")
     @SaCheckRole(ROLE_ADMIN)
     @ResponseStatus(HttpStatus.ACCEPTED)
+    @Throws(
+        CommonException.Forbidden::class,
+        PluginException.UnknownTaskType::class,
+        PluginException.InvalidTaskParams::class,
+    )
     fun submitPluginTask(
         @PathVariable taskType: String,
         @RequestBody params: Map<String, String>,
     ) {
         val type = runCatching { TaskType.valueOf(taskType) }.getOrElse {
-            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "unknown task type: $taskType")
+            throw PluginException.unknownTaskType(taskType = taskType)
         }
         try {
             pluginTaskService.submit(type, objectMapper.writeValueAsBytes(params))
         } catch (ex: IllegalArgumentException) {
-            throw ResponseStatusException(HttpStatus.BAD_REQUEST, ex.message)
+            throw PluginException.invalidTaskParams(message = ex.message)
         }
     }
 }

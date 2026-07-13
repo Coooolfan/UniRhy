@@ -3,6 +3,7 @@ package com.coooolfan.unirhy.controller
 import cn.dev33.satoken.annotation.SaCheckLogin
 import cn.dev33.satoken.annotation.SaCheckRole
 import com.coooolfan.unirhy.config.ROLE_ADMIN
+import com.coooolfan.unirhy.error.CommonException
 import com.coooolfan.unirhy.model.Album
 import com.coooolfan.unirhy.model.by
 import com.coooolfan.unirhy.model.dto.AlbumUpdate
@@ -96,6 +97,7 @@ class AlbumController(private val service: AlbumService) {
     @PutMapping("/{id}")
     @SaCheckRole(ROLE_ADMIN)
     @ResponseStatus(HttpStatus.OK)
+    @Throws(CommonException.Forbidden::class)
     fun updateAlbum(
         @PathVariable id: Long,
         @RequestBody input: AlbumUpdate,
@@ -118,6 +120,7 @@ class AlbumController(private val service: AlbumService) {
     @PutMapping("/{id}/recording-order")
     @SaCheckRole(ROLE_ADMIN)
     @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Throws(CommonException.Forbidden::class)
     fun reorderAlbumRecordings(
         @PathVariable id: Long,
         @RequestBody input: RecordingReorderReq,
