@@ -290,6 +290,7 @@ object PlaybackController {
                             "syncPhase" to phase.name.lowercase(),
                             "clockOffsetMs" to clockOffsetMs,
                             "roundTripEstimateMs" to roundTripEstimateMs,
+                            "diagnostics" to syncDiagnostics(),
                         ),
                     )
                     if (phase == SyncProtocolClient.Phase.READY) {
@@ -299,6 +300,23 @@ object PlaybackController {
 
                 override fun onServerMessage(message: ServerMessage) {
                     handleServerMessage(message)
+                }
+
+                override fun onProtocolEvent(
+                    direction: String,
+                    type: String,
+                    payload: Any?,
+                    atMs: Long,
+                ) {
+                    emitEvent(
+                        mapOf(
+                            "type" to "protocol-event",
+                            "direction" to direction,
+                            "messageType" to type,
+                            "payload" to payload,
+                            "atMs" to atMs,
+                        ),
+                    )
                 }
             },
         )
@@ -366,6 +384,7 @@ object PlaybackController {
         val action = payload.scheduledAction
         val delayMs = payload.serverTimeToExecuteMs - clock.estimatedServerNowMs()
         val executeAtElapsedMs = SystemClock.elapsedRealtime() + delayMs
+        emitLocalExecution(payload, delayMs)
 
         when (action.action) {
             ScheduledActionType.PLAY -> {
@@ -396,6 +415,41 @@ object PlaybackController {
                 )
             }
         }
+    }
+
+    /** 调度动作的本地执行画像（等待/迟到），仅供诊断页展示。 */
+    private fun emitLocalExecution(payload: ScheduledActionPayload, delayMs: Long) {
+        val action = payload.scheduledAction
+        val lateSeconds =
+            if (payload.skipLateCompensation) 0.0 else max(0.0, -delayMs / 1_000.0)
+        emitEvent(
+            mapOf(
+                "type" to "local-execution",
+                "atMs" to clock.clientNowMs(),
+                "action" to action.action.name,
+                "commandId" to payload.commandId,
+                "version" to action.version,
+                "estimatedServerNowMs" to clock.estimatedServerNowMs(),
+                "executeAtServerMs" to payload.serverTimeToExecuteMs,
+                "waitMs" to max(0L, delayMs),
+                "lateSeconds" to lateSeconds,
+                "scheduledOffset" to action.positionSeconds + lateSeconds,
+                "currentIndex" to action.currentIndex,
+                "mediaFileId" to action.currentIndex?.let { queueState.itemAt(it)?.mediaFileId },
+            ),
+        )
+    }
+
+    /** 同步链路诊断快照（附于 sync-state 事件与 getPlaybackState）。 */
+    fun syncDiagnostics(): Map<String, Any?>? {
+        val client = syncClient ?: return null
+        return mapOf(
+            "socketState" to client.socketState,
+            "reconnectAttempt" to client.reconnectAttemptCount,
+            "snapshotReceived" to client.snapshotReceived,
+            "lastNtpResponseAtMs" to clock.lastResponseAtMs,
+            "measurements" to clock.measurementsSnapshot(),
+        )
     }
 
     /** 快照恢复：校时就绪后按权威态定位/续播（重连、晚加入与 SYNC 响应共用此路径）。 */

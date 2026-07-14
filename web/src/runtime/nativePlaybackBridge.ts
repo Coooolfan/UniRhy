@@ -20,6 +20,21 @@ export type NativePlaybackConfig = {
     mode: NativePlaybackMode
 }
 
+export type NativeNtpMeasurement = {
+    offsetMs: number
+    rttMs: number
+    recordedAtMs: number
+}
+
+/** 原生同步链路的诊断快照（附于 sync-state 事件与 getPlaybackState）。 */
+export type NativeSyncDiagnostics = {
+    socketState: 'idle' | 'connecting' | 'open' | 'closed'
+    reconnectAttempt: number
+    snapshotReceived: boolean
+    lastNtpResponseAtMs: number | null
+    measurements: NativeNtpMeasurement[]
+}
+
 export type NativePlaybackState = {
     configured: boolean
     mode: NativePlaybackMode
@@ -32,6 +47,7 @@ export type NativePlaybackState = {
     syncPhase: NativeSyncPhase
     clockOffsetMs: number
     roundTripEstimateMs: number
+    syncDiagnostics?: NativeSyncDiagnostics | null
     queue?: CurrentQueueDto | null
     queueVersion: number | null
 }
@@ -54,8 +70,32 @@ export type NativePlaybackEvent =
           syncPhase: NativeSyncPhase
           clockOffsetMs: number
           roundTripEstimateMs: number
+          diagnostics?: NativeSyncDiagnostics | null
       }
     | { type: 'queue-changed'; seq: number; queue: CurrentQueueDto }
+    | {
+          type: 'protocol-event'
+          seq: number
+          direction: 'in' | 'out'
+          messageType: string
+          payload: unknown
+          atMs: number
+      }
+    | {
+          type: 'local-execution'
+          seq: number
+          atMs: number
+          action: 'PLAY' | 'PAUSE' | 'SEEK'
+          commandId: string
+          version: number
+          estimatedServerNowMs: number
+          executeAtServerMs: number
+          waitMs: number
+          lateSeconds: number
+          scheduledOffset: number
+          currentIndex: number | null
+          mediaFileId: number | null
+      }
     | { type: 'auth-required'; seq: number }
 
 const invokePlugin = async <T>(command: string, args?: Record<string, unknown>): Promise<T> => {

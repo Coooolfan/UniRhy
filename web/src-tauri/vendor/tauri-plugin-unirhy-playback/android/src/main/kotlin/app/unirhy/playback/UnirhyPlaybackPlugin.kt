@@ -150,6 +150,14 @@ class UnirhyPlaybackPlugin(private val activity: Activity) : Plugin(activity) {
         state.put("syncPhase", PlaybackController.syncPhase.name.lowercase())
         state.put("clockOffsetMs", PlaybackController.clock.clockOffsetMs)
         state.put("roundTripEstimateMs", PlaybackController.clock.roundTripEstimateMs)
+        PlaybackController.syncDiagnostics()?.let { diagnostics ->
+            state.put(
+                "syncDiagnostics",
+                JSObject(
+                    app.unirhy.playback.sync.PlaybackSyncJson.mapper.writeValueAsString(diagnostics),
+                ),
+            )
+        }
         if (queue != null) {
             state.put(
                 "queue",

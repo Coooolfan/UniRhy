@@ -49,17 +49,31 @@ class SyncProtocolClient(
         fun onSyncStateChanged(phase: Phase, clockOffsetMs: Double, roundTripEstimateMs: Double)
 
         fun onServerMessage(message: ServerMessage)
+
+        /** 非 NTP 协议消息的收发流水，仅用于诊断展示。 */
+        fun onProtocolEvent(direction: String, type: String, payload: Any?, atMs: Long) {}
     }
 
     @Volatile
     var phase: Phase = Phase.STOPPED
         private set
 
+    @Volatile
+    var socketState: String = "idle"
+        private set
+
+    @Volatile
+    var reconnectAttemptCount: Int = 0
+        private set
+
+    @Volatile
+    var snapshotReceived: Boolean = false
+        private set
+
     private var config: Config? = null
     private var webSocket: WebSocket? = null
     private var explicitStop = false
     private var reconnectAttempt = 0
-    private var snapshotReceived = false
 
     private var initialMeasurements = mutableListOf<NtpMeasurement>()
     private var initialSampleCount = 0
@@ -87,11 +101,13 @@ class SyncProtocolClient(
         executor.execute {
             explicitStop = true
             reconnectAttempt = 0
+            reconnectAttemptCount = 0
             cancelReconnect()
             cancelCalibration()
             cancelHeartbeat()
             webSocket?.close(NORMAL_CLOSE_CODE, null)
             webSocket = null
+            socketState = "closed"
             setPhase(Phase.STOPPED)
         }
     }
@@ -99,7 +115,11 @@ class SyncProtocolClient(
     /** 序列化后发送；socket 未就绪时静默丢弃并返回 false（与 TS 端一致）。 */
     fun send(type: String, payload: Any): Boolean {
         val socket = webSocket ?: return false
-        return socket.send(encodeClientMessage(type, payload))
+        val sent = socket.send(encodeClientMessage(type, payload))
+        if (sent && type != "NTP_REQUEST") {
+            listener.onProtocolEvent("out", type, payload, clock.clientNowMs())
+        }
+        return sent
     }
 
     fun requestSync(): Boolean {
@@ -153,6 +173,7 @@ class SyncProtocolClient(
         val requestBuilder = Request.Builder().url(buildWsUrl(config.apiBaseUrl))
         config.token?.let { requestBuilder.header(TOKEN_HEADER, it) }
 
+        socketState = "connecting"
         val socket = okHttpClient.newWebSocket(requestBuilder.build(), createSocketListener())
         webSocket = socket
     }
@@ -161,6 +182,7 @@ class SyncProtocolClient(
         override fun onOpen(ws: WebSocket, response: Response) {
             executor.execute {
                 if (webSocket !== ws) return@execute
+                socketState = "open"
                 val config = config ?: return@execute
                 send(
                     "HELLO",
@@ -196,6 +218,7 @@ class SyncProtocolClient(
             return
         }
         webSocket = null
+        socketState = "closed"
         cancelCalibration()
         cancelHeartbeat()
         if (explicitStop) {
@@ -209,6 +232,9 @@ class SyncProtocolClient(
         val message = ServerMessage.parse(raw) ?: run {
             Log.w(TAG, "ignoring unparsable playback sync message")
             return
+        }
+        if (message !is ServerMessage.NtpResponse) {
+            listener.onProtocolEvent("in", wireTypeOf(message), payloadOf(message), clock.clientNowMs())
         }
         when (message) {
             is ServerMessage.NtpResponse -> handleNtpResponse(message.payload)
@@ -227,6 +253,8 @@ class SyncProtocolClient(
         val measurement = clock.recordResponse(payload)
         if (phase == Phase.CALIBRATING) {
             initialMeasurements.add(measurement)
+            // 校准期无相位变化，逐样本回发以驱动诊断图表实时更新
+            emitSyncState()
         }
         if (phase == Phase.READY) {
             if (clock.applyRollingSummary() != null) {
@@ -280,6 +308,7 @@ class SyncProtocolClient(
             return
         }
         reconnectAttempt = 0
+        reconnectAttemptCount = 0
         setPhase(Phase.READY)
         startHeartbeat()
     }
@@ -308,6 +337,7 @@ class SyncProtocolClient(
         cancelReconnect()
         val delayMs = reconnectDelayMs(reconnectAttempt)
         reconnectAttempt += 1
+        reconnectAttemptCount = reconnectAttempt
         setPhase(Phase.RECONNECTING)
         reconnectFuture = executor.schedule(
             {
@@ -350,6 +380,26 @@ class SyncProtocolClient(
 
     companion object {
         private const val TAG = "UnirhyPlaybackSync"
+
+        fun wireTypeOf(message: ServerMessage): String = when (message) {
+            is ServerMessage.NtpResponse -> "NTP_RESPONSE"
+            is ServerMessage.Snapshot -> "SNAPSHOT"
+            is ServerMessage.LoadAudioSource -> "ROOM_EVENT_LOAD_AUDIO_SOURCE"
+            is ServerMessage.QueueChange -> "ROOM_EVENT_QUEUE_CHANGE"
+            is ServerMessage.ScheduledAction -> "SCHEDULED_ACTION"
+            is ServerMessage.DeviceChange -> "ROOM_EVENT_DEVICE_CHANGE"
+            is ServerMessage.ProtocolError -> "ERROR"
+        }
+
+        fun payloadOf(message: ServerMessage): Any = when (message) {
+            is ServerMessage.NtpResponse -> message.payload
+            is ServerMessage.Snapshot -> message.payload
+            is ServerMessage.LoadAudioSource -> message.payload
+            is ServerMessage.QueueChange -> message.payload
+            is ServerMessage.ScheduledAction -> message.payload
+            is ServerMessage.DeviceChange -> message.payload
+            is ServerMessage.ProtocolError -> message.payload
+        }
         private const val TOKEN_HEADER = "unirhy-token"
         private const val NORMAL_CLOSE_CODE = 1000
         const val INITIAL_SAMPLE_COUNT = 20

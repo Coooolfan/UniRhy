@@ -1,13 +1,27 @@
 import { watch, type Ref } from 'vue'
-import type { CurrentQueueDto } from '@/services/playbackSyncProtocol'
-import type { PlaybackSyncClientPhase } from '@/services/playbackSyncClient'
-import type { AudioTrack } from '@/stores/audioShared'
+import type {
+    CurrentQueueDto,
+    DeviceChangePayload,
+    LoadAudioSourcePayload,
+    ScheduledActionPayload,
+} from '@/services/playbackSyncProtocol'
+import type {
+    PlaybackSyncClientDiagnosticsSnapshot,
+    PlaybackSyncClientPhase,
+    PlaybackSyncDiagnosticsEvent,
+} from '@/services/playbackSyncClient'
+import type {
+    AudioTrack,
+    PlaybackSyncLocalExecutionSnapshot,
+    TimestampedPayload,
+} from '@/stores/audioShared'
 import { getAuthToken } from '@/ApiInstance'
 import { getPlatformRuntime } from '@/runtime/platform'
 import {
     type NativePlaybackEvent,
     type NativePlaybackState,
     type NativeQueueItem,
+    type NativeSyncDiagnostics,
     configureNativePlayback,
     connectNativeSync,
     disconnectNativeSync,
@@ -29,6 +43,19 @@ const NATIVE_CLIENT_VERSION = 'android-native@playback-sync'
 const POSITION_INTERPOLATION_INTERVAL_MS = 250
 /** 原生进程重启后事件 seq 会归零，低于该阈值的"回退"视为重启而非乱序 */
 const SEQ_RESET_TOLERANCE = 5
+/** 诊断页协议事件流的保留条数（与 TS 同步客户端一致） */
+const MAX_PROTOCOL_EVENT_COUNT = 30
+/** 原生初始校准采样数（SyncProtocolClient.INITIAL_SAMPLE_COUNT） */
+const INITIAL_SAMPLE_COUNT = 20
+
+const isScheduledActionPayload = (payload: unknown): payload is ScheduledActionPayload =>
+    typeof payload === 'object' && payload !== null && 'scheduledAction' in payload
+
+const isLoadAudioSourcePayload = (payload: unknown): payload is LoadAudioSourcePayload =>
+    typeof payload === 'object' && payload !== null && 'recordingId' in payload
+
+const isDeviceChangePayload = (payload: unknown): payload is DeviceChangePayload =>
+    typeof payload === 'object' && payload !== null && 'devices' in payload
 
 type UseAudioNativeSessionOptions = {
     currentTrack: Ref<AudioTrack | null>
@@ -41,6 +68,12 @@ type UseAudioNativeSessionOptions = {
     clientPhase: Ref<PlaybackSyncClientPhase>
     clockOffsetMs: Ref<number>
     roundTripEstimateMs: Ref<number>
+    clientDiagnostics: Ref<PlaybackSyncClientDiagnosticsSnapshot | null>
+    lastScheduledAction: Ref<TimestampedPayload<ScheduledActionPayload> | null>
+    lastLoadAudioSource: Ref<TimestampedPayload<LoadAudioSourcePayload> | null>
+    lastDeviceChange: Ref<TimestampedPayload<DeviceChangePayload> | null>
+    lastLocalExecution: Ref<PlaybackSyncLocalExecutionSnapshot | null>
+    lastAppliedVersion: Ref<number>
     volume: Ref<number>
     isIndependentPlaybackMode: () => boolean
     applyQueueSnapshot: (queue: CurrentQueueDto) => void
@@ -73,7 +106,75 @@ export const useAudioNativeSession = (options: UseAudioNativeSessionOptions) => 
     let positionBase: { positionSeconds: number; atMs: number } | null = null
     let interpolationTimer: number | null = null
 
+    const deviceId = getOrCreateNativeDeviceId()
+    let nativeDiagnostics: NativeSyncDiagnostics | null = null
+    let protocolEvents: PlaybackSyncDiagnosticsEvent[] = []
+    let lastInboundEvent: PlaybackSyncDiagnosticsEvent | null = null
+    let lastOutboundEvent: PlaybackSyncDiagnosticsEvent | null = null
+
     const currentMode = () => (options.isIndependentPlaybackMode() ? 'independent' : 'sync')
+
+    /** 把原生诊断数据组装成 TS 同步客户端同构的诊断快照，debug 页面直接复用。 */
+    const rebuildClientDiagnostics = () => {
+        options.clientDiagnostics.value = {
+            deviceId,
+            phase: options.clientPhase.value,
+            clockOffsetMs: options.clockOffsetMs.value,
+            roundTripEstimateMs: options.roundTripEstimateMs.value,
+            socketState: nativeDiagnostics?.socketState ?? 'idle',
+            reconnectAttempt: nativeDiagnostics?.reconnectAttempt ?? 0,
+            snapshotReceived: nativeDiagnostics?.snapshotReceived ?? false,
+            initialCalibration: {
+                sampledCount: nativeDiagnostics?.measurements.length ?? 0,
+                requiredSampleCount: INITIAL_SAMPLE_COUNT,
+                settling: false,
+            },
+            measurements: nativeDiagnostics?.measurements ?? [],
+            lastNtpRequestAtMs: null,
+            lastNtpResponseAtMs: nativeDiagnostics?.lastNtpResponseAtMs ?? null,
+            lastInboundEvent,
+            lastOutboundEvent,
+            protocolEvents,
+            lastError: null,
+        }
+    }
+
+    const recordProtocolEvent = (event: {
+        direction: 'in' | 'out'
+        messageType: string
+        payload: unknown
+        atMs: number
+    }) => {
+        const entry: PlaybackSyncDiagnosticsEvent = {
+            direction: event.direction,
+            type: event.messageType,
+            rawType: event.messageType,
+            atMs: event.atMs,
+            payload: event.payload,
+        }
+        protocolEvents = [...protocolEvents, entry].slice(-MAX_PROTOCOL_EVENT_COUNT)
+        if (entry.direction === 'in') {
+            lastInboundEvent = entry
+        } else {
+            lastOutboundEvent = entry
+        }
+        if (event.messageType === 'SCHEDULED_ACTION' && isScheduledActionPayload(event.payload)) {
+            options.lastScheduledAction.value = { atMs: event.atMs, payload: event.payload }
+        }
+        if (
+            event.messageType === 'ROOM_EVENT_LOAD_AUDIO_SOURCE' &&
+            isLoadAudioSourcePayload(event.payload)
+        ) {
+            options.lastLoadAudioSource.value = { atMs: event.atMs, payload: event.payload }
+        }
+        if (
+            event.messageType === 'ROOM_EVENT_DEVICE_CHANGE' &&
+            isDeviceChangePayload(event.payload)
+        ) {
+            options.lastDeviceChange.value = { atMs: event.atMs, payload: event.payload }
+        }
+        rebuildClientDiagnostics()
+    }
 
     const stopInterpolation = () => {
         if (interpolationTimer !== null) {
@@ -115,10 +216,44 @@ export const useAudioNativeSession = (options: UseAudioNativeSessionOptions) => 
                 options.clientPhase.value = event.syncPhase
                 options.clockOffsetMs.value = event.clockOffsetMs
                 options.roundTripEstimateMs.value = event.roundTripEstimateMs
+                if (event.diagnostics) {
+                    nativeDiagnostics = event.diagnostics
+                }
+                rebuildClientDiagnostics()
                 break
             }
             case 'queue-changed': {
+                options.lastAppliedVersion.value = Math.max(
+                    options.lastAppliedVersion.value,
+                    event.queue.version,
+                )
                 applyNativeQueue(event.queue)
+                break
+            }
+            case 'protocol-event': {
+                recordProtocolEvent(event)
+                break
+            }
+            case 'local-execution': {
+                options.lastLocalExecution.value = {
+                    atMs: event.atMs,
+                    action: event.action,
+                    commandId: event.commandId,
+                    version: event.version,
+                    estimatedServerNowMs: event.estimatedServerNowMs,
+                    executeAtServerMs: event.executeAtServerMs,
+                    waitMs: event.waitMs,
+                    lateSeconds: event.lateSeconds,
+                    scheduledOffset: event.scheduledOffset,
+                    whenContextTime: 0,
+                    bufferDuration: options.duration.value,
+                    currentIndex: event.currentIndex,
+                    mediaFileId: event.mediaFileId,
+                }
+                options.lastAppliedVersion.value = Math.max(
+                    options.lastAppliedVersion.value,
+                    event.version,
+                )
                 break
             }
             case 'state-changed': {
@@ -186,7 +321,15 @@ export const useAudioNativeSession = (options: UseAudioNativeSessionOptions) => 
         } else {
             stopInterpolation()
         }
+        if (state.syncDiagnostics) {
+            nativeDiagnostics = state.syncDiagnostics
+        }
+        rebuildClientDiagnostics()
         if (state.queue) {
+            options.lastAppliedVersion.value = Math.max(
+                options.lastAppliedVersion.value,
+                state.queue.version,
+            )
             applyNativeQueue(state.queue)
         }
     }
@@ -195,7 +338,7 @@ export const useAudioNativeSession = (options: UseAudioNativeSessionOptions) => 
         await configureNativePlayback({
             apiBaseUrl: getPlatformRuntime().apiBaseUrl,
             token: getAuthToken(),
-            deviceId: getOrCreateNativeDeviceId(),
+            deviceId,
             clientVersion: NATIVE_CLIENT_VERSION,
             mode: currentMode(),
         })

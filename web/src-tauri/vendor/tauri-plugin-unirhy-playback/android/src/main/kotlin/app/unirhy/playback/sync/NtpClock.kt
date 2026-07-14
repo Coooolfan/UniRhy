@@ -39,7 +39,14 @@ class NtpClock(
     var roundTripEstimateMs: Double = 0.0
         private set
 
+    @Volatile
+    var lastResponseAtMs: Long? = null
+        private set
+
     fun clientNowMs(): Long = wallAnchorMs + monotonicNowMs()
+
+    fun measurementsSnapshot(): List<NtpMeasurement> =
+        synchronized(measurements) { measurements.toList() }
 
     fun estimatedServerNowMs(): Long = clientNowMs() + clockOffsetMs.toLong()
 
@@ -49,6 +56,7 @@ class NtpClock(
         val offsetMs = ((payload.t1 - payload.t0) + (payload.t2 - t3)) / 2.0
         val rttMs = max(0.0, ((t3 - payload.t0) - (payload.t2 - payload.t1)).toDouble())
         val measurement = NtpMeasurement(offsetMs = offsetMs, rttMs = rttMs, recordedAtMs = t3)
+        lastResponseAtMs = t3
         synchronized(measurements) {
             measurements.addLast(measurement)
             while (measurements.size > MAX_MEASUREMENT_COUNT) {

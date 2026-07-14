@@ -1,8 +1,20 @@
 import { describe, expect, it, vi } from 'vitest'
-import { ref } from 'vue'
-import type { CurrentQueueDto } from '@/services/playbackSyncProtocol'
-import type { PlaybackSyncClientPhase } from '@/services/playbackSyncClient'
-import type { AudioTrack } from '@/stores/audioShared'
+import { ref, shallowRef } from 'vue'
+import type {
+    CurrentQueueDto,
+    DeviceChangePayload,
+    LoadAudioSourcePayload,
+    ScheduledActionPayload,
+} from '@/services/playbackSyncProtocol'
+import type {
+    PlaybackSyncClientDiagnosticsSnapshot,
+    PlaybackSyncClientPhase,
+} from '@/services/playbackSyncClient'
+import type {
+    AudioTrack,
+    PlaybackSyncLocalExecutionSnapshot,
+    TimestampedPayload,
+} from '@/stores/audioShared'
 import { useAudioNativeSession } from '@/stores/audioNativeSession'
 
 vi.mock('@/runtime/nativePlaybackBridge', () => ({
@@ -63,6 +75,12 @@ const createSession = (options: { independent?: boolean } = {}) => {
         clientPhase: ref<PlaybackSyncClientPhase>('connecting'),
         clockOffsetMs: ref(0),
         roundTripEstimateMs: ref(0),
+        clientDiagnostics: shallowRef<PlaybackSyncClientDiagnosticsSnapshot | null>(null),
+        lastScheduledAction: shallowRef<TimestampedPayload<ScheduledActionPayload> | null>(null),
+        lastLoadAudioSource: shallowRef<TimestampedPayload<LoadAudioSourcePayload> | null>(null),
+        lastDeviceChange: shallowRef<TimestampedPayload<DeviceChangePayload> | null>(null),
+        lastLocalExecution: shallowRef<PlaybackSyncLocalExecutionSnapshot | null>(null),
+        lastAppliedVersion: ref(0),
         volume: ref(1),
     }
     const applyQueueSnapshot = vi.fn<(queue: CurrentQueueDto) => void>()
@@ -155,6 +173,102 @@ describe('useAudioNativeSession', () => {
         expect(refs.duration.value).toBe(180)
         expect(updateLocalQueueCurrentIndex).toHaveBeenCalledWith(2)
         session.dispose()
+    })
+
+    it('assembles clientDiagnostics from sync-state diagnostics payloads', () => {
+        const { session, refs } = createSession()
+        session.applyNativeEvent({
+            type: 'sync-state',
+            seq: 1,
+            syncPhase: 'ready',
+            clockOffsetMs: 42.5,
+            roundTripEstimateMs: 18,
+            diagnostics: {
+                socketState: 'open',
+                reconnectAttempt: 2,
+                snapshotReceived: true,
+                lastNtpResponseAtMs: 1_000,
+                measurements: [{ offsetMs: 40, rttMs: 20, recordedAtMs: 990 }],
+            },
+        })
+
+        const diagnostics = refs.clientDiagnostics.value
+        expect(diagnostics).not.toBeNull()
+        expect(diagnostics?.phase).toBe('ready')
+        expect(diagnostics?.socketState).toBe('open')
+        expect(diagnostics?.reconnectAttempt).toBe(2)
+        expect(diagnostics?.lastNtpResponseAtMs).toBe(1_000)
+        expect(diagnostics?.measurements).toEqual([{ offsetMs: 40, rttMs: 20, recordedAtMs: 990 }])
+        expect(diagnostics?.deviceId.startsWith('tauri-android-')).toBe(true)
+    })
+
+    it('records protocol events and maps well-known message payloads', () => {
+        const { session, refs } = createSession()
+        const scheduledAction: ScheduledActionPayload = {
+            commandId: 'cmd-1',
+            serverTimeToExecuteMs: 5_000,
+            scheduledAction: {
+                action: 'PLAY',
+                status: 'PLAYING',
+                currentIndex: 0,
+                positionSeconds: 0,
+                version: 9,
+            },
+        }
+        session.applyNativeEvent({
+            type: 'protocol-event',
+            seq: 1,
+            direction: 'in',
+            messageType: 'SCHEDULED_ACTION',
+            payload: scheduledAction,
+            atMs: 4_900,
+        })
+        session.applyNativeEvent({
+            type: 'protocol-event',
+            seq: 2,
+            direction: 'in',
+            messageType: 'ROOM_EVENT_DEVICE_CHANGE',
+            payload: { devices: [{ deviceId: 'device-a' }] },
+            atMs: 4_950,
+        })
+        session.applyNativeEvent({
+            type: 'protocol-event',
+            seq: 3,
+            direction: 'out',
+            messageType: 'PLAY',
+            payload: { commandId: 'cmd-2' },
+            atMs: 4_960,
+        })
+
+        expect(refs.lastScheduledAction.value).toEqual({ atMs: 4_900, payload: scheduledAction })
+        expect(refs.lastDeviceChange.value?.payload.devices).toEqual([{ deviceId: 'device-a' }])
+        const diagnostics = refs.clientDiagnostics.value
+        expect(diagnostics?.protocolEvents).toHaveLength(3)
+        expect(diagnostics?.lastInboundEvent?.type).toBe('ROOM_EVENT_DEVICE_CHANGE')
+        expect(diagnostics?.lastOutboundEvent?.type).toBe('PLAY')
+    })
+
+    it('applies local-execution events and advances the applied version', () => {
+        const { session, refs } = createSession()
+        session.applyNativeEvent({
+            type: 'local-execution',
+            seq: 1,
+            atMs: 6_000,
+            action: 'PLAY',
+            commandId: 'cmd-3',
+            version: 12,
+            estimatedServerNowMs: 5_990,
+            executeAtServerMs: 6_040,
+            waitMs: 50,
+            lateSeconds: 0,
+            scheduledOffset: 3.2,
+            currentIndex: 1,
+            mediaFileId: 2001,
+        })
+
+        expect(refs.lastLocalExecution.value?.action).toBe('PLAY')
+        expect(refs.lastLocalExecution.value?.waitMs).toBe(50)
+        expect(refs.lastAppliedVersion.value).toBe(12)
     })
 
     it('updates position baseline from position heartbeats', () => {
