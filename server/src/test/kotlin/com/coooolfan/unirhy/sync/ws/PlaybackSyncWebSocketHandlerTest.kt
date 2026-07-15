@@ -149,6 +149,50 @@ class PlaybackSyncWebSocketHandlerTest {
         assertEquals(PlaybackSyncErrorCode.VERSION_CONFLICT, error.payload.code)
     }
 
+    @Test
+    fun `duplicate pause does not advance version or broadcast`() {
+        val queue = currentQueueService.replaceQueue(
+            accountId = 42L,
+            recordingIds = listOf(1001L),
+            currentIndex = 0,
+            expectedVersion = 0L,
+        ).queue
+        val session = connectAndHello()
+        session.clearServerMessages()
+
+        handler.handleMessage(session, TextMessage(playPayload(currentIndex = 0, version = queue.version)))
+        handler.handleMessage(
+            session,
+            TextMessage(audioSourceLoadedPayload(currentIndex = 0, recordingId = 1001L)),
+        )
+        val playingVersion = (session.serverMessages().last() as ScheduledActionMessage)
+            .payload.scheduledAction.version
+        session.clearServerMessages()
+
+        handler.handleMessage(
+            session,
+            TextMessage(pausePayload(positionSeconds = 12.5, version = playingVersion)),
+        )
+        val pausedVersion = (session.serverMessages().single() as ScheduledActionMessage)
+            .payload.scheduledAction.version
+        session.clearServerMessages()
+
+        handler.handleMessage(
+            session,
+            TextMessage(
+                pausePayload(
+                    positionSeconds = 12.6,
+                    version = pausedVersion,
+                    commandId = "cmd-pause-duplicate",
+                ),
+            ),
+        )
+
+        assertTrue(session.serverMessages().isEmpty())
+        assertEquals(pausedVersion, playbackSessionService.getOrCreateState(42L).version)
+        assertEquals(12.5, playbackSessionService.getOrCreateState(42L).positionSeconds)
+    }
+
     private fun connectAndHello(): TestWebSocketSession {
         val session = TestWebSocketSession(sessionId = "session-1", accountId = 42L)
         handler.afterConnectionEstablished(session)
@@ -252,6 +296,23 @@ class PlaybackSyncWebSocketHandlerTest {
             "deviceId": "web-7c2f",
             "currentIndex": $currentIndex,
             "recordingId": $recordingId
+          }
+        }
+    """.trimIndent()
+
+    private fun pausePayload(
+        positionSeconds: Double,
+        version: Long,
+        commandId: String = "cmd-pause-001",
+    ): String = """
+        {
+          "type": "PAUSE",
+          "payload": {
+            "commandId": "$commandId",
+            "deviceId": "web-7c2f",
+            "currentIndex": 0,
+            "positionSeconds": $positionSeconds,
+            "version": $version
           }
         }
     """.trimIndent()

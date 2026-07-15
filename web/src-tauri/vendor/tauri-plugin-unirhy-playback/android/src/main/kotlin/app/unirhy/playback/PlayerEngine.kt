@@ -5,6 +5,7 @@ import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
+import android.util.Log
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
@@ -86,10 +87,12 @@ class PlayerEngine(
     init {
         player.addListener(object : Player.Listener {
             override fun onIsPlayingChanged(isPlaying: Boolean) {
+                Log.i(TAG, "player isPlaying=$isPlaying pos=${player.currentPosition}ms state=${player.playbackState}")
                 listener.onIsPlayingChanged(isPlaying)
             }
 
             override fun onPlaybackStateChanged(playbackState: Int) {
+                Log.i(TAG, "player state=$playbackState pos=${player.currentPosition}ms")
                 when (playbackState) {
                     Player.STATE_READY -> {
                         val duration = player.duration
@@ -107,12 +110,18 @@ class PlayerEngine(
             }
 
             override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+                Log.i(TAG, "player playWhenReady=$playWhenReady reason=$reason pos=${player.currentPosition}ms")
                 if (!playWhenReady && reason == Player.PLAY_WHEN_READY_CHANGE_REASON_AUDIO_FOCUS_LOSS) {
                     listener.onSystemInducedPause(player.currentPosition / 1_000.0)
                 }
             }
 
+            override fun onPlaybackSuppressionReasonChanged(playbackSuppressionReason: Int) {
+                Log.i(TAG, "player suppressionReason=$playbackSuppressionReason pos=${player.currentPosition}ms")
+            }
+
             override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+                Log.w(TAG, "player error: ${error.errorCodeName} ${error.message}")
                 listener.onPlayerError(error.message ?: error.errorCodeName)
             }
         })
@@ -164,6 +173,7 @@ class PlayerEngine(
      * 已迟到（目标时刻已过）时立即起播，由调用方预先补偿位置。
      */
     fun playAt(executeAtElapsedMs: Long) = runOnPlayerThread {
+        Log.i(TAG, "playAt in=${executeAtElapsedMs - SystemClock.elapsedRealtime()}ms pos=${player.currentPosition}ms")
         cancelPendingStart()
         val start = Runnable {
             pendingStart = null
@@ -195,6 +205,7 @@ class PlayerEngine(
                 val expectedMs = startedPositionMs + (SystemClock.elapsedRealtime() - startedAtElapsedMs)
                 val driftMs = player.currentPosition - expectedMs
                 if (kotlin.math.abs(driftMs) > CORRECTION_THRESHOLD_MS) {
+                    Log.i(TAG, "position correction driftMs=$driftMs pos=${player.currentPosition}ms")
                     player.seekTo(expectedMs + (player.currentPosition - expectedMs) / 2)
                 }
             },
@@ -203,6 +214,7 @@ class PlayerEngine(
     }
 
     fun pauseAt(executeAtElapsedMs: Long, positionSeconds: Double) = runOnPlayerThread {
+        Log.i(TAG, "pauseAt in=${executeAtElapsedMs - SystemClock.elapsedRealtime()}ms target=${positionSeconds}s")
         cancelPendingStart()
         val delayMs = executeAtElapsedMs - SystemClock.elapsedRealtime()
         val action = Runnable {
@@ -262,6 +274,7 @@ class PlayerEngine(
     }
 
     companion object {
+        private const val TAG = "UnirhyPlayerEngine"
         private const val SPIN_WINDOW_MS = 50L
         private const val CORRECTION_DELAY_MS = 500L
         private const val CORRECTION_THRESHOLD_MS = 150L

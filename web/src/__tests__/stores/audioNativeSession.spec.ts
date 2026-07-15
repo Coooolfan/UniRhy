@@ -87,6 +87,7 @@ const createSession = (options: { independent?: boolean } = {}) => {
     const updateLocalQueueCurrentIndex = vi.fn<(currentIndex: number) => void>()
     const session = useAudioNativeSession({
         ...refs,
+        preferredAssetFormat: () => 'audio/opus',
         isIndependentPlaybackMode: () => options.independent ?? false,
         applyQueueSnapshot,
         updateLocalQueueCurrentIndex,

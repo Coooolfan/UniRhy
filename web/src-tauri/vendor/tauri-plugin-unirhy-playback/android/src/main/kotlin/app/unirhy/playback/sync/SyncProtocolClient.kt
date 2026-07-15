@@ -116,8 +116,11 @@ class SyncProtocolClient(
     fun send(type: String, payload: Any): Boolean {
         val socket = webSocket ?: return false
         val sent = socket.send(encodeClientMessage(type, payload))
-        if (sent && type != "NTP_REQUEST") {
-            listener.onProtocolEvent("out", type, payload, clock.clientNowMs())
+        if (type != "NTP_REQUEST") {
+            Log.i(TAG, "send $type sent=$sent")
+            if (sent) {
+                listener.onProtocolEvent("out", type, payload, clock.clientNowMs())
+            }
         }
         return sent
     }
@@ -353,6 +356,7 @@ class SyncProtocolClient(
         if (phase == next) {
             return
         }
+        Log.i(TAG, "phase $phase -> $next socketState=$socketState reconnectAttempt=$reconnectAttempt")
         phase = next
         emitSyncState()
     }

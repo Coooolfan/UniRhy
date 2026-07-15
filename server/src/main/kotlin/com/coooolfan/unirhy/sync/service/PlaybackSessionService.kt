@@ -129,6 +129,36 @@ class PlaybackSessionService(
         )
     }
 
+    fun schedulePauseIfChanged(
+        accountId: Long,
+        commandId: String,
+        currentIndex: Int,
+        positionSeconds: Double,
+        nowMs: Long,
+        executeAtMs: Long,
+        expectedVersion: Long,
+        positionToleranceSeconds: Double,
+    ): ScheduledActionPayload? {
+        return lockManager.withAccountLock(accountId) {
+            val currentState = getOrCreateState(accountId)
+            if (
+                currentState.status == PlaybackStatus.PAUSED &&
+                kotlin.math.abs(currentState.positionSeconds - positionSeconds) < positionToleranceSeconds
+            ) {
+                return@withAccountLock null
+            }
+            schedulePause(
+                accountId = accountId,
+                commandId = commandId,
+                currentIndex = currentIndex.takeIf { currentState.currentIndex != null },
+                positionSeconds = positionSeconds,
+                nowMs = nowMs,
+                executeAtMs = executeAtMs,
+                expectedVersion = expectedVersion,
+            )
+        }
+    }
+
     fun schedulePauseFromCurrentState(
         accountId: Long,
         commandId: String,

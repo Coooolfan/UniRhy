@@ -9,6 +9,7 @@ import android.util.Log
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.util.UnstableApi
 import app.unirhy.playback.queue.QueueHttpApi
+import app.unirhy.playback.queue.RecordingHttpApi
 import app.unirhy.playback.queue.QueueState
 import app.unirhy.playback.sync.CurrentQueueItemDto
 import app.unirhy.playback.sync.NtpClock
@@ -50,6 +51,7 @@ object PlaybackController {
         val deviceId: String,
         val clientVersion: String,
         val mode: String,
+        val preferredAssetFormat: String?,
     )
 
     /** 事件出口：参数为事件 JSON 字符串（含 type 与 seq）。 */
@@ -82,8 +84,10 @@ object PlaybackController {
     )
 
     private val queueHttpApi by lazy { QueueHttpApi(okHttpClient) }
+    private val recordingHttpApi by lazy { RecordingHttpApi(okHttpClient) }
 
     private val eventSeq = AtomicLong(0)
+    private val lifecycleGeneration = AtomicLong(0)
 
     @Volatile
     private var syncClient: SyncProtocolClient? = null
@@ -112,6 +116,15 @@ object PlaybackController {
     /** 最近一次可用的播放态版本号（SNAPSHOT / SCHEDULED_ACTION / 队列事件的最大值）。 */
     @Volatile
     private var lastKnownVersion: Long = 0
+
+    /**
+     * 服务端会话播放状态镜像（SNAPSHOT / SCHEDULED_ACTION 驱动）。
+     * 用于吸收 Media3 在焦点保持丢失期间对 (playWhenReady=false, AUDIO_FOCUS_LOSS)
+     * 的重复回调：会话已 PAUSED 时不再上报系统暂停，否则每个调度 PAUSE 的执行
+     * 都会再触发一次上报，形成 PAUSE 自激环。
+     */
+    @Volatile
+    private var lastKnownStatus: PlaybackStatus? = null
 
     /** 校时未就绪时暂存的快照状态，READY 后统一应用。 */
     private var pendingSnapshotState: PlaybackStateDto? = null
@@ -183,9 +196,24 @@ object PlaybackController {
     }
 
     fun disconnectSync() {
-        syncClient?.disconnect()
+        lifecycleGeneration.incrementAndGet()
+        val client = syncClient
+        client?.disconnect()
         queueState.clear()
         pendingSnapshotState = null
+        lastKnownVersion = 0
+        lastKnownStatus = null
+        executor.execute {
+            // 排在 SyncProtocolClient.disconnect() 之后执行，先吸收已经排队的旧账号消息，
+            // 再次清空协议镜像，避免旧版本在断开后被迟到消息重新写回。
+            if (syncClient !== client) {
+                return@execute
+            }
+            queueState.clear()
+            pendingSnapshotState = null
+            lastKnownVersion = 0
+            lastKnownStatus = null
+        }
         playerEngine?.stop()
         stopService()
     }
@@ -326,6 +354,7 @@ object PlaybackController {
         when (message) {
             is ServerMessage.Snapshot -> {
                 lastKnownVersion = max(lastKnownVersion, message.payload.state.version)
+                lastKnownStatus = message.payload.state.status
                 if (queueState.apply(message.payload.queue)) {
                     emitQueueChanged()
                 }
@@ -356,8 +385,7 @@ object PlaybackController {
 
     private fun handleLoadAudioSource(commandId: String, currentIndex: Int, recordingId: Long) {
         val item = queueState.itemAt(currentIndex)
-        val mediaFileId = item?.mediaFileId
-        if (item == null || mediaFileId == null) {
+        if (item == null) {
             Log.w(TAG, "load_audio_source: no playable media for index=$currentIndex")
             lastError = "曲目缺少可播放音源"
             emitStateChanged()
@@ -365,7 +393,17 @@ object PlaybackController {
         }
         isLoading = true
         emitStateChanged()
-        preloadQueueItem(item, positionSeconds = 0.0) {
+        preloadQueueItem(
+            item = item,
+            positionSeconds = 0.0,
+            onUnavailable = {
+                executor.execute {
+                    isLoading = false
+                    lastError = "曲目缺少可播放音源"
+                    emitStateChanged()
+                }
+            },
+        ) {
             executor.execute {
                 isLoading = false
                 emitStateChanged()
@@ -380,9 +418,15 @@ object PlaybackController {
 
     private fun handleScheduledAction(payload: ScheduledActionPayload) {
         lastKnownVersion = max(lastKnownVersion, payload.scheduledAction.version)
+        lastKnownStatus = payload.scheduledAction.status
         val engine = playerEngine ?: return
         val action = payload.scheduledAction
         val delayMs = payload.serverTimeToExecuteMs - clock.estimatedServerNowMs()
+        Log.i(
+            TAG,
+            "scheduled action=${action.action} version=${action.version} delayMs=$delayMs " +
+                "position=${action.positionSeconds} index=${action.currentIndex} commandId=${payload.commandId}",
+        )
         val executeAtElapsedMs = SystemClock.elapsedRealtime() + delayMs
         emitLocalExecution(payload, delayMs)
 
@@ -435,7 +479,7 @@ object PlaybackController {
                 "lateSeconds" to lateSeconds,
                 "scheduledOffset" to action.positionSeconds + lateSeconds,
                 "currentIndex" to action.currentIndex,
-                "mediaFileId" to action.currentIndex?.let { queueState.itemAt(it)?.mediaFileId },
+                "mediaFileId" to playerEngine?.loadedSource?.mediaFileId,
             ),
         )
     }
@@ -457,6 +501,11 @@ object PlaybackController {
         val state = pendingSnapshotState ?: return
         pendingSnapshotState = null
         val engine = playerEngine ?: return
+        Log.i(
+            TAG,
+            "apply snapshot status=${state.status} index=${state.currentIndex} " +
+                "position=${state.positionSeconds} version=${state.version}",
+        )
 
         val index = state.currentIndex
         if (index == null) {
@@ -492,21 +541,37 @@ object PlaybackController {
     private fun preloadQueueItem(
         item: CurrentQueueItemDto,
         positionSeconds: Double,
+        onUnavailable: () -> Unit = {},
         onReady: () -> Unit,
     ) {
         val config = sessionConfig ?: return
         val engine = playerEngine ?: return
-        val mediaFileId = item.mediaFileId ?: return
-        engine.preload(
-            url = "${config.apiBaseUrl}/api/media-files/$mediaFileId",
-            source = PlayerEngine.LoadedSource(
-                mediaFileId = mediaFileId,
-                recordingId = item.recordingId,
-            ),
-            positionSeconds = positionSeconds,
-            metadata = buildMetadata(item),
-            onReady = onReady,
-        )
+        val generation = lifecycleGeneration.get()
+        recordingHttpApi.resolveAudioMediaFileId(
+            apiBaseUrl = config.apiBaseUrl,
+            token = config.token,
+            recordingId = item.recordingId,
+            preferredAssetFormat = config.preferredAssetFormat,
+            fallbackMediaFileId = item.mediaFileId,
+        ) { mediaFileId ->
+            if (lifecycleGeneration.get() != generation) {
+                return@resolveAudioMediaFileId
+            }
+            if (mediaFileId == null) {
+                onUnavailable()
+                return@resolveAudioMediaFileId
+            }
+            engine.preload(
+                url = "${config.apiBaseUrl}/api/media-files/$mediaFileId",
+                source = PlayerEngine.LoadedSource(
+                    mediaFileId = mediaFileId,
+                    recordingId = item.recordingId,
+                ),
+                positionSeconds = positionSeconds,
+                metadata = buildMetadata(item),
+                onReady = onReady,
+            )
+        }
     }
 
     private fun buildMetadata(item: CurrentQueueItemDto): MediaMetadata {
@@ -529,6 +594,7 @@ object PlaybackController {
         currentIndexOverride: Int? = null,
         versionOverride: Long? = null,
     ) {
+        Log.i(TAG, "user play position=$positionSeconds index=$currentIndexOverride")
         executor.execute {
             if (isIndependentMode()) {
                 playerEngine?.let { engine ->
@@ -548,6 +614,7 @@ object PlaybackController {
     }
 
     fun onUserPause(positionOverride: Double? = null) {
+        Log.i(TAG, "user pause position=$positionOverride")
         executor.execute {
             if (isIndependentMode()) {
                 playerEngine?.let { engine ->
@@ -630,6 +697,11 @@ object PlaybackController {
             emitStateChanged()
             return
         }
+        if (lastKnownStatus != PlaybackStatus.PLAYING) {
+            Log.i(TAG, "system induced pause suppressed (session not playing) position=$positionSeconds")
+            return
+        }
+        Log.i(TAG, "system induced pause position=$positionSeconds")
         val index = queueState.queue?.currentIndex ?: return
         syncClient?.sendControl(
             type = "PAUSE",

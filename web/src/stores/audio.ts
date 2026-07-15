@@ -288,6 +288,7 @@ export const useAudioStore = defineStore('audio', () => {
                   lastLocalExecution,
                   lastAppliedVersion,
                   volume,
+                  preferredAssetFormat: () => userStore.preferredAssetFormat,
                   isIndependentPlaybackMode: () => isIndependentPlaybackMode.value,
                   applyQueueSnapshot,
                   updateLocalQueueCurrentIndex,
@@ -325,6 +326,9 @@ export const useAudioStore = defineStore('audio', () => {
                 return
             }
             invalidateCachedTrackSources()
+            if (native) {
+                void native.configure()
+            }
         },
     )
 

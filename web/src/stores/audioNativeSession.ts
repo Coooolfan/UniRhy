@@ -75,6 +75,7 @@ type UseAudioNativeSessionOptions = {
     lastLocalExecution: Ref<PlaybackSyncLocalExecutionSnapshot | null>
     lastAppliedVersion: Ref<number>
     volume: Ref<number>
+    preferredAssetFormat: () => string
     isIndependentPlaybackMode: () => boolean
     applyQueueSnapshot: (queue: CurrentQueueDto) => void
     updateLocalQueueCurrentIndex: (currentIndex: number) => void
@@ -341,6 +342,7 @@ export const useAudioNativeSession = (options: UseAudioNativeSessionOptions) => 
             deviceId,
             clientVersion: NATIVE_CLIENT_VERSION,
             mode: currentMode(),
+            preferredAssetFormat: options.preferredAssetFormat(),
         })
     }
 

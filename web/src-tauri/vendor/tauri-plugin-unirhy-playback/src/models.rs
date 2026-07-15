@@ -16,6 +16,7 @@ pub struct ConfigureRequest {
     pub device_id: String,
     pub client_version: String,
     pub mode: PlaybackMode,
+    pub preferred_asset_format: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

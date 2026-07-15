@@ -30,11 +30,9 @@ class PlaybackService : MediaSessionService() {
     }
 
     override fun onTaskRemoved(rootIntent: Intent?) {
-        // 划掉任务：播放中继续（治理目标本身），未播放则结束服务
-        val player = mediaSession?.player
-        if (player == null || !player.playWhenReady || player.mediaItemCount == 0) {
-            stopSelf()
-        }
+        // 用户从最近任务明确划掉 App：结束播放、同步连接与媒体服务。
+        // 部分系统会直接 force-stop 整包；此处为不会自动杀进程的实现补齐相同语义。
+        PlaybackController.disconnectSync()
     }
 
     override fun onDestroy() {

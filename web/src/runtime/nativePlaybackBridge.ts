@@ -18,6 +18,7 @@ export type NativePlaybackConfig = {
     deviceId: string
     clientVersion: string
     mode: NativePlaybackMode
+    preferredAssetFormat: string
 }
 
 export type NativeNtpMeasurement = {

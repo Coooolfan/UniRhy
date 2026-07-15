@@ -15,6 +15,7 @@ class ConfigureArgs {
     var deviceId: String = ""
     var clientVersion: String = ""
     var mode: String = "sync"
+    var preferredAssetFormat: String? = null
 }
 
 @InvokeArg
@@ -107,6 +108,7 @@ class UnirhyPlaybackPlugin(private val activity: Activity) : Plugin(activity) {
                 deviceId = args.deviceId,
                 clientVersion = args.clientVersion,
                 mode = args.mode,
+                preferredAssetFormat = args.preferredAssetFormat?.trim()?.takeIf(String::isNotEmpty),
             ),
         )
         invoke.resolve()
