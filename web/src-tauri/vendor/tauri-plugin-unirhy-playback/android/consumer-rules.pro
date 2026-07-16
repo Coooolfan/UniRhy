@@ -20,3 +20,17 @@
 # Jackson 反射依赖 Kotlin 元数据、泛型签名与运行时可见注解
 -keepattributes RuntimeVisibleAnnotations, RuntimeVisibleParameterAnnotations
 -keepattributes Signature, InnerClasses, EnclosingMethod
+
+# jackson-module-kotlin 通过 kotlin-reflect 读主构造函数参数名与默认值；
+# 上述 sync.** 已被 keep，这里补 Kotlin 元数据 + jackson 反射依赖链
+-keep class kotlin.Metadata { *; }
+-keep class kotlin.reflect.** { *; }
+-keep class kotlin.jvm.internal.DefaultConstructorMarker { *; }
+-keep class com.fasterxml.jackson.module.kotlin.** { *; }
+# Kotlin data class 带默认值参数会生成 XXX$default 合成桥接方法，
+# jackson-kotlin 的 ConstructorValueCreator 依赖这些方法反射默认值；
+# R8 minify 后会静默失败（treeToValue 抛异常被 runCatching 吞掉）。
+-keepclassmembers class app.unirhy.playback.sync.** {
+    <init>(...);
+    public synthetic <methods>;
+}

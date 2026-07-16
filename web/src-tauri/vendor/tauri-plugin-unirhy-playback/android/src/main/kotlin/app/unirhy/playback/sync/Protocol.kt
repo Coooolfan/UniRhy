@@ -1,5 +1,6 @@
 package app.unirhy.playback.sync
 
+import android.util.Log
 import com.fasterxml.jackson.databind.DeserializationFeature
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -155,9 +156,18 @@ sealed interface ServerMessage {
          * 未知类型不视为致命错误）。
          */
         fun parse(raw: String): ServerMessage? {
-            val root = runCatching { PlaybackSyncJson.mapper.readTree(raw) }.getOrNull() ?: return null
-            val type = root.get("type")?.asText() ?: return null
-            val payload = root.get("payload") ?: return null
+            val root = runCatching { PlaybackSyncJson.mapper.readTree(raw) }.getOrElse {
+                Log.w("UnirhyPlaybackProtocol", "parse readTree failed: ${it.message}")
+                return null
+            }
+            val type = root.get("type")?.asText() ?: run {
+                Log.w("UnirhyPlaybackProtocol", "parse missing type field")
+                return null
+            }
+            val payload = root.get("payload") ?: run {
+                Log.w("UnirhyPlaybackProtocol", "parse missing payload for type=$type")
+                return null
+            }
             val mapper = PlaybackSyncJson.mapper
             return runCatching {
                 when (type) {
@@ -173,7 +183,10 @@ sealed interface ServerMessage {
                     "ERROR" -> ProtocolError(mapper.treeToValue<ErrorPayload>(payload))
                     else -> null
                 }
-            }.getOrNull()
+            }.getOrElse {
+                Log.w("UnirhyPlaybackProtocol", "parse treeToValue failed type=$type: ${it.javaClass.simpleName}: ${it.message}")
+                null
+            }
         }
     }
 }
