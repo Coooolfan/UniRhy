@@ -683,10 +683,17 @@ object PlaybackController {
         call: (apiBaseUrl: String, token: String?, version: Long) -> QueueHttpApi.NavigationResult,
     ) {
         val config = sessionConfig ?: return
-        val version = queueState.version() ?: return
+        // 服务端在队列切换后紧跟一次播放调度，会把权威版本再前进一步。
+        // 队列广播只承载队列版本，调度版本经 scheduled action 回来落到 lastKnownVersion。
+        // 手动切歌若只用队列版本会必然落后一步触发 409，取二者最大值。
+        val queueVersion = queueState.version() ?: return
+        val version = max(queueVersion, lastKnownVersion)
         when (val result = call(config.apiBaseUrl, config.token, version)) {
             is QueueHttpApi.NavigationResult.Ok -> Unit
-            is QueueHttpApi.NavigationResult.VersionConflict -> syncClient?.requestSync()
+            is QueueHttpApi.NavigationResult.VersionConflict -> {
+                Log.w(TAG, "queue navigation version conflict version=$version, requesting sync")
+                syncClient?.requestSync()
+            }
             is QueueHttpApi.NavigationResult.Failed ->
                 Log.w(TAG, "queue navigation failed: ${result.message}")
         }

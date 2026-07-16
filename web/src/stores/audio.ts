@@ -145,6 +145,7 @@ export const useAudioStore = defineStore('audio', () => {
         currentBuffer,
         currentBufferTrack,
         latestSnapshot,
+        lastAppliedVersion,
         createTrackFromQueueItem,
         applyQueueSnapshot,
         rememberHydratedTrack,
@@ -315,7 +316,16 @@ export const useAudioStore = defineStore('audio', () => {
             } else {
                 requestSyncRecovery()
             }
-            return null
+            // 再重跑一次：回调内部会重新读取 getCurrentQueueVersion，用刚拉到的新版本发请求。
+            // 否则用户会看到"点击没反应"，只能自己重按一下切歌。
+            try {
+                return await mutation()
+            } catch (retryError: unknown) {
+                if (isQueueVersionConflict(retryError)) {
+                    return null
+                }
+                throw retryError
+            }
         }
     }
 

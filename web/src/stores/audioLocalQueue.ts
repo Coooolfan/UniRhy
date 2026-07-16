@@ -31,6 +31,7 @@ type UseAudioLocalQueueOptions = {
     currentBuffer: ShallowRef<AudioBuffer | null>
     currentBufferTrack: ShallowRef<AudioTrack | null>
     latestSnapshot: Ref<PlaybackSyncStatePayload | null>
+    lastAppliedVersion: Ref<number>
     createTrackFromQueueItem: (item: CurrentQueueItemDto) => AudioTrack
     applyQueueSnapshot: (queue: CurrentQueueDto) => void
     rememberHydratedTrack: (track: AudioTrack) => void
@@ -47,6 +48,7 @@ export const useAudioLocalQueue = (options: UseAudioLocalQueueOptions) => {
         currentBuffer,
         currentBufferTrack,
         latestSnapshot,
+        lastAppliedVersion,
         createTrackFromQueueItem,
         applyQueueSnapshot,
         rememberHydratedTrack,
@@ -103,7 +105,14 @@ export const useAudioLocalQueue = (options: UseAudioLocalQueueOptions) => {
     }
 
     const getCurrentQueueVersion = () => {
-        return Math.max(currentQueue.value.version, latestSnapshot.value?.version ?? 0)
+        // Android 路径下 latestSnapshot 由原生 WS 持有、TS 不感知，
+        // 只有 lastAppliedVersion 会随原生调度动作前进；Web 路径两者应保持一致，
+        // 取 max 兼顾两条链路，避免"队列版本落后于调度版本"触发的 409。
+        return Math.max(
+            currentQueue.value.version,
+            latestSnapshot.value?.version ?? 0,
+            lastAppliedVersion.value,
+        )
     }
 
     const nextLocalQueueVersion = () => getCurrentQueueVersion() + 1
