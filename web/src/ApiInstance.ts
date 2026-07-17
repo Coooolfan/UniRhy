@@ -13,6 +13,14 @@ export type ApiErrorShape = {
 const isRecord = (value: unknown): value is Record<string, unknown> =>
     typeof value === 'object' && value !== null
 
+const parseErrorResponse = (text: string) => {
+    try {
+        return JSON.parse(text)
+    } catch {
+        return new Error(i18n.global.t('errors.requestFailed'))
+    }
+}
+
 let hasHandledAuthExpiry = false
 
 const isLoginRequest = (uri: string, method: string) =>
@@ -100,14 +108,12 @@ export const api = new Api(async ({ uri, method, headers, body }) => {
         handleAuthExpiry()
     }
 
-    if (Math.floor(response.status / 100) === 5) {
-        const text = await response.text()
-        console.error('服务器错误:', response.status, uri, text)
-        throw new Error(i18n.global.t('errors.requestFailed') + text)
-    }
-
     if (Math.floor(response.status / 100) !== 2) {
-        throw await response.json()
+        const text = await response.text()
+        if (Math.floor(response.status / 100) === 5) {
+            console.error('服务器错误:', response.status, uri, text)
+        }
+        throw parseErrorResponse(text)
     }
 
     const text = await response.text()
