@@ -36,12 +36,12 @@ const {
     isLoading: isLoadingPlaylists,
     error: playlistError,
 } = storeToRefs(playlistStore)
-const navItems: NavItem[] = [
+const navItems = computed<NavItem[]>(() => [
     { label: t('dashboardNav.discover'), routeName: 'dashboard-home' },
     { label: t('dashboardNav.library'), routeName: 'album-list', matchNames: ['album-detail'] },
     { label: t('dashboardNav.tasks'), routeName: 'tasks' },
     { label: t('dashboardNav.settings'), routeName: 'settings' },
-]
+])
 
 const playlistSectionPaddingBottom = computed(() => {
     if (!audioStore.currentTrack || audioStore.isPlayerHidden) {

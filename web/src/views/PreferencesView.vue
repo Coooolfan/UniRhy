@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { BatteryCharging, Bell, ExternalLink, FileAudio, Radio } from 'lucide-vue-next'
+import { BatteryCharging, Bell, ExternalLink, FileAudio, Languages, Radio } from 'lucide-vue-next'
 import DashboardTopBar from '@/components/dashboard/DashboardTopBar.vue'
+import { SUPPORTED_LOCALES, type SupportedLocale } from '@/i18n'
 import { resolveErrorMessage } from '@/i18n/errors'
 import {
     type AndroidPlaybackSystemStatus,
@@ -144,6 +145,10 @@ const handlePlaybackModeChange = (event: Event) => {
     )
 }
 
+const handleLocaleChange = (event: Event) => {
+    clientPreferencesStore.setLocale((event.target as HTMLSelectElement).value as SupportedLocale)
+}
+
 const handleRequestNotificationPermission = async () => {
     androidStatusError.value = ''
     try {
@@ -182,6 +187,37 @@ const handleOpenBatterySettings = async () => {
         </div>
 
         <div class="mx-auto mt-6 max-w-5xl space-y-4 px-4 sm:mt-10 sm:space-y-6 sm:px-8">
+            <section class="border border-[#EAE6DE] bg-white p-4 sm:p-8">
+                <div class="mb-4 flex items-center gap-3 sm:mb-6">
+                    <div
+                        class="flex h-9 w-9 items-center justify-center rounded-full bg-[#F7F5F0] text-[#8C857B] sm:h-10 sm:w-10"
+                    >
+                        <Languages :size="18" />
+                    </div>
+                    <div>
+                        <h2 class="font-serif text-xl text-[#2B221B]">
+                            {{ t('preferences.language.title') }}
+                        </h2>
+                        <p class="text-xs text-[#8C857B]">
+                            {{ t('preferences.language.description') }}
+                        </p>
+                    </div>
+                </div>
+
+                <div class="space-y-1">
+                    <select
+                        data-test="language-select"
+                        :value="clientPreferencesStore.locale"
+                        class="w-full border border-[#D6D1C4] bg-white px-3 py-2.5 text-[#2C2825] outline-none transition-all focus:border-[#D98C28] focus:ring-1 focus:ring-[#D98C28]"
+                        @change="handleLocaleChange"
+                    >
+                        <option v-for="locale in SUPPORTED_LOCALES" :key="locale" :value="locale">
+                            {{ t(`preferences.language.${locale}`) }}
+                        </option>
+                    </select>
+                </div>
+            </section>
+
             <section class="border border-[#EAE6DE] bg-white p-4 sm:p-8">
                 <div class="mb-4 flex items-center gap-3 sm:mb-6">
                     <div

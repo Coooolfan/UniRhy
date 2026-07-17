@@ -84,12 +84,6 @@ export default {
         serverVersion: 'Server v{version}',
         clientVersion: 'Client v{version}',
         builtAt: 'Built at {time}',
-        language: {
-            title: 'Language',
-            description: 'Choose the display language of the interface',
-            'zh-CN': '简体中文',
-            en: 'English',
-        },
     },
     login: {
         title: 'Welcome Back',
@@ -208,6 +202,12 @@ export default {
     preferences: {
         title: 'Preferences',
         subtitle: 'Client playback and experience preferences',
+        language: {
+            title: 'Language',
+            description: 'Choose the display language of the interface',
+            'zh-CN': '简体中文',
+            en: 'English',
+        },
         playbackMode: 'Playback Mode',
         preferredFormat: 'Preferred Asset Format',
         androidBackgroundPlayback: 'Android Background Playback',

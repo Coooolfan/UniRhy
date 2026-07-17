@@ -3,7 +3,6 @@ import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import DashboardTopBar from '@/components/dashboard/DashboardTopBar.vue'
 import StorageNodesSection from '@/components/settings/StorageNodesSection.vue'
-import LanguageSection from '@/components/settings/LanguageSection.vue'
 import SystemStatusSection from '@/components/settings/SystemStatusSection.vue'
 import PluginsSection from '@/components/settings/PluginsSection.vue'
 import AccountsSection from '@/components/settings/AccountsSection.vue'
@@ -123,10 +122,7 @@ onMounted(() => {
                 :error="systemError"
             /> -->
 
-            <LanguageSection />
-
             <StorageNodesSection
-                class="mt-8 sm:mt-16"
                 :storage-nodes="storageNodes"
                 :system-config="systemConfig"
                 :is-loading="isLoadingStorage"

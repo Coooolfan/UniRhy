@@ -82,12 +82,6 @@ export default {
         serverVersion: '服务端 v{version}',
         clientVersion: '客户端 v{version}',
         builtAt: '构建于 {time}',
-        language: {
-            title: '语言',
-            description: '选择界面显示语言',
-            'zh-CN': '简体中文',
-            en: 'English',
-        },
     },
     login: {
         title: '欢迎回来',
@@ -205,6 +199,12 @@ export default {
     preferences: {
         title: '个人偏好',
         subtitle: '客户端播放与体验偏好',
+        language: {
+            title: '语言',
+            description: '选择界面显示语言',
+            'zh-CN': '简体中文',
+            en: 'English',
+        },
         playbackMode: '播放模式',
         playbackModeDescription: '控制本设备的播放队列与状态是否和同账号下的不同设备实时同步',
         mode: '模式',
