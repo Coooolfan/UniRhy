@@ -2,6 +2,7 @@ package com.coooolfan.unirhy.controller
 
 import cn.dev33.satoken.annotation.SaCheckLogin
 import cn.dev33.satoken.stp.StpUtil
+import com.coooolfan.unirhy.error.PlaybackQueueException
 import com.coooolfan.unirhy.model.dto.CurrentQueueAppendRequest
 import com.coooolfan.unirhy.model.dto.CurrentQueueRemoveRequest
 import com.coooolfan.unirhy.model.dto.CurrentQueueReorderRequest
@@ -71,6 +72,13 @@ class PlaybackQueueController(
      */
     @PutMapping
     @ResponseStatus(HttpStatus.OK)
+    @Throws(
+        PlaybackQueueException.EmptyQueueIndexInvalid::class,
+        PlaybackQueueException.CurrentIndexOutOfRange::class,
+        PlaybackQueueException.RecordingNotFound::class,
+        PlaybackQueueException.RecordingNotPlayable::class,
+        PlaybackQueueException.VersionConflict::class,
+    )
     fun replaceCurrentQueue(
         @RequestBody input: CurrentQueueReplaceRequest,
     ): CurrentQueueDto {
@@ -105,6 +113,12 @@ class PlaybackQueueController(
      */
     @PostMapping("/items")
     @ResponseStatus(HttpStatus.OK)
+    @Throws(
+        PlaybackQueueException.RecordingIdsEmpty::class,
+        PlaybackQueueException.RecordingNotFound::class,
+        PlaybackQueueException.RecordingNotPlayable::class,
+        PlaybackQueueException.VersionConflict::class,
+    )
     fun appendToCurrentQueue(
         @RequestBody input: CurrentQueueAppendRequest,
     ): CurrentQueueDto {
@@ -133,6 +147,13 @@ class PlaybackQueueController(
      */
     @PutMapping("/item-order")
     @ResponseStatus(HttpStatus.OK)
+    @Throws(
+        PlaybackQueueException.EmptyQueueIndexInvalid::class,
+        PlaybackQueueException.CurrentIndexOutOfRange::class,
+        PlaybackQueueException.RecordingNotFound::class,
+        PlaybackQueueException.RecordingNotPlayable::class,
+        PlaybackQueueException.VersionConflict::class,
+    )
     fun reorderCurrentQueue(
         @RequestBody input: CurrentQueueReorderRequest,
     ): CurrentQueueDto {
@@ -162,6 +183,12 @@ class PlaybackQueueController(
      */
     @PutMapping("/current-index")
     @ResponseStatus(HttpStatus.OK)
+    @Throws(
+        PlaybackQueueException.CurrentIndexOutOfRange::class,
+        PlaybackQueueException.RecordingNotFound::class,
+        PlaybackQueueException.RecordingNotPlayable::class,
+        PlaybackQueueException.VersionConflict::class,
+    )
     fun setCurrentIndex(
         @RequestBody input: CurrentQueueSetCurrentRequest,
     ): CurrentQueueDto {
@@ -195,6 +222,7 @@ class PlaybackQueueController(
      */
     @PutMapping("/strategies")
     @ResponseStatus(HttpStatus.OK)
+    @Throws(PlaybackQueueException.VersionConflict::class)
     fun updateCurrentQueueStrategy(
         @RequestBody input: CurrentQueueStrategyUpdateRequest,
     ): CurrentQueueDto {
@@ -224,6 +252,7 @@ class PlaybackQueueController(
      */
     @PostMapping("/next-navigation-requests")
     @ResponseStatus(HttpStatus.OK)
+    @Throws(PlaybackQueueException.VersionConflict::class)
     fun playNextInCurrentQueue(
         @RequestBody input: CurrentQueueVersionRequest,
     ): CurrentQueueDto {
@@ -252,6 +281,7 @@ class PlaybackQueueController(
      */
     @PostMapping("/previous-navigation-requests")
     @ResponseStatus(HttpStatus.OK)
+    @Throws(PlaybackQueueException.VersionConflict::class)
     fun playPreviousInCurrentQueue(
         @RequestBody input: CurrentQueueVersionRequest,
     ): CurrentQueueDto {
@@ -281,6 +311,12 @@ class PlaybackQueueController(
      */
     @PostMapping("/item-removals")
     @ResponseStatus(HttpStatus.OK)
+    @Throws(
+        PlaybackQueueException.IndexNotFound::class,
+        PlaybackQueueException.RecordingNotFound::class,
+        PlaybackQueueException.RecordingNotPlayable::class,
+        PlaybackQueueException.VersionConflict::class,
+    )
     fun removeCurrentQueueEntry(
         @RequestBody input: CurrentQueueRemoveRequest,
     ): CurrentQueueDto {
@@ -314,6 +350,7 @@ class PlaybackQueueController(
      */
     @PostMapping("/clear-requests")
     @ResponseStatus(HttpStatus.OK)
+    @Throws(PlaybackQueueException.VersionConflict::class)
     fun clearCurrentQueue(
         @RequestBody input: CurrentQueueVersionRequest,
     ): CurrentQueueDto {

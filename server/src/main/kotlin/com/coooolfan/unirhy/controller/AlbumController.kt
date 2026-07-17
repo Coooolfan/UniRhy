@@ -3,6 +3,7 @@ package com.coooolfan.unirhy.controller
 import cn.dev33.satoken.annotation.SaCheckLogin
 import cn.dev33.satoken.annotation.SaCheckRole
 import com.coooolfan.unirhy.config.ROLE_ADMIN
+import com.coooolfan.unirhy.error.AlbumException
 import com.coooolfan.unirhy.error.CommonException
 import com.coooolfan.unirhy.model.Album
 import com.coooolfan.unirhy.model.by
@@ -120,7 +121,12 @@ class AlbumController(private val service: AlbumService) {
     @PutMapping("/{id}/recording-order")
     @SaCheckRole(ROLE_ADMIN)
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @Throws(CommonException.Forbidden::class)
+    @Throws(
+        CommonException.Forbidden::class,
+        AlbumException.NotFound::class,
+        AlbumException.RecordingIdsContainDuplicates::class,
+        AlbumException.RecordingIdsMismatch::class,
+    )
     fun reorderAlbumRecordings(
         @PathVariable id: Long,
         @RequestBody input: RecordingReorderReq,

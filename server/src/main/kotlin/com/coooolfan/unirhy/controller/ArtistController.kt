@@ -3,6 +3,7 @@ package com.coooolfan.unirhy.controller
 import cn.dev33.satoken.annotation.SaCheckLogin
 import cn.dev33.satoken.annotation.SaCheckRole
 import com.coooolfan.unirhy.config.ROLE_ADMIN
+import com.coooolfan.unirhy.error.ArtistException
 import com.coooolfan.unirhy.error.CommonException
 import com.coooolfan.unirhy.model.Artist
 import com.coooolfan.unirhy.model.by
@@ -125,7 +126,11 @@ class ArtistController(private val service: ArtistService) {
     @PostMapping("/merge-requests")
     @SaCheckRole(ROLE_ADMIN)
     @ResponseStatus(HttpStatus.OK)
-    @Throws(CommonException.Forbidden::class)
+    @Throws(
+        CommonException.Forbidden::class,
+        ArtistException.TargetNotFound::class,
+        ArtistException.SourceNotFound::class,
+    )
     fun mergeArtists(@RequestBody input: ArtistMergeReq) {
         service.mergeArtists(input)
     }

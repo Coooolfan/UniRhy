@@ -1,5 +1,6 @@
 package com.coooolfan.unirhy.sync.service
 
+import com.coooolfan.unirhy.error.PlaybackQueueException
 import com.coooolfan.unirhy.model.Recording
 import com.coooolfan.unirhy.model.by
 import com.coooolfan.unirhy.model.id
@@ -17,10 +18,8 @@ import org.babyfish.jimmer.sql.kt.ast.expression.sql
 import org.babyfish.jimmer.sql.kt.ast.expression.valueIn
 import org.babyfish.jimmer.sql.kt.ast.expression.valueNotIn
 import org.babyfish.jimmer.sql.kt.fetcher.newFetcher
-import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Component
 import org.springframework.stereotype.Service
-import org.springframework.web.server.ResponseStatusException
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.random.Random
 
@@ -121,7 +120,7 @@ class CurrentQueueService(
         nowMs: Long = timeProvider.nowMs(),
     ): CurrentQueueChangeResult {
         if (recordingIds.isEmpty()) {
-            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "recordingIds must not be empty")
+            throw PlaybackQueueException.RecordingIdsEmpty()
         }
 
         return withMutationContext(accountId, expectedVersion) { context ->
@@ -274,7 +273,7 @@ class CurrentQueueService(
         return withMutationContext(accountId, expectedVersion) { context ->
             val currentState = context.currentState
             if (index !in currentState.recordingIds.indices) {
-                throw ResponseStatusException(HttpStatus.NOT_FOUND, "Queue index not found")
+                throw PlaybackQueueException.IndexNotFound()
             }
 
             val nextState = context.nextState
@@ -400,10 +399,7 @@ class CurrentQueueService(
 
     private fun requireEmptyQueueIndex(currentIndex: Int) {
         if (currentIndex != 0) {
-            throw ResponseStatusException(
-                HttpStatus.BAD_REQUEST,
-                "currentIndex must be 0 for an empty queue",
-            )
+            throw PlaybackQueueException.EmptyQueueIndexInvalid()
         }
     }
 
@@ -412,7 +408,7 @@ class CurrentQueueService(
         currentIndex: Int,
     ) {
         if (recordingIds.isEmpty() || currentIndex !in recordingIds.indices) {
-            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "currentIndex out of range")
+            throw PlaybackQueueException.CurrentIndexOutOfRange()
         }
     }
 
@@ -562,14 +558,12 @@ class CurrentQueueService(
             .associateBy(ResolvedQueueRecording::recordingId)
         return recordingIds.map { recordingId ->
             when (recordingId) {
-                !in existingRecordingIds -> throw ResponseStatusException(
-                    HttpStatus.CONFLICT,
-                    "Recording $recordingId not found",
+                !in existingRecordingIds -> throw PlaybackQueueException.RecordingNotFound(
+                    recordingId = recordingId,
                 )
 
-                !in resolvedByRecordingId -> throw ResponseStatusException(
-                    HttpStatus.CONFLICT,
-                    "Recording $recordingId is not playable",
+                !in resolvedByRecordingId -> throw PlaybackQueueException.RecordingNotPlayable(
+                    recordingId = recordingId,
                 )
 
                 else -> resolvedByRecordingId.getValue(recordingId).toCurrentQueueEntry()
@@ -667,7 +661,7 @@ class CurrentQueueService(
         state: AccountPlayQueueState,
     ) {
         if (!stateStore.save(previousVersion, state)) {
-            throw ResponseStatusException(HttpStatus.CONFLICT, VERSION_CONFLICT_REASON)
+            throw PlaybackQueueException.VersionConflict()
         }
         states[state.accountId] = state
     }
@@ -773,7 +767,7 @@ class CurrentQueueService(
         expectedVersion: Long,
     ): AccountPlayQueueState {
         if (state.version != expectedVersion) {
-            throw ResponseStatusException(HttpStatus.CONFLICT, VERSION_CONFLICT_REASON)
+            throw PlaybackQueueException.VersionConflict()
         }
         return state
     }
@@ -834,8 +828,6 @@ class CurrentQueueService(
     }
 
     companion object {
-        const val VERSION_CONFLICT_REASON: String = "Queue version conflict"
-
         /** 电台模式下队尾剩余曲目少于该值时触发补充 */
         const val RADIO_REFILL_THRESHOLD: Int = 5
 

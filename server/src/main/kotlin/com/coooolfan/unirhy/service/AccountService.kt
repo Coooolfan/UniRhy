@@ -4,6 +4,7 @@ import cn.dev33.satoken.stp.parameter.SaLoginParameter
 import cn.dev33.satoken.stp.StpUtil
 import com.coooolfan.unirhy.config.ROLE_ADMIN
 import com.coooolfan.unirhy.config.encodePassword
+import com.coooolfan.unirhy.error.AccountException
 import com.coooolfan.unirhy.error.CommonException
 import com.coooolfan.unirhy.model.Account
 import com.coooolfan.unirhy.model.dto.AccountCreate
@@ -14,10 +15,8 @@ import org.babyfish.jimmer.sql.ast.mutation.SaveMode
 import org.babyfish.jimmer.sql.fetcher.Fetcher
 import org.babyfish.jimmer.sql.kt.KSqlClient
 import org.babyfish.jimmer.sql.kt.ast.expression.eq
-import org.springframework.http.HttpStatus
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Service
-import org.springframework.web.server.ResponseStatusException
 
 @Service
 class AccountService(
@@ -78,7 +77,7 @@ class AccountService(
 
     fun updateCredentials(id: Long, update: AccountCredentialsUpdate, fetcher: Fetcher<Account>): Account {
         if (update.password == null && update.email == null) {
-            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "password or email is required")
+            throw AccountException.CredentialUpdateRequired()
         }
 
         val currentLoginId = StpUtil.getLoginIdAsLong()

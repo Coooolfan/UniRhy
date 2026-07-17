@@ -4,6 +4,7 @@ import cn.dev33.satoken.annotation.SaCheckLogin
 import cn.dev33.satoken.annotation.SaCheckRole
 import com.coooolfan.unirhy.config.ROLE_ADMIN
 import com.coooolfan.unirhy.error.CommonException
+import com.coooolfan.unirhy.error.RecordingException
 import com.coooolfan.unirhy.model.Recording
 import com.coooolfan.unirhy.model.by
 import com.coooolfan.unirhy.model.dto.RecordingMergeReq
@@ -39,6 +40,7 @@ class RecordingController(private val service: RecordingService) {
      */
     @GetMapping("/{id}")
     @ResponseStatus(HttpStatus.OK)
+    @Throws(RecordingException.NotFound::class)
     fun getRecording(
         @PathVariable id: Long,
     ): @FetchBy("PLAYBACK_RECORDING_FETCHER") Recording {
@@ -85,7 +87,11 @@ class RecordingController(private val service: RecordingService) {
     @PostMapping("/merge-requests")
     @SaCheckRole(ROLE_ADMIN)
     @ResponseStatus(HttpStatus.OK)
-    @Throws(CommonException.Forbidden::class)
+    @Throws(
+        CommonException.Forbidden::class,
+        RecordingException.TargetNotFound::class,
+        RecordingException.WorkMismatch::class,
+    )
     fun mergeRecording(@RequestBody input: RecordingMergeReq) {
         service.mergeRecording(input)
     }

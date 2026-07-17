@@ -1,5 +1,6 @@
 package com.coooolfan.unirhy.service
 
+import com.coooolfan.unirhy.error.MediaFileException
 import com.coooolfan.unirhy.model.MediaFile
 import com.coooolfan.unirhy.model.by
 import com.coooolfan.unirhy.model.id
@@ -9,9 +10,7 @@ import org.babyfish.jimmer.sql.fetcher.Fetcher
 import org.babyfish.jimmer.sql.kt.KSqlClient
 import org.babyfish.jimmer.sql.kt.ast.expression.eq
 import org.babyfish.jimmer.sql.kt.fetcher.newFetcher
-import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
-import org.springframework.web.server.ResponseStatusException
 
 @Service
 class MediaFileAccessService(
@@ -21,17 +20,17 @@ class MediaFileAccessService(
 
     fun load(id: Long): ResolvedMediaFile {
         val mediaFile = findMediaFile(id)
-            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Media file not found")
+            ?: throw MediaFileException.NotFound()
 
         val node = try {
             mediaFile.resolveStorageNode(storageObjects)
-        } catch (_: IllegalStateException) {
-            throw ResponseStatusException(HttpStatus.FORBIDDEN, "Invalid storage provider")
+        } catch (ex: IllegalStateException) {
+            throw MediaFileException.InvalidStorageProvider(cause = ex)
         }
         val stat = try {
             storageObjects.stat(node, mediaFile.objectKey)
-        } catch (_: RuntimeException) {
-            throw ResponseStatusException(HttpStatus.NOT_FOUND, "File not found")
+        } catch (ex: RuntimeException) {
+            throw MediaFileException.FileNotFound(cause = ex)
         }
 
         return ResolvedMediaFile(

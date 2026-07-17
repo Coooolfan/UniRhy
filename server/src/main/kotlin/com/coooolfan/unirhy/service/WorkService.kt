@@ -1,5 +1,6 @@
 package com.coooolfan.unirhy.service
 
+import com.coooolfan.unirhy.error.WorkException
 import com.coooolfan.unirhy.model.*
 import com.coooolfan.unirhy.model.dto.WorkMergeReq
 import org.babyfish.jimmer.Page
@@ -10,7 +11,6 @@ import org.babyfish.jimmer.sql.kt.ast.expression.ilike
 import org.babyfish.jimmer.sql.kt.ast.expression.valueIn
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
-import org.springframework.web.server.ResponseStatusException
 import java.lang.ScopedValue.where
 import java.util.*
 
@@ -38,10 +38,7 @@ class WorkService(private val sql: KSqlClient) {
         val offsetMillis = offset ?: 0L
 
         if (lengthMillis <= 0L) {
-            throw ResponseStatusException(
-                org.springframework.http.HttpStatus.BAD_REQUEST,
-                "length must be > 0 (milliseconds)",
-            )
+            throw WorkException.InvalidRandomLength()
         }
 
         val seed = Math.floorDiv(timestampMillis - offsetMillis, lengthMillis)

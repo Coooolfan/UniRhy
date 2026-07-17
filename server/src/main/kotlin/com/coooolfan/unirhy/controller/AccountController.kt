@@ -3,6 +3,7 @@ package com.coooolfan.unirhy.controller
 import cn.dev33.satoken.annotation.SaCheckLogin
 import cn.dev33.satoken.annotation.SaCheckRole
 import com.coooolfan.unirhy.config.ROLE_ADMIN
+import com.coooolfan.unirhy.error.AccountException
 import com.coooolfan.unirhy.error.CommonException
 import com.coooolfan.unirhy.model.Account
 import com.coooolfan.unirhy.model.by
@@ -138,7 +139,11 @@ class AccountController(private val service: AccountService) {
      */
     @SaCheckLogin
     @PutMapping("/{id}/credentials")
-    @Throws(CommonException.Forbidden::class, CommonException.AuthenticationFailed::class)
+    @Throws(
+        CommonException.Forbidden::class,
+        CommonException.AuthenticationFailed::class,
+        AccountException.CredentialUpdateRequired::class,
+    )
     fun updateCredentials(
         @PathVariable id: Long,
         @RequestBody update: AccountCredentialsUpdate,

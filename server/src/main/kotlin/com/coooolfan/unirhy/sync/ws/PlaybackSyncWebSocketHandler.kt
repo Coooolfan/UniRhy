@@ -1,14 +1,13 @@
 package com.coooolfan.unirhy.sync.ws
 
+import com.coooolfan.unirhy.error.PlaybackQueueException
 import com.coooolfan.unirhy.sync.log.*
 import com.coooolfan.unirhy.sync.model.toProtocolState
 import com.coooolfan.unirhy.sync.protocol.*
 import com.coooolfan.unirhy.sync.service.*
 import tools.jackson.databind.ObjectMapper
 import org.springframework.beans.factory.annotation.Qualifier
-import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Component
-import org.springframework.web.server.ResponseStatusException
 import org.springframework.web.socket.CloseStatus
 import org.springframework.web.socket.PongMessage
 import org.springframework.web.socket.TextMessage
@@ -106,11 +105,8 @@ class PlaybackSyncWebSocketHandler(
                 message = ex.message,
                 reason = ex.reason,
             )
-        } catch (ex: ResponseStatusException) {
-            val (code, reason) = if (
-                ex.statusCode == HttpStatus.CONFLICT &&
-                ex.reason == CurrentQueueService.VERSION_CONFLICT_REASON
-            ) {
+        } catch (ex: PlaybackQueueException) {
+            val (code, reason) = if (ex is PlaybackQueueException.VersionConflict) {
                 PlaybackSyncErrorCode.VERSION_CONFLICT to PlaybackSyncErrorReason.VERSION_CONFLICT
             } else {
                 PlaybackSyncErrorCode.INVALID_MESSAGE to PlaybackSyncErrorReason.INVALID_MESSAGE
@@ -118,7 +114,7 @@ class PlaybackSyncWebSocketHandler(
             sendProtocolError(
                 context = context,
                 code = code,
-                message = ex.reason ?: "Invalid playback sync message",
+                message = ex.code,
                 reason = reason,
             )
         } catch (_: Exception) {

@@ -95,7 +95,17 @@ class PluginController(
     @PostMapping("/plugins", consumes = ["multipart/form-data"])
     @SaCheckRole(ROLE_ADMIN)
     @ResponseStatus(HttpStatus.CREATED)
-    @Throws(CommonException.Forbidden::class)
+    @Throws(
+        CommonException.Forbidden::class,
+        PluginException.PackageTooLarge::class,
+        PluginException.WasmTooLarge::class,
+        PluginException.ManifestMissing::class,
+        PluginException.WasmMissing::class,
+        PluginException.InvalidManifest::class,
+        PluginException.UnsupportedRuntime::class,
+        PluginException.UnsupportedAbi::class,
+        PluginException.TaskBindingMissing::class,
+    )
     fun upload(@RequestParam("file") file: MultipartFile) {
         pluginService.upload(file)
     }
@@ -116,7 +126,7 @@ class PluginController(
     @PutMapping("/plugins/{id}/enabled-state")
     @SaCheckRole(ROLE_ADMIN)
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @Throws(CommonException.Forbidden::class)
+    @Throws(CommonException.Forbidden::class, PluginException.NotFound::class)
     fun setEnabled(@PathVariable id: String, @RequestParam enabled: Boolean) {
         pluginService.setEnabled(id, enabled)
     }
@@ -136,7 +146,7 @@ class PluginController(
     @DeleteMapping("/plugins/{id}")
     @SaCheckRole(ROLE_ADMIN)
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @Throws(CommonException.Forbidden::class)
+    @Throws(CommonException.Forbidden::class, PluginException.NotFound::class)
     fun delete(@PathVariable id: String) {
         pluginService.delete(id)
     }
@@ -156,7 +166,7 @@ class PluginController(
      */
     @GetMapping("/plugins/{id}/package")
     @SaCheckRole(ROLE_ADMIN)
-    @Throws(CommonException.Forbidden::class)
+    @Throws(CommonException.Forbidden::class, PluginException.NotFound::class)
     fun download(@PathVariable id: String, response: HttpServletResponse) {
         val plugin = pluginService.getPlugin(id)
         val zipBytes = pluginService.export(id)

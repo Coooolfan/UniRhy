@@ -1,5 +1,6 @@
 package com.coooolfan.unirhy.sync.service
 
+import com.coooolfan.unirhy.error.PlaybackQueueException
 import com.coooolfan.unirhy.service.MediaUrlSigner
 import com.coooolfan.unirhy.sync.protocol.PlaybackStatus
 import com.coooolfan.unirhy.sync.protocol.PlaybackStrategy
@@ -8,8 +9,6 @@ import com.coooolfan.unirhy.sync.support.InMemoryCurrentQueueStateStore
 import com.coooolfan.unirhy.sync.support.TestPlaybackSyncTimeProvider
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import org.springframework.http.HttpStatus
-import org.springframework.web.server.ResponseStatusException
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
@@ -115,20 +114,18 @@ class CurrentQueueServiceTest {
             expectedVersion = 0L,
         )
 
-        val error = assertFailsWith<ResponseStatusException> {
+        assertFailsWith<PlaybackQueueException.VersionConflict> {
             service.appendToQueue(
                 accountId = 42L,
                 recordingIds = listOf(1002L),
                 expectedVersion = 0L,
             )
         }
-
-        assertEquals(HttpStatus.CONFLICT, error.statusCode)
     }
 
     @Test
     fun `invalid queued recording fails with conflict`() {
-        val error = assertFailsWith<ResponseStatusException> {
+        assertFailsWith<PlaybackQueueException.RecordingNotFound> {
             service.replaceQueue(
                 accountId = 42L,
                 recordingIds = listOf(9999L),
@@ -136,8 +133,6 @@ class CurrentQueueServiceTest {
                 expectedVersion = 0L,
             )
         }
-
-        assertEquals(HttpStatus.CONFLICT, error.statusCode)
     }
 
     @Test
