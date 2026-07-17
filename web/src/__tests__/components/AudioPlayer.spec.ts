@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { reactive } from 'vue'
 import { mount } from '@vue/test-utils'
+import { i18n } from '@/i18n'
 
 const pushMock = vi.fn()
 
@@ -71,6 +72,7 @@ import AudioPlayer from '@/components/AudioPlayer.vue'
 
 describe('AudioPlayer', () => {
     beforeEach(() => {
+        i18n.global.locale.value = 'zh-CN'
         audioStore.currentTrack = {
             id: 1,
             title: 'Track 1',
@@ -258,6 +260,20 @@ describe('AudioPlayer', () => {
         expect(wrapper.find('[data-test="queue-sidebar"]').exists()).toBe(true)
         expect(wrapper.text()).toContain('播放队列')
         expect(wrapper.text()).toContain('2 首曲目')
+    })
+
+    it('updates queue option labels when the locale changes', async () => {
+        const wrapper = mount(AudioPlayer)
+
+        await wrapper.get('[data-test="queue-toggle-button"]').trigger('click')
+        expect(wrapper.get('[data-test="playback-strategy-select"]').text()).toContain('顺序')
+        expect(wrapper.get('[data-test="stop-strategy-select"]').text()).toContain('列表')
+
+        i18n.global.locale.value = 'en'
+        await wrapper.vm.$nextTick()
+
+        expect(wrapper.get('[data-test="playback-strategy-select"]').text()).toContain('Sequential')
+        expect(wrapper.get('[data-test="stop-strategy-select"]').text()).toContain('List')
     })
 
     it('updates playback and stop strategies through the store', async () => {

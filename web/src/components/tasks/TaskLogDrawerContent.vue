@@ -48,12 +48,12 @@ const toggleStatus = (target: TaskStatus) => {
     emit('update:statuses', next)
 }
 
-const STATUS_LABEL_MAP: Record<TaskStatus, string> = {
+const statusLabelMap = computed<Record<TaskStatus, string>>(() => ({
     PENDING: t('taskLog.pending'),
     RUNNING: t('taskLog.running'),
     COMPLETED: t('taskLog.completed'),
     FAILED: t('taskLog.failed'),
-}
+}))
 
 const STATUS_BADGE_CLASS = 'border-[#DFD6C4] bg-[#F1EBDD] text-[#5A524A]'
 
@@ -161,7 +161,7 @@ const resetTask = async (row: TaskLog) => {
         title: t('taskLog.resetTitle'),
         content: t('taskLog.resetConfirm', {
             id: row.id,
-            status: STATUS_LABEL_MAP[row.status],
+            status: statusLabelMap.value[row.status],
         }),
         confirmText: t('taskLog.reset'),
         cancelText: t('common.cancel'),
@@ -222,7 +222,7 @@ const resetTask = async (row: TaskLog) => {
                     "
                     @click="toggleStatus(s)"
                 >
-                    {{ STATUS_LABEL_MAP[s] }}
+                    {{ statusLabelMap[s] }}
                 </button>
             </div>
             <div class="text-xs text-[#8A8177]">
@@ -269,7 +269,7 @@ const resetTask = async (row: TaskLog) => {
                                     class="inline-flex shrink-0 items-center whitespace-nowrap border px-1.5 py-0.5 text-[10px] uppercase tracking-[0.2em]"
                                     :class="STATUS_BADGE_CLASS"
                                 >
-                                    {{ STATUS_LABEL_MAP[row.status] }}
+                                    {{ statusLabelMap[row.status] }}
                                 </span>
                                 <span class="hidden sm:inline">·</span>
                                 <span class="basis-full sm:basis-auto">

@@ -24,18 +24,18 @@ const strategyDisabled = computed(() => {
 // 电台模式依赖服务端从整库补曲，独立播放模式下不可用
 const isRadioUnavailable = computed(() => audioStore.syncState === 'independent')
 
-const playbackStrategyOptions = [
+const playbackStrategyOptions = computed(() => [
     { value: 'SEQUENTIAL', label: t('playbackMode.SEQUENTIAL') },
     { value: 'SHUFFLE', label: t('playbackMode.SHUFFLE') },
     { value: 'SINGLE', label: t('playbackMode.SINGLE') },
     { value: 'RADIO', label: t('playbackMode.RADIO') },
-] as const
+])
 
-const stopStrategyOptions = [
+const stopStrategyOptions = computed(() => [
     { value: 'TRACK', label: t('playbackStop.TRACK') },
     { value: 'LIST', label: t('playbackStop.LIST') },
     { value: 'NEVER', label: t('playbackStop.NEVER') },
-] as const
+])
 
 const isVisible = computed(
     () => props.expanded && audioStore.queueEntries.length > 0 && !audioStore.isPlayerHidden,

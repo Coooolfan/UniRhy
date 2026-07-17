@@ -43,12 +43,12 @@ type TaskSummaryRow = {
 const SUBMIT_FEEDBACK_DURATION_MS = 2000
 const TASK_AUTO_REFRESH_INTERVAL_MS = 2000
 
-const statusLabelMap: Record<TaskStatus, string> = {
+const statusLabelMap = computed<Record<TaskStatus, string>>(() => ({
     PENDING: t('tasks.pending'),
     RUNNING: t('tasks.running'),
     COMPLETED: t('tasks.completed'),
     FAILED: t('tasks.failed'),
-}
+}))
 
 const summaryToneClassMap: Record<SummaryTone, string> = {
     idle: 'border-[#EAE6DE] bg-[#F8F5EE] text-[#8A8A8A]',
@@ -118,7 +118,7 @@ const statusOverviewItems = computed(() => [
     {
         key: 'COMPLETED',
         count: completedTaskCount.value,
-        label: statusLabelMap.COMPLETED,
+        label: statusLabelMap.value.COMPLETED,
         eyebrow: 'Completed',
         valueClass: 'text-[#2B221B]',
         eyebrowClass: 'text-[#8A8177]',
@@ -126,7 +126,7 @@ const statusOverviewItems = computed(() => [
     {
         key: 'RUNNING',
         count: runningTaskCount.value,
-        label: statusLabelMap.RUNNING,
+        label: statusLabelMap.value.RUNNING,
         eyebrow: 'Running',
         valueClass: 'text-[#2B221B]',
         eyebrowClass: 'text-[#B86134]/70',
@@ -134,7 +134,7 @@ const statusOverviewItems = computed(() => [
     {
         key: 'PENDING',
         count: pendingTaskCount.value,
-        label: statusLabelMap.PENDING,
+        label: statusLabelMap.value.PENDING,
         eyebrow: 'Pending',
         valueClass: 'text-[#2B221B]',
         eyebrowClass: 'text-[#8A8177]',
@@ -142,7 +142,7 @@ const statusOverviewItems = computed(() => [
     {
         key: 'FAILED',
         count: failedTaskCount.value,
-        label: statusLabelMap.FAILED,
+        label: statusLabelMap.value.FAILED,
         eyebrow: 'Failed',
         valueClass: 'text-[#2B221B]',
         eyebrowClass: 'text-[#8A8177]',
