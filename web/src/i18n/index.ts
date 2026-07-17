@@ -23,9 +23,18 @@ const detectInitialLocale = (): SupportedLocale => {
     return window.navigator.language.toLowerCase().startsWith('zh') ? 'zh-CN' : 'en'
 }
 
+export const setDocumentLocale = (locale: SupportedLocale) => {
+    if (typeof document !== 'undefined') {
+        document.documentElement.lang = locale
+    }
+}
+
+const initialLocale = detectInitialLocale()
+setDocumentLocale(initialLocale)
+
 export const i18n = createI18n({
     legacy: false,
-    locale: detectInitialLocale(),
+    locale: initialLocale,
     fallbackLocale: DEFAULT_LOCALE,
     messages: {
         'zh-CN': zhCN,

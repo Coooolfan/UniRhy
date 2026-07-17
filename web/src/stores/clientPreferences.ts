@@ -1,6 +1,12 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
-import { i18n, isSupportedLocale, LOCALE_STORAGE_KEY, type SupportedLocale } from '@/i18n'
+import {
+    i18n,
+    isSupportedLocale,
+    LOCALE_STORAGE_KEY,
+    setDocumentLocale,
+    type SupportedLocale,
+} from '@/i18n'
 
 export const PLAYBACK_MODES = ['SYNC', 'INDEPENDENT'] as const
 export type PlaybackMode = (typeof PLAYBACK_MODES)[number]
@@ -53,6 +59,7 @@ export const useClientPreferencesStore = defineStore('clientPreferences', () => 
     const setLocale = (next: SupportedLocale) => {
         locale.value = next
         i18n.global.locale.value = next
+        setDocumentLocale(next)
         persistLocale(next)
     }
 

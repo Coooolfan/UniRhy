@@ -5,12 +5,98 @@ export type AllErrors = {
         family: 'COMMON', 
         code: 'AUTHENTICATION_FAILED'
     } | {
+        family: 'ACCOUNT', 
+        code: 'CREDENTIAL_UPDATE_REQUIRED'
+    } | {
+        family: 'ALBUM', 
+        code: 'NOT_FOUND'
+    } | {
+        family: 'ALBUM', 
+        code: 'RECORDING_IDS_CONTAIN_DUPLICATES'
+    } | {
+        family: 'ALBUM', 
+        code: 'RECORDING_IDS_MISMATCH'
+    } | {
+        family: 'ARTIST', 
+        code: 'TARGET_NOT_FOUND'
+    } | {
+        family: 'ARTIST', 
+        code: 'SOURCE_NOT_FOUND'
+    } | {
+        family: 'PLAYBACK_QUEUE', 
+        code: 'EMPTY_QUEUE_INDEX_INVALID'
+    } | {
+        family: 'PLAYBACK_QUEUE', 
+        code: 'CURRENT_INDEX_OUT_OF_RANGE'
+    } | {
+        family: 'PLAYBACK_QUEUE', 
+        code: 'RECORDING_NOT_FOUND', 
+        recordingId: number
+    } | {
+        family: 'PLAYBACK_QUEUE', 
+        code: 'RECORDING_NOT_PLAYABLE', 
+        recordingId: number
+    } | {
+        family: 'PLAYBACK_QUEUE', 
+        code: 'VERSION_CONFLICT'
+    } | {
+        family: 'PLAYBACK_QUEUE', 
+        code: 'RECORDING_IDS_EMPTY'
+    } | {
+        family: 'PLAYBACK_QUEUE', 
+        code: 'INDEX_NOT_FOUND'
+    } | {
+        family: 'PLAYLIST', 
+        code: 'NOT_FOUND'
+    } | {
+        family: 'PLAYLIST', 
+        code: 'RECORDING_IDS_CONTAIN_DUPLICATES'
+    } | {
+        family: 'PLAYLIST', 
+        code: 'RECORDING_IDS_MISMATCH'
+    } | {
+        family: 'PLUGIN', 
+        code: 'PACKAGE_TOO_LARGE'
+    } | {
+        family: 'PLUGIN', 
+        code: 'WASM_TOO_LARGE'
+    } | {
+        family: 'PLUGIN', 
+        code: 'MANIFEST_MISSING'
+    } | {
+        family: 'PLUGIN', 
+        code: 'WASM_MISSING'
+    } | {
+        family: 'PLUGIN', 
+        code: 'INVALID_MANIFEST'
+    } | {
+        family: 'PLUGIN', 
+        code: 'UNSUPPORTED_RUNTIME'
+    } | {
+        family: 'PLUGIN', 
+        code: 'UNSUPPORTED_ABI'
+    } | {
+        family: 'PLUGIN', 
+        code: 'TASK_BINDING_MISSING'
+    } | {
+        family: 'PLUGIN', 
+        code: 'NOT_FOUND'
+    } | {
         family: 'PLUGIN', 
         code: 'UNKNOWN_TASK_TYPE', 
         taskType: string
     } | {
         family: 'PLUGIN', 
         code: 'INVALID_TASK_PARAMS'
+    } | {
+        family: 'RECORDING', 
+        code: 'NOT_FOUND'
+    } | {
+        family: 'RECORDING', 
+        code: 'TARGET_NOT_FOUND'
+    } | {
+        family: 'RECORDING', 
+        code: 'WORK_MISMATCH'
     } | {
         family: 'SYSTEM', 
         code: 'SYSTEM_ALREADY_INITIALIZED'
@@ -23,6 +109,9 @@ export type AllErrors = {
     } | {
         family: 'COMMON', 
         code: 'NOT_FOUND'
+    } | {
+        family: 'WORK', 
+        code: 'INVALID_RANDOM_LENGTH'
     } | {
         family: 'SYSTEM', 
         code: 'SYSTEM_STORAGE_PROVIDER_CANNOT_BE_DELETED'
@@ -57,6 +146,10 @@ export type ApiErrors = {
                 family: 'COMMON', 
                 code: 'AUTHENTICATION_FAILED', 
                 readonly [key:string]: any
+            } | {
+                family: 'ACCOUNT', 
+                code: 'CREDENTIAL_UPDATE_REQUIRED', 
+                readonly [key:string]: any
             })
     }, 
     'albumController': {
@@ -68,6 +161,18 @@ export type ApiErrors = {
         'reorderAlbumRecordings': AllErrors & ({
                 family: 'COMMON', 
                 code: 'FORBIDDEN', 
+                readonly [key:string]: any
+            } | {
+                family: 'ALBUM', 
+                code: 'NOT_FOUND', 
+                readonly [key:string]: any
+            } | {
+                family: 'ALBUM', 
+                code: 'RECORDING_IDS_CONTAIN_DUPLICATES', 
+                readonly [key:string]: any
+            } | {
+                family: 'ALBUM', 
+                code: 'RECORDING_IDS_MISMATCH', 
                 readonly [key:string]: any
             })
     }, 
@@ -86,33 +191,236 @@ export type ApiErrors = {
                 family: 'COMMON', 
                 code: 'FORBIDDEN', 
                 readonly [key:string]: any
+            } | {
+                family: 'ARTIST', 
+                code: 'TARGET_NOT_FOUND', 
+                readonly [key:string]: any
+            } | {
+                family: 'ARTIST', 
+                code: 'SOURCE_NOT_FOUND', 
+                readonly [key:string]: any
             })
     }, 
     'mediaFileController': {
     }, 
     'playbackQueueController': {
+        'replaceCurrentQueue': AllErrors & ({
+                family: 'PLAYBACK_QUEUE', 
+                code: 'EMPTY_QUEUE_INDEX_INVALID', 
+                readonly [key:string]: any
+            } | {
+                family: 'PLAYBACK_QUEUE', 
+                code: 'CURRENT_INDEX_OUT_OF_RANGE', 
+                readonly [key:string]: any
+            } | {
+                family: 'PLAYBACK_QUEUE', 
+                code: 'RECORDING_NOT_FOUND', 
+                readonly [key:string]: any
+            } | {
+                family: 'PLAYBACK_QUEUE', 
+                code: 'RECORDING_NOT_PLAYABLE', 
+                readonly [key:string]: any
+            } | {
+                family: 'PLAYBACK_QUEUE', 
+                code: 'VERSION_CONFLICT', 
+                readonly [key:string]: any
+            }), 
+        'appendToCurrentQueue': AllErrors & ({
+                family: 'PLAYBACK_QUEUE', 
+                code: 'RECORDING_IDS_EMPTY', 
+                readonly [key:string]: any
+            } | {
+                family: 'PLAYBACK_QUEUE', 
+                code: 'RECORDING_NOT_FOUND', 
+                readonly [key:string]: any
+            } | {
+                family: 'PLAYBACK_QUEUE', 
+                code: 'RECORDING_NOT_PLAYABLE', 
+                readonly [key:string]: any
+            } | {
+                family: 'PLAYBACK_QUEUE', 
+                code: 'VERSION_CONFLICT', 
+                readonly [key:string]: any
+            }), 
+        'reorderCurrentQueue': AllErrors & ({
+                family: 'PLAYBACK_QUEUE', 
+                code: 'EMPTY_QUEUE_INDEX_INVALID', 
+                readonly [key:string]: any
+            } | {
+                family: 'PLAYBACK_QUEUE', 
+                code: 'CURRENT_INDEX_OUT_OF_RANGE', 
+                readonly [key:string]: any
+            } | {
+                family: 'PLAYBACK_QUEUE', 
+                code: 'RECORDING_NOT_FOUND', 
+                readonly [key:string]: any
+            } | {
+                family: 'PLAYBACK_QUEUE', 
+                code: 'RECORDING_NOT_PLAYABLE', 
+                readonly [key:string]: any
+            } | {
+                family: 'PLAYBACK_QUEUE', 
+                code: 'VERSION_CONFLICT', 
+                readonly [key:string]: any
+            }), 
+        'setCurrentIndex': AllErrors & ({
+                family: 'PLAYBACK_QUEUE', 
+                code: 'CURRENT_INDEX_OUT_OF_RANGE', 
+                readonly [key:string]: any
+            } | {
+                family: 'PLAYBACK_QUEUE', 
+                code: 'RECORDING_NOT_FOUND', 
+                readonly [key:string]: any
+            } | {
+                family: 'PLAYBACK_QUEUE', 
+                code: 'RECORDING_NOT_PLAYABLE', 
+                readonly [key:string]: any
+            } | {
+                family: 'PLAYBACK_QUEUE', 
+                code: 'VERSION_CONFLICT', 
+                readonly [key:string]: any
+            }), 
+        'updateCurrentQueueStrategy': AllErrors & ({
+                family: 'PLAYBACK_QUEUE', 
+                code: 'VERSION_CONFLICT', 
+                readonly [key:string]: any
+            }), 
+        'playNextInCurrentQueue': AllErrors & ({
+                family: 'PLAYBACK_QUEUE', 
+                code: 'VERSION_CONFLICT', 
+                readonly [key:string]: any
+            }), 
+        'playPreviousInCurrentQueue': AllErrors & ({
+                family: 'PLAYBACK_QUEUE', 
+                code: 'VERSION_CONFLICT', 
+                readonly [key:string]: any
+            }), 
+        'removeCurrentQueueEntry': AllErrors & ({
+                family: 'PLAYBACK_QUEUE', 
+                code: 'INDEX_NOT_FOUND', 
+                readonly [key:string]: any
+            } | {
+                family: 'PLAYBACK_QUEUE', 
+                code: 'RECORDING_NOT_FOUND', 
+                readonly [key:string]: any
+            } | {
+                family: 'PLAYBACK_QUEUE', 
+                code: 'RECORDING_NOT_PLAYABLE', 
+                readonly [key:string]: any
+            } | {
+                family: 'PLAYBACK_QUEUE', 
+                code: 'VERSION_CONFLICT', 
+                readonly [key:string]: any
+            }), 
+        'clearCurrentQueue': AllErrors & ({
+                family: 'PLAYBACK_QUEUE', 
+                code: 'VERSION_CONFLICT', 
+                readonly [key:string]: any
+            })
     }, 
     'playlistController': {
+        'getPlaylist': AllErrors & ({
+                family: 'PLAYLIST', 
+                code: 'NOT_FOUND', 
+                readonly [key:string]: any
+            }), 
+        'updatePlaylist': AllErrors & ({
+                family: 'PLAYLIST', 
+                code: 'NOT_FOUND', 
+                readonly [key:string]: any
+            }), 
+        'deletePlaylist': AllErrors & ({
+                family: 'PLAYLIST', 
+                code: 'NOT_FOUND', 
+                readonly [key:string]: any
+            }), 
+        'addRecordingToPlaylist': AllErrors & ({
+                family: 'PLAYLIST', 
+                code: 'NOT_FOUND', 
+                readonly [key:string]: any
+            }), 
+        'removeRecordingFromPlaylist': AllErrors & ({
+                family: 'PLAYLIST', 
+                code: 'NOT_FOUND', 
+                readonly [key:string]: any
+            }), 
+        'reorderPlaylistRecordings': AllErrors & ({
+                family: 'PLAYLIST', 
+                code: 'NOT_FOUND', 
+                readonly [key:string]: any
+            } | {
+                family: 'PLAYLIST', 
+                code: 'RECORDING_IDS_CONTAIN_DUPLICATES', 
+                readonly [key:string]: any
+            } | {
+                family: 'PLAYLIST', 
+                code: 'RECORDING_IDS_MISMATCH', 
+                readonly [key:string]: any
+            })
     }, 
     'pluginController': {
         'upload': AllErrors & ({
                 family: 'COMMON', 
                 code: 'FORBIDDEN', 
                 readonly [key:string]: any
+            } | {
+                family: 'PLUGIN', 
+                code: 'PACKAGE_TOO_LARGE', 
+                readonly [key:string]: any
+            } | {
+                family: 'PLUGIN', 
+                code: 'WASM_TOO_LARGE', 
+                readonly [key:string]: any
+            } | {
+                family: 'PLUGIN', 
+                code: 'MANIFEST_MISSING', 
+                readonly [key:string]: any
+            } | {
+                family: 'PLUGIN', 
+                code: 'WASM_MISSING', 
+                readonly [key:string]: any
+            } | {
+                family: 'PLUGIN', 
+                code: 'INVALID_MANIFEST', 
+                readonly [key:string]: any
+            } | {
+                family: 'PLUGIN', 
+                code: 'UNSUPPORTED_RUNTIME', 
+                readonly [key:string]: any
+            } | {
+                family: 'PLUGIN', 
+                code: 'UNSUPPORTED_ABI', 
+                readonly [key:string]: any
+            } | {
+                family: 'PLUGIN', 
+                code: 'TASK_BINDING_MISSING', 
+                readonly [key:string]: any
             }), 
         'setEnabled': AllErrors & ({
                 family: 'COMMON', 
                 code: 'FORBIDDEN', 
+                readonly [key:string]: any
+            } | {
+                family: 'PLUGIN', 
+                code: 'NOT_FOUND', 
                 readonly [key:string]: any
             }), 
         'delete': AllErrors & ({
                 family: 'COMMON', 
                 code: 'FORBIDDEN', 
                 readonly [key:string]: any
+            } | {
+                family: 'PLUGIN', 
+                code: 'NOT_FOUND', 
+                readonly [key:string]: any
             }), 
         'download': AllErrors & ({
                 family: 'COMMON', 
                 code: 'FORBIDDEN', 
+                readonly [key:string]: any
+            } | {
+                family: 'PLUGIN', 
+                code: 'NOT_FOUND', 
                 readonly [key:string]: any
             }), 
         'submitPluginTask': AllErrors & ({
@@ -130,6 +438,11 @@ export type ApiErrors = {
             })
     }, 
     'recordingController': {
+        'getRecording': AllErrors & ({
+                family: 'RECORDING', 
+                code: 'NOT_FOUND', 
+                readonly [key:string]: any
+            }), 
         'updateRecording': AllErrors & ({
                 family: 'COMMON', 
                 code: 'FORBIDDEN', 
@@ -138,6 +451,14 @@ export type ApiErrors = {
         'mergeRecording': AllErrors & ({
                 family: 'COMMON', 
                 code: 'FORBIDDEN', 
+                readonly [key:string]: any
+            } | {
+                family: 'RECORDING', 
+                code: 'TARGET_NOT_FOUND', 
+                readonly [key:string]: any
+            } | {
+                family: 'RECORDING', 
+                code: 'WORK_MISMATCH', 
                 readonly [key:string]: any
             })
     }, 
@@ -194,6 +515,10 @@ export type ApiErrors = {
         'randomWork': AllErrors & ({
                 family: 'COMMON', 
                 code: 'NOT_FOUND', 
+                readonly [key:string]: any
+            } | {
+                family: 'WORK', 
+                code: 'INVALID_RANDOM_LENGTH', 
                 readonly [key:string]: any
             }), 
         'deleteWork': AllErrors & ({
