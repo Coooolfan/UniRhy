@@ -39,6 +39,7 @@ import {
     type QueuedSystemPauseIntent,
 } from '@/stores/audioSyncSession'
 import { useAudioNativeSession } from '@/stores/audioNativeSession'
+import { installNativeErrorReporting } from '@/runtime/nativePlaybackBridge'
 import { getPlatformRuntime } from '@/runtime/platform'
 import { nowClientMs } from '@/utils/time'
 
@@ -52,19 +53,19 @@ export type {
 } from '@/stores/audioShared'
 
 const noop = () => undefined
-const QUEUE_VERSION_CONFLICT_DETAIL = 'Queue version conflict'
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
     typeof value === 'object' && value !== null
 
+// 队列操作端点的 409 一律视为版本冲突。错误体因端点而异（部分是
+// Spring 默认错误页，只有 status/error/path，没有 detail），不能按文案匹配。
 const isQueueVersionConflict = (value: unknown) => {
     if (!isRecord(value)) {
         return false
     }
 
     const status = value.status ?? value.statusCode
-    const detail = value.detail ?? value.message
-    return status === 409 && detail === QUEUE_VERSION_CONFLICT_DETAIL
+    return status === 409
 }
 
 export const useAudioStore = defineStore('audio', () => {
@@ -269,6 +270,9 @@ export const useAudioStore = defineStore('audio', () => {
     // Android 上播放执行与同步协议客户端下沉原生（Media3 + Kotlin），本 store 的
     // 播放控制入口全部早退到原生命令，Web Audio 引擎与 TS 同步客户端保持休眠
     // （不建 WS、不创建 AudioContext，避免与 ExoPlayer 抢音频焦点）。
+    if (getPlatformRuntime().platform === 'android') {
+        installNativeErrorReporting()
+    }
     const native =
         getPlatformRuntime().platform === 'android'
             ? useAudioNativeSession({
@@ -492,6 +496,8 @@ export const useAudioStore = defineStore('audio', () => {
 
         updateLocalQueueCurrentIndex(currentIndex)
         if (native) {
+            primeTrackState(track, positionSeconds)
+            await native.start()
             await native.pushLocalQueueToNative()
             await native.localPlay(currentIndex, positionSeconds)
             return
@@ -548,6 +554,8 @@ export const useAudioStore = defineStore('audio', () => {
             }
             if (native) {
                 const localIndex = currentQueue.value.recordingIds.indexOf(track.id)
+                primeTrackState(track, positionSeconds)
+                await native.start()
                 await native.pushLocalQueueToNative()
                 await native.localPlay(Math.max(0, localIndex), positionSeconds)
                 return
@@ -1044,6 +1052,7 @@ export const useAudioStore = defineStore('audio', () => {
 
         if (native) {
             if (isIndependentPlaybackMode.value) {
+                await native.start()
                 await native.localPlay(
                     Math.max(0, currentQueue.value.currentIndex),
                     currentTime.value,
@@ -1180,12 +1189,13 @@ export const useAudioStore = defineStore('audio', () => {
     }
 
     function connectPlaybackSync() {
-        if (isIndependentPlaybackMode.value) {
+        if (native) {
+            // 独立模式下 start() 只做 configure 与事件挂载，不建 WS 连接
+            void native.start()
             return
         }
 
-        if (native) {
-            void native.start()
+        if (isIndependentPlaybackMode.value) {
             return
         }
 

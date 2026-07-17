@@ -43,7 +43,7 @@ impl<R: Runtime> UnirhyPlayback<R> {
         Err(Error::UnsupportedPlatform)
     }
 
-    pub fn request_pause(&self) -> Result<()> {
+    pub fn request_pause(&self, _request: RequestPauseRequest) -> Result<()> {
         Err(Error::UnsupportedPlatform)
     }
 
@@ -70,4 +70,8 @@ impl<R: Runtime> UnirhyPlayback<R> {
     pub fn local_seek(&self, _request: LocalSeekRequest) -> Result<()> {
         Err(Error::UnsupportedPlatform)
     }
+    pub fn js_log(&self, _request: JsLogRequest) -> Result<()> {
+        Err(Error::UnsupportedPlatform)
+    }
+
 }

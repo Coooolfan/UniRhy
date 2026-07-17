@@ -55,8 +55,8 @@ impl<R: Runtime> UnirhyPlayback<R> {
         Ok(())
     }
 
-    pub fn request_pause(&self) -> Result<()> {
-        self.0.run_mobile_plugin::<()>("requestPause", ())?;
+    pub fn request_pause(&self, request: RequestPauseRequest) -> Result<()> {
+        self.0.run_mobile_plugin::<()>("requestPause", request)?;
         Ok(())
     }
 
@@ -89,4 +89,9 @@ impl<R: Runtime> UnirhyPlayback<R> {
         self.0.run_mobile_plugin::<()>("localSeek", request)?;
         Ok(())
     }
+    pub fn js_log(&self, request: JsLogRequest) -> Result<()> {
+        self.0.run_mobile_plugin::<()>("jsLog", request)?;
+        Ok(())
+    }
+
 }

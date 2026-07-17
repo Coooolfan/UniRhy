@@ -35,6 +35,14 @@ pub struct SetVolumeRequest {
 #[serde(rename_all = "camelCase")]
 pub struct RequestPlayRequest {
     pub position_seconds: Option<f64>,
+    pub current_index: Option<i32>,
+    pub version: Option<i64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RequestPauseRequest {
+    pub position_seconds: Option<f64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -73,4 +81,10 @@ pub struct LocalPlayRequest {
 #[serde(rename_all = "camelCase")]
 pub struct LocalSeekRequest {
     pub position_seconds: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct JsLogRequest {
+    pub message: String,
 }

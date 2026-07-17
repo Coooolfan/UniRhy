@@ -52,8 +52,11 @@ pub(crate) async fn request_play<R: Runtime>(
 }
 
 #[command]
-pub(crate) async fn request_pause<R: Runtime>(app: AppHandle<R>) -> Result<()> {
-    app.unirhy_playback().request_pause()
+pub(crate) async fn request_pause<R: Runtime>(
+    app: AppHandle<R>,
+    request: RequestPauseRequest,
+) -> Result<()> {
+    app.unirhy_playback().request_pause(request)
 }
 
 #[command]
@@ -96,4 +99,9 @@ pub(crate) async fn local_seek<R: Runtime>(
     request: LocalSeekRequest,
 ) -> Result<()> {
     app.unirhy_playback().local_seek(request)
+}
+
+#[command]
+pub(crate) async fn js_log<R: Runtime>(app: AppHandle<R>, request: JsLogRequest) -> Result<()> {
+    app.unirhy_playback().js_log(request)
 }

@@ -226,30 +226,30 @@ object PlaybackController {
         playerEngine?.setVolume(volume)
     }
 
-    /** 由 PlaybackService.onCreate（主线程）或 executor 调用，惰性构建 ExoPlayer。 */
+    /**
+     * 由 PlaybackService.onCreate（主线程）或 executor 调用，惰性构建 ExoPlayer。
+     *
+     * 锁只在主线程内持有：后台线程仅 post 到主线程后等结果，避免
+     * "后台持锁等主线程、主线程（Service.onCreate）等同一把锁"的互锁。
+     */
     fun ensurePlayerEngine(context: Context): PlayerEngine {
         attachContext(context)
         playerEngine?.let { return it }
-        synchronized(this) {
-            playerEngine?.let { return it }
-            val engine = createEngineOnMainThread(context.applicationContext)
-            playerEngine = engine
-            return engine
-        }
-    }
-
-    private fun createEngineOnMainThread(context: Context): PlayerEngine {
         if (Looper.myLooper() == Looper.getMainLooper()) {
-            return createEngine(context)
+            synchronized(this) {
+                playerEngine?.let { return it }
+                val engine = createEngine(context.applicationContext)
+                playerEngine = engine
+                return engine
+            }
         }
-        var created: PlayerEngine? = null
         val latch = CountDownLatch(1)
         Handler(Looper.getMainLooper()).post {
-            created = createEngine(context)
+            ensurePlayerEngine(context)
             latch.countDown()
         }
         latch.await(5, TimeUnit.SECONDS)
-        return created ?: error("failed to create player engine on main thread")
+        return playerEngine ?: error("failed to create player engine on main thread")
     }
 
     private fun createEngine(context: Context): PlayerEngine {
@@ -260,7 +260,14 @@ object PlaybackController {
             listener = object : PlayerEngine.Listener {
                 override fun onIsPlayingChanged(isPlaying: Boolean) {
                     this@PlaybackController.isPlaying = isPlaying
-                    if (isPlaying) startPositionHeartbeat() else stopPositionHeartbeat()
+                    if (isPlaying) {
+                        // 已实际起播即视为加载结束；连续切歌时被替换的 preload 回调
+                        // 可能丢失，避免 isLoading 卡死导致下游播控永久禁用
+                        isLoading = false
+                        startPositionHeartbeat()
+                    } else {
+                        stopPositionHeartbeat()
+                    }
                     emitStateChanged()
                 }
 
@@ -544,8 +551,16 @@ object PlaybackController {
         onUnavailable: () -> Unit = {},
         onReady: () -> Unit,
     ) {
-        val config = sessionConfig ?: return
-        val engine = playerEngine ?: return
+        val config = sessionConfig ?: run {
+            Log.w(TAG, "preload skipped: not configured")
+            return
+        }
+        // 服务启动是异步的，冷进程首次播放时 playerEngine 可能尚未由服务创建，
+        // 这里主动同步创建，避免首次播放被静默丢弃
+        val engine = playerEngine ?: appContext?.let { ensurePlayerEngine(it) } ?: run {
+            Log.w(TAG, "preload skipped: player engine unavailable")
+            return
+        }
         val generation = lifecycleGeneration.get()
         recordingHttpApi.resolveAudioMediaFileId(
             apiBaseUrl = config.apiBaseUrl,
