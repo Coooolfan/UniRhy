@@ -4,6 +4,7 @@ import { resetRecordingPlaybackResolverCaches } from '@/services/recordingPlayba
 
 const apiMockState = vi.hoisted(() => ({
     getRecording: vi.fn(),
+    getCurrentQueue: vi.fn(),
     replaceCurrentQueue: vi.fn(),
     appendToCurrentQueue: vi.fn(),
     reorderCurrentQueue: vi.fn(),
@@ -217,6 +218,7 @@ vi.mock('@/ApiInstance', async (importOriginal) => {
         Object.create(Object.getPrototypeOf(actual.api.playbackQueueController)),
         actual.api.playbackQueueController,
         {
+            getCurrentQueue: apiMockState.getCurrentQueue,
             replaceCurrentQueue: apiMockState.replaceCurrentQueue,
             appendToCurrentQueue: apiMockState.appendToCurrentQueue,
             reorderCurrentQueue: apiMockState.reorderCurrentQueue,
@@ -332,6 +334,7 @@ import { useUserStore } from '@/stores/user'
 import { nowClientMs } from '@/utils/time'
 
 const getRecordingMock = vi.mocked(api.recordingController.getRecording)
+const getCurrentQueueMock = apiMockState.getCurrentQueue
 const replaceCurrentQueueMock = apiMockState.replaceCurrentQueue
 const appendToCurrentQueueMock = apiMockState.appendToCurrentQueue
 const reorderCurrentQueueMock = apiMockState.reorderCurrentQueue
@@ -599,6 +602,7 @@ describe('audio store', () => {
         MockAudioContext.defaultState = 'running'
         fetchMock.mockReset()
         getRecordingMock.mockReset()
+        getCurrentQueueMock.mockReset()
         replaceCurrentQueueMock.mockReset()
         appendToCurrentQueueMock.mockReset()
         reorderCurrentQueueMock.mockReset()
@@ -606,6 +610,7 @@ describe('audio store', () => {
         removeCurrentQueueEntryMock.mockReset()
         clearCurrentQueueMock.mockReset()
         getRecordingMock.mockRejectedValue(new Error('metadata unavailable'))
+        getCurrentQueueMock.mockResolvedValue(buildQueue([]))
         replaceCurrentQueueMock.mockImplementation(
             ({
                 body,
@@ -1127,7 +1132,7 @@ describe('audio store', () => {
         expect(client.sendPlay).not.toHaveBeenCalled()
     })
 
-    it('refreshes the remote queue without retrying after a queue version conflict', async () => {
+    it('refreshes the remote queue and retries once after a queue version conflict', async () => {
         const audioStore = useAudioStore()
         audioStore.connectPlaybackSync()
         const client = latestClient()
@@ -1149,21 +1154,29 @@ describe('audio store', () => {
         })
         await flushPromises()
         client.requestSync.mockClear()
-        appendToCurrentQueueMock.mockRejectedValue({
-            status: 409,
-            detail: 'Queue version conflict',
-        })
-        reorderCurrentQueueMock.mockRejectedValue({
-            status: 409,
-            detail: 'Queue version conflict',
+        appendToCurrentQueueMock
+            .mockRejectedValueOnce({
+                family: 'PLAYBACK_QUEUE',
+                code: 'VERSION_CONFLICT',
+            })
+            .mockResolvedValueOnce({ ...buildQueue([buildTrack(1), buildTrack(2)], 0), version: 7 })
+        getCurrentQueueMock.mockResolvedValueOnce({
+            ...buildQueue([buildTrack(1)], 0),
+            version: 6,
         })
 
         await expect(audioStore.appendToQueue([buildTrack(2)])).resolves.toBeUndefined()
-        await expect(audioStore.reorderQueue([1], 0)).resolves.toBeUndefined()
 
-        expect(appendToCurrentQueueMock).toHaveBeenCalledTimes(1)
-        expect(reorderCurrentQueueMock).toHaveBeenCalledTimes(1)
+        expect(appendToCurrentQueueMock).toHaveBeenCalledTimes(2)
+        expect(appendToCurrentQueueMock).toHaveBeenNthCalledWith(1, {
+            body: { recordingIds: [2], version: 5 },
+        })
+        expect(getCurrentQueueMock).toHaveBeenCalledTimes(1)
+        expect(appendToCurrentQueueMock).toHaveBeenNthCalledWith(2, {
+            body: { recordingIds: [2], version: 6 },
+        })
         expect(client.requestSync).toHaveBeenCalledTimes(1)
+        expect(audioStore.queueEntries.map((entry) => entry.recordingId)).toEqual([1, 2])
         expect(audioStore.playbackSyncDebugSnapshot.awaitingSyncRecovery).toBe(true)
 
         client.emitMessage({
@@ -1188,16 +1201,16 @@ describe('audio store', () => {
     })
 
     it('does not swallow a non-version queue conflict', async () => {
-        appendToCurrentQueueMock.mockRejectedValue({
-            status: 409,
-            detail: 'Recording 2 not found',
-        })
+        const recordingNotFound = {
+            family: 'PLAYBACK_QUEUE',
+            code: 'RECORDING_NOT_FOUND',
+            recordingId: 2,
+        }
+        appendToCurrentQueueMock.mockRejectedValue(recordingNotFound)
         const audioStore = useAudioStore()
 
-        await expect(audioStore.appendToQueue([buildTrack(2)])).rejects.toEqual({
-            status: 409,
-            detail: 'Recording 2 not found',
-        })
+        await expect(audioStore.appendToQueue([buildTrack(2)])).rejects.toEqual(recordingNotFound)
+        expect(appendToCurrentQueueMock).toHaveBeenCalledTimes(1)
     })
 
     it('updates queue strategies through the server current queue API', async () => {

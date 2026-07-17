@@ -58,15 +58,8 @@ const noop = () => undefined
 const isRecord = (value: unknown): value is Record<string, unknown> =>
     typeof value === 'object' && value !== null
 
-// 队列操作端点的 409 一律视为版本冲突。错误体因端点而异（部分是
-// Spring 默认错误页，只有 status/error/path，没有 detail），不能按文案匹配。
 const isQueueVersionConflict = (value: unknown) => {
-    if (!isRecord(value)) {
-        return false
-    }
-
-    const status = value.status ?? value.statusCode
-    return status === 409
+    return isRecord(value) && value.family === 'PLAYBACK_QUEUE' && value.code === 'VERSION_CONFLICT'
 }
 
 export const useAudioStore = defineStore('audio', () => {
