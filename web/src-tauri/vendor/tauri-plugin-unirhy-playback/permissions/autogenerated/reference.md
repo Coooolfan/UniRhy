@@ -19,6 +19,7 @@ Default permissions for the UniRhy playback plugin
 - `allow-local-play`
 - `allow-local-pause`
 - `allow-local-seek`
+- `allow-js-log`
 
 ## Permission Table
 
@@ -129,6 +130,32 @@ Enables the get_playback_state command without any pre-configured scope.
 <td>
 
 Denies the get_playback_state command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`unirhy-playback:allow-js-log`
+
+</td>
+<td>
+
+Enables the js_log command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`unirhy-playback:deny-js-log`
+
+</td>
+<td>
+
+Denies the js_log command without any pre-configured scope.
 
 </td>
 </tr>

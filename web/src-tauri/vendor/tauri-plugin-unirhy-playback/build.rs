@@ -14,6 +14,7 @@ const COMMANDS: &[&str] = &[
     "local_play",
     "local_pause",
     "local_seek",
+    "js_log",
 ];
 
 fn main() {

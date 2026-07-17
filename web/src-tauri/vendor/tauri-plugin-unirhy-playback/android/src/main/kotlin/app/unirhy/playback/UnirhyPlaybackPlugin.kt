@@ -72,6 +72,11 @@ class LocalSeekArgs {
     var positionSeconds: Double = 0.0
 }
 
+@InvokeArg
+class JsLogArgs {
+    var message: String = ""
+}
+
 /**
  * UniRhy 原生播放内核的 Tauri 插件入口。
  *
@@ -81,8 +86,14 @@ class LocalSeekArgs {
 @TauriPlugin
 class UnirhyPlaybackPlugin(private val activity: Activity) : Plugin(activity) {
 
+    private companion object {
+        const val TAG = "UnirhyPlaybackPlugin"
+    }
+
     override fun load(webView: android.webkit.WebView) {
         super.load(webView)
+        // release 包 Tauri Logger 全静默，保留无条件日志用于定位插件加载/命令边界
+        android.util.Log.i(TAG, "plugin load")
         PlaybackController.attachContext(activity.applicationContext)
         PlaybackController.eventSink = { eventJson ->
             trigger("playback-event", JSObject(eventJson))
@@ -96,6 +107,7 @@ class UnirhyPlaybackPlugin(private val activity: Activity) : Plugin(activity) {
 
     @Command
     fun configure(invoke: Invoke) {
+        android.util.Log.i(TAG, "configure invoked")
         val args = invoke.parseArgs(ConfigureArgs::class.java)
         if (args.apiBaseUrl.isBlank() || args.deviceId.isBlank()) {
             invoke.reject("apiBaseUrl and deviceId are required")
@@ -116,6 +128,7 @@ class UnirhyPlaybackPlugin(private val activity: Activity) : Plugin(activity) {
 
     @Command
     fun updateAuth(invoke: Invoke) {
+        android.util.Log.i(TAG, "cmd updateAuth")
         val args = invoke.parseArgs(UpdateAuthArgs::class.java)
         PlaybackController.updateToken(args.token?.takeIf { it.isNotBlank() })
         invoke.resolve()
@@ -123,6 +136,7 @@ class UnirhyPlaybackPlugin(private val activity: Activity) : Plugin(activity) {
 
     @Command
     fun connectSync(invoke: Invoke) {
+        android.util.Log.i(TAG, "cmd connectSync")
         if (!PlaybackController.connectSync()) {
             invoke.reject("configure must be called before connectSync")
             return
@@ -132,12 +146,14 @@ class UnirhyPlaybackPlugin(private val activity: Activity) : Plugin(activity) {
 
     @Command
     fun disconnectSync(invoke: Invoke) {
+        android.util.Log.i(TAG, "cmd disconnectSync")
         PlaybackController.disconnectSync()
         invoke.resolve()
     }
 
     @Command
     fun getPlaybackState(invoke: Invoke) {
+        android.util.Log.i(TAG, "cmd getPlaybackState")
         val config = PlaybackController.sessionConfig
         val queue = PlaybackController.queueState.queue
         val state = JSObject()
@@ -174,6 +190,7 @@ class UnirhyPlaybackPlugin(private val activity: Activity) : Plugin(activity) {
 
     @Command
     fun setVolume(invoke: Invoke) {
+        android.util.Log.i(TAG, "cmd setVolume")
         val args = invoke.parseArgs(SetVolumeArgs::class.java)
         PlaybackController.setVolume(args.volume)
         invoke.resolve()
@@ -181,6 +198,7 @@ class UnirhyPlaybackPlugin(private val activity: Activity) : Plugin(activity) {
 
     @Command
     fun requestPlay(invoke: Invoke) {
+        android.util.Log.i(TAG, "cmd requestPlay")
         val args = invoke.parseArgs(RequestPlayArgs::class.java)
         PlaybackController.onUserPlay(
             positionSeconds = args.positionSeconds,
@@ -192,6 +210,7 @@ class UnirhyPlaybackPlugin(private val activity: Activity) : Plugin(activity) {
 
     @Command
     fun requestPause(invoke: Invoke) {
+        android.util.Log.i(TAG, "cmd requestPause")
         val args = invoke.parseArgs(RequestPauseArgs::class.java)
         PlaybackController.onUserPause(positionOverride = args.positionSeconds)
         invoke.resolve()
@@ -199,6 +218,7 @@ class UnirhyPlaybackPlugin(private val activity: Activity) : Plugin(activity) {
 
     @Command
     fun requestSeek(invoke: Invoke) {
+        android.util.Log.i(TAG, "cmd requestSeek")
         val args = invoke.parseArgs(RequestSeekArgs::class.java)
         PlaybackController.onUserSeek(args.positionSeconds)
         invoke.resolve()
@@ -206,12 +226,14 @@ class UnirhyPlaybackPlugin(private val activity: Activity) : Plugin(activity) {
 
     @Command
     fun requestSyncRecovery(invoke: Invoke) {
+        android.util.Log.i(TAG, "cmd requestSyncRecovery")
         PlaybackController.requestSyncRecovery()
         invoke.resolve()
     }
 
     @Command
     fun localSetQueue(invoke: Invoke) {
+        android.util.Log.i(TAG, "cmd localSetQueue")
         val args = invoke.parseArgs(LocalSetQueueArgs::class.java)
         PlaybackController.localSetQueue(
             items = args.items.map { item ->
@@ -231,6 +253,7 @@ class UnirhyPlaybackPlugin(private val activity: Activity) : Plugin(activity) {
 
     @Command
     fun localPlay(invoke: Invoke) {
+        android.util.Log.i(TAG, "cmd localPlay")
         val args = invoke.parseArgs(LocalPlayArgs::class.java)
         PlaybackController.localPlay(args.currentIndex, args.positionSeconds)
         invoke.resolve()
@@ -238,14 +261,24 @@ class UnirhyPlaybackPlugin(private val activity: Activity) : Plugin(activity) {
 
     @Command
     fun localPause(invoke: Invoke) {
+        android.util.Log.i(TAG, "cmd localPause")
         PlaybackController.localPause()
         invoke.resolve()
     }
 
     @Command
     fun localSeek(invoke: Invoke) {
+        android.util.Log.i(TAG, "cmd localSeek")
         val args = invoke.parseArgs(LocalSeekArgs::class.java)
         PlaybackController.localSeek(args.positionSeconds)
+        invoke.resolve()
+    }
+
+    /** JS→logcat 通道：release 包 WebView console 不可见，前端错误经此落日志。 */
+    @Command
+    fun jsLog(invoke: Invoke) {
+        val args = invoke.parseArgs(JsLogArgs::class.java)
+        android.util.Log.w("UnirhyJs", args.message)
         invoke.resolve()
     }
 }

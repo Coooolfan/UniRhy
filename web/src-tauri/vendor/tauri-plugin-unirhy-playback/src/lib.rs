@@ -52,6 +52,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::local_play,
             commands::local_pause,
             commands::local_seek,
+            commands::js_log,
         ])
         .setup(|app, api| {
             #[cfg(target_os = "android")]

@@ -99,13 +99,48 @@ export type NativePlaybackEvent =
       }
     | { type: 'auth-required'; seq: number }
 
-const invokePlugin = async <T>(command: string, args?: Record<string, unknown>): Promise<T> => {
+const rawInvokePlugin = async <T>(command: string, args?: Record<string, unknown>): Promise<T> => {
     const { invoke } = await import('@tauri-apps/api/core')
     return invoke<T>(`plugin:${PLUGIN_NAME}|${command}`, args)
 }
 
+/** 把前端消息写入原生 logcat（tag: UnirhyJs）。release 包 WebView console 不可见，仅此通道可用。 */
+export const reportNativeJsLog = (message: string) => {
+    rawInvokePlugin<unknown>('js_log', { request: { message } }).catch(() => {
+        // 日志通道本身失败时无处上报，静默
+    })
+}
+
+const invokePlugin = async <T>(command: string, args?: Record<string, unknown>): Promise<T> => {
+    try {
+        return await rawInvokePlugin<T>(command, args)
+    } catch (invokeError: unknown) {
+        reportNativeJsLog(`invoke ${command} failed: ${String(invokeError)}`)
+        throw invokeError
+    }
+}
+
 const invokeCommand = async (command: string, args?: Record<string, unknown>): Promise<void> => {
     await invokePlugin<unknown>(command, args)
+}
+
+/** 挂全局错误上报：未捕获异常与未处理 Promise 拒绝写入原生日志。 */
+export const installNativeErrorReporting = () => {
+    window.addEventListener('error', (event) => {
+        reportNativeJsLog(`uncaught: ${event.message} @${event.filename}:${event.lineno}`)
+    })
+    window.addEventListener('unhandledrejection', (event) => {
+        const reason: unknown = event.reason
+        let detail: string
+        if (reason instanceof Error) {
+            detail = reason.stack ?? reason.message
+        } else if (typeof reason === 'string') {
+            detail = reason
+        } else {
+            detail = JSON.stringify(reason)
+        }
+        reportNativeJsLog(`unhandledrejection: ${detail}`)
+    })
 }
 
 export const configureNativePlayback = (config: NativePlaybackConfig) =>
@@ -159,11 +194,19 @@ export const listenForNativePlaybackEvents = async (
     onEvent: (event: NativePlaybackEvent) => void,
 ) => {
     const { addPluginListener } = await import('@tauri-apps/api/core')
+    let reportedEventCount = 0
     const listener = await addPluginListener<NativePlaybackEvent>(
         PLUGIN_NAME,
         'playback-event',
-        onEvent,
+        (event) => {
+            if (reportedEventCount < 10) {
+                reportedEventCount += 1
+                reportNativeJsLog(`event #${reportedEventCount}: ${event.type}`)
+            }
+            onEvent(event)
+        },
     )
+    reportNativeJsLog('playback-event listener attached')
 
     return () => {
         void listener.unregister()

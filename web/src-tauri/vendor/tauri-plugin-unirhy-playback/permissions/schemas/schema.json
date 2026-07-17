@@ -343,6 +343,18 @@
           "markdownDescription": "Denies the get_playback_state command without any pre-configured scope."
         },
         {
+          "description": "Enables the js_log command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-js-log",
+          "markdownDescription": "Enables the js_log command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the js_log command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-js-log",
+          "markdownDescription": "Denies the js_log command without any pre-configured scope."
+        },
+        {
           "description": "Enables the local_pause command without any pre-configured scope.",
           "type": "string",
           "const": "allow-local-pause",
@@ -475,10 +487,10 @@
           "markdownDescription": "Denies the update_auth command without any pre-configured scope."
         },
         {
-          "description": "Default permissions for the UniRhy playback plugin\n#### This default permission set includes:\n\n- `allow-register-listener`\n- `allow-configure`\n- `allow-update-auth`\n- `allow-connect-sync`\n- `allow-disconnect-sync`\n- `allow-get-playback-state`\n- `allow-set-volume`\n- `allow-request-play`\n- `allow-request-pause`\n- `allow-request-seek`\n- `allow-request-sync-recovery`\n- `allow-local-set-queue`\n- `allow-local-play`\n- `allow-local-pause`\n- `allow-local-seek`",
+          "description": "Default permissions for the UniRhy playback plugin\n#### This default permission set includes:\n\n- `allow-register-listener`\n- `allow-configure`\n- `allow-update-auth`\n- `allow-connect-sync`\n- `allow-disconnect-sync`\n- `allow-get-playback-state`\n- `allow-set-volume`\n- `allow-request-play`\n- `allow-request-pause`\n- `allow-request-seek`\n- `allow-request-sync-recovery`\n- `allow-local-set-queue`\n- `allow-local-play`\n- `allow-local-pause`\n- `allow-local-seek`\n- `allow-js-log`",
           "type": "string",
           "const": "default",
-          "markdownDescription": "Default permissions for the UniRhy playback plugin\n#### This default permission set includes:\n\n- `allow-register-listener`\n- `allow-configure`\n- `allow-update-auth`\n- `allow-connect-sync`\n- `allow-disconnect-sync`\n- `allow-get-playback-state`\n- `allow-set-volume`\n- `allow-request-play`\n- `allow-request-pause`\n- `allow-request-seek`\n- `allow-request-sync-recovery`\n- `allow-local-set-queue`\n- `allow-local-play`\n- `allow-local-pause`\n- `allow-local-seek`"
+          "markdownDescription": "Default permissions for the UniRhy playback plugin\n#### This default permission set includes:\n\n- `allow-register-listener`\n- `allow-configure`\n- `allow-update-auth`\n- `allow-connect-sync`\n- `allow-disconnect-sync`\n- `allow-get-playback-state`\n- `allow-set-volume`\n- `allow-request-play`\n- `allow-request-pause`\n- `allow-request-seek`\n- `allow-request-sync-recovery`\n- `allow-local-set-queue`\n- `allow-local-play`\n- `allow-local-pause`\n- `allow-local-seek`\n- `allow-js-log`"
         }
       ]
     }

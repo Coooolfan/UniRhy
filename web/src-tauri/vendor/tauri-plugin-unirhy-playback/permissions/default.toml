@@ -18,4 +18,5 @@ permissions = [
     "allow-local-play",
     "allow-local-pause",
     "allow-local-seek",
+    "allow-js-log",
 ]
