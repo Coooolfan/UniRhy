@@ -5,7 +5,6 @@ import com.fasterxml.jackson.databind.DeserializationFeature
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
-import com.fasterxml.jackson.module.kotlin.treeToValue
 
 /**
  * 播放同步线级协议的 Kotlin 实现，规格见 server/README/PLAYBACK_SYNC.md。
@@ -169,18 +168,21 @@ sealed interface ServerMessage {
                 return null
             }
             val mapper = PlaybackSyncJson.mapper
+            // 传 Class 的重载而非 reified treeToValue<T>：后者经由匿名 TypeReference
+            // 子类携带泛型签名，R8 会剥掉签名导致 release 包解析必然失败
             return runCatching {
                 when (type) {
-                    "NTP_RESPONSE" -> NtpResponse(mapper.treeToValue<NtpResponsePayload>(payload))
-                    "SNAPSHOT" -> Snapshot(mapper.treeToValue<SnapshotPayload>(payload))
+                    "NTP_RESPONSE" ->
+                        NtpResponse(mapper.treeToValue(payload, NtpResponsePayload::class.java))
+                    "SNAPSHOT" -> Snapshot(mapper.treeToValue(payload, SnapshotPayload::class.java))
                     "ROOM_EVENT_LOAD_AUDIO_SOURCE" ->
-                        LoadAudioSource(mapper.treeToValue<LoadAudioSourcePayload>(payload))
+                        LoadAudioSource(mapper.treeToValue(payload, LoadAudioSourcePayload::class.java))
                     "ROOM_EVENT_QUEUE_CHANGE" ->
-                        QueueChange(mapper.treeToValue<QueueChangePayload>(payload))
+                        QueueChange(mapper.treeToValue(payload, QueueChangePayload::class.java))
                     "SCHEDULED_ACTION" ->
-                        ScheduledAction(mapper.treeToValue<ScheduledActionPayload>(payload))
+                        ScheduledAction(mapper.treeToValue(payload, ScheduledActionPayload::class.java))
                     "ROOM_EVENT_DEVICE_CHANGE" -> DeviceChange(payload)
-                    "ERROR" -> ProtocolError(mapper.treeToValue<ErrorPayload>(payload))
+                    "ERROR" -> ProtocolError(mapper.treeToValue(payload, ErrorPayload::class.java))
                     else -> null
                 }
             }.getOrElse {

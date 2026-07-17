@@ -1,36 +1,26 @@
-# Tauri 运行时通过字符串反射加载插件入口
+# Tauri 运行时通过字符串反射加载插件入口；Tauri 官方 consumer rules
+# 只 keep 它自己的类（proguard-tauri.pro 仅一行 TauriActivity），插件类必须自 keep。
+# @InvokeArg 参数类由 tauri-android 官方 consumer rules 自动 keep，无需重复声明。
 -keep class app.unirhy.playback.UnirhyPlaybackPlugin { *; }
 
-# Tauri @InvokeArg 命令参数经反射填充（Kotlin var 会生成 getter/setter/field，
-# Jackson-kotlin 通过主构造反序列化）；任一名称被最小化都会静默丢参
--keep @app.tauri.annotation.InvokeArg class * { *; }
-# 复合参数的嵌套元素类型（如 LocalQueueItemArg 作为 items 列表元素）
-# 未必总带 @InvokeArg，按命名兜底
--keep class app.unirhy.playback.*Args { *; }
--keep class app.unirhy.playback.*Arg  { *; }
+# Tauri 官方规则只 keep 带 @TauriPlugin 注解的类"自身声明"的 @Command 方法，
+# 基类 Plugin 里的 registerListener/removeListener 等命令方法不在覆盖范围内，
+# 被 R8 重命名后 JS addPluginListener 反射查找失败，事件面（trigger→JS）全断
+-keep class app.tauri.plugin.Plugin { *; }
 
 # Jackson (Kotlin 模块) 反射读写播放同步协议 DTO；R8 一旦把字段/getter 改成
-# a/b/c，服务端解析 HELLO / SNAPSHOT / SCHEDULED_ACTION 全部失效
+# a/b/c，服务端解析 HELLO / SNAPSHOT / SCHEDULED_ACTION 全部失效。
+# { *; } 已覆盖构造器与 Kotlin 合成的 $default 桥接方法。
 -keep class app.unirhy.playback.sync.** { *; }
 -keepclassmembers enum app.unirhy.playback.sync.** {
     public static **[] values();
     public static ** valueOf(java.lang.String);
 }
 
-# Jackson 反射依赖 Kotlin 元数据、泛型签名与运行时可见注解
+# jackson-module-kotlin 官方 README 要求：保留 Kotlin 元数据供 kotlin-reflect
+# 读主构造函数参数名与默认值。kotlin-reflect 1.4+ 自带内嵌 R8 规则，无需额外 keep。
+-keep class kotlin.Metadata { *; }
+
+# Jackson 反射依赖泛型签名与运行时可见注解（R8 full mode 下仅对被 keep 的类生效）
 -keepattributes RuntimeVisibleAnnotations, RuntimeVisibleParameterAnnotations
 -keepattributes Signature, InnerClasses, EnclosingMethod
-
-# jackson-module-kotlin 通过 kotlin-reflect 读主构造函数参数名与默认值；
-# 上述 sync.** 已被 keep，这里补 Kotlin 元数据 + jackson 反射依赖链
--keep class kotlin.Metadata { *; }
--keep class kotlin.reflect.** { *; }
--keep class kotlin.jvm.internal.DefaultConstructorMarker { *; }
--keep class com.fasterxml.jackson.module.kotlin.** { *; }
-# Kotlin data class 带默认值参数会生成 XXX$default 合成桥接方法，
-# jackson-kotlin 的 ConstructorValueCreator 依赖这些方法反射默认值；
-# R8 minify 后会静默失败（treeToValue 抛异常被 runCatching 吞掉）。
--keepclassmembers class app.unirhy.playback.sync.** {
-    <init>(...);
-    public synthetic <methods>;
-}
