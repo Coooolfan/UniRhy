@@ -1,5 +1,6 @@
 package com.coooolfan.unirhy.service
 
+import com.coooolfan.unirhy.error.ArtistException
 import com.coooolfan.unirhy.model.Artist
 import com.coooolfan.unirhy.model.alias
 import com.coooolfan.unirhy.model.displayName
@@ -13,11 +14,9 @@ import org.babyfish.jimmer.sql.kt.KSqlClient
 import org.babyfish.jimmer.sql.kt.ast.expression.ilike
 import org.babyfish.jimmer.sql.kt.ast.expression.or
 import org.babyfish.jimmer.sql.kt.ast.expression.valueIn
-import org.springframework.http.HttpStatus
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
-import org.springframework.web.server.ResponseStatusException
 
 @Service
 class ArtistService(
@@ -59,10 +58,8 @@ class ArtistService(
             return
         }
 
-        val target = sql.findById(Artist::class, input.targetId) ?: throw ResponseStatusException(
-            HttpStatus.NOT_FOUND,
-            "target artist not found"
-        )
+        val target = sql.findById(Artist::class, input.targetId)
+            ?: throw ArtistException.TargetNotFound()
 
         val sourceArtists = sql.createQuery(Artist::class) {
             where(table.id valueIn sourceIds)
@@ -70,7 +67,7 @@ class ArtistService(
         }.execute()
 
         if (sourceArtists.size != sourceIds.size) {
-            throw ResponseStatusException(HttpStatus.NOT_FOUND, "source artist not found")
+            throw ArtistException.SourceNotFound()
         }
 
         val mergedAlias = (target.alias + sourceArtists.flatMap { artist ->

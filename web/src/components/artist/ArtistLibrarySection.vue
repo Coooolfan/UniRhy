@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { api, normalizeApiError } from '@/ApiInstance'
+import { useI18n } from 'vue-i18n'
+import { api } from '@/ApiInstance'
+import { resolveErrorMessage } from '@/i18n/errors'
 import ArtistCard from '@/components/artist/ArtistCard.vue'
 import ArtistEditModal, { type ArtistEditForm } from '@/components/artist/ArtistEditModal.vue'
 import LibraryEmptyHint from '@/components/dashboard/LibraryEmptyHint.vue'
@@ -25,6 +27,7 @@ const emit = defineEmits<{
 
 const modal = useModal()
 const userStore = useUserStore()
+const { t } = useI18n()
 
 const isLoading = ref(false)
 const errorMessage = ref('')
@@ -33,7 +36,7 @@ const artists = ref<ArtistItem[]>([])
 const hasResults = computed(() => artists.value.length > 0)
 
 const subtitleOf = (artist: ArtistItem) =>
-    artist.alias.length > 0 ? artist.alias.join(' / ') : '艺术家'
+    artist.alias.length > 0 ? artist.alias.join(' / ') : t('artistLibrary.fallback')
 
 const toArtistItem = (raw: {
     id: number
@@ -59,7 +62,7 @@ const fetchArtists = async () => {
         emit('update:totalPageCount', page.totalPageCount)
         artists.value = page.rows.map((raw) => toArtistItem(raw))
     } catch (error) {
-        errorMessage.value = normalizeApiError(error).message ?? '艺术家加载失败'
+        errorMessage.value = resolveErrorMessage(error, 'errors.fallback.artistLoad')
         artists.value = []
         emit('update:totalPageCount', 0)
     } finally {
@@ -81,7 +84,7 @@ const openEditModal = async (artist: ArtistItem) => {
     }
 
     await modal.open(ArtistEditModal, {
-        title: '编辑艺术家',
+        title: t('artistLibrary.editTitle'),
         size: 'md',
         props: {
             initialForm: {
@@ -89,9 +92,8 @@ const openEditModal = async (artist: ArtistItem) => {
                 alias: [...artist.alias],
                 comment: artist.comment,
             },
-            submitText: '保存更改',
-            submittingText: '保存中...',
-            nameFailureMessage: '更新艺术家失败',
+            submitText: t('common.saveChanges'),
+            submittingText: t('common.saving'),
             onSubmit: async (form: ArtistEditForm) => {
                 await api.artistController.updateArtist({
                     id: artist.id,
@@ -111,18 +113,22 @@ const openEditModal = async (artist: ArtistItem) => {
 
 <template>
     <div class="space-y-6">
-        <div v-if="isLoading && artists.length === 0" class="text-sm text-[#8C857B]">加载中...</div>
+        <div v-if="isLoading && artists.length === 0" class="text-sm text-[#8C857B]">
+            {{ t('common.loading') }}
+        </div>
         <div v-else-if="errorMessage" class="text-sm text-[#B75D5D]">
             {{ errorMessage }}
-            <button class="ml-4 text-[#C27E46]" type="button" @click="fetchArtists">重试</button>
+            <button class="ml-4 text-[#C27E46]" type="button" @click="fetchArtists">
+                {{ t('common.retry') }}
+            </button>
         </div>
 
         <div v-else :class="{ 'pointer-events-none opacity-50': isLoading }">
             <LibraryEmptyHint
                 v-if="!hasResults"
                 :show-settings-button="false"
-                title="艺术家库空空如也"
-                :description="['尚未录入任何艺术家。']"
+                :title="t('artistLibrary.emptyTitle')"
+                :description="[t('artistLibrary.emptyDescription')]"
             />
             <div
                 v-else

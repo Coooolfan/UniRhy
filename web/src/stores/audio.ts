@@ -1,6 +1,7 @@
 import { computed, ref, shallowRef, watch } from 'vue'
 import { defineStore } from 'pinia'
 import { api } from '@/ApiInstance'
+import { i18n } from '@/i18n'
 import { useClientPreferencesStore } from '@/stores/clientPreferences'
 import { useUserStore } from '@/stores/user'
 import type {
@@ -57,15 +58,8 @@ const noop = () => undefined
 const isRecord = (value: unknown): value is Record<string, unknown> =>
     typeof value === 'object' && value !== null
 
-// 队列操作端点的 409 一律视为版本冲突。错误体因端点而异（部分是
-// Spring 默认错误页，只有 status/error/path，没有 detail），不能按文案匹配。
 const isQueueVersionConflict = (value: unknown) => {
-    if (!isRecord(value)) {
-        return false
-    }
-
-    const status = value.status ?? value.statusCode
-    return status === 409
+    return isRecord(value) && value.family === 'PLAYBACK_QUEUE' && value.code === 'VERSION_CONFLICT'
 }
 
 export const useAudioStore = defineStore('audio', () => {
@@ -369,21 +363,21 @@ export const useAudioStore = defineStore('audio', () => {
     const syncStatusText = computed(() => {
         switch (effectiveSyncState.value) {
             case 'independent':
-                return '独立播放'
+                return i18n.global.t('audioSync.independent')
             case 'connecting':
-                return '同步连接中'
+                return i18n.global.t('audioSync.connecting')
             case 'calibrating':
-                return '同步校时中'
+                return i18n.global.t('audioSync.calibrating')
             case 'ready':
-                return '同步已就绪'
+                return i18n.global.t('audioSync.ready')
             case 'reconnecting':
-                return '同步重连中'
+                return i18n.global.t('audioSync.reconnecting')
             case 'audio_locked':
-                return '等待启用音频'
+                return i18n.global.t('audioSync.audioLocked')
             case 'error':
-                return '同步连接失败'
+                return i18n.global.t('audioSync.error')
             default:
-                return '同步连接中'
+                return i18n.global.t('audioSync.connecting')
         }
     })
 

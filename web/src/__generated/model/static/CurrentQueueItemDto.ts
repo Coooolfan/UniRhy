@@ -4,4 +4,5 @@ export interface CurrentQueueItemDto {
     readonly artistLabel: string;
     readonly coverUrl?: string | undefined;
     readonly durationMs: number;
+    readonly mediaFileId?: number | undefined;
 }

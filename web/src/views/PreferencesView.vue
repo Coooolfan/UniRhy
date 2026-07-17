@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { BatteryCharging, Bell, ExternalLink, FileAudio, Radio } from 'lucide-vue-next'
+import { BatteryCharging, Bell, ExternalLink, FileAudio, Languages, Radio } from 'lucide-vue-next'
 import DashboardTopBar from '@/components/dashboard/DashboardTopBar.vue'
-import { normalizeApiError } from '@/ApiInstance'
+import { SUPPORTED_LOCALES, type SupportedLocale } from '@/i18n'
+import { resolveErrorMessage } from '@/i18n/errors'
 import {
     type AndroidPlaybackSystemStatus,
     getAndroidPlaybackSystemStatus,
@@ -12,6 +13,9 @@ import {
 } from '@/runtime/androidPlayback'
 import { useClientPreferencesStore, type PlaybackMode } from '@/stores/clientPreferences'
 import { useUserStore } from '@/stores/user'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 type PresetOption = {
     value: string
@@ -83,7 +87,7 @@ const refreshAndroidSystemStatus = async () => {
         androidSystemStatus.value = await getAndroidPlaybackSystemStatus()
     } catch (error) {
         console.error('Failed to load Android playback settings', error)
-        androidStatusError.value = '无法读取 Android 系统设置'
+        androidStatusError.value = t('preferences.androidStatusError')
     } finally {
         isLoadingAndroidStatus.value = false
     }
@@ -127,10 +131,9 @@ const handleSubmit = async () => {
         await userStore.updateUser({
             preferences: { preferredAssetFormat: nextFormat },
         })
-        successMessage.value = '个人偏好已更新'
+        successMessage.value = t('preferences.updated')
     } catch (error) {
-        const normalized = normalizeApiError(error)
-        errorMessage.value = normalized.message ?? '更新失败'
+        errorMessage.value = resolveErrorMessage(error, 'common.updateFailed')
     } finally {
         isSubmitting.value = false
     }
@@ -142,6 +145,10 @@ const handlePlaybackModeChange = (event: Event) => {
     )
 }
 
+const handleLocaleChange = (event: Event) => {
+    clientPreferencesStore.setLocale((event.target as HTMLSelectElement).value as SupportedLocale)
+}
+
 const handleRequestNotificationPermission = async () => {
     androidStatusError.value = ''
     try {
@@ -149,7 +156,7 @@ const handleRequestNotificationPermission = async () => {
         await refreshAndroidSystemStatus()
     } catch (error) {
         console.error('Failed to request Android notification permission', error)
-        androidStatusError.value = '无法请求通知权限'
+        androidStatusError.value = t('preferences.notificationPermissionError')
     }
 }
 
@@ -159,7 +166,7 @@ const handleOpenBatterySettings = async () => {
         await openAndroidBatterySettings()
     } catch (error) {
         console.error('Failed to open Android battery settings', error)
-        androidStatusError.value = '无法打开电池设置'
+        androidStatusError.value = t('preferences.batterySettingsError')
     }
 }
 </script>
@@ -170,8 +177,12 @@ const handleOpenBatterySettings = async () => {
 
         <div class="mx-auto max-w-5xl px-4 pt-4 sm:px-6 sm:pt-6 lg:px-8">
             <header class="mb-6 sm:mb-12">
-                <h1 class="mb-2 font-serif text-3xl tracking-tight text-[#2B221B]">个人偏好</h1>
-                <p class="font-serif text-sm italic text-[#8A8A8A]">客户端播放与体验偏好</p>
+                <h1 class="mb-2 font-serif text-3xl tracking-tight text-[#2B221B]">
+                    {{ t('preferences.title') }}
+                </h1>
+                <p class="font-serif text-sm italic text-[#8A8A8A]">
+                    {{ t('preferences.subtitle') }}
+                </p>
             </header>
         </div>
 
@@ -181,19 +192,52 @@ const handleOpenBatterySettings = async () => {
                     <div
                         class="flex h-9 w-9 items-center justify-center rounded-full bg-[#F7F5F0] text-[#8C857B] sm:h-10 sm:w-10"
                     >
+                        <Languages :size="18" />
+                    </div>
+                    <div>
+                        <h2 class="font-serif text-xl text-[#2B221B]">
+                            {{ t('preferences.language.title') }}
+                        </h2>
+                        <p class="text-xs text-[#8C857B]">
+                            {{ t('preferences.language.description') }}
+                        </p>
+                    </div>
+                </div>
+
+                <div class="space-y-1">
+                    <select
+                        data-test="language-select"
+                        :value="clientPreferencesStore.locale"
+                        class="w-full border border-[#D6D1C4] bg-white px-3 py-2.5 text-[#2C2825] outline-none transition-all focus:border-[#D98C28] focus:ring-1 focus:ring-[#D98C28]"
+                        @change="handleLocaleChange"
+                    >
+                        <option v-for="locale in SUPPORTED_LOCALES" :key="locale" :value="locale">
+                            {{ t(`preferences.language.${locale}`) }}
+                        </option>
+                    </select>
+                </div>
+            </section>
+
+            <section class="border border-[#EAE6DE] bg-white p-4 sm:p-8">
+                <div class="mb-4 flex items-center gap-3 sm:mb-6">
+                    <div
+                        class="flex h-9 w-9 items-center justify-center rounded-full bg-[#F7F5F0] text-[#8C857B] sm:h-10 sm:w-10"
+                    >
                         <Radio :size="18" />
                     </div>
                     <div>
-                        <h2 class="font-serif text-xl text-[#2B221B]">播放模式</h2>
+                        <h2 class="font-serif text-xl text-[#2B221B]">
+                            {{ t('preferences.playbackMode') }}
+                        </h2>
                         <p class="text-xs text-[#8C857B]">
-                            控制本设备的播放队列与状态是否和同账号下的不同设备实时同步
+                            {{ t('preferences.playbackModeDescription') }}
                         </p>
                     </div>
                 </div>
 
                 <div class="space-y-1">
                     <label class="ml-1 text-xs font-medium uppercase tracking-wider text-[#8C857B]">
-                        模式
+                        {{ t('preferences.mode') }}
                     </label>
                     <select
                         data-test="playback-mode-select"
@@ -201,11 +245,11 @@ const handleOpenBatterySettings = async () => {
                         class="w-full border border-[#D6D1C4] bg-white px-3 py-2.5 text-[#2C2825] outline-none transition-all focus:border-[#D98C28] focus:ring-1 focus:ring-[#D98C28]"
                         @change="handlePlaybackModeChange"
                     >
-                        <option value="SYNC">同步</option>
-                        <option value="INDEPENDENT">独立</option>
+                        <option value="SYNC">{{ t('sync.SYNC') }}</option>
+                        <option value="INDEPENDENT">{{ t('sync.INDEPENDENT') }}</option>
                     </select>
                     <p class="ml-1 text-xs text-[#B8B0A3]">
-                        独立模式下播放队列和控制只保存在当前客户端，不连接同步至其他设备
+                        {{ t('preferences.independentModeHint') }}
                     </p>
                 </div>
             </section>
@@ -222,8 +266,10 @@ const handleOpenBatterySettings = async () => {
                         <BatteryCharging :size="18" />
                     </div>
                     <div>
-                        <h2 class="font-serif text-xl text-[#2B221B]">Android 后台播放</h2>
-                        <p class="text-xs text-[#8C857B]">系统通知与后台用电状态</p>
+                        <h2 class="font-serif text-xl text-[#2B221B]">
+                            {{ t('preferences.androidBackgroundPlayback') }}
+                        </h2>
+                        <p class="text-xs text-[#8C857B]">{{ t('preferences.systemStatus') }}</p>
                     </div>
                 </div>
 
@@ -239,14 +285,16 @@ const handleOpenBatterySettings = async () => {
                         <div class="flex min-w-0 items-center gap-3">
                             <Bell :size="17" class="shrink-0 text-[#8C857B]" />
                             <div>
-                                <p class="text-sm font-medium text-[#3D3833]">通知权限</p>
+                                <p class="text-sm font-medium text-[#3D3833]">
+                                    {{ t('preferences.notificationPermission') }}
+                                </p>
                                 <p class="text-xs text-[#9C968B]" data-test="notification-status">
                                     {{
                                         androidSystemStatus === null
-                                            ? '检查中'
+                                            ? t('preferences.checking')
                                             : androidSystemStatus.notificationPermissionGranted
-                                              ? '已允许'
-                                              : '未允许'
+                                              ? t('preferences.permissionGranted')
+                                              : t('preferences.permissionDenied')
                                     }}
                                 </p>
                             </div>
@@ -260,7 +308,7 @@ const handleOpenBatterySettings = async () => {
                             @click="handleRequestNotificationPermission"
                         >
                             <Bell :size="15" />
-                            允许通知
+                            {{ t('preferences.allowNotification') }}
                         </button>
                     </div>
 
@@ -268,14 +316,16 @@ const handleOpenBatterySettings = async () => {
                         <div class="flex min-w-0 items-center gap-3">
                             <BatteryCharging :size="17" class="shrink-0 text-[#8C857B]" />
                             <div>
-                                <p class="text-sm font-medium text-[#3D3833]">后台用电</p>
+                                <p class="text-sm font-medium text-[#3D3833]">
+                                    {{ t('preferences.backgroundBattery') }}
+                                </p>
                                 <p class="text-xs text-[#9C968B]" data-test="battery-status">
                                     {{
                                         androidSystemStatus === null
-                                            ? '检查中'
+                                            ? t('preferences.checking')
                                             : androidSystemStatus.batteryOptimizationEnabled
-                                              ? '系统优化中'
-                                              : '不受限制'
+                                              ? t('preferences.batteryOptimizing')
+                                              : t('preferences.batteryUnrestricted')
                                     }}
                                 </p>
                             </div>
@@ -288,7 +338,7 @@ const handleOpenBatterySettings = async () => {
                             @click="handleOpenBatterySettings"
                         >
                             <ExternalLink :size="15" />
-                            系统设置
+                            {{ t('preferences.systemSettings') }}
                         </button>
                     </div>
                 </div>
@@ -302,9 +352,11 @@ const handleOpenBatterySettings = async () => {
                         <FileAudio :size="18" />
                     </div>
                     <div>
-                        <h2 class="font-serif text-xl text-[#2B221B]">首选资产格式</h2>
+                        <h2 class="font-serif text-xl text-[#2B221B]">
+                            {{ t('preferences.preferredFormat') }}
+                        </h2>
                         <p class="text-xs text-[#8C857B]">
-                            当同一曲目存在多个资产格式时，客户端将优先选用匹配此 MIME 的版本
+                            {{ t('preferences.preferredFormatDescription') }}
                         </p>
                     </div>
                 </div>
@@ -321,7 +373,7 @@ const handleOpenBatterySettings = async () => {
                         <label
                             class="ml-1 text-xs font-medium uppercase tracking-wider text-[#8C857B]"
                         >
-                            MIME 类型
+                            {{ t('preferences.mimeType') }}
                         </label>
                         <select
                             v-model="selectedPreset"
@@ -334,7 +386,7 @@ const handleOpenBatterySettings = async () => {
                             >
                                 {{ preset.label }}
                             </option>
-                            <option :value="CUSTOM_SENTINEL">自定义</option>
+                            <option :value="CUSTOM_SENTINEL">{{ t('preferences.custom') }}</option>
                         </select>
                     </div>
 
@@ -342,7 +394,7 @@ const handleOpenBatterySettings = async () => {
                         <label
                             class="ml-1 text-xs font-medium uppercase tracking-wider text-[#8C857B]"
                         >
-                            自定义 MIME
+                            {{ t('preferences.customMime') }}
                         </label>
                         <input
                             v-model="customValue"
@@ -352,7 +404,7 @@ const handleOpenBatterySettings = async () => {
                             class="w-full border border-[#D6D1C4] bg-white px-3 py-2.5 text-[#2C2825] outline-none transition-all placeholder-[#E0DCD6] focus:border-[#D98C28] focus:ring-1 focus:ring-[#D98C28]"
                         />
                         <p class="ml-1 text-xs text-[#B8B0A3]">
-                            服务器不验证 MIME 合法性，请填写标准 MIME 字符串
+                            {{ t('preferences.mimeHint') }}
                         </p>
                     </div>
 
@@ -362,7 +414,11 @@ const handleOpenBatterySettings = async () => {
                             :disabled="!canSubmit || isSubmitting"
                             class="bg-[#2B221B] px-6 py-2.5 text-sm uppercase tracking-wide text-[#F7F5F0] shadow-md transition-colors hover:bg-[#3E3228] disabled:cursor-not-allowed disabled:opacity-60"
                         >
-                            {{ isSubmitting ? '正在保存' : '保存更改' }}
+                            {{
+                                isSubmitting
+                                    ? t('preferences.saving')
+                                    : t('preferences.saveChanges')
+                            }}
                         </button>
                     </div>
                 </form>

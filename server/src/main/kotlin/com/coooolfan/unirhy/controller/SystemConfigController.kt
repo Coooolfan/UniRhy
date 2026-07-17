@@ -3,6 +3,7 @@ package com.coooolfan.unirhy.controller
 import cn.dev33.satoken.annotation.SaCheckLogin
 import cn.dev33.satoken.annotation.SaCheckRole
 import com.coooolfan.unirhy.config.ROLE_ADMIN
+import com.coooolfan.unirhy.error.CommonException
 import com.coooolfan.unirhy.error.SystemException
 import com.coooolfan.unirhy.model.SystemConfig
 import com.coooolfan.unirhy.model.by
@@ -68,6 +69,7 @@ class SystemConfigController(
     @SaCheckLogin
     @SaCheckRole(ROLE_ADMIN)
     @GetMapping
+    @Throws(CommonException.Forbidden::class)
     fun get(): @FetchBy("DEFAULT_SYSTEM_CONFIG_FETCHER") SystemConfig {
         return service.get(DEFAULT_SYSTEM_CONFIG_FETCHER)
     }
@@ -104,6 +106,11 @@ class SystemConfigController(
      */
     @SaCheckRole(ROLE_ADMIN)
     @PutMapping
+    @Throws(
+        CommonException.Forbidden::class,
+        SystemException.SystemStorageProviderMustBeSingle::class,
+        SystemException.SystemStorageProviderCannotBeReadonly::class,
+    )
     fun update(@RequestBody update: SystemConfigUpdate): @FetchBy("DEFAULT_SYSTEM_CONFIG_FETCHER") SystemConfig {
         return service.update(update, DEFAULT_SYSTEM_CONFIG_FETCHER)
     }

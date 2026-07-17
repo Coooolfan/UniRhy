@@ -1,5 +1,6 @@
 package com.coooolfan.unirhy.service
 
+import com.coooolfan.unirhy.error.RecordingException
 import com.coooolfan.unirhy.model.*
 import com.coooolfan.unirhy.model.dto.RecordingMergeReq
 import org.babyfish.jimmer.sql.ast.mutation.SaveMode
@@ -7,11 +8,9 @@ import org.babyfish.jimmer.sql.fetcher.Fetcher
 import org.babyfish.jimmer.sql.kt.KSqlClient
 import org.babyfish.jimmer.sql.kt.ast.expression.count
 import org.babyfish.jimmer.sql.kt.ast.expression.valueIn
-import org.springframework.http.HttpStatus
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
-import org.springframework.web.server.ResponseStatusException
 
 @Service
 class RecordingService(
@@ -19,10 +18,7 @@ class RecordingService(
     private val jdbc: NamedParameterJdbcTemplate,
 ) {
     fun getRecording(id: Long, fetcher: Fetcher<Recording>): Recording {
-        return sql.findById(fetcher, id) ?: throw ResponseStatusException(
-            HttpStatus.NOT_FOUND,
-            "recording not found"
-        )
+        return sql.findById(fetcher, id) ?: throw RecordingException.NotFound()
     }
 
     fun updateRecording(input: Recording) {
@@ -40,10 +36,7 @@ class RecordingService(
 
         val allRecordingIds = input.needMergeIds + input.targetId
 
-        sql.findById(Recording::class, input.targetId) ?: throw ResponseStatusException(
-            HttpStatus.NOT_FOUND,
-            "target recording not found"
-        )
+        sql.findById(Recording::class, input.targetId) ?: throw RecordingException.TargetNotFound()
 
         val workIdCount = sql.createQuery(Recording::class) {
             where(table.id valueIn allRecordingIds)
@@ -51,7 +44,7 @@ class RecordingService(
         }.execute().first()
 
         if (workIdCount != 1L) {
-            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "merge recording workId not match")
+            throw RecordingException.WorkMismatch()
         }
 
         sql.createUpdate(Asset::class) {

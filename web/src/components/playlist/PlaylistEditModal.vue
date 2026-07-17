@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
-import { normalizeApiError } from '@/ApiInstance'
+import { useI18n } from 'vue-i18n'
+import { resolveErrorMessage } from '@/i18n/errors'
+
+const { t } = useI18n()
 import { useModalContext } from '@/components/modals/modalContext'
 
 const props = defineProps<{
@@ -49,7 +52,7 @@ const confirmDelete = async () => {
         await props.onDelete()
         modal.resolve(undefined)
     } catch (submitError) {
-        deleteError.value = normalizeApiError(submitError).message ?? '删除歌单失败'
+        deleteError.value = resolveErrorMessage(submitError, 'errors.fallback.playlistDelete')
     } finally {
         isDeleting.value = false
     }
@@ -83,7 +86,7 @@ const submit = async () => {
         })
         modal.resolve(undefined)
     } catch (submitError) {
-        error.value = normalizeApiError(submitError).message ?? '更新歌单失败'
+        error.value = resolveErrorMessage(submitError, 'errors.fallback.playlistUpdate')
     } finally {
         isSaving.value = false
     }
@@ -94,34 +97,34 @@ const submit = async () => {
     <div class="space-y-6">
         <label class="block">
             <span class="mb-2 block font-serif text-xs uppercase tracking-wider text-[#8A8A8A]">
-                歌单名
+                {{ t('playlistEdit.name') }}
             </span>
             <input
                 v-model="name"
                 type="text"
                 maxlength="100"
                 class="w-full border-b border-[#D6D1C4] bg-[#F7F5F0] p-3 font-serif text-[#3D3D3D] transition-colors placeholder:text-[#BDB9AE] focus:border-[#C67C4E] focus:outline-none"
-                placeholder="例如：我的收藏"
+                :placeholder="t('playlistEdit.namePlaceholder')"
                 :disabled="isSaving || isDeleting"
             />
             <p
                 v-if="isDeleteAction() && isDeleteConfirming"
                 class="mt-2 font-serif text-sm italic text-[#B95D5D]"
             >
-                再次点击“确认删除”后将永久删除歌单，此操作不可恢复。
+                {{ t('playlistEdit.deleteHint') }}
             </p>
         </label>
 
         <label v-if="!isDeleteAction()" class="block">
             <span class="mb-2 block font-serif text-xs uppercase tracking-wider text-[#8A8A8A]">
-                歌单描述
+                {{ t('playlistEdit.description') }}
             </span>
             <textarea
                 v-model="comment"
                 rows="3"
                 maxlength="500"
                 class="w-full resize-none border-b border-[#D6D1C4] bg-[#F7F5F0] p-3 font-serif text-[#3D3D3D] transition-colors placeholder:text-[#BDB9AE] focus:border-[#C67C4E] focus:outline-none"
-                placeholder="可选的歌单描述"
+                :placeholder="t('playlistEdit.descriptionPlaceholder')"
                 :disabled="isSaving || isDeleting"
             />
         </label>
@@ -136,7 +139,7 @@ const submit = async () => {
                 :disabled="isSaving || isDeleting"
                 @click="closeModal"
             >
-                取消
+                {{ t('common.cancel') }}
             </button>
             <button
                 type="button"
@@ -151,11 +154,13 @@ const submit = async () => {
                 :disabled="isSaving || isDeleting"
                 @click="submit"
             >
-                <span v-if="isSaving">Updating...</span>
-                <span v-else-if="isDeleting">删除中...</span>
-                <span v-else-if="isDeleteAction() && isDeleteConfirming">确认删除</span>
-                <span v-else-if="isDeleteAction()">删除歌单</span>
-                <span v-else>保存更改</span>
+                <span v-if="isSaving">{{ t('common.updating') }}</span>
+                <span v-else-if="isDeleting">{{ t('common.deleting') }}</span>
+                <span v-else-if="isDeleteAction() && isDeleteConfirming">{{
+                    t('common.confirmDelete')
+                }}</span>
+                <span v-else-if="isDeleteAction()">{{ t('playlistEdit.deletePlaylist') }}</span>
+                <span v-else>{{ t('common.saveChanges') }}</span>
             </button>
         </div>
     </div>

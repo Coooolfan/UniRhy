@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Plus } from 'lucide-vue-next'
+import { useI18n } from 'vue-i18n'
 import { useModal } from '@/composables/useModal'
 import StorageNodeEditDialogContent from '@/components/settings/StorageNodeEditDialogContent.vue'
 import StorageNodeFormDialogContent from '@/components/settings/StorageNodeFormDialogContent.vue'
@@ -20,6 +21,7 @@ type Props = {
 }
 
 const props = defineProps<Props>()
+const { t } = useI18n()
 const modal = useModal()
 
 const openCreateStorageNodeModal = async () => {
@@ -28,7 +30,7 @@ const openCreateStorageNodeModal = async () => {
     }
 
     await modal.open(StorageNodeFormDialogContent, {
-        title: '新增存储节点',
+        title: t('storageNode.addNodeTitle'),
         size: 'md',
         closable: false,
         closeOnBackdrop: false,
@@ -47,7 +49,7 @@ const openEditStorageNodeModal = async (node: StorageNode) => {
     }
 
     await modal.open(StorageNodeEditDialogContent, {
-        title: '编辑存储节点',
+        title: t('storageNode.editNodeTitle'),
         size: 'md',
         closable: false,
         closeOnBackdrop: false,
@@ -71,10 +73,10 @@ const confirmDeleteStorageNode = async (node: StorageNode) => {
     }
 
     const confirmed = await modal.confirm({
-        title: '移除节点',
-        content: '确定要永久移除此存储节点配置吗？',
-        confirmText: '确认移除',
-        cancelText: '取消',
+        title: t('storageNode.removeTitle'),
+        content: t('storageNode.removeConfirm'),
+        confirmText: t('storageNode.confirmRemove'),
+        cancelText: t('common.cancel'),
         tone: 'danger',
     })
 
@@ -88,9 +90,9 @@ const confirmDeleteStorageNode = async (node: StorageNode) => {
     }
 
     await modal.alert({
-        title: '移除失败',
+        title: t('storageNode.removeFailed'),
         content: error,
-        confirmText: '确认',
+        confirmText: t('common.confirm'),
         tone: 'danger',
     })
 }
@@ -101,10 +103,10 @@ const confirmSetSystemStorageNode = async (node: StorageNode) => {
     }
 
     const confirmed = await modal.confirm({
-        title: '设置系统节点',
-        content: `确定要将「${node.name}」设置为系统节点吗？UniRhy 会把后续生成的媒体资源写入此节点。`,
-        confirmText: '设为系统节点',
-        cancelText: '取消',
+        title: t('storageNode.setSystemTitle'),
+        content: t('storageNode.setSystemConfirm', { name: node.name }),
+        confirmText: t('storageNode.setSystemConfirmText'),
+        cancelText: t('common.cancel'),
         tone: 'default',
     })
 
@@ -118,9 +120,9 @@ const confirmSetSystemStorageNode = async (node: StorageNode) => {
     }
 
     await modal.alert({
-        title: '设置失败',
+        title: t('storageNode.setSystemFailed'),
         content: error,
-        confirmText: '确认',
+        confirmText: t('common.confirm'),
         tone: 'danger',
     })
 }
@@ -131,7 +133,9 @@ const confirmSetSystemStorageNode = async (node: StorageNode) => {
         <div
             class="mb-4 flex items-center justify-between gap-3 border-b border-[#E0Dcd0] pb-2 sm:mb-6"
         >
-            <h2 class="text-2xl font-serif text-[#4A3B32] tracking-wide">存储节点</h2>
+            <h2 class="text-2xl font-serif text-[#4A3B32] tracking-wide">
+                {{ t('storageNode.title') }}
+            </h2>
             <button
                 v-if="canManage"
                 class="group flex w-auto shrink-0 items-center justify-center gap-2 bg-[#C67C4E] px-3 py-2 text-sm text-[#F7F5F0] shadow-md transition-all duration-300 hover:bg-[#A6633C] hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50 sm:px-6 sm:text-base"
@@ -139,11 +143,11 @@ const confirmSetSystemStorageNode = async (node: StorageNode) => {
                 @click="openCreateStorageNodeModal"
             >
                 <Plus :size="16" />
-                <span>新增节点</span>
+                <span>{{ t('storageNode.addNode') }}</span>
             </button>
         </div>
 
-        <div v-if="isLoading" class="text-sm text-[#8A8A8A] mb-4">加载中...</div>
+        <div v-if="isLoading" class="text-sm text-[#8A8A8A] mb-4">{{ t('common.loading') }}</div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
             <!-- 节点列表 -->

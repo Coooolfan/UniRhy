@@ -1,4 +1,5 @@
 import { computed, ref, type Ref } from 'vue'
+import { i18n } from '@/i18n'
 
 export type MergeOption = {
     id: number
@@ -101,12 +102,12 @@ export const useRecordingMergeState = <T extends { id: number }>(
 
     const submitMerge = async () => {
         if (selectedOptions.value.length < 2) {
-            mergeModalError.value = '至少选择 2 条曲目后才能合并。'
+            mergeModalError.value = i18n.global.t('validation.mergeMinRecordings')
             return
         }
 
         if (mergeTargetId.value === null) {
-            mergeModalError.value = '请选择一个目标曲目。'
+            mergeModalError.value = i18n.global.t('validation.mergeMissingTarget')
             return
         }
 
@@ -115,7 +116,7 @@ export const useRecordingMergeState = <T extends { id: number }>(
             .filter((id) => id !== mergeTargetId.value)
 
         if (sourceIds.length === 0) {
-            mergeModalError.value = '请选择至少一条来源曲目。'
+            mergeModalError.value = i18n.global.t('validation.mergeMissingSource')
             return
         }
 
@@ -130,7 +131,10 @@ export const useRecordingMergeState = <T extends { id: number }>(
             resetState()
         } catch (error) {
             const message = options.parseError?.(error)
-            mergeModalError.value = message || options.fallbackErrorMessage || '合并曲目失败'
+            mergeModalError.value =
+                message ||
+                options.fallbackErrorMessage ||
+                i18n.global.t('errors.fallback.mergeRecordings')
         } finally {
             mergeSubmitting.value = false
         }

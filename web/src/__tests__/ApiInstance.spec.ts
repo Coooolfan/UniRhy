@@ -27,8 +27,11 @@ const createTextResponse = (status: number, body: string) =>
         },
     })
 
-const loadApiInstance = () => {
+const loadApiInstance = async () => {
     vi.resetModules()
+    // 模块重置后 i18n 是全新实例（默认可能回退到英文），显式锁定 zh-CN 使断言按中文匹配
+    const { i18n } = await import('@/i18n')
+    i18n.global.locale.value = 'zh-CN'
     return import('@/ApiInstance')
 }
 
@@ -112,6 +115,26 @@ describe('ApiInstance', () => {
         expect(document.cookie).toContain('unirhy-token=test-token')
     })
 
+    it('preserves structured 500 errors for localized error resolution', async () => {
+        const consoleErrorMock = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+        fetchMock.mockResolvedValue(
+            createJsonResponse(500, { family: 'COMMON', code: 'INTERNAL_ERROR' }),
+        )
+
+        const { api } = await loadApiInstance()
+
+        await expect(api.accountController.me()).rejects.toEqual({
+            family: 'COMMON',
+            code: 'INTERNAL_ERROR',
+        })
+        expect(consoleErrorMock).toHaveBeenCalledWith(
+            '服务器错误:',
+            500,
+            '/api/accounts/me',
+            '{"family":"COMMON","code":"INTERNAL_ERROR"}',
+        )
+    })
+
     it('keeps existing non-401 error behavior', async () => {
         const consoleErrorMock = vi.spyOn(console, 'error').mockImplementation(() => undefined)
         fetchMock
@@ -124,7 +147,7 @@ describe('ApiInstance', () => {
 
         const { api } = await loadApiInstance()
 
-        await expect(api.accountController.me()).rejects.toThrow('请求失败：server exploded')
+        await expect(api.accountController.me()).rejects.toThrow('请求失败：')
         expect(consoleErrorMock).toHaveBeenCalledWith(
             '服务器错误:',
             500,

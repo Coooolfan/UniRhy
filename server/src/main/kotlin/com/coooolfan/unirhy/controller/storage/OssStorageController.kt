@@ -3,6 +3,8 @@ package com.coooolfan.unirhy.controller.storage
 import cn.dev33.satoken.annotation.SaCheckLogin
 import cn.dev33.satoken.annotation.SaCheckRole
 import com.coooolfan.unirhy.config.ROLE_ADMIN
+import com.coooolfan.unirhy.error.CommonException
+import com.coooolfan.unirhy.error.SystemException
 import com.coooolfan.unirhy.model.storage.FileProviderOss
 import com.coooolfan.unirhy.model.storage.by
 import com.coooolfan.unirhy.model.storage.dto.FileProviderOssCreate
@@ -46,6 +48,7 @@ class OssStorageController(private val service: OssStorageService) {
      * @description 调用OssStorageService.list()方法获取存储列表
      */
     @GetMapping
+    @Throws(CommonException.Forbidden::class)
     fun list(): List<@FetchBy("DEFAULT_OSS_FETCHER") FileProviderOss> {
         return service.list(DEFAULT_OSS_FETCHER)
     }
@@ -64,6 +67,7 @@ class OssStorageController(private val service: OssStorageService) {
      * @description 调用OssStorageService.get()方法获取存储配置
      */
     @GetMapping("/{id}")
+    @Throws(CommonException.Forbidden::class)
     fun get(@PathVariable id: Long): @FetchBy("DEFAULT_OSS_FETCHER") FileProviderOss {
         return service.get(id, DEFAULT_OSS_FETCHER)
     }
@@ -83,6 +87,7 @@ class OssStorageController(private val service: OssStorageService) {
      */
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
+    @Throws(CommonException.Forbidden::class)
     fun create(@RequestBody create: FileProviderOssCreate): @FetchBy("DEFAULT_OSS_FETCHER") FileProviderOss {
         return service.create(create, DEFAULT_OSS_FETCHER)
     }
@@ -102,6 +107,7 @@ class OssStorageController(private val service: OssStorageService) {
      * @description 调用OssStorageService.update()方法更新存储配置
      */
     @PutMapping("/{id}")
+    @Throws(CommonException.Forbidden::class)
     fun update(
         @PathVariable id: Long,
         @RequestBody update: FileProviderOssUpdate,
@@ -123,6 +129,7 @@ class OssStorageController(private val service: OssStorageService) {
      */
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Throws(CommonException.Forbidden::class, SystemException.SystemStorageProviderCannotBeDeleted::class)
     fun delete(@PathVariable id: Long) {
         service.delete(id)
     }

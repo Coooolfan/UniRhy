@@ -1,13 +1,16 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { api, normalizeApiError } from '@/ApiInstance'
+import { api } from '@/ApiInstance'
+import { i18n } from '@/i18n'
+import { resolveErrorMessage } from '@/i18n/errors'
 
 export type PlaylistListItem = {
     id: number
     name: string
 }
 
-const normalizeName = (name?: string | null) => name?.trim() || '未命名歌单'
+const normalizeName = (name?: string | null) =>
+    name?.trim() || i18n.global.t('common.untitledPlaylist')
 
 export const usePlaylistStore = defineStore('playlist', () => {
     const playlists = ref<PlaylistListItem[]>([])
@@ -28,8 +31,7 @@ export const usePlaylistStore = defineStore('playlist', () => {
             }))
             hasLoaded.value = true
         } catch (e) {
-            const normalized = normalizeApiError(e)
-            error.value = normalized.message ?? '歌单加载失败'
+            error.value = resolveErrorMessage(e, 'errors.fallback.playlistLoad')
             playlists.value = []
             hasLoaded.value = false
         } finally {

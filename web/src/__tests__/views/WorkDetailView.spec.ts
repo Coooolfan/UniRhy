@@ -284,7 +284,6 @@ describe('WorkDetailView', () => {
         setUser({ admin: true })
         getWorkByIdMock.mockResolvedValue(buildWorkResponse())
         mergeRecordingMock.mockRejectedValueOnce({ message: '合并曲目失败（测试）' })
-
         const wrapper = mountWithModalHost()
 
         await flushView()
@@ -308,7 +307,7 @@ describe('WorkDetailView', () => {
 
         expect(mergeRecordingMock).toHaveBeenCalledTimes(1)
         expect(getWorkByIdMock).toHaveBeenCalledTimes(1)
-        expect(wrapper.text()).toContain('合并曲目失败（测试）')
+        expect(wrapper.text()).toContain('合并失败')
         expect(wrapper.findAll('[data-testid="recording-select-checkbox"]:checked')).toHaveLength(2)
     })
 

@@ -3,6 +3,8 @@ package com.coooolfan.unirhy.controller
 import cn.dev33.satoken.annotation.SaCheckLogin
 import cn.dev33.satoken.annotation.SaCheckRole
 import com.coooolfan.unirhy.config.ROLE_ADMIN
+import com.coooolfan.unirhy.error.ArtistException
+import com.coooolfan.unirhy.error.CommonException
 import com.coooolfan.unirhy.model.Artist
 import com.coooolfan.unirhy.model.by
 import com.coooolfan.unirhy.model.dto.ArtistCreate
@@ -80,6 +82,7 @@ class ArtistController(private val service: ArtistService) {
     @PostMapping
     @SaCheckRole(ROLE_ADMIN)
     @ResponseStatus(HttpStatus.CREATED)
+    @Throws(CommonException.Forbidden::class)
     fun createArtist(
         @RequestBody input: ArtistCreate,
         @RequestParam(required = false) copyAssociationsFrom: Long?,
@@ -103,6 +106,7 @@ class ArtistController(private val service: ArtistService) {
     @PutMapping("/{id}")
     @SaCheckRole(ROLE_ADMIN)
     @ResponseStatus(HttpStatus.OK)
+    @Throws(CommonException.Forbidden::class)
     fun updateArtist(
         @PathVariable id: Long,
         @RequestBody input: ArtistUpdate,
@@ -122,6 +126,11 @@ class ArtistController(private val service: ArtistService) {
     @PostMapping("/merge-requests")
     @SaCheckRole(ROLE_ADMIN)
     @ResponseStatus(HttpStatus.OK)
+    @Throws(
+        CommonException.Forbidden::class,
+        ArtistException.TargetNotFound::class,
+        ArtistException.SourceNotFound::class,
+    )
     fun mergeArtists(@RequestBody input: ArtistMergeReq) {
         service.mergeArtists(input)
     }

@@ -1,8 +1,12 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Search } from 'lucide-vue-next'
-import { api, normalizeApiError } from '@/ApiInstance'
+import { api } from '@/ApiInstance'
+import { resolveErrorMessage } from '@/i18n/errors'
 import { useModalContext } from '@/components/modals/modalContext'
+
+const { t } = useI18n()
 
 type PlaylistOption = {
     id: number
@@ -46,10 +50,10 @@ const fetchPlaylists = async () => {
         const data = await api.playlistController.listPlaylists()
         playlists.value = data.map((playlist) => ({
             id: playlist.id,
-            name: playlist.name?.trim() || '未命名歌单',
+            name: playlist.name?.trim() || t('addToPlaylist.unnamedPlaylist'),
         }))
     } catch (fetchError) {
-        error.value = normalizeApiError(fetchError).message ?? '歌单加载失败'
+        error.value = resolveErrorMessage(fetchError, 'errors.fallback.playlistLoad')
         playlists.value = []
     } finally {
         isLoading.value = false
@@ -75,7 +79,7 @@ const addToPlaylist = async (playlist: PlaylistOption) => {
         })
         modal.resolve(undefined)
     } catch (submitError) {
-        error.value = normalizeApiError(submitError).message ?? '添加到歌单失败'
+        error.value = resolveErrorMessage(submitError, 'errors.fallback.playlistAddRecording')
     } finally {
         isSubmitting.value = false
     }
@@ -93,7 +97,7 @@ const addToPlaylist = async (playlist: PlaylistOption) => {
                 <input
                     v-model="keyword"
                     type="text"
-                    placeholder="搜索歌单..."
+                    :placeholder="t('addToPlaylist.searchPlaceholder')"
                     class="w-full border-b border-[#D6D1C4] bg-[#F7F5F0] py-3 pr-3 pl-9 font-serif text-sm text-[#3D3D3D] transition-colors placeholder:text-[#BDB9AE] focus:border-[#C67C4E] focus:outline-none"
                     :disabled="isSubmitting"
                 />
@@ -101,16 +105,18 @@ const addToPlaylist = async (playlist: PlaylistOption) => {
         </div>
 
         <div class="min-h-0 flex-1 overflow-y-auto">
-            <div v-if="isLoading" class="py-4 text-center text-sm text-[#9C968B]">加载中...</div>
+            <div v-if="isLoading" class="py-4 text-center text-sm text-[#9C968B]">
+                {{ t('common.loading') }}
+            </div>
             <p v-else-if="error" class="py-4 text-center text-sm text-[#B95D5D]">{{ error }}</p>
             <div v-else-if="playlists.length === 0" class="py-4 text-center text-sm text-[#8C857B]">
-                还没有歌单，请先在侧边栏创建歌单
+                {{ t('addToPlaylist.noPlaylists') }}
             </div>
             <div
                 v-else-if="filteredPlaylists.length === 0"
                 class="py-4 text-center text-sm text-[#8C857B]"
             >
-                没有匹配的歌单
+                {{ t('addToPlaylist.noMatch') }}
             </div>
             <ul v-else class="space-y-2 pb-4">
                 <li v-for="playlist in filteredPlaylists" :key="playlist.id">
@@ -135,7 +141,7 @@ const addToPlaylist = async (playlist: PlaylistOption) => {
                 :disabled="isSubmitting"
                 @click="closeModal"
             >
-                取消
+                {{ t('common.cancel') }}
             </button>
         </div>
     </div>

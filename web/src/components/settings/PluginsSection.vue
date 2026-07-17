@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { CheckCircle2, Download, Loader2, Puzzle, Trash2, Upload, XCircle } from 'lucide-vue-next'
 import type { PluginInfoResponse } from '@/__generated/model/static/PluginInfoResponse'
 
@@ -14,6 +15,8 @@ const props = defineProps<{
     onDownload: (plugin: PluginInfoResponse) => Promise<void>
     canManage?: boolean
 }>()
+
+const { t } = useI18n()
 
 const fileInputRef = ref<HTMLInputElement | null>(null)
 const togglingId = ref<string | null>(null)
@@ -64,7 +67,7 @@ const handleDownload = async (plugin: PluginInfoResponse) => {
         <div
             class="mb-4 flex items-center justify-between gap-3 border-b border-[#E8E4D9] pb-2 sm:mb-6"
         >
-            <h2 class="font-serif text-2xl text-[#2C2A28]">插件</h2>
+            <h2 class="font-serif text-2xl text-[#2C2A28]">{{ t('plugins.title') }}</h2>
             <input
                 v-if="canManage"
                 ref="fileInputRef"
@@ -82,7 +85,7 @@ const handleDownload = async (plugin: PluginInfoResponse) => {
             >
                 <Loader2 v-if="isUploading" class="h-4 w-4 animate-spin" />
                 <Upload v-else class="h-4 w-4" />
-                <span>{{ isUploading ? '上传中...' : '上传插件' }}</span>
+                <span>{{ isUploading ? t('plugins.uploading') : t('plugins.upload') }}</span>
             </button>
         </div>
 
@@ -94,12 +97,12 @@ const handleDownload = async (plugin: PluginInfoResponse) => {
         </div>
 
         <p class="mb-4 text-xs italic text-[#8A8A8A]">
-            插件允许您扩展 UniRhy 的功能（此功能仍处于早期阶段，相关能力正在完善）
+            {{ t('plugins.description') }}
         </p>
 
         <div v-if="isLoading" class="flex items-center justify-center py-10 text-sm text-[#6B635B]">
             <Loader2 class="mr-2 h-4 w-4 animate-spin text-[#C27E46]" />
-            正在加载插件列表...
+            {{ t('plugins.loading') }}
         </div>
 
         <div
@@ -107,8 +110,8 @@ const handleDownload = async (plugin: PluginInfoResponse) => {
             class="flex flex-col items-center justify-center border border-dashed border-[#D6D1C4] py-12 text-center"
         >
             <Puzzle class="h-10 w-10 text-[#C27E46]" />
-            <p class="mt-4 text-sm text-[#6B635B]">暂无已安装的插件</p>
-            <p v-if="canManage" class="mt-1 text-xs text-[#9C968B]">上传 .up 文件后即可在此管理</p>
+            <p class="mt-4 text-sm text-[#6B635B]">{{ t('plugins.empty') }}</p>
+            <p v-if="canManage" class="mt-1 text-xs text-[#9C968B]">{{ t('plugins.emptyHint') }}</p>
         </div>
 
         <div v-else class="space-y-4">
@@ -152,7 +155,11 @@ const handleDownload = async (plugin: PluginInfoResponse) => {
                                                 : 'text-[#9C968B]'
                                         "
                                     >
-                                        {{ plugin.isAvailable ? '运行中' : '未加载' }}
+                                        {{
+                                            plugin.isAvailable
+                                                ? t('plugins.running')
+                                                : t('plugins.notLoaded')
+                                        }}
                                     </span>
                                 </div>
                             </div>
@@ -173,7 +180,9 @@ const handleDownload = async (plugin: PluginInfoResponse) => {
                             @click="handleSetEnabled(plugin.id, !plugin.enabled)"
                         >
                             <Loader2 v-if="togglingId === plugin.id" class="h-3 w-3 animate-spin" />
-                            <span>{{ plugin.enabled ? '禁用' : '启用' }}</span>
+                            <span>{{
+                                plugin.enabled ? t('plugins.disable') : t('plugins.enable')
+                            }}</span>
                         </button>
 
                         <button
@@ -181,7 +190,7 @@ const handleDownload = async (plugin: PluginInfoResponse) => {
                             type="button"
                             class="p-1.5 text-[#9C968B] transition-colors hover:text-[#C27E46] disabled:opacity-50"
                             :disabled="downloadingId === plugin.id"
-                            title="导出 .up 文件"
+                            :title="t('plugins.exportFile')"
                             @click="handleDownload(plugin)"
                         >
                             <Loader2
@@ -196,7 +205,7 @@ const handleDownload = async (plugin: PluginInfoResponse) => {
                             type="button"
                             class="p-1.5 text-[#9C968B] transition-colors hover:text-rose-500 disabled:opacity-50"
                             :disabled="deletingId === plugin.id"
-                            title="删除插件"
+                            :title="t('plugins.deletePlugin')"
                             @click="handleDelete(plugin.id)"
                         >
                             <Loader2 v-if="deletingId === plugin.id" class="h-4 w-4 animate-spin" />
@@ -210,7 +219,7 @@ const handleDownload = async (plugin: PluginInfoResponse) => {
                     class="mt-4 border-t border-[#EBE6D9] pt-4"
                 >
                     <div class="mb-2 text-[11px] uppercase tracking-[0.24em] text-[#9C968B]">
-                        表单参数
+                        {{ t('plugins.formParams') }}
                     </div>
                     <div class="grid gap-2 sm:grid-cols-2">
                         <div
@@ -221,7 +230,7 @@ const handleDownload = async (plugin: PluginInfoResponse) => {
                             <span class="font-mono text-xs text-[#C27E46]">{{ field.type }}</span>
                             <span class="text-[#2C2A28]">{{ field.label }}</span>
                             <span v-if="field.default !== undefined" class="text-xs text-[#9C968B]">
-                                默认 {{ field.default }}
+                                {{ t('plugins.default', { value: field.default }) }}
                             </span>
                         </div>
                     </div>

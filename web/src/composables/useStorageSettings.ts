@@ -1,5 +1,7 @@
 import { computed, ref } from 'vue'
-import { api, normalizeApiError } from '@/ApiInstance'
+import { api } from '@/ApiInstance'
+import { i18n } from '@/i18n'
+import { resolveErrorMessage } from '@/i18n/errors'
 import type { FileProviderType } from '@/__generated/model/enums/FileProviderType'
 import type { SystemConfigUpdate } from '@/__generated/model/static'
 
@@ -62,19 +64,19 @@ const validateStorageNodeForm = (
     const secretKey = form.secretKey.trim()
 
     if (!name) {
-        return { error: '请填写节点名称' }
+        return { error: i18n.global.t('validation.nodeNameRequired') }
     }
 
     if (form.type === 'FILE_SYSTEM' && !parentPath) {
-        return { error: '请填写本地存储根路径' }
+        return { error: i18n.global.t('validation.localPathRequired') }
     }
 
     if (form.type === 'OSS') {
         if (!host || !bucket || !accessKey) {
-            return { error: '请填写对象存储 Endpoint、Bucket 与 Access Key' }
+            return { error: i18n.global.t('validation.ossFieldsRequired') }
         }
         if (options.mode === 'create' && !secretKey) {
-            return { error: '请填写对象存储 Secret Key' }
+            return { error: i18n.global.t('validation.ossSecretKeyRequired') }
         }
     }
 
@@ -109,7 +111,7 @@ export const useStorageSettings = () => {
     const activeStorageLabel = computed(() => {
         const activeId = systemConfig.value.fsProviderId ?? systemConfig.value.ossProviderId
         if (activeId === null) {
-            return '未选择'
+            return i18n.global.t('validation.notSelected')
         }
         const activeType: FileProviderType =
             systemConfig.value.fsProviderId === null ? 'OSS' : 'FILE_SYSTEM'
@@ -127,10 +129,9 @@ export const useStorageSettings = () => {
             systemConfig.value.fsProviderId = config.fsProviderId ?? null
             systemConfig.value.ossProviderId = config.ossProviderId ?? null
         } catch (error) {
-            const normalized = normalizeApiError(error)
             systemConfig.value.fsProviderId = null
             systemConfig.value.ossProviderId = null
-            systemError.value = normalized.message ?? '系统配置加载失败'
+            systemError.value = resolveErrorMessage(error, 'errors.fallback.systemConfigLoad')
         } finally {
             isLoadingSystem.value = false
         }
@@ -164,8 +165,7 @@ export const useStorageSettings = () => {
                 })),
             ]
         } catch (error) {
-            const normalized = normalizeApiError(error)
-            storageError.value = normalized.message ?? '存储节点加载失败'
+            storageError.value = resolveErrorMessage(error, 'errors.fallback.storageNodeLoad')
         } finally {
             isLoadingStorage.value = false
         }
@@ -181,7 +181,7 @@ export const useStorageSettings = () => {
             return validated.error
         }
         if (isSaving.value) {
-            return '已有保存操作正在执行'
+            return i18n.global.t('common.savingInProgress')
         }
 
         isSaving.value = true
@@ -210,8 +210,7 @@ export const useStorageSettings = () => {
             await fetchStorageNodes()
             return null
         } catch (error) {
-            const normalized = normalizeApiError(error)
-            return normalized.message ?? '创建失败'
+            return resolveErrorMessage(error, 'common.createFailed')
         } finally {
             isSaving.value = false
         }
@@ -223,7 +222,7 @@ export const useStorageSettings = () => {
             return validated.error
         }
         if (isSaving.value) {
-            return '已有保存操作正在执行'
+            return i18n.global.t('common.savingInProgress')
         }
 
         isSaving.value = true
@@ -254,8 +253,7 @@ export const useStorageSettings = () => {
             await fetchStorageNodes()
             return null
         } catch (error) {
-            const normalized = normalizeApiError(error)
-            return normalized.message ?? '更新失败'
+            return resolveErrorMessage(error, 'common.updateFailed')
         } finally {
             isSaving.value = false
         }
@@ -263,7 +261,7 @@ export const useStorageSettings = () => {
 
     const deleteStorageNode = async (node: StorageNode) => {
         if (isSaving.value) {
-            return '已有保存操作正在执行'
+            return i18n.global.t('common.savingInProgress')
         }
 
         isSaving.value = true
@@ -276,8 +274,7 @@ export const useStorageSettings = () => {
             await Promise.all([fetchStorageNodes(), fetchSystemConfig()])
             return null
         } catch (error) {
-            const normalized = normalizeApiError(error)
-            storageError.value = normalized.message ?? '删除失败'
+            storageError.value = resolveErrorMessage(error, 'common.deleteFailed')
             return storageError.value
         } finally {
             isSaving.value = false
@@ -286,10 +283,10 @@ export const useStorageSettings = () => {
 
     const setSystemStorageNode = async (node: StorageNode) => {
         if (isSaving.value) {
-            return '已有保存操作正在执行'
+            return i18n.global.t('common.savingInProgress')
         }
         if (node.readonly) {
-            return '只读节点不能设置为系统节点'
+            return i18n.global.t('validation.readonlyCannotBeSystem')
         }
 
         isSaving.value = true
@@ -308,8 +305,7 @@ export const useStorageSettings = () => {
             systemConfig.value.ossProviderId = config.ossProviderId ?? null
             return null
         } catch (error) {
-            const normalized = normalizeApiError(error)
-            systemError.value = normalized.message ?? '设置系统节点失败'
+            systemError.value = resolveErrorMessage(error, 'errors.fallback.systemNodeSet')
             return systemError.value
         } finally {
             isSaving.value = false

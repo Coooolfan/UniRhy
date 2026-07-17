@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { ChevronRight, Music, Plus, X } from 'lucide-vue-next'
 import { computed, onMounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { storeToRefs } from 'pinia'
 import { useRoute, useRouter } from 'vue-router'
 import { api, normalizeApiError } from '@/ApiInstance'
+import BrandWatermark from '@/components/common/BrandWatermark.vue'
 import PlaylistCreateDialogContent from '@/components/playlist/PlaylistCreateDialogContent.vue'
 import { useDashboardLayout } from '@/composables/useDashboardLayout'
 import { useModal } from '@/composables/useModal'
@@ -21,6 +23,7 @@ const route = useRoute()
 const audioStore = useAudioStore()
 const playlistStore = usePlaylistStore()
 const modal = useModal()
+const { t } = useI18n()
 const {
     isDesktopViewport,
     isDesktopSidebarCollapsed,
@@ -33,12 +36,12 @@ const {
     isLoading: isLoadingPlaylists,
     error: playlistError,
 } = storeToRefs(playlistStore)
-const navItems: NavItem[] = [
-    { label: '发现', routeName: 'dashboard-home' },
-    { label: '资料库', routeName: 'album-list', matchNames: ['album-detail'] },
-    { label: '任务管理', routeName: 'tasks' },
-    { label: '系统设置', routeName: 'settings' },
-]
+const navItems = computed<NavItem[]>(() => [
+    { label: t('dashboardNav.discover'), routeName: 'dashboard-home' },
+    { label: t('dashboardNav.library'), routeName: 'album-list', matchNames: ['album-detail'] },
+    { label: t('dashboardNav.tasks'), routeName: 'tasks' },
+    { label: t('dashboardNav.settings'), routeName: 'settings' },
+])
 
 const playlistSectionPaddingBottom = computed(() => {
     if (!audioStore.currentTrack || audioStore.isPlayerHidden) {
@@ -93,7 +96,7 @@ const handlePlaylistClick = (playlistId: number) => {
 
 const openCreatePlaylistModal = async () => {
     await modal.open(PlaylistCreateDialogContent, {
-        title: '创建新歌单',
+        title: t('dashboardNav.createPlaylist'),
         size: 'md',
         props: {
             onSubmit: async ({ name, comment }: { name: string; comment: string }) => {
@@ -141,12 +144,12 @@ onMounted(() => {
             <div class="flex h-full min-h-0 flex-col md:pl-10 md:pr-6 md:pt-12">
                 <div class="mb-10 flex items-center justify-between md:mb-12">
                     <div class="flex select-none items-center gap-3">
-                        <h1 class="text-3xl font-serif tracking-tight text-[#2C2C2C]">UniRhy.</h1>
+                        <BrandWatermark class="text-3xl font-serif tracking-tight text-[#2C2C2C]" />
                     </div>
                     <button
                         type="button"
                         class="inline-flex h-9 w-9 items-center justify-center rounded-full text-[#8A857D] transition-colors hover:bg-white/60 hover:text-[#5E5950] md:hidden"
-                        aria-label="切换侧边栏"
+                        :aria-label="t('dashboardNav.toggleSidebar')"
                         @click="closeSidebar"
                     >
                         <X :size="18" />
@@ -181,7 +184,7 @@ onMounted(() => {
                             class="inline-flex select-none items-center gap-2 text-sm text-[#8A857D] transition-colors hover:text-[#C27E46]"
                             @click="openCreatePlaylistModal"
                         >
-                            <span>创建歌单</span>
+                            <span>{{ t('dashboardNav.createPlaylistLabel') }}</span>
                             <ChevronRight :size="14" aria-hidden="true" />
                         </button>
                         <template v-else>
@@ -190,7 +193,7 @@ onMounted(() => {
                             >
                                 <span
                                     class="select-none text-sm uppercase tracking-[0.24em] text-[#9C968B] md:text-xs"
-                                    >我的歌单</span
+                                    >{{ t('dashboardNav.myPlaylists') }}</span
                                 >
                                 <button
                                     v-if="
@@ -200,14 +203,14 @@ onMounted(() => {
                                     "
                                     type="button"
                                     class="inline-flex h-5 w-5 items-center justify-center text-[#8A857D] transition-colors hover:text-[#C27E46]"
-                                    aria-label="创建歌单"
+                                    :aria-label="t('dashboardNav.createPlaylistLabel')"
                                     @click="openCreatePlaylistModal"
                                 >
                                     <Plus :size="14" aria-hidden="true" />
                                 </button>
                             </div>
                             <div v-if="isLoadingPlaylists" class="text-sm text-[#9C968B]">
-                                加载中...
+                                {{ t('dashboardNav.loading') }}
                             </div>
                             <div v-else-if="playlistError" class="text-sm text-red-500">
                                 {{ playlistError }}

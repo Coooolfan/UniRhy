@@ -1,5 +1,6 @@
 import type { Ref, ShallowRef } from 'vue'
 import { api } from '@/ApiInstance'
+import { i18n } from '@/i18n'
 import { resolveCover } from '@/composables/recordingMedia'
 import { buildApiUrl } from '@/runtime/platform'
 import {
@@ -32,10 +33,10 @@ const applyRecordingMetadata = (
 ): AudioTrack => {
     const title =
         pickFirstNonBlank(metadata.title, metadata.comment, metadata.work?.title, track.title) ??
-        `曲目 #${track.id}`
+        i18n.global.t('trackFallback.title', { id: track.id })
     const artist =
         pickFirstNonBlank(resolveMetadataArtistLabel(metadata.artists), track.artist) ??
-        '未知艺术家'
+        i18n.global.t('trackFallback.unknownArtist')
     const cover = metadata.cover?.url ? resolveCover(metadata.cover) : (track.cover ?? '')
     let workId = track.workId
     if (metadata.work?.id !== undefined) {
@@ -82,8 +83,16 @@ export const useAudioTrackCatalog = (options: UseAudioTrackCatalogOptions) => {
         }
 
         const cover = item.coverUrl ? buildApiUrl(item.coverUrl) : ''
-        const title = item.title || cached?.title || current?.title || `曲目 #${item.recordingId}`
-        const artist = item.artistLabel || cached?.artist || current?.artist || '未知艺术家'
+        const title =
+            item.title ||
+            cached?.title ||
+            current?.title ||
+            i18n.global.t('trackFallback.title', { id: item.recordingId })
+        const artist =
+            item.artistLabel ||
+            cached?.artist ||
+            current?.artist ||
+            i18n.global.t('trackFallback.unknownArtist')
 
         return {
             id: item.recordingId,
@@ -234,8 +243,8 @@ export const useAudioTrackCatalog = (options: UseAudioTrackCatalogOptions) => {
         const base = current ?? cached
         const track: AudioTrack = {
             id: recordingId,
-            title: base?.title ?? `曲目 #${recordingId}`,
-            artist: base?.artist ?? '未知艺术家',
+            title: base?.title ?? i18n.global.t('trackFallback.title', { id: recordingId }),
+            artist: base?.artist ?? i18n.global.t('trackFallback.unknownArtist'),
             cover: base?.cover ?? '',
             src: base?.src,
             mediaFileId: base?.mediaFileId,

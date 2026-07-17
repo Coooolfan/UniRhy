@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { useAudioStore } from '@/stores/audio'
 import CurrentQueueSidebar from '@/components/CurrentQueueSidebar.vue'
 import {
@@ -19,6 +20,7 @@ import {
 
 const audioStore = useAudioStore()
 const router = useRouter()
+const { t } = useI18n()
 const pendingSeekValue = ref<number | null>(null)
 const isQueueExpanded = ref(false)
 
@@ -205,8 +207,8 @@ const syncStatusClass = computed(() => {
                                     data-test="sync-status"
                                     class="shrink-0 inline-flex cursor-pointer items-center text-[10px] tracking-wide transition-colors hover:text-[#5E5950] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#C17D46]/40"
                                     :class="syncStatusClass"
-                                    title="打开同步调试页面"
-                                    aria-label="打开同步调试页面"
+                                    :title="t('audioPlayer.openSyncDebug')"
+                                    :aria-label="t('audioPlayer.openSyncDebug')"
                                     @click="openPlaybackSyncDebug"
                                 >
                                     {{ audioStore.syncStatusText }}
@@ -392,8 +394,8 @@ const syncStatusClass = computed(() => {
                             <button
                                 @click="hidePlayer"
                                 class="p-1 text-[#CFC9BF] hover:text-[#8C857B] transition-colors"
-                                title="收起播放器"
-                                aria-label="收起播放器"
+                                :title="t('audioPlayer.collapse')"
+                                :aria-label="t('audioPlayer.collapse')"
                             >
                                 <ChevronRight :size="20" />
                             </button>
@@ -433,7 +435,7 @@ const syncStatusClass = computed(() => {
                             opacity: isCornerHovered ? 1 : 0,
                             pointerEvents: isCornerHovered ? 'auto' : 'none',
                         }"
-                        aria-label="展开播放栏"
+                        :aria-label="t('audioPlayer.expand')"
                         @click="showPlayer"
                     >
                         <svg viewBox="0 0 320 320" class="absolute inset-0 w-full h-full">
@@ -477,8 +479,8 @@ const syncStatusClass = computed(() => {
                             background: `conic-gradient(from 0deg, transparent 0%, rgba(255,255,255,0.08) 15%, transparent 30%, transparent 50%, rgba(255,255,255,0.08) 65%, transparent 80%), repeating-radial-gradient(circle at 50% 50%, #1A1A1A 0%, #242424 1%, #1A1A1A 2%)`,
                             backgroundColor: '#1A1A1A',
                         }"
-                        aria-label="切换播放器展开状态"
-                        title="切换播放器展开状态"
+                        :aria-label="t('audioPlayer.toggleExpand')"
+                        :title="t('audioPlayer.toggleExpand')"
                         @click="togglePlayerVisibility"
                     >
                         <div

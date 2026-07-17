@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { reactive, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useModalContext } from '@/components/modals/modalContext'
 import type { StorageNodeForm } from '@/composables/useStorageSettings'
+
+const { t } = useI18n()
 
 type SubmitStorageNodeForm = (payload: StorageNodeForm) => Promise<string | null>
 
@@ -25,7 +28,7 @@ const props = withDefaults(
         initialHost: '',
         initialBucket: '',
         initialAccessKey: '',
-        submitText: '创建节点',
+        submitText: '',
     },
 )
 
@@ -86,7 +89,7 @@ const handleSubmit = async () => {
 <template>
     <div class="space-y-6">
         <p class="text-xs text-[#8A8A8A] font-serif italic">
-            UniRhy 可以扫描其中的媒体文件并管理、索引其中的内容
+            {{ t('storageNodeForm.scanHint') }}
         </p>
 
         <div class="space-y-6">
@@ -94,15 +97,15 @@ const handleSubmit = async () => {
                 <label
                     class="text-xs uppercase tracking-wider text-[#8A8A8A] font-serif block mb-2"
                 >
-                    节点类型
+                    {{ t('storageNodeForm.nodeType') }}
                 </label>
                 <select
                     v-model="form.type"
                     data-testid="storage-node-form-type"
                     class="w-full bg-[#F7F5F0] border-b border-[#D6D1C4] p-3 text-[#3D3D3D] focus:outline-none focus:border-[#C67C4E] transition-colors font-serif"
                 >
-                    <option value="FILE_SYSTEM">本地文件系统</option>
-                    <option value="OSS">对象存储</option>
+                    <option value="FILE_SYSTEM">{{ t('storageNodeForm.localFileSystem') }}</option>
+                    <option value="OSS">{{ t('storageNodeForm.objectStorage') }}</option>
                 </select>
             </div>
 
@@ -110,13 +113,13 @@ const handleSubmit = async () => {
                 <label
                     class="text-xs uppercase tracking-wider text-[#8A8A8A] font-serif block mb-2"
                 >
-                    节点名称
+                    {{ t('storageNodeForm.nodeName') }}
                 </label>
                 <input
                     v-model="form.name"
                     data-testid="storage-node-form-name"
                     type="text"
-                    placeholder="专辑刻录"
+                    :placeholder="t('storageNodeForm.nodeNamePlaceholder')"
                     class="w-full bg-[#F7F5F0] border-b border-[#D6D1C4] p-3 text-[#3D3D3D] focus:outline-none focus:border-[#C67C4E] transition-colors font-serif placeholder:text-[#BDB9AE]"
                 />
             </div>
@@ -125,7 +128,7 @@ const handleSubmit = async () => {
                 <label
                     class="text-xs uppercase tracking-wider text-[#8A8A8A] font-serif block mb-2"
                 >
-                    存储节点根路径
+                    {{ t('storageNodeForm.storagePath') }}
                 </label>
                 <input
                     v-model="form.parentPath"
@@ -170,7 +173,7 @@ const handleSubmit = async () => {
                         <label
                             class="text-xs uppercase tracking-wider text-[#8A8A8A] font-serif block mb-2"
                         >
-                            根路径前缀
+                            {{ t('storageNodeForm.rootPrefix') }}
                         </label>
                         <input
                             v-model="form.parentPath"
@@ -229,15 +232,15 @@ const handleSubmit = async () => {
                     <span
                         class="text-sm text-[#5A5A5A] group-hover:text-[#2B221B] transition-colors"
                     >
-                        只读节点
+                        {{ t('storageNodeForm.readonlyNode') }}
                     </span>
                 </label>
                 <p class="text-xs text-[#8A8A8A] leading-relaxed">
                     <span v-if="form.readonly">
-                        UniRhy 仅扫描此节点中的媒体文件，不会对其进行任何写入或修改操作
+                        {{ t('storageNodeForm.readonlyHint') }}
                     </span>
                     <span v-else>
-                        将此节点配置为系统节点后，UniRhy 将会在此节点中写入缓存、元数据等文件
+                        {{ t('storageNodeForm.systemNodeHint') }}
                     </span>
                 </p>
             </div>
@@ -258,7 +261,7 @@ const handleSubmit = async () => {
                     :disabled="isSubmitting"
                     @click="handleCancel"
                 >
-                    取消
+                    {{ t('common.cancel') }}
                 </button>
                 <button
                     type="button"
@@ -267,8 +270,8 @@ const handleSubmit = async () => {
                     :disabled="isSubmitting"
                     @click="handleSubmit"
                 >
-                    <span v-if="isSubmitting">正在创建...</span>
-                    <span v-else>{{ submitText }}</span>
+                    <span v-if="isSubmitting">{{ t('storageNodeForm.creating') }}</span>
+                    <span v-else>{{ submitText || t('storageNodeForm.createNode') }}</span>
                 </button>
             </div>
         </div>

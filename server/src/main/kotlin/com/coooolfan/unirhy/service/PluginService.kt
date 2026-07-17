@@ -1,5 +1,6 @@
 package com.coooolfan.unirhy.service
 
+import com.coooolfan.unirhy.error.PluginException
 import com.coooolfan.unirhy.model.Plugin
 import com.coooolfan.unirhy.model.enabled
 import com.coooolfan.unirhy.model.id
@@ -15,10 +16,8 @@ import tools.jackson.module.kotlin.kotlinModule
 import org.babyfish.jimmer.sql.ast.mutation.SaveMode
 import org.babyfish.jimmer.sql.kt.KSqlClient
 import org.slf4j.LoggerFactory
-import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.web.multipart.MultipartFile
-import org.springframework.web.server.ResponseStatusException
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.time.Instant
@@ -48,11 +47,11 @@ class PluginService(
 
     fun getPlugin(id: String): Plugin =
         sql.findById(Plugin::class, id)
-            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "plugin not found: $id")
+            ?: throw PluginException.NotFound()
 
     fun upload(file: MultipartFile) {
         if (file.size > MAX_ZIP_BYTES) {
-            throw ResponseStatusException(HttpStatus.CONTENT_TOO_LARGE, "plugin file exceeds 10MB limit")
+            throw PluginException.PackageTooLarge()
         }
 
         var manifestYaml: String? = null
@@ -66,7 +65,7 @@ class PluginService(
                     "plugin.wasm" -> {
                         val bytes = zis.readBytes()
                         if (bytes.size > MAX_WASM_BYTES) {
-                            throw ResponseStatusException(HttpStatus.CONTENT_TOO_LARGE, "wasm exceeds 20MB limit")
+                            throw PluginException.WasmTooLarge()
                         }
                         wasmBytes = bytes
                     }
@@ -76,23 +75,23 @@ class PluginService(
             }
         }
 
-        val yaml = manifestYaml ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, "plugin.yml missing from archive")
-        val wasm = wasmBytes ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, "plugin.wasm missing from archive")
+        val yaml = manifestYaml ?: throw PluginException.ManifestMissing()
+        val wasm = wasmBytes ?: throw PluginException.WasmMissing()
 
         val manifest = try {
             yamlMapper.readValue(yaml, PluginManifest::class.java)
         } catch (ex: Exception) {
-            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "invalid plugin.yml: ${ex.message}")
+            throw PluginException.InvalidManifest(cause = ex)
         }
 
         if (manifest.runtime.type != "wasm") {
-            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "unsupported runtime type: ${manifest.runtime.type}")
+            throw PluginException.UnsupportedRuntime()
         }
         if (manifest.runtime.abi != UNIRHY_WASM_ABI_V1) {
-            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "unsupported abi: ${manifest.runtime.abi}")
+            throw PluginException.UnsupportedAbi()
         }
         if (manifest.tasks.isEmpty()) {
-            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "plugin declares no task bindings")
+            throw PluginException.TaskBindingMissing()
         }
 
         val task = manifest.tasks.first()

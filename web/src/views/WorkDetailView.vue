@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { api, normalizeApiError } from '@/ApiInstance'
+import { useI18n } from 'vue-i18n'
+import { api } from '@/ApiInstance'
+import { resolveErrorMessage } from '@/i18n/errors'
 import DashboardTopBar from '@/components/dashboard/DashboardTopBar.vue'
 import MediaListPanel from '@/components/MediaListPanel.vue'
 import MediaListItem from '@/components/MediaListItem.vue'
@@ -31,6 +33,8 @@ import {
     type RecordingPlaybackCandidate,
 } from '@/services/recordingPlaybackResolver'
 import { useUserStore } from '@/stores/user'
+
+const { t } = useI18n()
 
 const route = useRoute()
 const modal = useModal()
@@ -174,8 +178,7 @@ const mergeState = useRecordingMergeState<Recording>({
         invalidateWorkPlaybackCache([targetId, ...sourceIds])
         await fetchWork(workId)
     },
-    parseError: (error) => normalizeApiError(error).message ?? '合并曲目失败',
-    fallbackErrorMessage: '合并曲目失败',
+    parseError: (error) => resolveErrorMessage(error, 'errors.fallback.mergeRecordings'),
 })
 
 const {
@@ -205,7 +208,7 @@ const openEditModal = async () => {
     }
 
     await modal.open(WorkTitleEditModal, {
-        title: '编辑作品',
+        title: t('work.editWork'),
         size: 'sm',
         props: {
             initialTitle: workData.value.title,
@@ -284,7 +287,7 @@ const openEditRecordingModal = async (recording: Recording) => {
 
 const openAddToPlaylistModal = (recording: Recording) => {
     void modal.open(AddRecordingToPlaylistModal, {
-        title: '添加到歌单',
+        title: t('media.addToPlaylist'),
         props: {
             recordingId: recording.id,
         },
@@ -317,23 +320,23 @@ const openRecordingMergeModal = async () => {
     }
 
     await modal.open(MergeSelectModal, {
-        title: '合并曲目',
+        title: t('merge.title'),
         size: 'md',
         props: {
-            description: '请选择保留的目标曲目，其余已选曲目将合并到该曲目。',
+            description: t('merge.description'),
             options: selectedRecordingOptions.value,
-            note: '来源曲目的音频资源、专辑关联、歌单关联、艺人关联会并入目标曲目，来源曲目将被删除；Default 标记按后端结果保持原样。',
+            note: t('merge.note'),
             modalTestId: 'recording-merge-modal',
             optionRadioTestId: 'recording-merge-target-radio',
             confirmTestId: 'submit-recording-merge-button',
-            missingTargetMessage: '请选择一个目标曲目。',
+            missingTargetMessage: t('merge.missingTargetMessage'),
             onConfirm: async (targetId: number) => {
                 const sourceIds = selectedRecordingOptions.value
                     .map((option) => option.id)
                     .filter((id) => id !== targetId)
 
                 if (sourceIds.length === 0) {
-                    throw new Error('请选择至少一条来源曲目。')
+                    throw new Error(t('merge.missingSourceMessage'))
                 }
 
                 await api.recordingController.mergeRecording({
@@ -391,7 +394,7 @@ watch(
             />
 
             <MediaListPanel
-                title="曲目"
+                :title="t('media.tracks')"
                 :items="recordings"
                 :playing-id="playingId"
                 :enable-multi-select="userStore.isAdmin"
@@ -408,7 +411,7 @@ watch(
                         class="px-3 py-1 border border-[#C27E46] text-[#C27E46] text-xs tracking-wide transition-colors hover:bg-[#C27E46] hover:text-white uppercase"
                         @click="openRecordingMergeModal"
                     >
-                        合并
+                        {{ t('workDetail.merge') }}
                     </button>
                 </template>
                 <template #item="{ item }">

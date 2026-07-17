@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { formatDurationMs } from '@/composables/recordingMedia'
 import { useAudioStore } from '@/stores/audio'
 import { ArrowDown, ArrowUp, LoaderCircle, Play, Trash2, ChevronDown } from 'lucide-vue-next'
+
+const { t } = useI18n()
 
 const props = defineProps<{
     expanded: boolean
@@ -21,18 +24,18 @@ const strategyDisabled = computed(() => {
 // 电台模式依赖服务端从整库补曲，独立播放模式下不可用
 const isRadioUnavailable = computed(() => audioStore.syncState === 'independent')
 
-const playbackStrategyOptions = [
-    { value: 'SEQUENTIAL', label: '顺序' },
-    { value: 'SHUFFLE', label: '随机' },
-    { value: 'SINGLE', label: '单曲' },
-    { value: 'RADIO', label: '电台' },
-] as const
+const playbackStrategyOptions = computed(() => [
+    { value: 'SEQUENTIAL', label: t('playbackMode.SEQUENTIAL') },
+    { value: 'SHUFFLE', label: t('playbackMode.SHUFFLE') },
+    { value: 'SINGLE', label: t('playbackMode.SINGLE') },
+    { value: 'RADIO', label: t('playbackMode.RADIO') },
+])
 
-const stopStrategyOptions = [
-    { value: 'TRACK', label: '单曲' },
-    { value: 'LIST', label: '列表' },
-    { value: 'NEVER', label: '永不' },
-] as const
+const stopStrategyOptions = computed(() => [
+    { value: 'TRACK', label: t('playbackStop.TRACK') },
+    { value: 'LIST', label: t('playbackStop.LIST') },
+    { value: 'NEVER', label: t('playbackStop.NEVER') },
+])
 
 const isVisible = computed(
     () => props.expanded && audioStore.queueEntries.length > 0 && !audioStore.isPlayerHidden,
@@ -111,10 +114,10 @@ const updateStopStrategy = (value: 'TRACK' | 'LIST' | 'NEVER') => {
                 <div class="flex items-start justify-between gap-3">
                     <div>
                         <div class="text-[11px] uppercase tracking-[0.22em] text-[#8C857B]">
-                            播放队列
+                            {{ t('queue.playQueue') }}
                         </div>
                         <div class="mt-1 text-sm font-medium text-[#3E322B]">
-                            {{ audioStore.queueEntries.length }} 首曲目
+                            {{ t('queue.trackCount', { count: audioStore.queueEntries.length }) }}
                         </div>
                     </div>
                     <button
@@ -127,7 +130,7 @@ const updateStopStrategy = (value: 'TRACK' | 'LIST' | 'NEVER') => {
                 </div>
                 <div class="mt-3 flex items-center gap-3 text-[11px] text-[#7C7367]">
                     <label class="flex flex-1 min-w-0 items-center gap-2">
-                        <span class="shrink-0 text-[#9A9287]">播放策略</span>
+                        <span class="shrink-0 text-[#9A9287]">{{ t('queue.playStrategy') }}</span>
                         <div class="relative min-w-0 flex-1">
                             <select
                                 data-test="playback-strategy-select"
@@ -161,7 +164,7 @@ const updateStopStrategy = (value: 'TRACK' | 'LIST' | 'NEVER') => {
                     </label>
 
                     <label class="flex flex-1 min-w-0 items-center gap-2">
-                        <span class="shrink-0 text-[#9A9287]">停止策略</span>
+                        <span class="shrink-0 text-[#9A9287]">{{ t('queue.stopStrategy') }}</span>
                         <div class="relative min-w-0 flex-1">
                             <select
                                 data-test="stop-strategy-select"
@@ -198,7 +201,7 @@ const updateStopStrategy = (value: 'TRACK' | 'LIST' | 'NEVER') => {
                         :disabled="!audioStore.canSendRealtimeControl"
                         @click="clearQueue"
                     >
-                        清空队列
+                        {{ t('queue.clearQueue') }}
                     </button>
                 </div>
             </div>

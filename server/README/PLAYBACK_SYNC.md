@@ -242,7 +242,7 @@ data class DeviceRuntimeState(
       "version": 8,
       "updatedAtMs": 1730844000100
     },
-    "queue": { "items": [], "recordingIds": [], "currentIndex": 0, "playbackStrategy": "SEQUENTIAL", "stopStrategy": "LIST", "playbackStatus": "PAUSED", "positionMs": 0, "serverTimeToExecuteMs": 0, "version": 8, "updatedAtMs": 1730844000100 }, 
+    "queue": { "items": [], "recordingIds": [], "currentIndex": 0, "playbackStrategy": "SEQUENTIAL", "stopStrategy": "LIST", "playbackStatus": "PAUSED", "positionMs": 0, "serverTimeToExecuteMs": 0, "version": 8, "updatedAtMs": 1730844000100 },
     "serverNowMs": 1730844000200
   }
 }

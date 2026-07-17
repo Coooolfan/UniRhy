@@ -1,4 +1,11 @@
 import { vi } from 'vitest'
+import { config } from '@vue/test-utils'
+import { i18n } from '@/i18n'
+
+// 所有组件测试共享同一个 i18n 实例，强制 zh-CN，
+// 使 useI18n()/$t 在挂载时可用，断言仍按中文文案匹配。
+i18n.global.locale.value = 'zh-CN'
+config.global.plugins = [i18n]
 
 const createTestStorage = (): Storage => {
     const store = new Map<string, string>()

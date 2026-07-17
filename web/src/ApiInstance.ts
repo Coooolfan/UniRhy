@@ -1,7 +1,7 @@
 import { Api, type ApiErrors } from './__generated'
 import { buildApiUrl } from '@/runtime/platform'
 import { runtimeFetch } from '@/runtime/http'
-const AUTH_EXPIRED_MESSAGE = '登录已过期，请重新登录'
+import { i18n } from '@/i18n'
 const TOKEN_STORAGE_KEY = 'unirhy.auth-token'
 const TOKEN_HEADER_NAME = 'unirhy-token'
 
@@ -12,6 +12,14 @@ export type ApiErrorShape = {
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
     typeof value === 'object' && value !== null
+
+const parseErrorResponse = (text: string) => {
+    try {
+        return JSON.parse(text)
+    } catch {
+        return new Error(i18n.global.t('errors.requestFailed'))
+    }
+}
 
 let hasHandledAuthExpiry = false
 
@@ -35,11 +43,11 @@ const handleAuthExpiry = () => {
     if (!hasHandledAuthExpiry) {
         hasHandledAuthExpiry = true
         clearAuthToken()
-        window.alert(AUTH_EXPIRED_MESSAGE)
+        window.alert(i18n.global.t('auth.expired'))
         window.location.replace('/')
     }
 
-    throw new Error(AUTH_EXPIRED_MESSAGE)
+    throw new Error(i18n.global.t('auth.expired'))
 }
 
 export function normalizeApiError(error: unknown): ApiErrorShape
@@ -65,7 +73,7 @@ export function normalizeApiError(
         return { message: error }
     }
 
-    return { message: '未知错误' }
+    return { message: i18n.global.t('common.unknownError') }
 }
 
 // 导出全局变量`api`
@@ -100,14 +108,12 @@ export const api = new Api(async ({ uri, method, headers, body }) => {
         handleAuthExpiry()
     }
 
-    if (Math.floor(response.status / 100) === 5) {
-        const text = await response.text()
-        console.error('服务器错误:', response.status, uri, text)
-        throw new Error('请求失败：' + text)
-    }
-
     if (Math.floor(response.status / 100) !== 2) {
-        throw await response.json()
+        const text = await response.text()
+        if (Math.floor(response.status / 100) === 5) {
+            console.error('服务器错误:', response.status, uri, text)
+        }
+        throw parseErrorResponse(text)
     }
 
     const text = await response.text()

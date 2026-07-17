@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { onBeforeUnmount, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { X } from 'lucide-vue-next'
+
+const { t } = useI18n()
 
 const props = defineProps<{
     open: boolean
@@ -74,7 +77,7 @@ onBeforeUnmount(() => {
                     <button
                         type="button"
                         class="p-1.5 text-[#8A8A8A] transition-colors hover:text-[#B86134]"
-                        aria-label="关闭"
+                        :aria-label="t('common.close')"
                         @click="close"
                     >
                         <X class="h-4 w-4" />

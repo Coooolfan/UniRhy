@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { reactive, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useModalContext } from '@/components/modals/modalContext'
 import type { AccountForm } from '@/composables/useAccountSettings'
+
+const { t } = useI18n()
 
 type SubmitAccountForm = (payload: AccountForm) => Promise<string | null>
 
@@ -33,7 +36,7 @@ const form = reactive<AccountForm>({
 
 const resolvedSubmitText = () => {
     if (props.submitText) return props.submitText
-    return props.mode === 'create' ? '创建账号' : '保存修改'
+    return props.mode === 'create' ? t('accountForm.createTitle') : t('accountForm.saveTitle')
 }
 
 const handleCancel = () => {
@@ -69,8 +72,8 @@ const handleSubmit = async () => {
 <template>
     <div class="space-y-6">
         <p class="font-serif text-xs italic text-[#8A8A8A]">
-            <span v-if="mode === 'create'">新账号将以非管理员身份登入 UniRhy</span>
-            <span v-else>留空密码字段表示保持当前密码不变</span>
+            <span v-if="mode === 'create'">{{ t('accountForm.createHint') }}</span>
+            <span v-else>{{ t('accountForm.editHint') }}</span>
         </p>
 
         <div class="space-y-6">
@@ -78,13 +81,13 @@ const handleSubmit = async () => {
                 <label
                     class="mb-2 block font-serif text-xs uppercase tracking-wider text-[#8A8A8A]"
                 >
-                    账号名称
+                    {{ t('accountForm.name') }}
                 </label>
                 <input
                     v-model="form.name"
                     data-testid="account-form-name"
                     type="text"
-                    placeholder="例如：listener"
+                    :placeholder="t('accountForm.namePlaceholder')"
                     autocomplete="off"
                     class="w-full border-b border-[#D6D1C4] bg-[#F7F5F0] p-3 font-serif text-[#3D3D3D] transition-colors placeholder:text-[#BDB9AE] focus:border-[#C67C4E] focus:outline-none"
                 />
@@ -94,7 +97,7 @@ const handleSubmit = async () => {
                 <label
                     class="mb-2 block font-serif text-xs uppercase tracking-wider text-[#8A8A8A]"
                 >
-                    邮箱
+                    {{ t('accountForm.email') }}
                 </label>
                 <input
                     v-model="form.email"
@@ -110,13 +113,21 @@ const handleSubmit = async () => {
                 <label
                     class="mb-2 block font-serif text-xs uppercase tracking-wider text-[#8A8A8A]"
                 >
-                    {{ mode === 'create' ? '初始密码' : '新密码（可选）' }}
+                    {{
+                        mode === 'create'
+                            ? t('accountForm.initialPassword')
+                            : t('accountForm.newPassword')
+                    }}
                 </label>
                 <input
                     v-model="form.password"
                     data-testid="account-form-password"
                     type="password"
-                    :placeholder="mode === 'create' ? '请输入密码' : '不修改请留空'"
+                    :placeholder="
+                        mode === 'create'
+                            ? t('accountForm.passwordPlaceholderCreate')
+                            : t('accountForm.passwordPlaceholderEdit')
+                    "
                     autocomplete="new-password"
                     class="w-full border-b border-[#D6D1C4] bg-[#F7F5F0] p-3 font-serif text-[#3D3D3D] transition-colors placeholder:text-[#BDB9AE] focus:border-[#C67C4E] focus:outline-none"
                 />
@@ -134,7 +145,7 @@ const handleSubmit = async () => {
                     :disabled="isSubmitting"
                     @click="handleCancel"
                 >
-                    取消
+                    {{ t('common.cancel') }}
                 </button>
                 <button
                     type="button"
@@ -144,7 +155,9 @@ const handleSubmit = async () => {
                     @click="handleSubmit"
                 >
                     <span v-if="isSubmitting">
-                        {{ mode === 'create' ? '正在创建...' : '正在保存...' }}
+                        {{
+                            mode === 'create' ? t('accountForm.creating') : t('accountForm.saving')
+                        }}
                     </span>
                     <span v-else>{{ resolvedSubmitText() }}</span>
                 </button>

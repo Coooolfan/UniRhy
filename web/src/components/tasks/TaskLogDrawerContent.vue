@@ -1,12 +1,16 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { api, normalizeApiError } from '@/ApiInstance'
+import { api } from '@/ApiInstance'
+import { resolveErrorMessage } from '@/i18n/errors'
 import type { AsyncTaskLogDto } from '@/__generated/model/dto'
 import type { TaskStatus } from '@/__generated/model/enums/TaskStatus'
 import type { TaskType } from '@/__generated/model/enums/TaskType'
+import { useI18n } from 'vue-i18n'
 import { useUserStore } from '@/stores/user'
 import { useModal } from '@/composables/useModal'
 import { ChevronLeft, ChevronRight, Loader2, RotateCcw } from 'lucide-vue-next'
+
+const { t } = useI18n()
 
 type TaskLog = AsyncTaskLogDto['TaskController/DEFAULT_TASK_LOG_FETCHER']
 
@@ -44,12 +48,12 @@ const toggleStatus = (target: TaskStatus) => {
     emit('update:statuses', next)
 }
 
-const STATUS_LABEL_MAP: Record<TaskStatus, string> = {
-    PENDING: '待处理',
-    RUNNING: '执行中',
-    COMPLETED: '已完成',
-    FAILED: '失败',
-}
+const statusLabelMap = computed<Record<TaskStatus, string>>(() => ({
+    PENDING: t('taskLog.pending'),
+    RUNNING: t('taskLog.running'),
+    COMPLETED: t('taskLog.completed'),
+    FAILED: t('taskLog.failed'),
+}))
 
 const STATUS_BADGE_CLASS = 'border-[#DFD6C4] bg-[#F1EBDD] text-[#5A524A]'
 
@@ -92,7 +96,7 @@ const fetchLogs = async () => {
         totalPageCount.value = page.totalPageCount
         totalRowCount.value = page.totalRowCount
     } catch (err) {
-        error.value = normalizeApiError(err).message ?? '加载任务列表失败'
+        error.value = resolveErrorMessage(err, 'errors.fallback.taskLogLoad')
         rows.value = []
         totalPageCount.value = 0
         totalRowCount.value = 0
@@ -154,10 +158,13 @@ const formatParams = (raw: string) => {
 const resetTask = async (row: TaskLog) => {
     if (!canResetRow(row) || resettingId.value !== null) return
     const confirmed = await modal.confirm({
-        title: '重置任务',
-        content: `确定将任务 #${row.id}（${STATUS_LABEL_MAP[row.status]}）重置为待处理？worker 将重新执行该任务。`,
-        confirmText: '重置',
-        cancelText: '取消',
+        title: t('taskLog.resetTitle'),
+        content: t('taskLog.resetConfirm', {
+            id: row.id,
+            status: statusLabelMap.value[row.status],
+        }),
+        confirmText: t('taskLog.reset'),
+        cancelText: t('common.cancel'),
         tone: 'danger',
     })
     if (!confirmed) return
@@ -169,7 +176,7 @@ const resetTask = async (row: TaskLog) => {
         emit('resetSuccess')
         await fetchLogs()
     } catch (err) {
-        error.value = normalizeApiError(err).message ?? '重置任务失败'
+        error.value = resolveErrorMessage(err, 'errors.fallback.taskLogReset')
     } finally {
         resettingId.value = null
     }
@@ -181,7 +188,7 @@ const resetTask = async (row: TaskLog) => {
         <div class="space-y-3 border-b border-[#EAE6DE] px-4 py-4 sm:px-6">
             <label class="block">
                 <span class="mb-1.5 block text-[10px] uppercase tracking-[0.24em] text-[#8A8177]">
-                    任务类型
+                    {{ t('taskLog.taskType') }}
                 </span>
                 <div class="relative">
                     <select
@@ -215,10 +222,12 @@ const resetTask = async (row: TaskLog) => {
                     "
                     @click="toggleStatus(s)"
                 >
-                    {{ STATUS_LABEL_MAP[s] }}
+                    {{ statusLabelMap[s] }}
                 </button>
             </div>
-            <div class="text-xs text-[#8A8177]">共 {{ totalRowCount }} 条</div>
+            <div class="text-xs text-[#8A8177]">
+                {{ t('taskLog.totalCount', { count: totalRowCount }) }}
+            </div>
         </div>
 
         <div class="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6">
@@ -234,14 +243,14 @@ const resetTask = async (row: TaskLog) => {
                 class="flex items-center justify-center py-12 text-sm text-[#6B635B]"
             >
                 <Loader2 class="mr-2 h-4 w-4 animate-spin" />
-                加载中...
+                {{ t('taskLog.loading') }}
             </div>
 
             <div
                 v-else-if="rows.length === 0"
                 class="flex items-center justify-center py-12 text-sm text-[#8A8177]"
             >
-                当前状态下没有任务记录
+                {{ t('taskLog.noRecords') }}
             </div>
 
             <ul v-else class="space-y-3">
@@ -260,18 +269,24 @@ const resetTask = async (row: TaskLog) => {
                                     class="inline-flex shrink-0 items-center whitespace-nowrap border px-1.5 py-0.5 text-[10px] uppercase tracking-[0.2em]"
                                     :class="STATUS_BADGE_CLASS"
                                 >
-                                    {{ STATUS_LABEL_MAP[row.status] }}
+                                    {{ statusLabelMap[row.status] }}
                                 </span>
                                 <span class="hidden sm:inline">·</span>
                                 <span class="basis-full sm:basis-auto">
-                                    创建 {{ formatTime(row.createdAt) }}
+                                    {{
+                                        t('taskLog.createdAt', { time: formatTime(row.createdAt) })
+                                    }}
                                 </span>
                             </div>
                             <div
                                 class="mt-1 grid grid-cols-1 gap-x-3 text-[11px] text-[#8A8177] sm:grid-cols-2"
                             >
-                                <span>开始 {{ formatTime(row.startedAt) }}</span>
-                                <span>结束 {{ formatTime(row.completedAt) }}</span>
+                                <span>{{
+                                    t('taskLog.startedAt', { time: formatTime(row.startedAt) })
+                                }}</span>
+                                <span>{{
+                                    t('taskLog.completedAt', { time: formatTime(row.completedAt) })
+                                }}</span>
                             </div>
                             <div
                                 v-if="row.completedReason"
@@ -289,7 +304,7 @@ const resetTask = async (row: TaskLog) => {
                         >
                             <Loader2 v-if="resettingId === row.id" class="h-3 w-3 animate-spin" />
                             <RotateCcw v-else class="h-3 w-3" />
-                            <span>重置</span>
+                            <span>{{ t('taskLog.reset') }}</span>
                         </button>
                     </div>
 
@@ -298,7 +313,11 @@ const resetTask = async (row: TaskLog) => {
                         class="mt-3 text-[11px] uppercase tracking-[0.22em] text-[#8A8177] transition-colors hover:text-[#B86134]"
                         @click="toggleExpand(row.id)"
                     >
-                        {{ expandedIds.has(row.id) ? '隐藏参数' : '查看参数' }}
+                        {{
+                            expandedIds.has(row.id)
+                                ? t('taskLog.hideParams')
+                                : t('taskLog.viewParams')
+                        }}
                     </button>
                     <pre
                         v-if="expandedIds.has(row.id)"
@@ -313,7 +332,12 @@ const resetTask = async (row: TaskLog) => {
             class="flex items-center justify-between border-t border-[#EAE6DE] px-4 py-3 text-xs text-[#6B635B] sm:px-6"
         >
             <span>
-                第 {{ totalPageCount === 0 ? 0 : pageIndex + 1 }} / {{ totalPageCount }} 页
+                {{
+                    t('taskLog.pageInfo', {
+                        current: totalPageCount === 0 ? 0 : pageIndex + 1,
+                        total: totalPageCount,
+                    })
+                }}
             </span>
             <div class="flex items-center gap-2">
                 <button
@@ -323,7 +347,7 @@ const resetTask = async (row: TaskLog) => {
                     @click="goPrev"
                 >
                     <ChevronLeft class="h-3 w-3" />
-                    上一页
+                    {{ t('taskLog.prevPage') }}
                 </button>
                 <button
                     type="button"
@@ -331,7 +355,7 @@ const resetTask = async (row: TaskLog) => {
                     :disabled="pageIndex + 1 >= totalPageCount || loading"
                     @click="goNext"
                 >
-                    下一页
+                    {{ t('taskLog.nextPage') }}
                     <ChevronRight class="h-3 w-3" />
                 </button>
             </div>

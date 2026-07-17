@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { api, normalizeApiError } from '@/ApiInstance'
+import { useI18n } from 'vue-i18n'
+import { api } from '@/ApiInstance'
+import { resolveErrorMessage } from '@/i18n/errors'
 import DashboardTopBar from '@/components/dashboard/DashboardTopBar.vue'
 import MediaListPanel from '@/components/MediaListPanel.vue'
 import MediaListItem from '@/components/MediaListItem.vue'
@@ -31,6 +33,8 @@ import {
 } from '@/services/recordingPlaybackResolver'
 import { useUserStore } from '@/stores/user'
 import { hasSameItemOrder, moveItemById, type ReorderPayload } from '@/utils/recordingOrder'
+
+const { t } = useI18n()
 
 const route = useRoute()
 const modal = useModal()
@@ -162,7 +166,7 @@ const fetchAlbum = async (id: number) => {
 
 const openAddToPlaylistModal = (recording: Recording) => {
     void modal.open(AddRecordingToPlaylistModal, {
-        title: '添加到歌单',
+        title: t('media.addToPlaylist'),
         size: 'sm',
         props: {
             recordingId: recording.id,
@@ -177,7 +181,7 @@ const openEditAlbumModal = async () => {
     }
 
     await modal.open(AlbumEditModal, {
-        title: '编辑专辑',
+        title: t('album.editAlbum'),
         size: 'md',
         props: {
             initialForm: { ...albumEditInitial.value },
@@ -236,8 +240,10 @@ const handleRecordingReorder = async (payload: ReorderPayload) => {
         invalidateResolvedPlayableTrack('album', albumId)
     } catch (error) {
         recordings.value = previousRecordings
-        const normalized = normalizeApiError(error)
-        reorderRecordingError.value = normalized.message ?? '调整曲目顺序失败'
+        reorderRecordingError.value = resolveErrorMessage(
+            error,
+            'errors.fallback.reorderRecordings',
+        )
     } finally {
         isReorderingRecordings.value = false
     }
@@ -322,8 +328,8 @@ watch(
             />
 
             <MediaListPanel
-                title="曲目"
-                :summary="`${recordings.length} 首曲目`"
+                :title="t('media.tracks')"
+                :summary="t('media.trackCount', { count: recordings.length })"
                 :items="recordings"
                 :playing-id="playingId"
                 :enable-reorder="userStore.isAdmin"
@@ -334,7 +340,7 @@ watch(
             >
                 <template #actions>
                     <span class="text-[11px] uppercase tracking-[0.24em] text-[#B0AAA0]">
-                        {{ isReorderingRecordings ? '正在保存顺序' : '' }}
+                        {{ isReorderingRecordings ? t('recording.savingOrder') : '' }}
                     </span>
                 </template>
                 <template #item="{ item }">

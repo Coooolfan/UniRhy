@@ -4,6 +4,7 @@ import { nextTick } from 'vue'
 import { createPinia, setActivePinia } from 'pinia'
 import AppModalHost from '@/components/modals/AppModalHost.vue'
 import { useUserStore } from '@/stores/user'
+import { i18n } from '@/i18n'
 
 vi.mock('@/ApiInstance', async (importOriginal) => {
     const actual = await importOriginal<typeof import('@/ApiInstance')>()
@@ -91,6 +92,7 @@ const setUser = (admin: boolean) => {
 
 describe('TasksView', () => {
     beforeEach(() => {
+        i18n.global.locale.value = 'zh-CN'
         setActivePinia(createPinia())
         setUser(true)
         listTaskLogsMock.mockReset()
@@ -131,6 +133,22 @@ describe('TasksView', () => {
         expect(wrapper.text()).toContain('任务类型分布')
         expect(wrapper.text()).toMatch(/其中\s*5\s*个排队，1\s*个正在执行。?/u)
         expect(wrapper.text()).toMatch(/1\s*Failed\s*失败/u)
+    })
+
+    it('updates status labels when the locale changes', async () => {
+        listTaskLogsMock.mockResolvedValue([
+            { taskType: 'METADATA_PARSE', status: 'PENDING', count: 1 },
+        ])
+        const wrapper = mountWithModalHost()
+
+        await flushView()
+        expect(wrapper.text()).toMatch(/Pending\s*待处理/u)
+
+        i18n.global.locale.value = 'en'
+        await nextTick()
+
+        expect(wrapper.text()).toMatch(/Pending\s*Pending/u)
+        expect(wrapper.text()).not.toContain('待处理')
     })
 
     it('shows submit feedback on the action button for two seconds after a successful submission', async () => {

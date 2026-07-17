@@ -14,7 +14,9 @@ import DashboardTopBar from '@/components/dashboard/DashboardTopBar.vue'
 import LibraryEmptyHint from '@/components/dashboard/LibraryEmptyHint.vue'
 import AlbumGridCard from '@/components/media/AlbumGridCard.vue'
 import WorkGridCard from '@/components/media/WorkGridCard.vue'
-import { api, normalizeApiError } from '@/ApiInstance'
+import { useI18n } from 'vue-i18n'
+import { api } from '@/ApiInstance'
+import { resolveErrorMessage } from '@/i18n/errors'
 import { type Breakpoint, useBreakpoint } from '@/composables/useBreakpoint'
 import { resolveArtistName, resolveCover } from '@/composables/recordingMedia'
 import {
@@ -35,6 +37,7 @@ type DisplayItem = {
 
 const router = useRouter()
 const route = useRoute()
+const { t } = useI18n()
 const audioStore = useAudioStore()
 const viewMode = ref<'grid' | 'list'>('grid')
 type LibraryTab = 'Albums' | 'Works' | 'Artists'
@@ -68,13 +71,12 @@ const fetchAlbums = async () => {
         displayItems.value = page.rows.map((album) => ({
             id: album.id,
             type: 'album',
-            title: album.title || 'Untitled Album',
+            title: album.title || t('common.untitledAlbum'),
             subtitle: resolveArtistName(album.recordings?.[0]?.artists),
             cover: resolveCover(album.cover),
         }))
     } catch (error) {
-        const normalized = normalizeApiError(error)
-        errorMessage.value = normalized.message ?? '专辑加载失败'
+        errorMessage.value = resolveErrorMessage(error, 'errors.fallback.albumLoad')
     } finally {
         isLoading.value = false
     }
@@ -94,12 +96,12 @@ const fetchWorks = async () => {
             const mainRecording =
                 work.recordings?.find((recording) => recording.defaultInWork) ??
                 work.recordings?.[0]
-            const artistName = mainRecording?.artists?.[0]?.displayName || 'Unknown Artist'
+            const artistName = mainRecording?.artists?.[0]?.displayName || t('common.unknownArtist')
 
             return {
                 id: work.id,
                 type: 'work',
-                title: work.title || 'Untitled Work',
+                title: work.title || t('common.untitledWork'),
                 subtitle: artistName,
                 cover: resolveCover(mainRecording?.cover),
                 stackedImages: work.recordings?.map((recording) => ({
@@ -109,8 +111,7 @@ const fetchWorks = async () => {
             }
         })
     } catch (error) {
-        const normalized = normalizeApiError(error)
-        errorMessage.value = normalized.message ?? '作品加载失败'
+        errorMessage.value = resolveErrorMessage(error, 'errors.fallback.workLoad')
     } finally {
         isLoading.value = false
     }
@@ -250,8 +251,12 @@ const playItem = async (item: DisplayItem) => {
                 class="mb-8 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between sm:gap-6"
             >
                 <div>
-                    <h2 class="mb-2 text-3xl font-serif text-[#2C2420] sm:text-4xl">资料库</h2>
-                    <p class="text-[#8C857B] font-serif italic">所有旋律归于此处</p>
+                    <h2 class="mb-2 text-3xl font-serif text-[#2C2420] sm:text-4xl">
+                        {{ t('albumList.library') }}
+                    </h2>
+                    <p class="text-[#8C857B] font-serif italic">
+                        {{ t('albumList.librarySubtitle') }}
+                    </p>
                 </div>
 
                 <div
@@ -297,7 +302,7 @@ const playItem = async (item: DisplayItem) => {
                     "
                     @click="handleTabChange('Albums')"
                 >
-                    专辑
+                    {{ t('albums.title') }}
                 </button>
                 <button
                     class="text-sm tracking-wide transition-colors relative"
@@ -308,7 +313,7 @@ const playItem = async (item: DisplayItem) => {
                     "
                     @click="handleTabChange('Works')"
                 >
-                    作品
+                    {{ t('works.title') }}
                 </button>
                 <button
                     class="text-sm tracking-wide transition-colors relative"
@@ -319,7 +324,7 @@ const playItem = async (item: DisplayItem) => {
                     "
                     @click="handleTabChange('Artists')"
                 >
-                    艺术家
+                    {{ t('artists.title') }}
                 </button>
             </div>
         </div>
@@ -332,23 +337,22 @@ const playItem = async (item: DisplayItem) => {
                 @update:total-page-count="(value: number) => (totalPageCount = value)"
             />
             <div v-else-if="isLoading && displayItems.length === 0" class="text-[#8C857B] text-sm">
-                加载中...
+                {{ t('albumList.loading') }}
             </div>
             <div v-else-if="errorMessage" class="text-[#B75D5D] text-sm">
                 {{ errorMessage }}
-                <button class="ml-4 text-[#C27E46]" type="button" @click="fetchData">重试</button>
+                <button class="ml-4 text-[#C27E46]" type="button" @click="fetchData">
+                    {{ t('albumList.retry') }}
+                </button>
             </div>
 
             <div v-else :class="{ 'opacity-50 pointer-events-none': isLoading }">
                 <LibraryEmptyHint
                     v-if="displayItems.length === 0"
-                    :title="activeTab === 'Works' ? '作品库空空如也' : undefined"
+                    :title="activeTab === 'Works' ? t('works.emptyHint') : undefined"
                     :description="
                         activeTab === 'Works'
-                            ? [
-                                  '我们将旋律的不同演绎版本，称之为作品。',
-                                  '连接存储节点，发起元数据解析任务，UniRhy 将自动发现作品。',
-                              ]
+                            ? [t('works.explanation1'), t('works.explanation2')]
                             : undefined
                     "
                 />
@@ -394,9 +398,11 @@ const playItem = async (item: DisplayItem) => {
                     >
                         <div class="col-span-1">#</div>
                         <div class="col-span-5">
-                            {{ activeTab === 'Albums' ? '专辑名' : '作品名' }}
+                            {{
+                                activeTab === 'Albums' ? t('albums.albumName') : t('works.workName')
+                            }}
                         </div>
-                        <div class="col-span-4">艺术家</div>
+                        <div class="col-span-4">{{ t('artists.title') }}</div>
                     </div>
                     <div
                         v-for="(item, idx) in displayItems"
@@ -468,7 +474,7 @@ const playItem = async (item: DisplayItem) => {
                     <ChevronLeft :size="20" />
                 </button>
                 <span class="font-serif text-sm text-[#5E5950]">
-                    第 {{ pageIndex + 1 }} / {{ totalPageCount }} 页
+                    {{ t('albumList.pageInfo', { current: pageIndex + 1, total: totalPageCount }) }}
                 </span>
                 <button
                     :disabled="pageIndex >= totalPageCount - 1 || isLoading"

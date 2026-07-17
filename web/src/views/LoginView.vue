@@ -18,7 +18,7 @@
                 "
                 :role="isLoginMode ? 'button' : undefined"
                 :tabindex="isLoginMode ? 0 : -1"
-                :aria-label="isLoginMode ? '切换到注册' : undefined"
+                :aria-label="isLoginMode ? t('login.switchToRegister') : undefined"
                 @click="switchToRegister"
                 @keydown.enter.space.self.prevent="switchToRegister"
             >
@@ -26,14 +26,14 @@
                     <h1
                         class="mb-8 border-b-2 border-[#2c2825] pb-4 text-left text-3xl font-bold tracking-widest sm:mb-10"
                     >
-                        注册
+                        {{ t('login.register') }}
                     </h1>
 
                     <div
                         class="flex-1 flex flex-col items-center justify-center text-center text-[#5a534d] leading-relaxed tracking-wide"
                     >
-                        <p>这不是一个公共站点</p>
-                        <p class="mt-2">请联系管理员创建账号</p>
+                        <p>{{ t('login.notPublicSite') }}</p>
+                        <p class="mt-2">{{ t('login.contactAdmin') }}</p>
                     </div>
 
                     <div class="text-center mt-6">
@@ -41,7 +41,7 @@
                             @click.stop="switchToLogin"
                             class="text-sm text-[#8a817c] hover:text-[#d98c28] underline decoration-dotted underline-offset-4"
                         >
-                            已有账号？去登录
+                            {{ t('login.alreadyHaveAccount') }}
                         </button>
                     </div>
                 </div>
@@ -54,7 +54,7 @@
                     <h2
                         class="writing-vertical-rl select-none text-2xl font-bold tracking-widest sm:text-3xl"
                     >
-                        登录
+                        {{ t('login.login') }}
                     </h2>
                 </div>
             </div>
@@ -69,7 +69,7 @@
                 "
                 :role="!isLoginMode ? 'button' : undefined"
                 :tabindex="!isLoginMode ? 0 : -1"
-                :aria-label="!isLoginMode ? '切换到登录' : undefined"
+                :aria-label="!isLoginMode ? t('login.switchToLogin') : undefined"
                 @click="switchToLogin"
                 @keydown.enter.space.self.prevent="switchToLogin"
             >
@@ -77,7 +77,7 @@
                     <h1
                         class="mb-8 border-b-2 border-[#2c2825] pb-4 text-left text-3xl tracking-widest sm:mb-10"
                     >
-                        欢迎回来
+                        {{ t('login.title') }}
                     </h1>
 
                     <form
@@ -97,13 +97,14 @@
                                 required
                                 class="peer w-full bg-transparent border-b border-[#d6d0c4] focus:border-[#d98c28] outline-none py-2 text-[#2c2825] placeholder-transparent transition-colors"
                                 placeholder="Email"
+                                data-i18n-ignore
                                 @input="clearLoginError"
                             />
                             <label
                                 for="login-email"
                                 class="absolute left-0 -top-3.5 text-[#8a817c] text-sm transition-all peer-placeholder-shown:text-base peer-placeholder-shown:text-[#b0a8a0] peer-placeholder-shown:top-2 peer-focus:-top-3.5 peer-focus:text-[#2c2825] peer-focus:text-sm cursor-text"
                             >
-                                邮箱
+                                {{ t('login.email') }}
                             </label>
                         </div>
 
@@ -117,13 +118,14 @@
                                 required
                                 class="peer w-full bg-transparent border-b border-[#d6d0c4] focus:border-[#d98c28] outline-none py-2 text-[#2c2825] placeholder-transparent transition-colors"
                                 placeholder="Password"
+                                data-i18n-ignore
                                 @input="clearLoginError"
                             />
                             <label
                                 for="login-password"
                                 class="absolute left-0 -top-3.5 text-[#8a817c] text-sm transition-all peer-placeholder-shown:text-base peer-placeholder-shown:text-[#b0a8a0] peer-placeholder-shown:top-2 peer-focus:-top-3.5 peer-focus:text-[#2c2825] peer-focus:text-sm cursor-text"
                             >
-                                密码
+                                {{ t('login.password') }}
                             </label>
                         </div>
 
@@ -136,7 +138,7 @@
                                 type="submit"
                                 class="outline-button px-8 py-2 font-bold tracking-widest transition-all duration-300 transform active:scale-95"
                             >
-                                进 入
+                                {{ t('login.enter') }}
                             </button>
                         </div>
                     </form>
@@ -158,7 +160,7 @@
                                 for="backend-url"
                                 class="absolute left-0 -top-3.5 text-[#8a817c] text-sm transition-all peer-placeholder-shown:text-base peer-placeholder-shown:text-[#b0a8a0] peer-placeholder-shown:top-2 peer-focus:-top-3.5 peer-focus:text-[#2c2825] peer-focus:text-sm cursor-text"
                             >
-                                服务端地址
+                                {{ t('login.backendUrl') }}
                             </label>
                         </div>
 
@@ -171,7 +173,7 @@
                                 type="submit"
                                 class="outline-button px-8 py-2 font-bold tracking-widest transition-all duration-300 transform active:scale-95"
                             >
-                                保 存
+                                {{ t('login.save') }}
                             </button>
                         </div>
                     </form>
@@ -181,7 +183,7 @@
                             @click.stop="switchToRegister"
                             class="text-sm text-[#8a817c] hover:text-[#d98c28] decoration-dotted hover:underline underline-offset-4 transition-colors"
                         >
-                            注册账号
+                            {{ t('login.registerAccount') }}
                         </button>
                     </div>
 
@@ -189,7 +191,7 @@
                         v-if="showBackendEndpoint && !isEditingBackendUrl"
                         class="mt-4 border-t border-[#e6dcc8] pt-3 text-left text-xs text-[#8a817c]"
                     >
-                        <span>已连接至：</span>
+                        <span>{{ t('login.connectedTo') }}</span>
                         <button
                             type="button"
                             class="break-all text-[#2c2825] underline decoration-dotted underline-offset-4 transition-colors hover:text-[#d98c28]"
@@ -204,7 +206,7 @@
                     <h2
                         class="writing-vertical-rl select-none text-2xl font-bold tracking-widest sm:text-3xl"
                     >
-                        注册
+                        {{ t('login.register') }}
                     </h2>
                 </div>
             </div>
@@ -215,9 +217,13 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { api, normalizeApiError, saveAuthToken } from '@/ApiInstance'
+import { useI18n } from 'vue-i18n'
+import { api, saveAuthToken } from '@/ApiInstance'
+import { resolveErrorMessage } from '@/i18n/errors'
 import { getPlatformRuntime, setPlatformApiBaseUrl } from '@/runtime/platform'
 import { getInitializationStatus, resetInitializationStatus } from '@/services/systemInitialization'
+
+const { t } = useI18n()
 
 const router = useRouter()
 const isLoginMode = ref(true)
@@ -254,7 +260,7 @@ const saveBackendUrl = async () => {
         }
         isEditingBackendUrl.value = false
     } catch (error) {
-        backendUrlError.value = normalizeApiError(error).message ?? '保存失败'
+        backendUrlError.value = resolveErrorMessage(error, 'errors.fallback.backendUrlSave')
     }
 }
 
@@ -281,15 +287,8 @@ const clearLoginError = () => {
     loginError.value = ''
 }
 
-const getLoginErrorMessage = (error: unknown) => {
-    const normalizedError = normalizeApiError(error, 'tokenController', 'login')
-
-    if (normalizedError.code === 'AUTHENTICATION_FAILED' || normalizedError.status === 401) {
-        return '邮箱或密码不正确'
-    }
-
-    return normalizedError.message || '登录失败，请检查服务端连接后重试'
-}
+const getLoginErrorMessage = (error: unknown) =>
+    resolveErrorMessage(error, 'errors.fallback.loginFailed')
 
 const handleLogin = async () => {
     loginError.value = ''

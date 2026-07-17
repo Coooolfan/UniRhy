@@ -1,6 +1,9 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import { Pause, Play } from 'lucide-vue-next'
 import StackedCovers from '@/components/StackedCovers.vue'
+
+const { t } = useI18n()
 
 type CoverItem = {
     id: number | string
@@ -50,7 +53,7 @@ const emit = defineEmits<{
                 <button
                     v-if="selectable"
                     type="button"
-                    aria-label="选择作品"
+                    :aria-label="t('media.selectWork')"
                     class="absolute top-0 left-0 w-1/2 h-1/2 z-30 cursor-pointer"
                     @click.stop="emit('toggle-select')"
                 ></button>

@@ -3,6 +3,7 @@ import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { nextTick } from 'vue'
 import { PLAYBACK_MODE_STORAGE_KEY, useClientPreferencesStore } from '@/stores/clientPreferences'
+import { i18n, LOCALE_STORAGE_KEY, setDocumentLocale } from '@/i18n'
 import { useUserStore } from '@/stores/user'
 import PreferencesView from '@/views/PreferencesView.vue'
 
@@ -43,6 +44,8 @@ describe('PreferencesView', () => {
     beforeEach(() => {
         setActivePinia(createPinia())
         window.localStorage.clear()
+        i18n.global.locale.value = 'zh-CN'
+        setDocumentLocale('zh-CN')
         androidPlaybackMocks.isAndroid = false
         androidPlaybackMocks.getSystemStatus.mockReset().mockResolvedValue({
             notificationPermissionGranted: false,
@@ -63,6 +66,16 @@ describe('PreferencesView', () => {
         expect(window.localStorage.getItem(PLAYBACK_MODE_STORAGE_KEY)).toBe('SYNC')
         expect(useClientPreferencesStore().playbackMode).toBe('SYNC')
         expect(updateUserSpy).not.toHaveBeenCalled()
+    })
+
+    it('persists the locale and updates the document language', async () => {
+        const wrapper = mount(PreferencesView)
+
+        await wrapper.get('[data-test="language-select"]').setValue('en')
+
+        expect(window.localStorage.getItem(LOCALE_STORAGE_KEY)).toBe('en')
+        expect(useClientPreferencesStore().locale).toBe('en')
+        expect(document.documentElement.lang).toBe('en')
     })
 
     it('shows Android playback status and opens the relevant system settings', async () => {

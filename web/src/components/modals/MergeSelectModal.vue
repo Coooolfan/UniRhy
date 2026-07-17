@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { normalizeApiError } from '@/ApiInstance'
+import { useI18n } from 'vue-i18n'
+import { resolveErrorMessage } from '@/i18n/errors'
 import { useModalContext } from '@/components/modals/modalContext'
+
+const { t } = useI18n()
 
 export type MergeSelectOption = {
     id: number
@@ -24,12 +27,12 @@ const props = withDefaults(
     }>(),
     {
         note: '',
-        confirmText: '确认合并',
-        submittingText: '合并中...',
+        confirmText: undefined,
+        submittingText: undefined,
         modalTestId: undefined,
         optionRadioTestId: undefined,
         confirmTestId: undefined,
-        missingTargetMessage: '请选择一个目标项。',
+        missingTargetMessage: undefined,
     },
 )
 
@@ -49,7 +52,7 @@ const closeModal = () => {
 
 const submit = async () => {
     if (selectedTargetId.value === null) {
-        error.value = props.missingTargetMessage
+        error.value = props.missingTargetMessage ?? t('mergeSelect.missingTargetMessage')
         return
     }
 
@@ -60,7 +63,7 @@ const submit = async () => {
         await props.onConfirm(selectedTargetId.value)
         modal.resolve(undefined)
     } catch (submitError) {
-        error.value = normalizeApiError(submitError).message ?? '合并失败'
+        error.value = resolveErrorMessage(submitError, 'errors.fallback.merge')
     } finally {
         submitting.value = false
     }
@@ -106,7 +109,7 @@ const submit = async () => {
             {{ error }}
         </p>
         <p v-else-if="options.length < 2" class="text-sm text-[#8C857B]">
-            需要至少选中 2 项才能执行合并。
+            {{ t('mergeSelect.minSelectionHint') }}
         </p>
 
         <div class="grid grid-cols-2 gap-3 border-t border-[#EAE6DE] pt-6">
@@ -116,7 +119,7 @@ const submit = async () => {
                 :disabled="submitting"
                 @click="closeModal"
             >
-                取消
+                {{ t('common.cancel') }}
             </button>
             <button
                 type="button"
@@ -125,7 +128,11 @@ const submit = async () => {
                 :disabled="options.length < 2 || selectedTargetId === null || submitting"
                 @click="submit"
             >
-                {{ submitting ? submittingText : confirmText }}
+                {{
+                    submitting
+                        ? (submittingText ?? t('mergeSelect.submittingText'))
+                        : (confirmText ?? t('mergeSelect.confirmText'))
+                }}
             </button>
         </div>
     </div>

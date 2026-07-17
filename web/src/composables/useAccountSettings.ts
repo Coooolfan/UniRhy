@@ -1,5 +1,7 @@
 import { ref } from 'vue'
-import { api, normalizeApiError } from '@/ApiInstance'
+import { api } from '@/ApiInstance'
+import { i18n } from '@/i18n'
+import { resolveErrorMessage } from '@/i18n/errors'
 import type { AccountDto } from '@/__generated/model/dto/AccountDto'
 
 export type Account = AccountDto['AccountController/DEFAULT_ACCOUNT_FETCHER']
@@ -31,16 +33,16 @@ const validateAccountForm = (
     const password = form.password
 
     if (!name) {
-        return { error: '请填写账号名称' }
+        return { error: i18n.global.t('validation.accountNameRequired') }
     }
     if (!email) {
-        return { error: '请填写邮箱' }
+        return { error: i18n.global.t('validation.emailRequired') }
     }
     if (!EMAIL_PATTERN.test(email)) {
-        return { error: '邮箱格式不正确' }
+        return { error: i18n.global.t('validation.emailInvalid') }
     }
     if (options.mode === 'create' && !password) {
-        return { error: '请填写初始密码' }
+        return { error: i18n.global.t('validation.initialPasswordRequired') }
     }
 
     return { payload: { name, email, password } }
@@ -59,8 +61,7 @@ export const useAccountSettings = () => {
             const list = await api.accountController.list()
             accounts.value = [...list]
         } catch (e) {
-            const normalized = normalizeApiError(e)
-            error.value = normalized.message ?? '账号列表加载失败'
+            error.value = resolveErrorMessage(e, 'errors.fallback.accountList')
         } finally {
             isLoading.value = false
         }
@@ -72,7 +73,7 @@ export const useAccountSettings = () => {
             return validated.error
         }
         if (isSaving.value) {
-            return '已有保存操作正在执行'
+            return i18n.global.t('common.savingInProgress')
         }
 
         isSaving.value = true
@@ -87,8 +88,7 @@ export const useAccountSettings = () => {
             await fetchAccounts()
             return null
         } catch (e) {
-            const normalized = normalizeApiError(e)
-            return normalized.message ?? '创建失败'
+            return resolveErrorMessage(e, 'common.createFailed')
         } finally {
             isSaving.value = false
         }
@@ -104,7 +104,7 @@ export const useAccountSettings = () => {
             return validated.error
         }
         if (isSaving.value) {
-            return '已有保存操作正在执行'
+            return i18n.global.t('common.savingInProgress')
         }
 
         const emailChanged = validated.payload.email !== currentEmail
@@ -129,8 +129,7 @@ export const useAccountSettings = () => {
             await fetchAccounts()
             return null
         } catch (e) {
-            const normalized = normalizeApiError(e)
-            return normalized.message ?? '更新失败'
+            return resolveErrorMessage(e, 'common.updateFailed')
         } finally {
             isSaving.value = false
         }
@@ -138,7 +137,7 @@ export const useAccountSettings = () => {
 
     const deleteAccount = async (account: Account): Promise<string | null> => {
         if (isSaving.value) {
-            return '已有保存操作正在执行'
+            return i18n.global.t('common.savingInProgress')
         }
         isSaving.value = true
         try {
@@ -146,8 +145,7 @@ export const useAccountSettings = () => {
             await fetchAccounts()
             return null
         } catch (e) {
-            const normalized = normalizeApiError(e)
-            return normalized.message ?? '删除失败'
+            return resolveErrorMessage(e, 'common.deleteFailed')
         } finally {
             isSaving.value = false
         }

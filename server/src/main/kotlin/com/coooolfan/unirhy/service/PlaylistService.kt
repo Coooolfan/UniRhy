@@ -1,6 +1,7 @@
 package com.coooolfan.unirhy.service
 
 import cn.dev33.satoken.stp.StpUtil
+import com.coooolfan.unirhy.error.PlaylistException
 import com.coooolfan.unirhy.model.*
 import org.babyfish.jimmer.ImmutableObjects
 import org.babyfish.jimmer.sql.ast.mutation.SaveMode
@@ -8,10 +9,8 @@ import org.babyfish.jimmer.sql.fetcher.Fetcher
 import org.babyfish.jimmer.sql.kt.KSqlClient
 import org.babyfish.jimmer.sql.kt.ast.expression.eq
 import org.babyfish.jimmer.sql.kt.ast.expression.max
-import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
-import org.springframework.web.server.ResponseStatusException
 
 @Service
 class PlaylistService(private val sql: KSqlClient) {
@@ -31,7 +30,7 @@ class PlaylistService(private val sql: KSqlClient) {
             where(table.ownerId eq accountId)
             select(table.fetch(fetcher))
         }.execute().firstOrNull()
-            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Playlist not found")
+            ?: throw PlaylistException.NotFound()
     }
 
     fun createPlaylist(create: Playlist, fetcher: Fetcher<Playlist>): Playlist {
@@ -62,7 +61,7 @@ class PlaylistService(private val sql: KSqlClient) {
         }.execute()
 
         if (affectedRows == 0) {
-            throw ResponseStatusException(HttpStatus.NOT_FOUND, "Playlist not found")
+            throw PlaylistException.NotFound()
         }
 
         return getPlaylist(input.id, fetcher)
@@ -76,7 +75,7 @@ class PlaylistService(private val sql: KSqlClient) {
         }.execute()
 
         if (affectedRows == 0) {
-            throw ResponseStatusException(HttpStatus.NOT_FOUND, "Playlist not found")
+            throw PlaylistException.NotFound()
         }
     }
 
@@ -123,14 +122,14 @@ class PlaylistService(private val sql: KSqlClient) {
             where(table.ownerId eq StpUtil.getLoginIdAsLong())
             selectCount()
         }.first() > 0L
-        if (!exists) throw ResponseStatusException(HttpStatus.NOT_FOUND, "Playlist not found")
+        if (!exists) throw PlaylistException.NotFound()
     }
 
     @Transactional
     fun reorderPlaylistRecordings(playlistId: Long, recordingIds: List<Long>) {
         val requestedSet = recordingIds.toSet()
         if (requestedSet.size != recordingIds.size) {
-            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "recordingIds contain duplicates")
+            throw PlaylistException.RecordingIdsContainDuplicates()
         }
 
         val currentIds = sql.createQuery(PlaylistRecording::class) {
@@ -140,10 +139,7 @@ class PlaylistService(private val sql: KSqlClient) {
         }.execute()
 
         if (requestedSet != currentIds.toSet()) {
-            throw ResponseStatusException(
-                HttpStatus.BAD_REQUEST,
-                "Playlist not found or recordingIds do not match playlist recordings",
-            )
+            throw PlaylistException.RecordingIdsMismatch()
         }
 
         val sortedRecordings = ArrayList<PlaylistRecording>(recordingIds.size)

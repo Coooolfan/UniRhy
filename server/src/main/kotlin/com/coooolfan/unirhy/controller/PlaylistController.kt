@@ -1,6 +1,7 @@
 package com.coooolfan.unirhy.controller
 
 import cn.dev33.satoken.annotation.SaCheckLogin
+import com.coooolfan.unirhy.error.PlaylistException
 import com.coooolfan.unirhy.model.Playlist
 import com.coooolfan.unirhy.model.by
 import com.coooolfan.unirhy.model.dto.PlaylistCreate
@@ -56,6 +57,7 @@ class PlaylistController(private val service: PlaylistService) {
      */
     @GetMapping("/{id}")
     @ResponseStatus(HttpStatus.OK)
+    @Throws(PlaylistException.NotFound::class)
     fun getPlaylist(@PathVariable id: Long): @FetchBy("DETAIL_PLAYLIST_FETCHER") Playlist {
         return service.getPlaylist(id, DETAIL_PLAYLIST_FETCHER)
     }
@@ -76,6 +78,7 @@ class PlaylistController(private val service: PlaylistService) {
      */
     @PutMapping("/{id}")
     @ResponseStatus(HttpStatus.OK)
+    @Throws(PlaylistException.NotFound::class)
     fun updatePlaylist(
         @PathVariable id: Long,
         @RequestBody input: PlaylistUpdate
@@ -118,6 +121,7 @@ class PlaylistController(private val service: PlaylistService) {
      */
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Throws(PlaylistException.NotFound::class)
     fun deletePlaylist(@PathVariable id: Long) {
         service.deletePlaylist(id)
     }
@@ -137,6 +141,7 @@ class PlaylistController(private val service: PlaylistService) {
      */
     @PutMapping("/{id}/recordings/{recordingId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Throws(PlaylistException.NotFound::class)
     fun addRecordingToPlaylist(
         @PathVariable id: Long,
         @PathVariable recordingId: Long,
@@ -159,6 +164,7 @@ class PlaylistController(private val service: PlaylistService) {
      */
     @DeleteMapping("/{id}/recordings/{recordingId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Throws(PlaylistException.NotFound::class)
     fun removeRecordingFromPlaylist(
         @PathVariable id: Long,
         @PathVariable recordingId: Long,
@@ -180,6 +186,11 @@ class PlaylistController(private val service: PlaylistService) {
      */
     @PutMapping("/{id}/recording-order")
     @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Throws(
+        PlaylistException.NotFound::class,
+        PlaylistException.RecordingIdsContainDuplicates::class,
+        PlaylistException.RecordingIdsMismatch::class,
+    )
     fun reorderPlaylistRecordings(
         @PathVariable id: Long,
         @RequestBody input: RecordingReorderReq,

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import DashboardTopBar from '@/components/dashboard/DashboardTopBar.vue'
 import StorageNodesSection from '@/components/settings/StorageNodesSection.vue'
 import SystemStatusSection from '@/components/settings/SystemStatusSection.vue'
@@ -13,6 +14,7 @@ import type { SystemStatus } from '@/__generated/model/static'
 import { useUserStore } from '@/stores/user'
 import { getClientVersion } from '@/runtime/platform'
 
+const { t } = useI18n()
 const userStore = useUserStore()
 
 const {
@@ -67,10 +69,10 @@ const buildInfo = ref<SystemStatus | null>(null)
 const clientVersion = ref<string | null>(null)
 
 const formattedBuildTime = computed(() => {
-    const t = buildInfo.value?.buildTime
-    if (!t) return null
-    const d = new Date(t)
-    if (Number.isNaN(d.getTime())) return t
+    const buildTime = buildInfo.value?.buildTime
+    if (!buildTime) return null
+    const d = new Date(buildTime)
+    if (Number.isNaN(d.getTime())) return buildTime
     return d.toLocaleString(undefined, { timeZoneName: 'short' })
 })
 
@@ -102,9 +104,11 @@ onMounted(() => {
 
         <div class="mx-auto max-w-5xl px-4 pt-4 sm:px-6 sm:pt-6 lg:px-8">
             <header class="mb-6 sm:mb-12">
-                <h1 class="mb-2 font-serif text-3xl tracking-tight text-[#2B221B]">系统设置</h1>
+                <h1 class="mb-2 font-serif text-3xl tracking-tight text-[#2B221B]">
+                    {{ t('settings.title') }}
+                </h1>
                 <p class="font-serif text-sm italic text-[#8A8A8A]">
-                    管理实例级配置、存储节点与插件
+                    {{ t('settings.subtitle') }}
                 </p>
             </header>
         </div>
@@ -119,7 +123,6 @@ onMounted(() => {
             /> -->
 
             <StorageNodesSection
-                class="mt-8 sm:mt-16"
                 :storage-nodes="storageNodes"
                 :system-config="systemConfig"
                 :is-loading="isLoadingStorage"
@@ -164,8 +167,12 @@ onMounted(() => {
                 class="mt-16 border-t border-[#E5DED5] pt-6 font-serif text-xs text-[#8A8A8A]"
             >
                 <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
-                    <span v-if="buildInfo?.version">服务端 v{{ buildInfo.version }}</span>
-                    <span v-if="clientVersion">客户端 v{{ clientVersion }}</span>
+                    <span v-if="buildInfo?.version">{{
+                        t('settings.serverVersion', { version: buildInfo.version })
+                    }}</span>
+                    <span v-if="clientVersion">{{
+                        t('settings.clientVersion', { version: clientVersion })
+                    }}</span>
                     <a
                         v-if="buildInfo?.gitUrl && shortCommit"
                         :href="buildInfo.gitUrl"
@@ -178,7 +185,9 @@ onMounted(() => {
                     <span v-else-if="shortCommit">
                         {{ buildInfo?.gitBranch ?? 'unknown' }}@{{ shortCommit }}
                     </span>
-                    <span v-if="formattedBuildTime">构建于 {{ formattedBuildTime }}</span>
+                    <span v-if="formattedBuildTime">{{
+                        t('settings.builtAt', { time: formattedBuildTime })
+                    }}</span>
                 </div>
             </footer>
         </div>
