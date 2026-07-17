@@ -7,4 +7,5 @@ data class CurrentQueueEntry(
     val artistLabel: String,
     val coverMediaFileId: Long?,
     val durationMs: Long,
+    val audioMediaFileId: Long?,
 )

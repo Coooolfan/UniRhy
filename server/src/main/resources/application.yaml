@@ -5,6 +5,11 @@ server:
 spring:
   application:
     name: unirhy
+  mvc:
+    async:
+      # 媒体文件以 StreamingResponseBody 流式下发，客户端（ExoPlayer 等）会按缓冲水位暂停读取，
+      # 容器默认异步超时会在写入停滞约 30s 后中止响应，导致播放中断，故禁用
+      request-timeout: -1
   servlet:
     multipart:
       max-file-size: -1

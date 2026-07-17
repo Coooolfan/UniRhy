@@ -24,7 +24,12 @@
 ### 2.1 通道与鉴权
 
 - 通道：`/ws/playback-sync`
-- 鉴权：复用 Sa-Token 登录态（cookie）。握手阶段缺少有效登录态时，WebSocket 升级直接失败并返回 `401`，不发送 `ERROR` 消息。
+- 鉴权：复用 Sa-Token 登录态，凭证按以下顺序解析：
+  1. 握手 HTTP 头 `unirhy-token`；
+  2. 握手 Cookie 中的 `unirhy-token`；
+  3. 首条 `HELLO` 消息的 `payload.token`（供无法自定义握手头的运行时使用，如浏览器 WebSocket）。
+- 握手阶段携带了凭证但校验失败时，WebSocket 升级直接返回 `401`，不发送 `ERROR` 消息；未携带凭证时允许匿名完成握手，由 `HELLO` 的 `token` 补齐鉴权。
+- 连接建立后 10 秒内必须收到合法且鉴权通过的 `HELLO`，否则服务端以 `POLICY_VIOLATION (1008)` 关闭连接。
 
 ### 2.2 服务端职责
 
@@ -50,8 +55,7 @@ enum class PlaybackStatus { PLAYING, PAUSED }
 data class AccountPlaybackState(
     val accountId: Long,
     val status: PlaybackStatus,
-    val recordingId: Long?,
-    val mediaFileId: Long?,
+    val currentIndex: Int?,
     val positionSeconds: Double,
     val serverTimeToExecuteMs: Long,
     val version: Long,
@@ -60,18 +64,20 @@ data class AccountPlaybackState(
 ```
 
 - `positionSeconds + serverTimeToExecuteMs` 构成播放锚点。
-- `version` 单调递增，服务端每次更新 `AccountPlaybackState` 时自增；客户端仅接受更高版本。
-- 内部状态不保存 URL，`presignedUrl` 仅在出站消息发送前由 `PlaybackSyncMessageSender` 根据 `mediaFileId` 生成。
-- 无播放状态用 `PAUSED + recordingId=null` 表示，不设 `STOPPED` 状态。
+- `currentIndex` 指向当前队列下标，曲目身份由队列（`recordingIds[currentIndex]`）解析。
+- `version` 单调递增，与队列版本共用同一计数（任何队列或播放态变更都会推进）；客户端仅接受更高版本。
+- 内部状态不保存媒体地址，客户端根据队列项的 `mediaFileId` 自行构造音源 URL。
+- 无播放状态用 `PAUSED + currentIndex=null` 表示，不设 `STOPPED` 状态。
 
 ### 3.2 执行中临时态（每账号可空）
 
 ```kotlin
 data class PendingPlayState(
     val commandId: String,
-    val initiatorDeviceId: String,
+    val initiatorDeviceId: String?,
+    val currentIndex: Int,
     val recordingId: Long,
-    val mediaFileId: Long,
+    val positionSeconds: Double,
     val clientsLoaded: MutableSet<String>,
     val createdAtMs: Long,
     val timeoutAtMs: Long,
@@ -79,9 +85,9 @@ data class PendingPlayState(
 ```
 
 - 只在“切歌播放需预加载”阶段存在。
-- `executeScheduledPlay()` 执行时，将 pending 中的 `recordingId` / `mediaFileId` 写入 `AccountPlaybackState`。
+- `executeScheduledPlay()` 执行时，将 pending 中的 `currentIndex` / `positionSeconds` 写入 `AccountPlaybackState`。
 - 收到新 `PLAY` 时先 `clearPendingPlay()`（取消超时定时器）再创建新的，即“后到覆盖”语义。
-- `clientsLoaded` 初始化即包含 `initiatorDeviceId`（发起者视为已加载）。
+- `clientsLoaded` 初始化即包含 `initiatorDeviceId`（发起者视为已加载）；服务端自动切歌等无发起设备的场景 `initiatorDeviceId=null`。
 
 ### 3.3 设备运行态（每账号下每设备一份）
 
@@ -91,12 +97,14 @@ data class DeviceRuntimeState(
     val accountId: Long,
     var rttEmaMs: Double,
     var lastNtpResponseAtMs: Long,
+    var lastPongAtMs: Long,
     var lastSeenAtMs: Long,
 )
 ```
 
 - `rttEmaMs` 用于计算账号级调度窗口。
-- `lastNtpResponseAtMs` 用于活跃性判断与断链清理，超过 `3750ms`（`1.5 * STEADY_STATE_INTERVAL_MS`）未响应判定为 stale。
+- `lastPongAtMs` 用于活跃性判断与断链清理：服务端每 `15s` 发送一次 WebSocket 协议层 Ping，超过 `60s` 未收到 Pong 判定为 stale。Pong 由客户端网络栈自动回复，不依赖页面 JS 运行，后台被节流的 WebView 也能响应。
+- `lastNtpResponseAtMs` 仅用于校时诊断与 `SYNC` 就绪判断（`isSyncReady`），不参与活跃性判定。
 
 ### 3.4 连接注册态
 
@@ -131,15 +139,16 @@ data class DeviceRuntimeState(
 
 - `type` 使用大写蛇形命名，`payload` 字段使用 camelCase。
 - `recordingId` 指向后端 `Recording` 实体；UI 侧可继续展示为 Track / 曲目。
-- `presignedUrl` 为服务端根据 `mediaFileId` 生成的带签名相对路径，客户端不得上传。
+- `currentIndex` 指向当前队列（`CurrentQueueDto.items`）中的下标；播放控制与调度均以队列下标 + 队列版本号表达，不直接携带媒体地址。
 - `positionSeconds` 表示播放偏移，单位秒，类型为 `Double`。
+- 双方解析消息时必须忽略未知字段。
 
 ### 4.2 消息类型
 
 | 方向 | 消息 |
 | --- | --- |
 | C2S | `HELLO`、`NTP_REQUEST`、`PLAY`、`PAUSE`、`SEEK`、`AUDIO_SOURCE_LOADED`、`SYNC` |
-| S2C | `NTP_RESPONSE`、`SNAPSHOT`、`ROOM_EVENT_LOAD_AUDIO_SOURCE`、`SCHEDULED_ACTION`、`ROOM_EVENT_DEVICE_CHANGE`、`ERROR` |
+| S2C | `NTP_RESPONSE`、`SNAPSHOT`、`ROOM_EVENT_LOAD_AUDIO_SOURCE`、`ROOM_EVENT_QUEUE_CHANGE`、`SCHEDULED_ACTION`、`ROOM_EVENT_DEVICE_CHANGE`、`ERROR` |
 
 播放状态枚举：`PLAYING`、`PAUSED`。调度动作类型：`PLAY`、`PAUSE`、`SEEK`。
 
@@ -150,12 +159,13 @@ data class DeviceRuntimeState(
 ```json
 {
   "type": "HELLO",
-  "payload": { "deviceId": "web-7c2f", "clientVersion": "web@0.1.0" }
+  "payload": { "deviceId": "web-7c2f", "clientVersion": "web@0.1.0", "token": "..." }
 }
 ```
 
-- `deviceId: String`（非空白），`clientVersion: String?`
+- `deviceId: String`（非空白），`clientVersion: String?`，`token: String?`
 - 连接建立后的首条业务消息必须是 `HELLO`，且同一连接只允许发送一次。
+- 握手阶段未携带凭证时，`token` 必填且必须合法，否则服务端以 `POLICY_VIOLATION (1008)` 关闭连接；握手已鉴权时 `token` 被忽略。
 - 同一 `accountId` 下，若新连接使用了已在线的 `deviceId`，服务端以新连接为准并关闭旧连接。
 
 #### `NTP_REQUEST`
@@ -174,30 +184,30 @@ data class DeviceRuntimeState(
   "payload": {
     "commandId": "cmd-play-001",
     "deviceId": "web-7c2f",
-    "recordingId": 1001,
-    "mediaFileId": 2001,
-    "positionSeconds": 12.5
+    "currentIndex": 2,
+    "positionSeconds": 12.5,
+    "version": 8
   }
 }
 ```
 
-控制类字段：`commandId: String`、`deviceId: String`、`recordingId: Long?`、`mediaFileId: Long?`、`positionSeconds: Double`。
+控制类字段：`commandId: String`、`deviceId: String`、`currentIndex: Int`、`positionSeconds: Double`、`version: Long`。
 
 约束：
 
-- `PLAY` 与 `SEEK` 必须提供非空 `recordingId` 与 `mediaFileId`。
-- `PAUSE` 可携带当前录音上下文；表达“暂停且清空当前录音”时，允许 `recordingId=null` 且 `mediaFileId=null`。
+- `currentIndex` 必须落在当前队列范围内，否则返回 `ERROR(INVALID_MESSAGE)`。
+- `version` 必须等于客户端已知的最新播放态版本号，不一致时返回 `ERROR(VERSION_CONFLICT)`，客户端应发送 `SYNC` 恢复。
 
 #### `AUDIO_SOURCE_LOADED`
 
 ```json
 {
   "type": "AUDIO_SOURCE_LOADED",
-  "payload": { "commandId": "cmd-play-001", "deviceId": "web-85ab", "recordingId": 1001, "mediaFileId": 2001 }
+  "payload": { "commandId": "cmd-play-001", "deviceId": "web-85ab", "currentIndex": 2, "recordingId": 1001 }
 }
 ```
 
-- `commandId: String`、`deviceId: String`、`recordingId: Long`、`mediaFileId: Long`
+- `commandId: String`、`deviceId: String`、`currentIndex: Int`、`recordingId: Long`
 
 #### `SYNC`
 
@@ -226,33 +236,69 @@ data class DeviceRuntimeState(
   "payload": {
     "state": {
       "status": "PLAYING",
-      "recordingId": 1001,
-      "mediaFileId": 2001,
-      "presignedUrl": "/api/media/2001",
+      "currentIndex": 2,
       "positionSeconds": 12.5,
       "serverTimeToExecuteMs": 1730844001500,
       "version": 8,
       "updatedAtMs": 1730844000100
     },
+    "queue": { "items": [], "recordingIds": [], "currentIndex": 0, "playbackStrategy": "SEQUENTIAL", "stopStrategy": "LIST", "playbackStatus": "PAUSED", "positionMs": 0, "serverTimeToExecuteMs": 0, "version": 8, "updatedAtMs": 1730844000100 },
     "serverNowMs": 1730844000200
   }
 }
 ```
 
-- `state` 字段：`status: PlaybackStatus`、`recordingId: Long?`、`mediaFileId: Long?`、`presignedUrl: String?`、`positionSeconds: Double`、`serverTimeToExecuteMs: Long`、`version: Long`、`updatedAtMs: Long`。
+- `state` 字段：`status: PlaybackStatus`、`currentIndex: Int?`、`positionSeconds: Double`、`serverTimeToExecuteMs: Long`、`version: Long`、`updatedAtMs: Long`。
+- `queue: CurrentQueueDto`（结构见 `ROOM_EVENT_QUEUE_CHANGE`）。
 - 发送时机：①`HELLO` 响应；②断线重连后服务端自动下发（无需客户端主动 `SYNC`）。
-- 无当前录音时使用 `status=PAUSED`、`recordingId=null`、`mediaFileId=null`、`presignedUrl=null`、`positionSeconds=0.0`。
+- 队列为空时使用 `status=PAUSED`、`currentIndex=null`、`positionSeconds=0.0`。
 
 #### `ROOM_EVENT_LOAD_AUDIO_SOURCE`
 
 ```json
 {
   "type": "ROOM_EVENT_LOAD_AUDIO_SOURCE",
-  "payload": { "commandId": "cmd-play-001", "recordingId": 1001, "mediaFileId": 2001, "presignedUrl": "/api/media/2001" }
+  "payload": { "commandId": "cmd-play-001", "currentIndex": 2, "recordingId": 1001 }
 }
 ```
 
-- `commandId: String`、`recordingId: Long`、`mediaFileId: Long`、`presignedUrl: String`
+- `commandId: String`、`currentIndex: Int`、`recordingId: Long`
+- 消息不携带媒体地址：客户端根据队列项的 `mediaFileId` 自行构造 `GET /api/media-files/{mediaFileId}` 加载音源（登录态鉴权，或使用队列项中已带签名的资源路径）。
+
+#### `ROOM_EVENT_QUEUE_CHANGE`
+
+```json
+{
+  "type": "ROOM_EVENT_QUEUE_CHANGE",
+  "payload": {
+    "queue": {
+      "items": [
+        {
+          "recordingId": 1001,
+          "title": "Track 1",
+          "artistLabel": "Artist 1",
+          "coverUrl": "/api/media-files/3001?_sig=...&_exp=...",
+          "durationMs": 180000,
+          "mediaFileId": 2001
+        }
+      ],
+      "recordingIds": [1001],
+      "currentIndex": 0,
+      "playbackStrategy": "SEQUENTIAL",
+      "stopStrategy": "LIST",
+      "playbackStatus": "PAUSED",
+      "positionMs": 0,
+      "serverTimeToExecuteMs": 0,
+      "version": 9,
+      "updatedAtMs": 1730844000300
+    }
+  }
+}
+```
+
+- `queue: CurrentQueueDto`：`items: CurrentQueueItemDto[]`、`recordingIds: Long[]`、`currentIndex: Int`、`playbackStrategy: PlaybackStrategy`、`stopStrategy: StopStrategy`、`playbackStatus: PlaybackStatus`、`positionMs: Long`、`serverTimeToExecuteMs: Long`、`version: Long`、`updatedAtMs: Long`。
+- `CurrentQueueItemDto`：`recordingId: Long`、`title: String`、`artistLabel: String`、`coverUrl: String?`（带签名的封面路径）、`durationMs: Long`、`mediaFileId: Long?`（首个音频 asset 的媒体文件 ID，供客户端构造音源地址；录音无音频 asset 时为 `null`，客户端应跳过该曲目）。
+- 广播时机：任何队列变更（替换/追加/删除/重排/切换索引/策略变更/服务端自动切歌）成功持久化后。
 
 #### `SCHEDULED_ACTION`
 
@@ -265,19 +311,18 @@ data class DeviceRuntimeState(
     "scheduledAction": {
       "action": "PLAY",
       "status": "PLAYING",
-      "recordingId": 1001,
-      "mediaFileId": 2001,
-      "presignedUrl": "/api/media/2001",
+      "currentIndex": 2,
       "positionSeconds": 12.5,
       "version": 8
-    }
+    },
+    "skipLateCompensation": false
   }
 }
 ```
 
-- `scheduledAction` 字段：`action: ScheduledActionType`、`status: PlaybackStatus`、`recordingId: Long?`、`mediaFileId: Long?`、`presignedUrl: String?`、`positionSeconds: Double`、`version: Long`。
-- `PLAY` 必须提供非空 `recordingId`、`mediaFileId`、`presignedUrl`。
-- `PAUSE` 允许 `recordingId`、`mediaFileId`、`presignedUrl` 为空。
+- `scheduledAction` 字段：`action: ScheduledActionType`、`status: PlaybackStatus`、`currentIndex: Int?`、`positionSeconds: Double`、`version: Long`。
+- `skipLateCompensation: Boolean`（默认 `false`）：为 `true` 时，迟到执行的客户端不做“位置 + 迟到量”补偿，直接从 `positionSeconds` 起播。
+- `PLAY` 与 `SEEK` 携带非空 `currentIndex`；`PAUSE` 允许 `currentIndex=null`（表示暂停且清空当前曲目）。
 - `SEEK` 必须提供与当前权威态一致的 `status`，客户端按 `status` 决定 seek 后是否继续播放。
 
 #### `ROOM_EVENT_DEVICE_CHANGE`
@@ -301,7 +346,7 @@ data class DeviceRuntimeState(
 
 - `code: PlaybackSyncErrorCode`、`message: String`
 
-错误码：`INVALID_MESSAGE`、`UNSUPPORTED_MESSAGE`、`RECORDING_NOT_FOUND`、`MEDIA_FILE_NOT_FOUND`、`RECORDING_NOT_PLAYABLE`、`SYNC_NOT_READY`、`INTERNAL_ERROR`。
+错误码：`INVALID_MESSAGE`、`UNSUPPORTED_MESSAGE`、`VERSION_CONFLICT`、`RECORDING_NOT_FOUND`、`MEDIA_FILE_NOT_FOUND`、`RECORDING_NOT_PLAYABLE`、`SYNC_NOT_READY`、`INTERNAL_ERROR`。
 
 ### 4.5 ACK 规则
 
@@ -316,16 +361,16 @@ data class DeviceRuntimeState(
 1. 设备连接 WS，发送 `HELLO`。
 2. 服务端返回 `SNAPSHOT`（包含当前 `AccountPlaybackState`）。
 3. 客户端快速发送 NTP 采样（20~40 次，每 30ms 一次，约 1.2 秒完成）。
-4. 达到采样数后标记 `isSynced=true`，进入稳态校时（每 2500ms 一次，兼作心跳）。
+4. 达到采样数后标记 `isSynced=true`，进入稳态校时（每 2500ms 一次，仅用于校时，不承担活性检测）。
 
 ### 5.2 PLAY（切歌场景）
 
-1. 设备 A 发 `PLAY { recordingId, mediaFileId, positionSeconds }`。
-2. 服务端校验 `recordingId` / `mediaFileId` 关联关系。
+1. 设备 A 发 `PLAY { currentIndex, positionSeconds, version }`。
+2. 服务端校验 `version` 与 `currentIndex` 合法性，并解析该下标对应的 `recordingId`。
 3. 若已有 `PendingPlayState`，先 `clearPendingPlay()` 再创建新的（后到覆盖）。
 4. 创建 `PendingPlayState`，`clientsLoaded` 初始化为 `Set([发起者 deviceId])`。
-5. 广播 `ROOM_EVENT_LOAD_AUDIO_SOURCE`（`presignedUrl` 由 `PlaybackSyncMessageSender` 补齐）。
-6. 各设备 `fetch → decodeAudioData`，完成后发 `AUDIO_SOURCE_LOADED`。
+5. 广播 `ROOM_EVENT_LOAD_AUDIO_SOURCE { currentIndex, recordingId }`。
+6. 各设备按队列项 `mediaFileId` 加载音源，完成后发 `AUDIO_SOURCE_LOADED`。
 7. 全部加载完成或 3 秒超时后，服务端执行 `executeScheduledPlay()`：写入 `AccountPlaybackState`、计算 `serverTimeToExecuteMs`、广播 `SCHEDULED_ACTION(PLAY)`。
 8. 客户端使用 `AudioBufferSourceNode.start(when, offset)` 精确调度：
    - `when = audioContext.currentTime + (serverTimeToExecuteMs - estimatedServerNowMs) / 1000`
@@ -346,10 +391,11 @@ data class DeviceRuntimeState(
 
 断线重连的设备无需手动 `SYNC`，服务端在 `HELLO` 阶段自动下发 `SNAPSHOT`，客户端完成 NTP 校时后自行恢复。
 
-### 5.5 心跳与掉线
+### 5.5 活性检测与掉线
 
-- 客户端：NTP 请求超过 `3750ms` 未收到响应，判定连接 stale，主动重连。
-- 服务端：按 `lastNtpResponseAtMs` 检查，超过 `3750ms`（`1.5 * 2500ms`）清理 stale 设备。
+- 活性检测与 NTP 校时解耦：NTP 心跳停摆（如后台定时器节流）不构成掉线。
+- 服务端：每 `15s` 向所有已完成 `HELLO` 的连接发送协议层 Ping，按 `lastPongAtMs` 检查，超过 `60s` 未收到 Pong 则关闭连接（close reason `stale_connection`），清扫周期 `10s`。
+- 客户端：无活性看门狗，重连由 `close` 事件驱动；Pong 回复由网络栈/传输层自动完成，浏览器、Tauri（tungstenite）与原生客户端均无需实现。
 - 设备断开后若存在 `PendingPlayState`，从 `clientsLoaded` 移除该设备，若剩余设备全部就绪则立即触发 `executeScheduledPlay()`。
 
 ## 6. 时间与调度策略

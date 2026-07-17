@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-disconnect-sync"
+description = "Enables the disconnect_sync command without any pre-configured scope."
+commands.allow = ["disconnect_sync"]
+
+[[permission]]
+identifier = "deny-disconnect-sync"
+description = "Denies the disconnect_sync command without any pre-configured scope."
+commands.deny = ["disconnect_sync"]

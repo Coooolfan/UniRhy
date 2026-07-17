@@ -36,7 +36,7 @@ class PlaybackSyncStaleConnectionJanitor(
             val nowMs = timeProvider.nowMs()
             deviceRuntimeService.cleanupStaleConnections(
                 nowMs = nowMs,
-                staleThresholdMs = PlaybackSchedulerService.STALE_THRESHOLD_MS,
+                staleThresholdMs = PlaybackSchedulerService.PONG_TIMEOUT_MS,
             ).forEach { removal ->
                 removal.context.session.close(STALE_CONNECTION_CLOSE_STATUS)
                 sessionRemovalCoordinator.handleRemoval(

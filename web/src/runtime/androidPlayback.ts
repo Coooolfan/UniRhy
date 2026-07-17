@@ -1,20 +1,9 @@
 import { getPlatformRuntime } from '@/runtime/platform'
-import { i18n } from '@/i18n'
 
 export type AndroidPlaybackSystemStatus = {
     notificationPermissionGranted: boolean
     batteryOptimizationEnabled: boolean
 }
-
-type AndroidPlaybackNativeLifecycleEvent = {
-    type: 'androidNotificationStop' | 'androidTimeout'
-    fgsType?: string
-}
-
-const createPlaybackServiceConfig = () => ({
-    serviceLabel: i18n.global.t('androidService.label'),
-    foregroundServiceType: 'mediaPlayback',
-})
 
 export const isAndroidRuntime = () => getPlatformRuntime().platform === 'android'
 
@@ -26,52 +15,6 @@ export const getAndroidNotificationPermission = async () => {
 export const requestAndroidNotificationPermission = async () => {
     const { requestPermission } = await import('@tauri-apps/plugin-notification')
     return requestPermission()
-}
-
-export const isAndroidPlaybackServiceRunning = async () => {
-    const { isServiceRunning } = await import('tauri-plugin-background-service')
-    return isServiceRunning()
-}
-
-export const startAndroidPlaybackService = async () => {
-    const { isServiceRunning, startService } = await import('tauri-plugin-background-service')
-    const config = createPlaybackServiceConfig()
-
-    if (!(await isServiceRunning())) {
-        await startService(config)
-    }
-}
-
-export const stopAndroidPlaybackService = async () => {
-    const { isServiceRunning, stopService } = await import('tauri-plugin-background-service')
-
-    if (await isServiceRunning()) {
-        await stopService()
-    }
-}
-
-export const listenForAndroidPlaybackStop = async (onStop: () => void) => {
-    const { addPluginListener, invoke } = await import('@tauri-apps/api/core')
-    const listener = await addPluginListener<AndroidPlaybackNativeLifecycleEvent>(
-        'background-service',
-        'native-lifecycle-event',
-        (event) => {
-            if (event.type !== 'androidNotificationStop') {
-                return
-            }
-
-            onStop()
-            void invoke('plugin:background-service|native_lifecycle_event', { event }).catch(
-                (error: unknown) => {
-                    console.error('Failed to reconcile native Android playback stop', error)
-                },
-            )
-        },
-    )
-
-    return () => {
-        void listener.unregister()
-    }
 }
 
 export const getAndroidPlaybackSystemStatus = async (): Promise<AndroidPlaybackSystemStatus> => {

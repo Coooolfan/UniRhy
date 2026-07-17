@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-js-log"
+description = "Enables the js_log command without any pre-configured scope."
+commands.allow = ["js_log"]
+
+[[permission]]
+identifier = "deny-js-log"
+description = "Denies the js_log command without any pre-configured scope."
+commands.deny = ["js_log"]

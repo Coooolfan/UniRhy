@@ -1519,17 +1519,17 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@tauri-apps/api@npm:^2.0.0, @tauri-apps/api@npm:^2.11.1, @tauri-apps/api@npm:^2.5.0":
-  version: 2.11.1
-  resolution: "@tauri-apps/api@npm:2.11.1"
-  checksum: 10c0/78a08a64ee7eab9d34bd4ba1bdc3a2440c7e9cc5737b3f1d77bd80fa38b0cb5e9601efe04da40c947c5da2ca38dc702bec21b4ae96b18ee5f3e82980d1f0b325
-  languageName: node
-  linkType: hard
-
 "@tauri-apps/api@npm:^2.11.0, @tauri-apps/api@npm:^2.8.0":
   version: 2.11.0
   resolution: "@tauri-apps/api@npm:2.11.0"
   checksum: 10c0/70c9f692d14ef7a5f69aa56d474e993f2c25f393e30a26099cca198040ccd33724e4978cefd455c73ecb169b36ca9b7ee010db88b05b0a8bd4a85801caa317d6
+  languageName: node
+  linkType: hard
+
+"@tauri-apps/api@npm:^2.11.1, @tauri-apps/api@npm:^2.5.0":
+  version: 2.11.1
+  resolution: "@tauri-apps/api@npm:2.11.1"
+  checksum: 10c0/78a08a64ee7eab9d34bd4ba1bdc3a2440c7e9cc5737b3f1d77bd80fa38b0cb5e9601efe04da40c947c5da2ca38dc702bec21b4ae96b18ee5f3e82980d1f0b325
   languageName: node
   linkType: hard
 
@@ -4494,15 +4494,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"tauri-plugin-background-service@npm:0.7.1":
-  version: 0.7.1
-  resolution: "tauri-plugin-background-service@npm:0.7.1"
-  dependencies:
-    "@tauri-apps/api": "npm:^2.0.0"
-  checksum: 10c0/a1e4b1ac954c340f46a97e0092e312d5bdc68c9d2526bd9437f5ca186a0e71213758a8da8a84bd33b09f2303315af90e6a28c2b7b76adf8e849513a8d000f5ff
-  languageName: node
-  linkType: hard
-
 "temp-dir@npm:^3.0.0":
   version: 3.0.0
   resolution: "temp-dir@npm:3.0.0"
@@ -4716,7 +4707,6 @@ __metadata:
     pinia: "npm:^3.0.4"
     tailwindcss: "npm:^4.3.1"
     tauri-plugin-android-battery-optimization-api: "npm:0.1.0"
-    tauri-plugin-background-service: "npm:0.7.1"
     temp-dir: "npm:^3.0.0"
     typescript: "npm:~6.0.3"
     uuid: "npm:^14.0.1"

@@ -5,5 +5,6 @@ class DeviceRuntimeState(
     val accountId: Long,
     var rttEmaMs: Double = 0.0,
     var lastNtpResponseAtMs: Long = 0L,
+    var lastPongAtMs: Long,
     var lastSeenAtMs: Long,
 )

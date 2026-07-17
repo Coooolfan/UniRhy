@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-local-seek"
+description = "Enables the local_seek command without any pre-configured scope."
+commands.allow = ["local_seek"]
+
+[[permission]]
+identifier = "deny-local-seek"
+description = "Denies the local_seek command without any pre-configured scope."
+commands.deny = ["local_seek"]

@@ -112,15 +112,23 @@ class PlaybackSyncWebSocketHandlerTest {
             TextMessage(playPayload(currentIndex = 1, version = queue.version)),
         )
 
-        val messages = session.serverMessages()
-        assertTrue(messages[0] is QueueChangeMessage)
-        assertTrue(messages[1] is LoadAudioSourceMessage)
-        assertTrue(messages[2] is ScheduledActionMessage)
+        val loadingMessages = session.serverMessages()
+        assertEquals(2, loadingMessages.size)
+        assertTrue(loadingMessages[0] is QueueChangeMessage)
+        assertTrue(loadingMessages[1] is LoadAudioSourceMessage)
 
-        val loadAudio = messages[1] as LoadAudioSourceMessage
-        val scheduledAction = messages[2] as ScheduledActionMessage
+        val loadAudio = loadingMessages[1] as LoadAudioSourceMessage
         assertEquals(1, loadAudio.payload.currentIndex)
         assertEquals(1002L, loadAudio.payload.recordingId)
+
+        handler.handleMessage(
+            session,
+            TextMessage(audioSourceLoadedPayload(currentIndex = 1, recordingId = 1002L)),
+        )
+
+        val messages = session.serverMessages()
+        assertEquals(3, messages.size)
+        val scheduledAction = messages[2] as ScheduledActionMessage
         assertEquals(1, scheduledAction.payload.scheduledAction.currentIndex)
     }
 
@@ -139,6 +147,50 @@ class PlaybackSyncWebSocketHandlerTest {
 
         val error = session.serverMessages().single() as ErrorMessage
         assertEquals(PlaybackSyncErrorCode.VERSION_CONFLICT, error.payload.code)
+    }
+
+    @Test
+    fun `duplicate pause does not advance version or broadcast`() {
+        val queue = currentQueueService.replaceQueue(
+            accountId = 42L,
+            recordingIds = listOf(1001L),
+            currentIndex = 0,
+            expectedVersion = 0L,
+        ).queue
+        val session = connectAndHello()
+        session.clearServerMessages()
+
+        handler.handleMessage(session, TextMessage(playPayload(currentIndex = 0, version = queue.version)))
+        handler.handleMessage(
+            session,
+            TextMessage(audioSourceLoadedPayload(currentIndex = 0, recordingId = 1001L)),
+        )
+        val playingVersion = (session.serverMessages().last() as ScheduledActionMessage)
+            .payload.scheduledAction.version
+        session.clearServerMessages()
+
+        handler.handleMessage(
+            session,
+            TextMessage(pausePayload(positionSeconds = 12.5, version = playingVersion)),
+        )
+        val pausedVersion = (session.serverMessages().single() as ScheduledActionMessage)
+            .payload.scheduledAction.version
+        session.clearServerMessages()
+
+        handler.handleMessage(
+            session,
+            TextMessage(
+                pausePayload(
+                    positionSeconds = 12.6,
+                    version = pausedVersion,
+                    commandId = "cmd-pause-duplicate",
+                ),
+            ),
+        )
+
+        assertTrue(session.serverMessages().isEmpty())
+        assertEquals(pausedVersion, playbackSessionService.getOrCreateState(42L).version)
+        assertEquals(12.5, playbackSessionService.getOrCreateState(42L).positionSeconds)
     }
 
     private fun connectAndHello(): TestWebSocketSession {
@@ -233,6 +285,38 @@ class PlaybackSyncWebSocketHandlerTest {
         }
     """.trimIndent()
 
+    private fun audioSourceLoadedPayload(
+        currentIndex: Int,
+        recordingId: Long,
+    ): String = """
+        {
+          "type": "AUDIO_SOURCE_LOADED",
+          "payload": {
+            "commandId": "cmd-play-001",
+            "deviceId": "web-7c2f",
+            "currentIndex": $currentIndex,
+            "recordingId": $recordingId
+          }
+        }
+    """.trimIndent()
+
+    private fun pausePayload(
+        positionSeconds: Double,
+        version: Long,
+        commandId: String = "cmd-pause-001",
+    ): String = """
+        {
+          "type": "PAUSE",
+          "payload": {
+            "commandId": "$commandId",
+            "deviceId": "web-7c2f",
+            "currentIndex": 0,
+            "positionSeconds": $positionSeconds,
+            "version": $version
+          }
+        }
+    """.trimIndent()
+
     private fun TestWebSocketSession.serverMessages(): List<ServerPlaybackSyncMessage> {
         return sentTextMessages.map { objectMapper.readValue(it, ServerPlaybackSyncMessage::class.java) }
     }
@@ -250,6 +334,7 @@ private class FakeCurrentQueueRecordingCatalog : CurrentQueueRecordingCatalog {
                 artistLabel = "Artist $recordingId",
                 coverMediaFileId = null,
                 durationMs = 180_000,
+                audioMediaFileId = recordingId + 4_000L,
             )
         }
     }

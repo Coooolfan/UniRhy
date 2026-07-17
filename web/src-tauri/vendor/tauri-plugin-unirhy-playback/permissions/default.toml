@@ -1,0 +1,22 @@
+"$schema" = "schemas/schema.json"
+
+[default]
+description = "Default permissions for the UniRhy playback plugin"
+permissions = [
+    "allow-register-listener",
+    "allow-configure",
+    "allow-update-auth",
+    "allow-connect-sync",
+    "allow-disconnect-sync",
+    "allow-get-playback-state",
+    "allow-set-volume",
+    "allow-request-play",
+    "allow-request-pause",
+    "allow-request-seek",
+    "allow-request-sync-recovery",
+    "allow-local-set-queue",
+    "allow-local-play",
+    "allow-local-pause",
+    "allow-local-seek",
+    "allow-js-log",
+]

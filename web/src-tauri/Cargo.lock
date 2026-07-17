@@ -3799,23 +3799,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tauri-plugin-background-service"
-version = "0.7.1"
-dependencies = [
- "async-trait",
- "libc",
- "log",
- "serde",
- "serde_json",
- "tauri",
- "tauri-plugin",
- "tauri-plugin-notification",
- "thiserror 2.0.18",
- "tokio",
- "tokio-util",
-]
-
-[[package]]
 name = "tauri-plugin-fs"
 version = "2.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3880,6 +3863,18 @@ dependencies = [
  "thiserror 2.0.18",
  "time",
  "url",
+]
+
+[[package]]
+name = "tauri-plugin-unirhy-playback"
+version = "0.1.0"
+dependencies = [
+ "log",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-plugin",
+ "thiserror 2.0.18",
 ]
 
 [[package]]
@@ -4141,9 +4136,7 @@ dependencies = [
  "bytes",
  "libc",
  "mio",
- "parking_lot",
  "pin-project-lite",
- "signal-hook-registry",
  "socket2",
  "tokio-macros",
  "windows-sys 0.61.2",
@@ -4195,7 +4188,6 @@ dependencies = [
  "bytes",
  "futures-core",
  "futures-sink",
- "futures-util",
  "pin-project-lite",
  "tokio",
 ]
@@ -4529,15 +4521,14 @@ checksum = "ebc1c04c71510c7f702b52b7c350734c9ff1295c464a03335b00bb84fc54f853"
 name = "unirhy-desktop"
 version = "0.1.0"
 dependencies = [
- "async-trait",
  "serde",
  "serde_json",
  "tauri",
  "tauri-build",
  "tauri-plugin-android-battery-optimization",
- "tauri-plugin-background-service",
  "tauri-plugin-http",
  "tauri-plugin-notification",
+ "tauri-plugin-unirhy-playback",
  "tauri-plugin-websocket",
  "tokio",
 ]

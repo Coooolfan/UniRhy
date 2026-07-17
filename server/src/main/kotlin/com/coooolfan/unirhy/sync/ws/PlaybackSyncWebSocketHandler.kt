@@ -10,6 +10,7 @@ import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Component
 import org.springframework.web.server.ResponseStatusException
 import org.springframework.web.socket.CloseStatus
+import org.springframework.web.socket.PongMessage
 import org.springframework.web.socket.TextMessage
 import org.springframework.web.socket.WebSocketSession
 import org.springframework.web.socket.handler.ConcurrentWebSocketSessionDecorator
@@ -128,6 +129,16 @@ class PlaybackSyncWebSocketHandler(
                 reason = PlaybackSyncErrorReason.INTERNAL_ERROR,
             )
         }
+    }
+
+    override fun handlePongMessage(
+        session: WebSocketSession,
+        message: PongMessage,
+    ) {
+        deviceRuntimeService.recordPong(
+            sessionId = session.getPlaybackSyncSessionId(),
+            nowMs = timeProvider.nowMs(),
+        )
     }
 
     override fun afterConnectionClosed(
@@ -349,21 +360,33 @@ class PlaybackSyncWebSocketHandler(
 
         sessionRemovalCoordinator.abandonPendingPlay(context.accountId)
 
+        val scheduledAction = playbackSessionService.schedulePauseIfChanged(
+            accountId = context.accountId,
+            commandId = payload.commandId,
+            currentIndex = payload.currentIndex,
+            positionSeconds = payload.positionSeconds,
+            nowMs = nowMs,
+            executeAtMs = playbackSchedulerService.calculateExecuteAtMs(context.accountId, nowMs),
+            expectedVersion = payload.version,
+            positionToleranceSeconds = PAUSE_IDEMPOTENT_EPSILON_SECONDS,
+        )
+        if (scheduledAction == null) {
+            logWriter.info(
+                PlaybackSyncLogEvents.PAUSE_REQUEST,
+                *context.toBaseLogFields(),
+                PlaybackSyncLogFields.COMMAND_ID to payload.commandId,
+                PlaybackSyncLogFields.POSITION_SECONDS to payload.positionSeconds,
+                PlaybackSyncLogFields.RESULT to "ignored_already_paused",
+            )
+            return
+        }
+
         logControlRequest(
             event = PlaybackSyncLogEvents.PAUSE_REQUEST,
             context = context,
             payload = payload,
         )
 
-        val scheduledAction = playbackSessionService.schedulePause(
-            accountId = context.accountId,
-            commandId = payload.commandId,
-            currentIndex = payload.currentIndex.takeIf { currentQueueService.getCurrentRecordingId(context.accountId) != null },
-            positionSeconds = payload.positionSeconds,
-            nowMs = nowMs,
-            executeAtMs = playbackSchedulerService.calculateExecuteAtMs(context.accountId, nowMs),
-            expectedVersion = payload.version,
-        )
         scheduledActionDispatcher.broadcastAndLog(context.accountId, context.deviceId, scheduledAction, nowMs)
         autoAdvanceService.syncFromScheduledAction(context.accountId, scheduledAction, nowMs)
     }
@@ -641,6 +664,7 @@ class PlaybackSyncWebSocketHandler(
     }
 
     private companion object {
+        private const val PAUSE_IDEMPOTENT_EPSILON_SECONDS = 0.25
         private const val SEND_TIME_LIMIT_MS = 10_000
         private const val SEND_BUFFER_SIZE_LIMIT_BYTES = 512 * 1024
         private const val HELLO_TIMEOUT_SECONDS = 10L

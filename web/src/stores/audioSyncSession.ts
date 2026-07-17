@@ -150,8 +150,10 @@ export const usePlaybackSyncSession = (options: UsePlaybackSyncSessionOptions) =
         if (!playbackSyncClient.value || awaitingSyncRecovery.value) {
             return
         }
-        awaitingSyncRecovery.value = true
-        playbackSyncClient.value.requestSync()
+        // 发送失败（socket 未打开）时不置位，等连接恢复后由 handleClientReady 重试
+        if (playbackSyncClient.value.requestSync()) {
+            awaitingSyncRecovery.value = true
+        }
     }
 
     const flushQueuedSystemPauseIntent = () => {
@@ -505,6 +507,10 @@ export const usePlaybackSyncSession = (options: UsePlaybackSyncSessionOptions) =
         const queuedSystemPause = queuedSystemPauseIntent.value
         if (phase !== 'ready' && queuedSystemPause?.commandId) {
             queuedSystemPauseIntent.value = { ...queuedSystemPause, commandId: undefined }
+        }
+        // 连接掉出 ready 说明在途的 SYNC 已不可能得到响应，复位以便重连后重新发起恢复
+        if (previousPhase === 'ready' && phase !== 'ready') {
+            awaitingSyncRecovery.value = false
         }
         clockOffsetMs.value = offsetMs
         roundTripEstimateMs.value = rttMs

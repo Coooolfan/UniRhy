@@ -68,12 +68,14 @@ class PlaybackSchedulerServiceTest {
                 deviceId = "web-a",
                 accountId = 42L,
                 rttEmaMs = 20.0,
+                lastPongAtMs = 1_000L,
                 lastSeenAtMs = 1_000L,
             ),
             DeviceRuntimeState(
                 deviceId = "web-b",
                 accountId = 42L,
                 rttEmaMs = 200.0,
+                lastPongAtMs = 1_000L,
                 lastSeenAtMs = 1_000L,
             ),
         )

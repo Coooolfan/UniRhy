@@ -371,7 +371,7 @@ class CurrentQueueServiceTest {
 
         override fun loadResolvedRecordings(recordingIds: Set<Long>): List<ResolvedQueueRecording> {
             return library.filter { it in recordingIds }.map { recordingId ->
-                ResolvedQueueRecording(recordingId, recordingId, "Track $recordingId", "Artist $recordingId", null, 180_000)
+                ResolvedQueueRecording(recordingId, recordingId, "Track $recordingId", "Artist $recordingId", null, 180_000, recordingId + 4_000L)
             }
         }
 
@@ -383,9 +383,9 @@ class CurrentQueueServiceTest {
 
     private class MutableCatalog : CurrentQueueRecordingCatalog {
         private val recordings = linkedMapOf(
-            1001L to ResolvedQueueRecording(1001L, 3001L, "Track 1", "Artist 1", null, 180_000),
-            1002L to ResolvedQueueRecording(1002L, 3002L, "Track 2", "Artist 2", null, 210_000),
-            1003L to ResolvedQueueRecording(1003L, 3003L, "Track 3", "Artist 3", null, 240_000),
+            1001L to ResolvedQueueRecording(1001L, 3001L, "Track 1", "Artist 1", null, 180_000, 5001L),
+            1002L to ResolvedQueueRecording(1002L, 3002L, "Track 2", "Artist 2", null, 210_000, 5002L),
+            1003L to ResolvedQueueRecording(1003L, 3003L, "Track 3", "Artist 3", null, 240_000, 5003L),
         )
 
         fun remove(recordingId: Long) {
@@ -407,9 +407,9 @@ class CurrentQueueServiceTest {
 
     private class FakeCatalog : CurrentQueueRecordingCatalog {
         private val recordings = mapOf(
-            1001L to ResolvedQueueRecording(1001L, 3001L, "Track 1", "Artist 1", null, 180_000),
-            1002L to ResolvedQueueRecording(1002L, 3002L, "Track 2", "Artist 2", null, 210_000),
-            1003L to ResolvedQueueRecording(1003L, 3003L, "Track 3", "Artist 3", null, 240_000),
+            1001L to ResolvedQueueRecording(1001L, 3001L, "Track 1", "Artist 1", null, 180_000, 5001L),
+            1002L to ResolvedQueueRecording(1002L, 3002L, "Track 2", "Artist 2", null, 210_000, 5002L),
+            1003L to ResolvedQueueRecording(1003L, 3003L, "Track 3", "Artist 3", null, 240_000, 5003L),
         )
 
         override fun getExistingRecordingIds(recordingIds: Set<Long>): Set<Long> {

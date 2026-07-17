@@ -8,8 +8,9 @@ import type {
 import { getAuthToken } from '@/ApiInstance'
 import { getPlatformRuntime } from '@/runtime/platform'
 import {
-    RUNTIME_WEB_SOCKET_CONNECTING,
     RUNTIME_WEB_SOCKET_CLOSED,
+    RUNTIME_WEB_SOCKET_CLOSING,
+    RUNTIME_WEB_SOCKET_CONNECTING,
     RUNTIME_WEB_SOCKET_OPEN,
     type RuntimeWebSocket,
     createRuntimeWebSocket,
@@ -23,6 +24,7 @@ const INITIAL_SAMPLE_INTERVAL_MS = 30
 const INITIAL_SAMPLE_SETTLE_MS = 60
 const STEADY_STATE_INTERVAL_MS = 2_500
 const RECONNECT_DELAYS_MS = [1_000, 2_000, 5_000] as const
+const HEALTH_PROBE_TIMEOUT_MS = 5_000
 const MAX_MEASUREMENT_COUNT = 20
 const MAX_PROTOCOL_EVENT_COUNT = 30
 const CLIENT_VERSION = 'web@playback-sync'
@@ -239,6 +241,7 @@ export class PlaybackSyncClient {
     private initialSampleTimer: number | null = null
     private initialSettleTimer: number | null = null
     private heartbeatTimer: number | null = null
+    private healthProbeTimer: number | null = null
 
     public constructor(callbacks: PlaybackSyncClientCallbacks = {}) {
         this.callbacks = callbacks
@@ -355,6 +358,7 @@ export class PlaybackSyncClient {
         this.clearReconnectTimer()
         this.clearCalibrationTimers()
         this.clearHeartbeatTimer()
+        this.clearHealthProbeTimer()
         if (this.socket && this.socket.readyState !== RUNTIME_WEB_SOCKET_CLOSED) {
             this.updateSocketState('closing')
             this.socket.close()
@@ -362,6 +366,58 @@ export class PlaybackSyncClient {
         this.socket = null
         this.updateSocketState('idle')
         this.setPhase('stopped')
+    }
+
+    /**
+     * 校验连接健康状况，用于从后台恢复等可能存在半死连接的时机。
+     * socket 已关闭时立即重连；socket 声称打开时发送 NTP 探测并限时验证响应，
+     * 超时未响应则强制重建连接。
+     */
+    public verifyConnectionHealth() {
+        if (this.explicitStop || this.healthProbeTimer !== null) {
+            return
+        }
+
+        if (!this.socket || this.socket.readyState === RUNTIME_WEB_SOCKET_CONNECTING) {
+            this.connect()
+            return
+        }
+        if (
+            this.socket.readyState === RUNTIME_WEB_SOCKET_CLOSED ||
+            this.socket.readyState === RUNTIME_WEB_SOCKET_CLOSING
+        ) {
+            this.forceReconnect()
+            return
+        }
+
+        const probeStartedAtMs = nowClientMs()
+        this.sendNtpProbe()
+        this.healthProbeTimer = window.setTimeout(() => {
+            this.healthProbeTimer = null
+            if (this.explicitStop) {
+                return
+            }
+            const respondedAfterProbe =
+                this.lastNtpResponseAtMs !== null && this.lastNtpResponseAtMs >= probeStartedAtMs
+            if (!respondedAfterProbe) {
+                this.forceReconnect()
+            }
+        }, HEALTH_PROBE_TIMEOUT_MS)
+    }
+
+    private forceReconnect() {
+        const staleSocket = this.socket
+        this.socket = null
+        this.clearCalibrationTimers()
+        this.clearHeartbeatTimer()
+        if (staleSocket) {
+            try {
+                staleSocket.close()
+            } catch {
+                // 半死 socket 的 close 可能抛错，忽略并继续重建
+            }
+        }
+        this.connect()
     }
 
     public requestSync() {
@@ -699,6 +755,13 @@ export class PlaybackSyncClient {
         if (this.heartbeatTimer !== null) {
             window.clearInterval(this.heartbeatTimer)
             this.heartbeatTimer = null
+        }
+    }
+
+    private clearHealthProbeTimer() {
+        if (this.healthProbeTimer !== null) {
+            window.clearTimeout(this.healthProbeTimer)
+            this.healthProbeTimer = null
         }
     }
 }
