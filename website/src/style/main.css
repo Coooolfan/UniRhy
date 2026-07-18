@@ -19,6 +19,32 @@ html:has(.home-view) {
   overflow: hidden;
 }
 
+.home-optical-pillar[data-render-mode='sdr-webgl'] {
+  filter: brightness(0.7);
+}
+
+.home-hero-content {
+  width: min(92vw, 72rem);
+}
+
+@media (max-width: 640px) {
+  .brand-logo-title {
+    font-size: clamp(4.25rem, 22vw, 7rem);
+  }
+
+  .brand-logo-ghost--latin {
+    font-size: clamp(4.7rem, 24vw, 6.5rem);
+    letter-spacing: 0.18em;
+    padding-left: 0.18em;
+  }
+
+  .brand-logo-ghost--han {
+    font-size: clamp(4.3rem, 22vw, 6rem);
+    letter-spacing: 0.48em;
+    padding-left: 0.48em;
+  }
+}
+
 html:has(.blog-layout) {
   background: radial-gradient(circle at top left, #f5f0e6, #e6dcc8);
   background-attachment: fixed;

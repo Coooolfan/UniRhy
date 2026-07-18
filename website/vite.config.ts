@@ -35,7 +35,14 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id) {
-          return id.includes('three') ? 'three' : undefined
+          if (
+            id.includes('/three/build/three.webgpu.js') ||
+            id.includes('/three/build/three.tsl.js')
+          ) {
+            return 'three-webgpu'
+          }
+
+          return id.includes('/three/') ? 'three' : undefined
         },
       },
     },

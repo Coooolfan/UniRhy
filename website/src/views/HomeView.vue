@@ -1,15 +1,23 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useHead } from '@unhead/vue'
 import LightPillar from '@/components/LightPillar.vue'
 import BrandLogo from '@/components/BrandLogo.vue'
 import HeroSubtitle from '@/components/HeroSubtitle.vue'
+import HdrToneCurvePanel from '@/components/HdrToneCurvePanel.vue'
+import { DEFAULT_HDR_TONE_CURVE } from '@/components/hdrToneCurve'
 import { useLang } from '@/composables/useLang'
 
 const { lang, setLang } = useLang()
 const isChinese = computed(() => lang.value === 'zh')
 const blogPath = computed(() => `/${lang.value}/blog`)
 const docsPath = computed(() => `/${lang.value}/docs`)
+const showHdrToneCurve = ref(false)
+const hdrToneCurve = ref({ ...DEFAULT_HDR_TONE_CURVE })
+
+onMounted(() => {
+  showHdrToneCurve.value = new URLSearchParams(window.location.search).has('hdrControls')
+})
 
 useHead(() => ({
   title: 'UniRhy · 独一律',
@@ -27,9 +35,9 @@ useHead(() => ({
 </script>
 
 <template>
-  <div class="home-view relative h-full w-full">
+  <div class="home-view relative h-full w-full overflow-hidden">
     <LightPillar
-      class="brightness-[0.7]"
+      class="home-optical-pillar"
       topColor="#FFD700"
       bottomColor="#FF8C00"
       :intensity="1"
@@ -40,15 +48,17 @@ useHead(() => ({
       :noiseIntensity="0.5"
       :pillarRotation="90"
       :interactive="false"
+      :toneCurve="hdrToneCurve"
       mixBlendMode="normal"
     />
+    <HdrToneCurvePanel v-if="showHdrToneCurve" v-model="hdrToneCurve" />
     <div
-      class="pointer-events-none absolute top-1/2 left-1/2 z-10 -translate-x-1/2 -translate-y-1/2 text-center text-white font-brand-sans pb-24"
+      class="home-hero-content pointer-events-none absolute top-1/2 left-1/2 z-10 -translate-x-1/2 -translate-y-1/2 pb-24 text-center font-brand-sans text-white"
     >
       <BrandLogo :isChinese="isChinese" />
       <HeroSubtitle :isChinese="isChinese" />
       <div
-        class="pointer-events-auto flex items-center justify-center gap-4 text-[1.1rem] text-white/60"
+        class="home-hero-links pointer-events-auto flex items-center justify-center gap-4 text-[1.1rem] text-white/60"
       >
         <router-link
           class="text-inherit no-underline transition-all duration-400 ease-[cubic-bezier(0.25,0.46,0.45,0.94)] hover:text-white/90"
