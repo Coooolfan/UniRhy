@@ -126,6 +126,10 @@ object PlaybackController {
     @Volatile
     private var lastKnownStatus: PlaybackStatus? = null
 
+    /** 最近一次 PLAY 调度的服务端目标时刻，供 playout-advanced 计算实际出声偏差。 */
+    @Volatile
+    private var lastPlayTargetServerMs: Long? = null
+
     /** 校时未就绪时暂存的快照状态，READY 后统一应用。 */
     private var pendingSnapshotState: PlaybackStateDto? = null
 
@@ -288,6 +292,10 @@ object PlaybackController {
                     lastError = message
                     emitStateChanged()
                 }
+
+                override fun onPlayoutStarted(playoutStartSystemTimeMs: Long) {
+                    executor.execute { emitPlayoutAdvanced(playoutStartSystemTimeMs) }
+                }
             },
         )
     }
@@ -400,6 +408,8 @@ object PlaybackController {
         }
         isLoading = true
         emitStateChanged()
+        // LOAD 后播放器暂停驻留等待 PLAY 调度：扣留真实 PCM，保持注入窗口完整
+        playerEngine?.armHold()
         preloadQueueItem(
             item = item,
             positionSeconds = 0.0,
@@ -445,6 +455,9 @@ object PlaybackController {
                 if (delayMs < 0 && !payload.skipLateCompensation) {
                     position += -delayMs / 1_000.0
                 }
+                // 采样级排期须先于预滚 seek（sink 的 flush 保留排期），READY 后 playAt 立即 play
+                lastPlayTargetServerMs = payload.serverTimeToExecuteMs
+                engine.armScheduledStart(executeAtElapsedMs)
                 preloadQueueItem(item, positionSeconds = position) {
                     engine.playAt(executeAtElapsedMs)
                 }
@@ -491,6 +504,33 @@ object PlaybackController {
         )
     }
 
+    /**
+     * 实际出声画像：AudioTrack 首个真实样本播出的墙钟时刻，换算到服务端时钟后上抛，
+     * 供服务端与 serverTimeToExecuteMs 一次比对（采样级方案交付判据 §7.1）。
+     */
+    private fun emitPlayoutAdvanced(playoutStartSystemTimeMs: Long) {
+        val playoutStartServerMs = playoutStartSystemTimeMs + clock.clockOffsetMs.toLong()
+        val targetServerMs = lastPlayTargetServerMs
+        // 每个 PLAY 目标只测一次：后续 advancing（焦点恢复等）不对应调度目标
+        lastPlayTargetServerMs = null
+        targetServerMs?.let { playerEngine?.reportPlayoutDrift(playoutStartServerMs - it) }
+        Log.i(
+            TAG,
+            "playout advanced serverMs=$playoutStartServerMs targetServerMs=$targetServerMs " +
+                "driftMs=${targetServerMs?.let { playoutStartServerMs - it }}",
+        )
+        emitEvent(
+            mapOf(
+                "type" to "playout-advanced",
+                "atMs" to clock.clientNowMs(),
+                "playoutStartClientMs" to playoutStartSystemTimeMs,
+                "playoutStartServerMs" to playoutStartServerMs,
+                "targetServerMs" to targetServerMs,
+                "mediaFileId" to playerEngine?.loadedSource?.mediaFileId,
+            ),
+        )
+    }
+
     /** 同步链路诊断快照（附于 sync-state 事件与 getPlaybackState）。 */
     fun syncDiagnostics(): Map<String, Any?>? {
         val client = syncClient ?: return null
@@ -529,6 +569,7 @@ object PlaybackController {
                 }
             }
             PlaybackStatus.PAUSED -> {
+                engine.armHold()
                 preloadQueueItem(item, positionSeconds = state.positionSeconds) {}
             }
         }
