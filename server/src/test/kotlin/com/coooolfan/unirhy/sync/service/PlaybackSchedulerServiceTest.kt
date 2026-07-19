@@ -46,6 +46,31 @@ class PlaybackSchedulerServiceTest {
     }
 
     @Test
+    fun `android native device raises the minimum schedule delay`() {
+        registerAndSampleRtt(deviceId = "web-a", rttMs = 20.0)
+        assertEquals(400L, schedulerService.calculateScheduleDelayMs(42L))
+
+        registerAndSampleRtt(
+            deviceId = "android-a",
+            rttMs = 20.0,
+            sessionId = "session-2",
+            clientVersion = "android-native@playback-sync",
+        )
+        assertEquals(1_000L, schedulerService.calculateScheduleDelayMs(42L))
+    }
+
+    @Test
+    fun `rtt driven delay still wins over android native minimum`() {
+        registerAndSampleRtt(
+            deviceId = "android-a",
+            rttMs = 600.0,
+            clientVersion = "android-native@playback-sync",
+        )
+        // 600 * 1.5 + 200 = 1100 > 1000
+        assertEquals(1_100L, schedulerService.calculateScheduleDelayMs(42L))
+    }
+
+    @Test
     fun `execute at helpers reuse the same clamped delay`() {
         registerAndSampleRtt(deviceId = "web-a", rttMs = 20.0)
         val snapshot = deviceRuntimeService.getActiveRuntimeSnapshot(42L)
@@ -88,6 +113,7 @@ class PlaybackSchedulerServiceTest {
         deviceId: String,
         rttMs: Double,
         sessionId: String = "session-1",
+        clientVersion: String = "web@0.1.0",
     ) {
         deviceRuntimeService.registerConnection(
             accountId = 42L,
@@ -102,7 +128,7 @@ class PlaybackSchedulerServiceTest {
             accountId = 42L,
             sessionId = sessionId,
             deviceId = deviceId,
-            clientVersion = "web@0.1.0",
+            clientVersion = clientVersion,
         )
         deviceRuntimeService.recordNtpResponse(
             accountId = 42L,

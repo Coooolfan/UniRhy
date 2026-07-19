@@ -95,6 +95,7 @@ data class PendingPlayState(
 data class DeviceRuntimeState(
     val deviceId: String,
     val accountId: Long,
+    val clientVersion: String?,
     var rttEmaMs: Double,
     var lastNtpResponseAtMs: Long,
     var lastPongAtMs: Long,
@@ -102,6 +103,7 @@ data class DeviceRuntimeState(
 )
 ```
 
+- `clientVersion` 来自 HELLO，用于按设备端型确定调度窗口下限。
 - `rttEmaMs` 用于计算账号级调度窗口。
 - `lastPongAtMs` 用于活跃性判断与断链清理：服务端每 `15s` 发送一次 WebSocket 协议层 Ping，超过 `60s` 未收到 Pong 判定为 stale。Pong 由客户端网络栈自动回复，不依赖页面 JS 运行，后台被节流的 WebView 也能响应。
 - `lastNtpResponseAtMs` 仅用于校时诊断与 `SYNC` 就绪判断（`isSyncReady`），不参与活跃性判定。
@@ -402,7 +404,8 @@ data class DeviceRuntimeState(
 
 - NTP 公式：`offset = ((t1 - t0) + (t2 - t3)) / 2`，`rtt = (t3 - t0) - (t2 - t1)`。
 - 过滤与平滑：客户端按 RTT 升序取最优半数计算 offset；服务端对 `clientRttMs` 做 EMA（`alpha=0.2`）。
-- 调度窗口：`scheduleDelayMs = clamp(maxRttMs * 1.5 + 200, 400, 3000)`，`executeAtServerMs = serverNowMs + scheduleDelayMs`。`400ms` 为最小安全窗口，`3000ms` 为上限。
+- 调度窗口：`scheduleDelayMs = clamp(maxRttMs * 1.5 + 200, minDelayMs, 3000)`，`executeAtServerMs = serverNowMs + scheduleDelayMs`。`3000ms` 为上限。
+- 窗口下限 `minDelayMs` 取会话内所有设备端型下限的最大值：默认 `400ms`；`clientVersion` 以 `android-native` 开头的设备为 `1000ms`——Android 原生端起播链路（MediaCodec 恢复供流 + AudioTrack 起播填充）需要更大提前量才能进入采样级静音注入路径（见 docs/ANDROID_SAMPLE_ACCURATE_PLAYBACK.md）。
 
 ## 7. 幂等与一致性
 

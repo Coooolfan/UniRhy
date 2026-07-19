@@ -29,7 +29,20 @@ class PlaybackSchedulerService(
             .maxOfOrNull { it.rttEmaMs }
             ?: 0.0
         val rawDelayMs = maxRttMs * RTT_MULTIPLIER + BASE_SCHEDULE_BUFFER_MS
-        return rawDelayMs.roundToLong().coerceIn(MIN_SCHEDULE_DELAY_MS, MAX_SCHEDULE_DELAY_MS)
+        // Android 原生端起播链路（MediaCodec 恢复供流 + AudioTrack primer）需要更大的
+        // 提前量才能进入采样级静音注入路径，按会话内设备端型抬高下限
+        val minDelayMs = runtimeStates
+            .maxOfOrNull { minScheduleDelayMsFor(it.clientVersion) }
+            ?: MIN_SCHEDULE_DELAY_MS
+        return rawDelayMs.roundToLong().coerceIn(minDelayMs, MAX_SCHEDULE_DELAY_MS)
+    }
+
+    private fun minScheduleDelayMsFor(clientVersion: String?): Long {
+        return if (clientVersion?.startsWith(ANDROID_NATIVE_CLIENT_PREFIX) == true) {
+            ANDROID_NATIVE_MIN_SCHEDULE_DELAY_MS
+        } else {
+            MIN_SCHEDULE_DELAY_MS
+        }
     }
 
     fun calculateExecuteAtMs(
@@ -93,6 +106,7 @@ class PlaybackSchedulerService(
     companion object {
         const val PENDING_PLAY_TIMEOUT_MS = 3_000L
         const val MIN_SCHEDULE_DELAY_MS = 400L
+        const val ANDROID_NATIVE_MIN_SCHEDULE_DELAY_MS = 1_000L
         const val MAX_SCHEDULE_DELAY_MS = 3_000L
         const val SYNC_PLAY_BUFFER_MS = 1_500L
         const val PING_INTERVAL_MS = 15_000L
@@ -101,5 +115,6 @@ class PlaybackSchedulerService(
 
         private const val RTT_MULTIPLIER = 1.5
         private const val BASE_SCHEDULE_BUFFER_MS = 200.0
+        private const val ANDROID_NATIVE_CLIENT_PREFIX = "android-native"
     }
 }

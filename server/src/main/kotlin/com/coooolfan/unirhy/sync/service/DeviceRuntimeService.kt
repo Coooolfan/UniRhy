@@ -61,6 +61,7 @@ class DeviceRuntimeService(
             runtimeStateByDeviceKey[deviceKey] = DeviceRuntimeState(
                 deviceId = deviceId,
                 accountId = accountId,
+                clientVersion = clientVersion,
                 lastPongAtMs = nowMs,
                 lastSeenAtMs = nowMs,
             )
