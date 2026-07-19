@@ -13,7 +13,7 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
 /**
- * 采样级起播调度的 `AudioSink` 装饰器（方案见 docs/ANDROID_SAMPLE_ACCURATE_PLAYBACK.md）。
+ * 采样级起播调度的 `AudioSink` 装饰器（架构见 docs/PLAYBACK_ARCHITECTURE.md §3.1）。
  *
  * 解码/焦点/路由等一切能力委托给底层 `DefaultAudioSink`，本类只干预 `handleBuffer`：
  * `scheduleStartAt` 排期后，真实 PCM 被扣留，先向底层灌入按目标单调钟时刻折算的静音帧，

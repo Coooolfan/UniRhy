@@ -405,7 +405,7 @@ data class DeviceRuntimeState(
 - NTP 公式：`offset = ((t1 - t0) + (t2 - t3)) / 2`，`rtt = (t3 - t0) - (t2 - t1)`。
 - 过滤与平滑：客户端按 RTT 升序取最优半数计算 offset；服务端对 `clientRttMs` 做 EMA（`alpha=0.2`）。
 - 调度窗口：`scheduleDelayMs = clamp(maxRttMs * 1.5 + 200, minDelayMs, 3000)`，`executeAtServerMs = serverNowMs + scheduleDelayMs`。`3000ms` 为上限。
-- 窗口下限 `minDelayMs` 取会话内所有设备端型下限的最大值：默认 `400ms`；`clientVersion` 以 `android-native` 开头的设备为 `1000ms`——Android 原生端起播链路（MediaCodec 恢复供流 + AudioTrack 起播填充）需要更大提前量才能进入采样级静音注入路径（见 docs/ANDROID_SAMPLE_ACCURATE_PLAYBACK.md）。
+- 窗口下限 `minDelayMs` 取会话内所有设备端型下限的最大值：默认 `400ms`；`clientVersion` 以 `android-native` 开头的设备为 `1000ms`——Android 原生端起播链路（MediaCodec 恢复供流 + AudioTrack 起播填充）需要更大提前量才能进入采样级静音注入路径（见 docs/PLAYBACK_ARCHITECTURE.md）。
 
 ## 7. 幂等与一致性
 

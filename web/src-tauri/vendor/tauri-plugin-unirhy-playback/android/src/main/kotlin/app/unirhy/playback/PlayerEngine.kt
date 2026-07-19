@@ -25,7 +25,7 @@ import okhttp3.OkHttpClient
  * 支持"预滚暂停在目标位置 → 按单调钟定时起播"的调度语义。
  *
  * 所有播放器操作在主线程执行（ExoPlayer 线程约束），外部线程调用会被投递。
- * 定时起播走采样级路径（docs/ANDROID_SAMPLE_ACCURATE_PLAYBACK.md）：调度方先
+ * 定时起播走采样级路径（docs/PLAYBACK_ARCHITECTURE.md §3.1）：调度方先
  * [armScheduledStart] 排期，[playAt] 立即 play，可听起播点由 [ScheduledAudioSink]
  * 的静音注入落在 AudioTrack 帧钟上；未排期或非 PCM 输入时退化为 postDelayed 兜底。
  */
