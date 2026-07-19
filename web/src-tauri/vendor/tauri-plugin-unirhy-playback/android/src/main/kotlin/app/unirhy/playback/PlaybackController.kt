@@ -410,9 +410,16 @@ object PlaybackController {
         emitStateChanged()
         // LOAD 后播放器暂停驻留等待 PLAY 调度：扣留真实 PCM，保持注入窗口完整
         playerEngine?.armHold()
+        // 同曲目续播沿用当前位置：seek 会重启解码链并重新拉流（数百 ms），
+        // 与紧随其后的 PLAY 调度 seek 叠加会耗尽采样级注入窗口
+        val positionSeconds = if (playerEngine?.loadedSource?.recordingId == item.recordingId) {
+            currentPositionSeconds
+        } else {
+            0.0
+        }
         preloadQueueItem(
             item = item,
-            positionSeconds = 0.0,
+            positionSeconds = positionSeconds,
             onUnavailable = {
                 executor.execute {
                     isLoading = false

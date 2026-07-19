@@ -172,8 +172,8 @@ class PlayerEngine(
     /**
      * 预滚：加载音源并暂停定位到 positionSeconds，STATE_READY 后回调 onReady（用于回报
      * AUDIO_SOURCE_LOADED）。相同 mediaFileId 已加载（READY 或 seek 引发的瞬时 BUFFERING）
-     * 时只重新定位、不重建媒体源——LOAD 与紧随的 PLAY 调度会连续两次 preload，
-     * 若第二次因 BUFFERING 走完整 prepare 会耗尽调度窗口，导致采样级起播必然迟到。
+     * 时只重新定位、不重建媒体源；同位置（±[SEEK_EPSILON_MS]）不重复 seek——seek 会
+     * flush 解码链并重新拉流，代价须留给真正的位置变更。
      */
     fun preload(
         url: String,
@@ -188,8 +188,6 @@ class PlayerEngine(
         if (loadedSource?.mediaFileId == source.mediaFileId && reusableState) {
             player.pause()
             val targetMs = (positionSeconds * 1_000).toLong()
-            // 同位置不重复 seek：seek 触发的 flush 会重启解码链并销毁 AudioTrack，
-            // 使采样级起播的注入窗口被解码重启耗尽
             if (kotlin.math.abs(player.currentPosition - targetMs) > SEEK_EPSILON_MS) {
                 player.seekTo(targetMs)
             }
