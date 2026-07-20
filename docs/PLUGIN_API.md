@@ -67,6 +67,11 @@
 
 *（随工作推进追加。每条结论应是最终决定，附带生效的代码位置。）*
 
+### WASM 运行时：Chicory → Endive
+
+- 插件 WASM 运行时由 [Chicory](https://github.com/dylibso/chicory) 切换为 [Endive](https://github.com/bytecodealliance/endive)（Bytecode Alliance 出品的纯 JVM WebAssembly 运行时，零原生依赖、无 JNI，全 WASM 规范 + WASI + SIMD + GC 支持）。ABI 标识 `unirhy-wasm-abi-v1` 与 guest 侧内存交换协议（`alloc/dealloc` + `(ptr << 32 | len)` 打包返回）不变。
+- 生效位置：`server/gradle/libs.versions.toml`（依赖坐标）、`server/build.gradle.kts`（依赖引入）、`WasmPlugin.kt`（模块解析、实例化、导出/Host 函数类型）、`PluginHostArtist.kt` / `PluginHostHttp.kt`（Host 函数定义）。
+
 ### 任务身份：`(namespace, task_type)` 二元组
 
 - 任务身份由封闭枚举改为二元组：`namespace`（反向域名，如 `com.coooolfan.fetch_cover`）+ `task_type`（全大写标识符，如 `FETCH_COVER`）。插件任务的 namespace 即插件 id。
