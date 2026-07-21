@@ -2,7 +2,6 @@ package com.unirhy.e2e
 
 import com.coooolfan.unirhy.UnirhyApplication
 import com.unirhy.e2e.support.E2eAssert
-import com.unirhy.e2e.support.E2eHttpClient
 import com.unirhy.e2e.support.E2eJson
 import com.unirhy.e2e.support.E2eRuntime
 import com.unirhy.e2e.support.bootstrapAdminSession
@@ -13,11 +12,8 @@ import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
 import org.junit.jupiter.api.TestMethodOrder
-import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.web.server.LocalServerPort
-import org.springframework.jdbc.core.namedparam.MapSqlParameterSource
-import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate
 import org.springframework.test.annotation.DirtiesContext
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
@@ -29,6 +25,7 @@ import java.util.zip.ZipOutputStream
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlin.test.fail
 
 @SpringBootTest(
     classes = [UnirhyApplication::class],
@@ -43,9 +40,6 @@ class PluginE2eTest {
     @LocalServerPort
     private var port: Int = 0
 
-    @Autowired
-    private lateinit var jdbc: NamedParameterJdbcTemplate
-
     @AfterAll
     fun cleanup() {
         E2eRuntime.cleanup()
@@ -55,7 +49,7 @@ class PluginE2eTest {
     @Order(2)
     fun `plugin lifecycle should support upload list download enable submit disable and delete`() {
         val state = bootstrapAdminSession(baseUrl())
-        val pluginId = "com.unirhy.e2e.${suffix()}"
+        val pluginId = "com.unirhy-e2e.${suffix()}"
         val pluginArchive = pluginArchive(pluginId)
 
         val uploadResponse = state.api.postMultipartFile(
@@ -71,6 +65,8 @@ class PluginE2eTest {
         val uploaded = pluginNode(listAfterUploadResponse.body(), pluginId)
         assertEquals(pluginId, uploaded.path("id").asString(), "[plugins] list should contain uploaded plugin")
         assertEquals("0.0.1", uploaded.path("version").asString(), "[plugins] version should match manifest")
+        assertEquals(TASK_TYPE, uploaded.path("taskType").asString(), "[plugins] task type should match manifest")
+        assertEquals(1, uploaded.path("concurrency").intValue(), "[plugins] concurrency should match manifest")
         assertFalse(uploaded.path("enabled").asBoolean(), "[plugins] uploaded plugin should start disabled")
         assertFalse(uploaded.path("isAvailable").asBoolean(), "[plugins] disabled plugin should not be loaded")
 
@@ -85,6 +81,18 @@ class PluginE2eTest {
             "[plugins] downloaded archive should contain manifest and wasm",
         )
 
+        val invalidConcurrencyResponse = state.api.put(
+            path = "/api/plugins/$pluginId/concurrency",
+            query = mapOf("concurrency" to 0),
+        )
+        E2eAssert.status(invalidConcurrencyResponse, 400, "[plugins] non-positive concurrency should fail")
+
+        val concurrencyResponse = state.api.put(
+            path = "/api/plugins/$pluginId/concurrency",
+            query = mapOf("concurrency" to 5),
+        )
+        E2eAssert.status(concurrencyResponse, 204, "[plugins] concurrency update should succeed")
+
         val enableResponse = state.api.put(
             path = "/api/plugins/$pluginId/enabled-state",
             query = mapOf("enabled" to true),
@@ -96,12 +104,37 @@ class PluginE2eTest {
         val enabled = pluginNode(listAfterEnableResponse.body(), pluginId)
         assertTrue(enabled.path("enabled").asBoolean(), "[plugins] enabled flag should be true")
         assertTrue(enabled.path("isAvailable").asBoolean(), "[plugins] enabled wasm should be loaded")
+        assertEquals(5, enabled.path("concurrency").intValue(), "[plugins] concurrency update should persist")
+
+        E2eAssert.status(
+            state.api.delete("/api/plugins/$pluginId"),
+            409,
+            "[plugins] deleting enabled plugin should fail",
+        )
 
         val submitResponse = state.api.post(
-            path = "/api/plugin-task-submissions/METADATA_PARSE",
-            json = emptyMap<String, String>(),
+            path = "/api/task-submissions",
+            json = mapOf(
+                "namespace" to pluginId,
+                "taskType" to TASK_TYPE,
+                "params" to emptyMap<String, Any>(),
+            ),
         )
         E2eAssert.status(submitResponse, 202, "[plugins] submit should accept loaded plugin task")
+        val submissionId = E2eJson.mapper.readTree(submitResponse.body()).path("submissionId").longValue()
+        assertTrue(submissionId > 0, "[plugins] submit should return submissionId")
+
+        awaitSubmissionTerminal(state, submissionId)
+
+        val invalidParamsResponse = state.api.post(
+            path = "/api/task-submissions",
+            json = mapOf(
+                "namespace" to pluginId,
+                "taskType" to TASK_TYPE,
+                "params" to mapOf("unknownField" to true),
+            ),
+        )
+        E2eAssert.status(invalidParamsResponse, 400, "[plugins] params outside schema should fail")
 
         val disableResponse = state.api.put(
             path = "/api/plugins/$pluginId/enabled-state",
@@ -110,10 +143,14 @@ class PluginE2eTest {
         E2eAssert.status(disableResponse, 204, "[plugins] disable should succeed")
 
         val submitAfterDisableResponse = state.api.post(
-            path = "/api/plugin-task-submissions/METADATA_PARSE",
-            json = emptyMap<String, String>(),
+            path = "/api/task-submissions",
+            json = mapOf(
+                "namespace" to pluginId,
+                "taskType" to TASK_TYPE,
+                "params" to emptyMap<String, Any>(),
+            ),
         )
-        E2eAssert.status(submitAfterDisableResponse, 400, "[plugins] submit without loaded plugin should fail")
+        E2eAssert.status(submitAfterDisableResponse, 409, "[plugins] submit for disabled plugin should conflict")
 
         val deleteResponse = state.api.delete("/api/plugins/$pluginId")
         E2eAssert.status(deleteResponse, 204, "[plugins] delete should succeed")
@@ -157,56 +194,60 @@ class PluginE2eTest {
             fileBytes = invalidPluginArchive(),
         )
         E2eAssert.status(response, 400, "[plugins] upload without wasm should fail")
+
+        val reservedResponse = state.api.postMultipartFile(
+            path = "/api/plugins",
+            fieldName = "file",
+            fileName = "reserved.up",
+            fileBytes = pluginArchive("app.unirhy.evil"),
+        )
+        E2eAssert.status(reservedResponse, 400, "[plugins] reserved namespace should be rejected")
     }
 
     @Test
     @Order(4)
-    fun `plugin list should reject invalid stored form metadata`() {
-        val state = bootstrapAdminSession(baseUrl())
-        val pluginId = "com.unirhy.e2e.invalid-form.${suffix()}"
-        jdbc.update(
-            """
-                INSERT INTO public.plugin (
-                    id, name, version, abi, task_type, extension, network_allow, form_fields, wasm, enabled
-                ) VALUES (
-                    :id, :name, :version, :abi, :taskType, :extension, :networkAllow, :formFields, :wasm, false
-                )
-            """.trimIndent(),
-            MapSqlParameterSource()
-                .addValue("id", pluginId)
-                .addValue("name", "Invalid form metadata")
-                .addValue("version", "0.0.1")
-                .addValue("abi", "unirhy-wasm-abi-v1")
-                .addValue("taskType", "METADATA_PARSE")
-                .addValue("extension", "metadata.scan@1")
-                .addValue("networkAllow", emptyArray<String>())
-                .addValue("formFields", "{not-json")
-                .addValue("wasm", minimalPlanningWasm()),
-        )
-
-        try {
-            E2eAssert.status(
-                state.api.get("/api/plugins"),
-                500,
-                "[plugins] list should fail on invalid stored form metadata",
-            )
-        } finally {
-            jdbc.update(
-                "DELETE FROM public.plugin WHERE id = :id",
-                mapOf("id" to pluginId),
-            )
-        }
-    }
-
-    @Test
-    @Order(5)
-    fun `plugin submit should reject invalid task type`() {
+    fun `task submission should reject unknown task key`() {
         val state = bootstrapAdminSession(baseUrl())
         E2eAssert.status(
-            state.api.post(path = "/api/plugin-task-submissions/NOT_A_TASK", json = emptyMap<String, String>()),
-            400,
-            "[plugins] submit should reject unknown task type",
+            state.api.post(
+                path = "/api/task-submissions",
+                json = mapOf(
+                    "namespace" to "com.unirhy-e2e.not-installed",
+                    "taskType" to "NOT_A_TASK",
+                    "params" to emptyMap<String, Any>(),
+                ),
+            ),
+            404,
+            "[submissions] unknown task key should return 404",
         )
+        E2eAssert.status(
+            state.api.post(
+                path = "/api/task-submissions",
+                json = mapOf(
+                    "namespace" to "INVALID NAMESPACE",
+                    "taskType" to "lower",
+                    "params" to emptyMap<String, Any>(),
+                ),
+            ),
+            400,
+            "[submissions] invalid task key format should return 400",
+        )
+    }
+
+    private fun awaitSubmissionTerminal(state: com.unirhy.e2e.support.E2eAdminSession, submissionId: Long) {
+        val deadline = System.currentTimeMillis() + SUBMISSION_WAIT_TIMEOUT_MILLIS
+        var lastStatus = "<none>"
+        while (System.currentTimeMillis() <= deadline) {
+            val response = state.api.get("/api/task-submissions/$submissionId")
+            E2eAssert.status(response, 200, "[plugins] submission detail should succeed")
+            lastStatus = E2eJson.mapper.readTree(response.body()).path("submission").path("status").asString()
+            if (lastStatus in setOf("COMPLETED", "FAILED", "CANCELLED")) {
+                assertEquals("COMPLETED", lastStatus, "[plugins] plan() returning empty list should complete submission")
+                return
+            }
+            Thread.sleep(200L)
+        }
+        fail("[plugins] submission $submissionId did not reach terminal state, last=$lastStatus")
     }
 
     private fun pluginArchive(pluginId: String): ByteArray {
@@ -217,14 +258,20 @@ class PluginE2eTest {
             runtime:
               type: wasm
               abi: unirhy-wasm-abi-v1
-            tasks:
-              - type: METADATA_PARSE
-                extension: metadata.scan@1
+            task:
+              type: $TASK_TYPE
+              concurrency: 1
             form:
-              fields:
-                - name: dryRun
-                  type: boolean
-                  label: Dry run
+              schema:
+                type: object
+                properties:
+                  dryRun:
+                    type: boolean
+                    title: Dry run
+                required: []
+                additionalProperties: false
+              order:
+                - dryRun
         """.trimIndent()
         return zip(
             "plugin.yml" to manifest.toByteArray(),
@@ -235,14 +282,14 @@ class PluginE2eTest {
     private fun invalidPluginArchive(): ByteArray {
         return zip(
             "plugin.yml" to """
-                id: invalid
+                id: com.unirhy-e2e.invalid
                 version: 0.0.1
                 runtime:
                   type: wasm
                   abi: unirhy-wasm-abi-v1
-                tasks:
-                  - type: METADATA_PARSE
-                    extension: metadata.scan@1
+                task:
+                  type: $TASK_TYPE
+                  concurrency: 1
             """.trimIndent().toByteArray(),
         )
     }
@@ -306,6 +353,9 @@ class PluginE2eTest {
     private fun baseUrl(): String = "http://127.0.0.1:$port"
 
     companion object {
+        private const val TASK_TYPE = "E2E_TASK"
+        private const val SUBMISSION_WAIT_TIMEOUT_MILLIS = 30_000L
+
         @JvmStatic
         @DynamicPropertySource
         fun registerDatasource(registry: DynamicPropertyRegistry) {

@@ -240,13 +240,13 @@ class TaskContentReadE2eTest {
         val fixture = prepareScanFixture(state.runtime.scanWorkspace)
         val expectedTaskCount = countFilesWithExtensions(fixture.fixtureRoot, ACCEPT_EXTENSIONS)
         val baselineStats = fetchTaskStats(state, "[scan] baseline task stats before submit")
-        val baselinePending = taskCount(baselineStats, "METADATA_PARSE", "PENDING")
-        val baselineCompleted = taskCount(baselineStats, "METADATA_PARSE", "COMPLETED")
-        val baselineFailed = taskCount(baselineStats, "METADATA_PARSE", "FAILED")
+        val baselineActive = taskCount(baselineStats, "METADATA_PARSE", "active")
+        val baselineCompleted = taskCount(baselineStats, "METADATA_PARSE", "completed")
+        val baselineFailed = taskCount(baselineStats, "METADATA_PARSE", "failed")
 
         val submitResponse = state.api.post(
-            path = "/api/tasks/scans",
-            json = scanRequestBody,
+            path = "/api/task-submissions",
+            json = submissionBody("METADATA_PARSE", scanRequestBody),
         )
         E2eAssert.status(submitResponse, 202, "[scan] submit scan task should return accepted")
 
@@ -254,7 +254,7 @@ class TaskContentReadE2eTest {
             state = state,
             scanRequestBody = scanRequestBody,
             expectedTaskCount = expectedTaskCount,
-            baselinePending = baselinePending,
+            baselineActive = baselineActive,
             baselineCompleted = baselineCompleted,
             baselineFailed = baselineFailed,
         )
@@ -356,13 +356,13 @@ class TaskContentReadE2eTest {
         state: E2eAdminSession,
         scanRequestBody: Map<String, Any>,
         expectedTaskCount: Int,
-        baselinePending: Long,
+        baselineActive: Long,
         baselineCompleted: Long,
         baselineFailed: Long,
     ) {
         val duplicateSubmitResponse = state.api.post(
-            path = "/api/tasks/scans",
-            json = scanRequestBody,
+            path = "/api/task-submissions",
+            json = submissionBody("METADATA_PARSE", scanRequestBody),
         )
         E2eAssert.status(
             duplicateSubmitResponse,
@@ -372,7 +372,7 @@ class TaskContentReadE2eTest {
 
         val timeoutMillis = scanWaitTimeoutMillis()
         val deadline = System.currentTimeMillis() + timeoutMillis
-        var observedPending = false
+        var observedActive = false
         var observedCompletion = false
         var lastStatsBody = """{"rows":[]}"""
         var pollCount = 0
@@ -380,20 +380,20 @@ class TaskContentReadE2eTest {
         while (System.currentTimeMillis() <= deadline) {
             pollCount += 1
             val statsRows = fetchTaskStats(state, "[scan] task stats")
-            val pending = taskCount(statsRows, "METADATA_PARSE", "PENDING")
-            val completed = taskCount(statsRows, "METADATA_PARSE", "COMPLETED")
-            val failed = taskCount(statsRows, "METADATA_PARSE", "FAILED")
+            val active = taskCount(statsRows, "METADATA_PARSE", "active")
+            val completed = taskCount(statsRows, "METADATA_PARSE", "completed")
+            val failed = taskCount(statsRows, "METADATA_PARSE", "failed")
             lastStatsBody = taskStatsBody(statsRows)
 
-            if (pending > baselinePending) {
-                observedPending = true
+            if (active > baselineActive) {
+                observedActive = true
             }
             val terminalDelta = (completed - baselineCompleted) + (failed - baselineFailed)
             if (terminalDelta > 0) {
                 observedCompletion = true
             }
 
-            if (pending <= baselinePending && terminalDelta >= expectedTaskCount) {
+            if (active <= baselineActive && terminalDelta >= expectedTaskCount) {
                 break
             }
 
@@ -401,7 +401,7 @@ class TaskContentReadE2eTest {
         }
 
         assertTrue(
-            observedPending || observedCompletion,
+            observedActive || observedCompletion,
             "[scan] expected METADATA_PARSE stats to change after submit, last=$lastStatsBody",
         )
         assertTrue(
@@ -409,13 +409,19 @@ class TaskContentReadE2eTest {
             "[scan] METADATA_PARSE task stats never reached terminal state before timeout ${timeoutMillis}ms, last=$lastStatsBody",
         )
         val finalStats = fetchTaskStats(state, "[scan] final task stats")
-        val completed = taskCount(finalStats, "METADATA_PARSE", "COMPLETED")
-        val failed = taskCount(finalStats, "METADATA_PARSE", "FAILED")
+        val completed = taskCount(finalStats, "METADATA_PARSE", "completed")
+        val failed = taskCount(finalStats, "METADATA_PARSE", "failed")
         val terminalDelta = (completed - baselineCompleted) + (failed - baselineFailed)
+        // 重复 submission 在首批任务完成后规划时会补投相同 payload（活动去重只覆盖 PENDING/RUNNING），
+        // 补投的任务按“已扫描”跳过，因此终态总量 >= 文件数且不产生失败。
+        assertTrue(
+            terminalDelta >= expectedTaskCount.toLong(),
+            "[scan] final stats should cover unique fixture file count, last=${taskStatsBody(finalStats)}",
+        )
         assertEquals(
-            expectedTaskCount.toLong(),
-            terminalDelta,
-            "[scan] final stats should only grow by unique fixture file count, last=${taskStatsBody(finalStats)}",
+            baselineFailed,
+            failed,
+            "[scan] scan tasks should not fail, last=${taskStatsBody(finalStats)}",
         )
     }
 
@@ -424,34 +430,34 @@ class TaskContentReadE2eTest {
         assertTrue(expectedOpusCount > 0, "[transcode] fixture should contain audio files: ${fixture.fixtureRoot}")
         val existingOpusCount = countFilesWithExtensions(state.runtime.scanWorkspace, setOf("opus"))
         val baselineStats = fetchTaskStats(state, "[transcode] baseline task stats")
-        val baselinePending = taskCount(baselineStats, "TRANSCODE", "PENDING")
-        val baselineCompleted = taskCount(baselineStats, "TRANSCODE", "COMPLETED")
-        val baselineFailed = taskCount(baselineStats, "TRANSCODE", "FAILED")
+        val baselineActive = taskCount(baselineStats, "TRANSCODE", "active")
+        val baselineCompleted = taskCount(baselineStats, "TRANSCODE", "completed")
+        val baselineFailed = taskCount(baselineStats, "TRANSCODE", "failed")
 
         val submitResponse = state.api.post(
-            path = "/api/tasks/transcodes",
-            json = transcodeRequestBody(state),
+            path = "/api/task-submissions",
+            json = submissionBody("TRANSCODE", transcodeRequestBody(state)),
         )
         E2eAssert.status(submitResponse, 202, "[transcode] submit transcode task should return accepted")
 
         val timeoutMillis = scanWaitTimeoutMillis()
         val deadline = System.currentTimeMillis() + timeoutMillis
-        var observedPending = false
+        var observedActive = false
         var lastStatsBody = """{"rows":[]}"""
 
         while (System.currentTimeMillis() <= deadline) {
             val statsRows = fetchTaskStats(state, "[transcode] task stats")
-            val pending = taskCount(statsRows, "TRANSCODE", "PENDING")
-            val completed = taskCount(statsRows, "TRANSCODE", "COMPLETED")
-            val failed = taskCount(statsRows, "TRANSCODE", "FAILED")
+            val active = taskCount(statsRows, "TRANSCODE", "active")
+            val completed = taskCount(statsRows, "TRANSCODE", "completed")
+            val failed = taskCount(statsRows, "TRANSCODE", "failed")
             lastStatsBody = taskStatsBody(statsRows)
 
-            if (pending > baselinePending) {
-                observedPending = true
+            if (active > baselineActive) {
+                observedActive = true
             }
 
             val terminalDelta = (completed - baselineCompleted) + (failed - baselineFailed)
-            if (pending <= baselinePending && terminalDelta >= expectedOpusCount) {
+            if (active <= baselineActive && terminalDelta >= expectedOpusCount) {
                 val actualOpusCount = countFilesWithExtensions(state.runtime.scanWorkspace, setOf("opus")) - existingOpusCount
                 assertEquals(
                     expectedOpusCount,
@@ -459,7 +465,7 @@ class TaskContentReadE2eTest {
                     "[transcode] expected opus output count to match fixture file count, fixture=${fixture.fixtureRoot}",
                 )
                 assertTrue(
-                    observedPending || completed - baselineCompleted == expectedOpusCount.toLong(),
+                    observedActive || completed - baselineCompleted == expectedOpusCount.toLong(),
                     "[transcode] expected pending count increase or direct completion for all tasks, last=$lastStatsBody",
                 )
                 return
@@ -502,9 +508,17 @@ class TaskContentReadE2eTest {
     }
 
     private fun fetchTaskStats(state: E2eAdminSession, step: String): List<JsonNode> {
-        val response = state.api.get("/api/tasks/log-counts")
+        val response = state.api.get("/api/task-statistics")
         E2eAssert.status(response, 200, "$step should succeed")
         return taskStatRows(response.body(), step)
+    }
+
+    private fun submissionBody(taskType: String, params: Map<String, Any>): Map<String, Any> {
+        return linkedMapOf(
+            "namespace" to "app.unirhy.built-in",
+            "taskType" to taskType,
+            "params" to params,
+        )
     }
 
     private fun taskStatRows(responseBody: String, step: String): List<JsonNode> {
@@ -513,18 +527,17 @@ class TaskContentReadE2eTest {
         return root.toList()
     }
 
-    private fun taskCount(rows: List<JsonNode>, taskType: String, status: String): Long {
+    private fun taskCount(rows: List<JsonNode>, taskType: String, field: String): Long {
         return rows.firstOrNull { row ->
-            row.path("taskType").asString() == taskType && row.path("status").asString() == status
-        }?.path("count")?.longValue() ?: 0L
+            row.path("taskType").asString() == taskType
+        }?.path("tasks")?.path(field)?.longValue() ?: 0L
     }
 
     private fun taskStatsBody(rows: List<JsonNode>): String {
         return rows.joinToString(prefix = "[", postfix = "]") { row ->
             val taskType = row.path("taskType").asString("<missing>")
-            val status = row.path("status").asString("<missing>")
-            val count = row.path("count").asLong(-1L)
-            """{"taskType":"$taskType","status":"$status","count":$count}"""
+            val tasks = row.path("tasks")
+            """{"taskType":"$taskType","tasks":$tasks}"""
         }
     }
 
@@ -596,23 +609,6 @@ class TaskContentReadE2eTest {
             "[scan] env $SCAN_WAIT_TIMEOUT_ENV must be a positive integer milliseconds, actual=$value"
         }
         return parsed
-    }
-
-    private fun scanRequestBodyForUnauth(): Map<String, Any> {
-        return linkedMapOf(
-            "providerType" to "FILE_SYSTEM",
-            "providerId" to 0L,
-        )
-    }
-
-    private fun transcodeRequestBodyForUnauth(): Map<String, Any> {
-        return linkedMapOf(
-            "srcProviderType" to "FILE_SYSTEM",
-            "srcProviderId" to 0L,
-            "dstProviderType" to "FILE_SYSTEM",
-            "dstProviderId" to 0L,
-            "targetCodec" to "OPUS",
-        )
     }
 
     private fun scanRequestBody(state: E2eAdminSession): Map<String, Any> {

@@ -161,6 +161,25 @@ class E2eHttpClient(private val baseUrl: String) {
         )
     }
 
+    fun patch(
+        path: String,
+        query: Map<String, Any?> = emptyMap(),
+        headers: Map<String, String> = emptyMap(),
+        json: Any? = null,
+        form: Map<String, Any?>? = null,
+    ): HttpResponse<String> {
+        return requestText(
+            E2eRequest(
+                method = HttpMethod.PATCH,
+                path = path,
+                query = query,
+                headers = headers,
+                json = json,
+                form = form,
+            ),
+        )
+    }
+
     fun delete(
         path: String,
         query: Map<String, Any?> = emptyMap(),
@@ -283,6 +302,7 @@ enum class HttpMethod(val value: String) {
     HEAD("HEAD"),
     POST("POST"),
     PUT("PUT"),
+    PATCH("PATCH"),
     DELETE("DELETE"),
 }
 

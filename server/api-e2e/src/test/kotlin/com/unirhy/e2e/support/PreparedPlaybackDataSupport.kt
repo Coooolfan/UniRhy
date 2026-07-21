@@ -60,9 +60,9 @@ private fun executeScanAndPreparePlaybackData(
     minRecordingCount: Int,
 ): PreparedPlaybackData {
     val baselineStats = fetchTaskStats(state, "[prepare] playback baseline task stats")
-    val baselinePending = taskCount(baselineStats, "METADATA_PARSE", "PENDING")
-    val baselineCompleted = taskCount(baselineStats, "METADATA_PARSE", "COMPLETED")
-    val baselineFailed = taskCount(baselineStats, "METADATA_PARSE", "FAILED")
+    val baselineActive = taskCount(baselineStats, "METADATA_PARSE", "active")
+    val baselineCompleted = taskCount(baselineStats, "METADATA_PARSE", "completed")
+    val baselineFailed = taskCount(baselineStats, "METADATA_PARSE", "failed")
 
     val fixture = preparePlaybackFixture(
         scanWorkspace = state.runtime.scanWorkspace,
@@ -70,10 +70,14 @@ private fun executeScanAndPreparePlaybackData(
     )
 
     val submitResponse = state.api.post(
-        path = "/api/tasks/scans",
+        path = "/api/task-submissions",
         json = mapOf(
-            "providerType" to "FILE_SYSTEM",
-            "providerId" to resolveSystemFsProviderId(state),
+            "namespace" to "app.unirhy.built-in",
+            "taskType" to "METADATA_PARSE",
+            "params" to mapOf(
+                "providerType" to "FILE_SYSTEM",
+                "providerId" to resolveSystemFsProviderId(state),
+            ),
         ),
     )
     E2eAssert.status(submitResponse, 202, "[prepare] playback scan task should be accepted")
@@ -81,7 +85,7 @@ private fun executeScanAndPreparePlaybackData(
     val recordingIds = awaitPlayableRecordings(
         state = state,
         minRecordingCount = minRecordingCount,
-        baselinePending = baselinePending,
+        baselineActive = baselineActive,
         baselineCompleted = baselineCompleted,
         baselineFailed = baselineFailed,
     )
@@ -133,7 +137,7 @@ private fun fetchTaskStats(
     state: E2eAdminSession,
     step: String,
 ): List<JsonNode> {
-    val response = state.api.get("/api/tasks/log-counts")
+    val response = state.api.get("/api/task-statistics")
     E2eAssert.status(response, 200, "$step should succeed")
     val root = E2eJson.mapper.readTree(response.body())
     assertTrue(root.isArray, "$step expected root array")
@@ -143,11 +147,11 @@ private fun fetchTaskStats(
 private fun taskCount(
     rows: List<JsonNode>,
     taskType: String,
-    status: String,
+    field: String,
 ): Long {
     return rows.firstOrNull { row ->
-        row.path("taskType").asString() == taskType && row.path("status").asString() == status
-    }?.path("count")?.longValue() ?: 0L
+        row.path("taskType").asString() == taskType
+    }?.path("tasks")?.path(field)?.longValue() ?: 0L
 }
 
 /**
@@ -163,12 +167,12 @@ private fun taskCount(
 private fun awaitPlayableRecordings(
     state: E2eAdminSession,
     minRecordingCount: Int,
-    baselinePending: Long,
+    baselineActive: Long,
     baselineCompleted: Long,
     baselineFailed: Long,
 ): List<Long> {
     val deadline = System.currentTimeMillis() + scanWaitTimeoutMillis()
-    var observedPending = false
+    var observedActive = false
     var lastTerminal = -1L
     var stableCount = 0
 
@@ -176,11 +180,11 @@ private fun awaitPlayableRecordings(
         // 先读任务统计，再读 works。completeTask 与 saveScannedRecording 处于同一事务，
         // 先统计后 works 可保证已计入 completed 的 recording 一定可见。
         val statsRows = fetchTaskStats(state, "[prepare] playback scan task stats")
-        val pending = taskCount(statsRows, "METADATA_PARSE", "PENDING")
-        val terminal = taskCount(statsRows, "METADATA_PARSE", "COMPLETED") +
-            taskCount(statsRows, "METADATA_PARSE", "FAILED")
-        if (pending > baselinePending) {
-            observedPending = true
+        val active = taskCount(statsRows, "METADATA_PARSE", "active")
+        val terminal = taskCount(statsRows, "METADATA_PARSE", "completed") +
+            taskCount(statsRows, "METADATA_PARSE", "failed")
+        if (active > baselineActive) {
+            observedActive = true
         }
 
         val works = listWorks(state, "[prepare] list works during playback scan")
@@ -190,7 +194,7 @@ private fun awaitPlayableRecordings(
         }
 
         // 终态计数在 pending 回落后连续保持不变，视为调度器已排空。
-        if (observedPending && pending <= baselinePending && terminal > baselineCompleted + baselineFailed) {
+        if (observedActive && active <= baselineActive && terminal > baselineCompleted + baselineFailed) {
             stableCount = if (terminal == lastTerminal) stableCount + 1 else 0
             lastTerminal = terminal
             if (stableCount >= DRAIN_STABLE_POLLS) {

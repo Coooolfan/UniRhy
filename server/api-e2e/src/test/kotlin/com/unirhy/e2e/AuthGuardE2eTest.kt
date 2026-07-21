@@ -49,6 +49,7 @@ class AuthGuardE2eTest {
             "GET" -> api.get(endpoint.path, endpoint.headers)
             "POST" -> api.post(path = endpoint.path, headers = endpoint.headers)
             "PUT" -> api.put(path = endpoint.path, headers = endpoint.headers)
+            "PATCH" -> api.patch(path = endpoint.path, headers = endpoint.headers)
             "DELETE" -> api.delete(path = endpoint.path, headers = endpoint.headers)
             "HEAD" -> api.head(endpoint.path, endpoint.headers)
             else -> error("unsupported method ${endpoint.method}")
@@ -140,9 +141,20 @@ class AuthGuardE2eTest {
             ProtectedEndpoint("POST", "/api/playback-queues/current/item-removals"),
             ProtectedEndpoint("POST", "/api/playback-queues/current/clear-requests"),
             // tasks
-            ProtectedEndpoint("GET", "/api/tasks/log-counts"),
-            ProtectedEndpoint("POST", "/api/tasks/scans"),
-            ProtectedEndpoint("POST", "/api/tasks/transcodes"),
+            ProtectedEndpoint("GET", "/api/task-definitions"),
+            ProtectedEndpoint("GET", "/api/task-definitions/app.unirhy.built-in/METADATA_PARSE"),
+            ProtectedEndpoint("GET", "/api/task-statistics"),
+            ProtectedEndpoint("GET", "/api/task-submissions"),
+            ProtectedEndpoint("POST", "/api/task-submissions"),
+            ProtectedEndpoint("GET", "/api/task-submissions/1"),
+            ProtectedEndpoint("PATCH", "/api/task-submissions/1"),
+            ProtectedEndpoint("PATCH", "/api/task-submissions"),
+            ProtectedEndpoint("DELETE", "/api/task-submissions/1"),
+            ProtectedEndpoint("GET", "/api/task-submissions/1/tasks"),
+            ProtectedEndpoint("GET", "/api/tasks"),
+            ProtectedEndpoint("GET", "/api/tasks/1"),
+            ProtectedEndpoint("PATCH", "/api/tasks/1"),
+            ProtectedEndpoint("PATCH", "/api/tasks"),
             // storage (fs)
             ProtectedEndpoint("GET", "/api/storage/file-system-nodes"),
             ProtectedEndpoint("POST", "/api/storage/file-system-nodes"),
@@ -161,9 +173,9 @@ class AuthGuardE2eTest {
             // 不带该 header 时会直接返回 415，鉴权拦截器不会执行。
             ProtectedEndpoint("POST", "/api/plugins", headers = mapOf("Content-Type" to "multipart/form-data; boundary=test")),
             ProtectedEndpoint("PUT", "/api/plugins/1/enabled-state"),
+            ProtectedEndpoint("PUT", "/api/plugins/1/concurrency"),
             ProtectedEndpoint("DELETE", "/api/plugins/1"),
             ProtectedEndpoint("GET", "/api/plugins/1/package"),
-            ProtectedEndpoint("POST", "/api/plugin-task-submissions/METADATA_PARSE"),
         )
 
         @JvmStatic

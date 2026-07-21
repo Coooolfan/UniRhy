@@ -1307,18 +1307,22 @@ class AccountPlaylistContentE2eTest {
         val requestBody = scanRequestBody(state)
         val fixture = prepareScanFixture(state.runtime.scanWorkspace)
         val baselineStats = fetchTaskStats(state, "[prepare] baseline task stats before submit")
-        val baselinePending = taskCount(baselineStats, "METADATA_PARSE", "PENDING")
-        val baselineCompleted = taskCount(baselineStats, "METADATA_PARSE", "COMPLETED")
-        val baselineFailed = taskCount(baselineStats, "METADATA_PARSE", "FAILED")
+        val baselineActive = taskCount(baselineStats, "METADATA_PARSE", "active")
+        val baselineCompleted = taskCount(baselineStats, "METADATA_PARSE", "completed")
+        val baselineFailed = taskCount(baselineStats, "METADATA_PARSE", "failed")
 
         val submitResponse = state.api.post(
-            path = "/api/tasks/scans",
-            json = requestBody,
+            path = "/api/task-submissions",
+            json = mapOf(
+                "namespace" to "app.unirhy.built-in",
+                "taskType" to "METADATA_PARSE",
+                "params" to requestBody,
+            ),
         )
         E2eAssert.status(submitResponse, 202, "[prepare] submit scan task should return accepted")
         awaitScanTaskFinished(
             state = state,
-            baselinePending = baselinePending,
+            baselineActive = baselineActive,
             baselineCompleted = baselineCompleted,
             baselineFailed = baselineFailed,
         )
@@ -1479,13 +1483,17 @@ class AccountPlaylistContentE2eTest {
 
     private fun submitScanAndAwaitCompletion(state: E2eAdminSession, expectedTaskCount: Int) {
         val baselineStats = fetchTaskStats(state, "[scan-helper] baseline task stats")
-        val baselinePending = taskCount(baselineStats, "METADATA_PARSE", "PENDING")
-        val baselineCompleted = taskCount(baselineStats, "METADATA_PARSE", "COMPLETED")
-        val baselineFailed = taskCount(baselineStats, "METADATA_PARSE", "FAILED")
+        val baselineActive = taskCount(baselineStats, "METADATA_PARSE", "active")
+        val baselineCompleted = taskCount(baselineStats, "METADATA_PARSE", "completed")
+        val baselineFailed = taskCount(baselineStats, "METADATA_PARSE", "failed")
 
         val submitResponse = state.api.post(
-            path = "/api/tasks/scans",
-            json = scanRequestBody(state),
+            path = "/api/task-submissions",
+            json = mapOf(
+                "namespace" to "app.unirhy.built-in",
+                "taskType" to "METADATA_PARSE",
+                "params" to scanRequestBody(state),
+            ),
         )
         E2eAssert.status(submitResponse, 202, "[scan-helper] submit scan task should return accepted")
 
@@ -1494,13 +1502,13 @@ class AccountPlaylistContentE2eTest {
 
         while (System.currentTimeMillis() <= deadline) {
             val statsRows = fetchTaskStats(state, "[scan-helper] task stats")
-            val pending = taskCount(statsRows, "METADATA_PARSE", "PENDING")
-            val completed = taskCount(statsRows, "METADATA_PARSE", "COMPLETED")
-            val failed = taskCount(statsRows, "METADATA_PARSE", "FAILED")
+            val active = taskCount(statsRows, "METADATA_PARSE", "active")
+            val completed = taskCount(statsRows, "METADATA_PARSE", "completed")
+            val failed = taskCount(statsRows, "METADATA_PARSE", "failed")
             val terminalDelta = (completed - baselineCompleted) + (failed - baselineFailed)
             lastStatsBody = statsRows.joinToString(prefix = "[", postfix = "]") { it.toString() }
 
-            if (pending <= baselinePending && terminalDelta >= expectedTaskCount) {
+            if (active <= baselineActive && terminalDelta >= expectedTaskCount) {
                 assertEquals(
                     0L,
                     failed - baselineFailed,
@@ -1517,24 +1525,24 @@ class AccountPlaylistContentE2eTest {
 
     private fun awaitScanTaskFinished(
         state: E2eAdminSession,
-        baselinePending: Long,
+        baselineActive: Long,
         baselineCompleted: Long,
         baselineFailed: Long,
     ) {
         val deadline = System.currentTimeMillis() + scanWaitTimeoutMillis()
-        var observedPending = false
+        var observedActive = false
 
         while (System.currentTimeMillis() <= deadline) {
             val statsRows = fetchTaskStats(state, "[prepare] scan task stats")
-            val pending = taskCount(statsRows, "METADATA_PARSE", "PENDING")
-            val completed = taskCount(statsRows, "METADATA_PARSE", "COMPLETED")
-            val failed = taskCount(statsRows, "METADATA_PARSE", "FAILED")
+            val active = taskCount(statsRows, "METADATA_PARSE", "active")
+            val completed = taskCount(statsRows, "METADATA_PARSE", "completed")
+            val failed = taskCount(statsRows, "METADATA_PARSE", "failed")
 
-            if (pending > baselinePending) {
-                observedPending = true
+            if (active > baselineActive) {
+                observedActive = true
             }
-            if (pending <= baselinePending && (completed > baselineCompleted || failed > baselineFailed)) {
-                assertTrue(observedPending || completed > baselineCompleted, "[prepare] scan task stats should advance before finishing")
+            if (active <= baselineActive && (completed > baselineCompleted || failed > baselineFailed)) {
+                assertTrue(observedActive || completed > baselineCompleted, "[prepare] scan task stats should advance before finishing")
                 return
             }
             Thread.sleep(POLL_INTERVAL_MILLIS)
@@ -1544,17 +1552,17 @@ class AccountPlaylistContentE2eTest {
     }
 
     private fun fetchTaskStats(state: E2eAdminSession, step: String): List<JsonNode> {
-        val response = state.api.get("/api/tasks/log-counts")
+        val response = state.api.get("/api/task-statistics")
         E2eAssert.status(response, 200, "$step should succeed")
         val root = E2eJson.mapper.readTree(response.body())
         assertTrue(root.isArray, "$step expected root array")
         return root.toList()
     }
 
-    private fun taskCount(rows: List<JsonNode>, taskType: String, status: String): Long {
+    private fun taskCount(rows: List<JsonNode>, taskType: String, field: String): Long {
         return rows.firstOrNull { row ->
-            row.path("taskType").asString() == taskType && row.path("status").asString() == status
-        }?.path("count")?.longValue() ?: 0L
+            row.path("taskType").asString() == taskType
+        }?.path("tasks")?.path(field)?.longValue() ?: 0L
     }
 
     private fun prepareScanFixture(scanWorkspace: Path): FixtureInfo {

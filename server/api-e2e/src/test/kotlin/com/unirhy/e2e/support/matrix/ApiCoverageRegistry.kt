@@ -248,7 +248,6 @@ object ApiCoverageRegistry {
             "GET",
             "/api/plugins",
             testRef = PLUGIN_LIFECYCLE_CASE,
-            note = "error: invalid stored form metadata returns 500",
         ),
         full(
             "POST",
@@ -275,10 +274,23 @@ object ApiCoverageRegistry {
             note = "error: deleted plugin returns 404",
         ),
         full(
-            "POST",
-            "/api/plugin-task-submissions/{taskType}",
+            "PUT",
+            "/api/plugins/{id}/concurrency",
             testRef = PLUGIN_LIFECYCLE_CASE,
-            note = "validation: unknown task type returns 400; error: disabled plugin task returns 400",
+            note = "validation: non-positive concurrency returns 400",
+        ),
+        full(
+            "POST",
+            "/api/task-submissions",
+            testRef = TASK_SCAN_LIFECYCLE_CASE,
+            note = "auth: $AUTH_GUARD_CASE; duplicate: repeated submission returns 202 and active payload dedup keeps task count stable; " +
+                "plugin: $PLUGIN_LIFECYCLE_CASE covers plugin task keys, disabled plugin returns 409, unknown key returns 404, invalid key returns 400",
+        ),
+        full(
+            "GET",
+            "/api/task-submissions/{id}",
+            testRef = PLUGIN_LIFECYCLE_CASE,
+            note = "auth: $AUTH_GUARD_CASE; polling: submission reaches COMPLETED after async planning",
         ),
         full(
             "GET",
@@ -348,21 +360,9 @@ object ApiCoverageRegistry {
         full("DELETE", "/api/tokens/current", testRef = SYSTEM_AUTH_FLOW_CASE),
         full(
             "GET",
-            "/api/tasks/log-counts",
+            "/api/task-statistics",
             testRef = TASK_SCAN_LIFECYCLE_CASE,
-            note = "auth: $AUTH_GUARD_CASE; stats: returns taskType/status counts without pagination",
-        ),
-        full(
-            "POST",
-            "/api/tasks/scans",
-            testRef = TASK_SCAN_LIFECYCLE_CASE,
-            note = "auth: $AUTH_GUARD_CASE; duplicate: repeated submission returns 202 and only supplements missing file tasks",
-        ),
-        full(
-            "POST",
-            "/api/tasks/transcodes",
-            testRef = TASK_TRANSCODE_SUCCESS_CASE,
-            note = "auth: $AUTH_GUARD_CASE; stats: pending count drains into completed or failed; output: writes opus files for prepared fixture",
+            note = "auth: $AUTH_GUARD_CASE; stats: per task key submission/task status counts, transcode drain covered by $TASK_TRANSCODE_SUCCESS_CASE",
         ),
         full(
             "GET",
