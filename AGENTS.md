@@ -26,4 +26,5 @@ UniRhy (独一律) 是一个私有化的音乐流媒体平台
 
 # 本地开发
 
-参考 @AGENTS.local.md
+- 涉及启动开发环境、查看/管理本地服务状态时，**必须优先使用 `scripts/dev.sh`**（详见 [scripts/README.md](scripts/README.md)），不要绕过脚本直接执行 `./gradlew bootRun` / `yarn dev` 等前台命令，也不要自行使用 `tmux attach`、`tail -f` 等阻塞命令
+- 参考 @AGENTS.local.md
