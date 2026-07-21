@@ -30,6 +30,7 @@ export const useTaskManagement = () => {
     const taskDefinitions = ref<ReadonlyArray<TaskDefinitionView>>([])
     const providerOptions = ref<TaskProviderOption[]>([])
     const hasLoadedProviders = ref(false)
+    const hasLoadedDefinitions = ref(false)
 
     const isLoadingTaskStatistics = ref(false)
     const isLoadingProviders = ref(false)
@@ -104,16 +105,27 @@ export const useTaskManagement = () => {
         }
     }
 
-    const fetchTaskDefinitions = async () => {
-        if (isLoadingDefinitions.value) return
-        isLoadingDefinitions.value = true
-        try {
-            taskDefinitions.value = await api.taskDefinitionController.listTaskDefinitions()
-        } catch (error) {
-            console.error('Failed to fetch task definitions', error)
-        } finally {
-            isLoadingDefinitions.value = false
+    let definitionsInFlight: Promise<void> | null = null
+
+    const fetchTaskDefinitions = async (force = false) => {
+        if (!force && hasLoadedDefinitions.value) return
+        if (definitionsInFlight) {
+            await definitionsInFlight
+            return
         }
+        isLoadingDefinitions.value = true
+        definitionsInFlight = (async () => {
+            try {
+                taskDefinitions.value = await api.taskDefinitionController.listTaskDefinitions()
+                hasLoadedDefinitions.value = true
+            } catch (error) {
+                console.error('Failed to fetch task definitions', error)
+            } finally {
+                isLoadingDefinitions.value = false
+                definitionsInFlight = null
+            }
+        })()
+        await definitionsInFlight
     }
 
     const submitTask = async (

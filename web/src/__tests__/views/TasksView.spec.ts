@@ -183,7 +183,7 @@ describe('TasksView', () => {
         expect(getSystemConfigMock).not.toHaveBeenCalled()
         expect(wrapper.text()).toContain('6 个任务待处理或执行中')
         expect(wrapper.text()).toContain('元数据解析')
-        expect(wrapper.text()).toContain('音频转码')
+        expect(wrapper.text()).toContain('媒体转码')
         expect(wrapper.text()).toContain('状态概览')
         expect(wrapper.text()).toContain('任务类型分布')
         expect(wrapper.text()).toMatch(/1\s*Failed\s*失败/u)
