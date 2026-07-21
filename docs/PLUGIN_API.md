@@ -456,3 +456,11 @@ CREATE UNIQUE INDEX uq_async_task_active_payload
 - 管理员降低并发数时不取消或中断已经执行的任务；当本节点当前占用数大于或等于新值时不再启动 Worker，直到任务完成后占用数降到新值以下。提高并发数在下一轮 Dispatcher 唤醒时生效。
 - Planner 使用与 Handler 分离的每节点、每 TaskKey single-flight 容量，同一节点对同一 TaskKey 同时只规划一条 submission；`plugin.concurrency` 只控制 Handler 子任务执行，不控制 `plan()`。
 - 生效位置：manifest `task.concurrency`、`plugin.concurrency` 字段及插件管理员 API、TaskKey 本地并发管理器、Task Dispatcher 的 discovery 后预留与 Worker `finally` 释放、Planner Dispatcher 的本地 single-flight、插件导出时读取当前并发值。
+
+### 内建扫描的并发保存正确性
+
+- `METADATA_PARSE` 以并发 `10` 执行后，多个 Worker 可能同时按 key 创建相同的 Work / Album / Artist；Album 与 Artist 没有数据库唯一约束，`APPEND_IF_ABSENT` 的查询-插入窗口会产生重复行。
+- 扫描 Handler 在保存段前获取固定 key 的 PostgreSQL advisory xact lock，将保存串行化；下载与元数据解析等重 IO 保持并行。锁随任务事务提交自动释放，后来的保存能看到先提交的行。
+- Work 存在唯一键约束，与已提交事务的冲突通过嵌套事务（savepoint）回滚后有界重试解决，让 `APPEND_IF_ABSENT` 关联到先提交的行；这属于 Handler 在单次 `run()` 内的自行重试，不改变执行引擎「普通异常不自动重试」的语义。
+- 内建任务表单 Schema 不为 `providerId` 等运行时领域数据声明取值下界（存储节点 id 可能为 0），Schema 只约束类型与枚举。
+- 生效位置：`ScanTaskService.kt`（advisory lock 与 savepoint 重试）、`BuiltInTasks.kt`（内建表单 Schema）。
