@@ -76,7 +76,7 @@ jobs:
           ref: ${{ needs.prepare-release.outputs.target_sha }}
 
       - name: 设置 Node 环境
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
 
@@ -86,7 +86,7 @@ jobs:
           corepack prepare yarn@${{ env.YARN_VERSION }} --activate
 
       - name: 缓存 Yarn 包缓存
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: web/.yarn/cache
           key: ${{ runner.os }}-yarn-web-${{ hashFiles('web/yarn.lock') }}
@@ -102,7 +102,7 @@ jobs:
           yarn build
 
       - name: 上传前端产物
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: frontend-dist
           path: web/dist
@@ -122,7 +122,7 @@ jobs:
           ref: ${{ needs.prepare-release.outputs.target_sha }}
 
       - name: 设置 Node 环境
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
 
@@ -132,7 +132,7 @@ jobs:
           corepack prepare yarn@${{ env.YARN_VERSION }} --activate
 
       - name: 缓存 Yarn 包缓存
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: website/.yarn/cache
           key: ${{ runner.os }}-yarn-website-${{ hashFiles('website/yarn.lock') }}
@@ -148,7 +148,7 @@ jobs:
           yarn build
 
       - name: 上传官网产物
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: website-dist
           path: website/dist
@@ -168,7 +168,7 @@ jobs:
           ref: ${{ needs.prepare-release.outputs.target_sha }}
 
       - name: 设置 Node 环境
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
 
@@ -178,7 +178,7 @@ jobs:
           corepack prepare yarn@${{ env.YARN_VERSION }} --activate
 
       - name: 缓存 Yarn 包缓存
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: web/.yarn/cache
           key: ${{ runner.os }}-yarn-web-${{ hashFiles('web/yarn.lock') }}
@@ -189,7 +189,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: 缓存 Cargo 依赖
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.cargo/registry
@@ -224,7 +224,7 @@ jobs:
           ls -al "$OUT_DMG"
 
       - name: 上传桌面产物
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: desktop-macos
           path: web/src-tauri/target/release/bundle/dmg/unirhy-v${{ needs.prepare-release.outputs.version }}-macos-arm64.dmg
@@ -245,7 +245,7 @@ jobs:
           ref: ${{ needs.prepare-release.outputs.target_sha }}
 
       - name: 设置 Node 环境
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
 
@@ -255,7 +255,7 @@ jobs:
           corepack prepare yarn@${{ env.YARN_VERSION }} --activate
 
       - name: 缓存 Yarn 包缓存
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: web/.yarn/cache
           key: ${{ runner.os }}-yarn-web-${{ hashFiles('web/yarn.lock') }}
@@ -266,7 +266,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: 缓存 Cargo 依赖
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.cargo/registry
@@ -295,7 +295,7 @@ jobs:
           ls -al "src-tauri/target/release/bundle/nsis/unirhy-v${VERSION}-windows-x64-setup.exe"
 
       - name: 上传 Windows 产物
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: desktop-windows
           path: web/src-tauri/target/release/bundle/nsis/unirhy-v${{ needs.prepare-release.outputs.version }}-windows-x64-setup.exe
@@ -315,7 +315,7 @@ jobs:
           ref: ${{ needs.prepare-release.outputs.target_sha }}
 
       - name: 设置 Node 环境
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
 
@@ -325,7 +325,7 @@ jobs:
           corepack prepare yarn@${{ env.YARN_VERSION }} --activate
 
       - name: 缓存 Yarn 包缓存
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: web/.yarn/cache
           key: ${{ runner.os }}-yarn-web-${{ hashFiles('web/yarn.lock') }}
@@ -347,7 +347,7 @@ jobs:
           targets: aarch64-linux-android
 
       - name: 缓存 Cargo 依赖
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.cargo/registry
@@ -391,7 +391,7 @@ jobs:
           ls -al src-tauri/gen/android/release-assets
 
       - name: 上传 Android 产物
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: android-arm64
           path: |
@@ -417,7 +417,7 @@ jobs:
           distribution: temurin
 
       - name: 缓存 Gradle 依赖
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.gradle/caches
@@ -427,7 +427,7 @@ jobs:
             ${{ runner.os }}-gradle-
 
       - name: 下载前端产物
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: frontend-dist
           path: server/src/main/resources/static
@@ -453,7 +453,7 @@ jobs:
           ls -al "unirhy-v${VERSION}.jar"
 
       - name: 上传 JAR 产物
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: jar
           path: server/build/libs/unirhy-v${{ needs.prepare-release.outputs.version }}.jar
@@ -490,30 +490,43 @@ jobs:
       - build-desktop-windows
       - build-android-arm64
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
     steps:
       - name: 下载 JAR 产物
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: jar
           path: dist
 
       - name: 下载桌面产物
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: desktop-macos
           path: dist
 
       - name: 下载 Windows 产物
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: desktop-windows
           path: dist
 
       - name: 下载 Android 产物
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: android-arm64
           path: dist
+
+      - name: 生成构建来源证明
+        uses: actions/attest-build-provenance@v4
+        with:
+          subject-path: |
+            dist/unirhy-v${{ needs.prepare-release.outputs.version }}.jar
+            dist/unirhy-v${{ needs.prepare-release.outputs.version }}-macos-arm64.dmg
+            dist/unirhy-v${{ needs.prepare-release.outputs.version }}-windows-x64-setup.exe
+            dist/unirhy-v${{ needs.prepare-release.outputs.version }}-android-arm64.apk
 
       - name: 上传到 Release
         env:
@@ -544,19 +557,19 @@ jobs:
           ref: ${{ needs.prepare-release.outputs.target_sha }}
 
       - name: 设置 QEMU
-        uses: docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@v4
 
       - name: 设置 Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       - name: 下载 JAR 产物
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: jar
           path: dist
 
       - name: 登录到 DockerHub
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -571,7 +584,7 @@ jobs:
             type=raw,value=latest,enable=${{ needs.prepare-release.outputs.publish_latest == 'true' }}
 
       - name: 构建并推送 Docker 镜像
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: ./docker/Dockerfile.jvm
@@ -597,7 +610,7 @@ jobs:
           ref: ${{ needs.prepare-release.outputs.target_sha }}
 
       - name: 设置 Node 环境
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
 
@@ -607,7 +620,7 @@ jobs:
           corepack prepare yarn@${{ env.YARN_VERSION }} --activate
 
       - name: 下载官网产物
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: website-dist
           path: website/dist
