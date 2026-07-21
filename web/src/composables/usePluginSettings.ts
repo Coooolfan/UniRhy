@@ -50,6 +50,16 @@ export const usePluginSettings = () => {
         }
     }
 
+    const updateConcurrency = async (id: string, concurrency: number) => {
+        try {
+            await api.pluginController.updateConcurrency({ id, concurrency })
+            await fetch()
+        } catch (e) {
+            error.value = resolveErrorMessage(e)
+            throw e
+        }
+    }
+
     const deletePlugin = async (id: string) => {
         try {
             await api.pluginController.delete({ id })
@@ -90,6 +100,7 @@ export const usePluginSettings = () => {
         fetch,
         upload,
         setEnabled,
+        updateConcurrency,
         deletePlugin,
         downloadPlugin,
     }

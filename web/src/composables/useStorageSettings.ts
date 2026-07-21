@@ -2,7 +2,7 @@ import { computed, ref } from 'vue'
 import { api } from '@/ApiInstance'
 import { i18n } from '@/i18n'
 import { resolveErrorMessage } from '@/i18n/errors'
-import type { FileProviderType } from '@/__generated/model/enums/FileProviderType'
+import type { FileProviderType } from '@/composables/useTaskManagement'
 import type { SystemConfigUpdate } from '@/__generated/model/static'
 
 export type StorageNode = {

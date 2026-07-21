@@ -5,16 +5,21 @@ import { createPinia, setActivePinia } from 'pinia'
 import AppModalHost from '@/components/modals/AppModalHost.vue'
 import { useUserStore } from '@/stores/user'
 import { i18n } from '@/i18n'
+import type { TaskStatisticsResponse, TaskStatusCounts } from '@/__generated/model/static'
 
 vi.mock('@/ApiInstance', async (importOriginal) => {
     const actual = await importOriginal<typeof import('@/ApiInstance')>()
     return {
         ...actual,
         api: {
-            taskController: {
-                listTaskLogs: vi.fn(),
-                executeScanTask: vi.fn(),
-                executeTranscodeTask: vi.fn(),
+            taskStatisticsController: {
+                getTaskStatistics: vi.fn(),
+            },
+            taskDefinitionController: {
+                listTaskDefinitions: vi.fn(),
+            },
+            taskSubmissionController: {
+                createSubmission: vi.fn(),
             },
             fileSystemStorageController: {
                 list: vi.fn(),
@@ -25,10 +30,6 @@ vi.mock('@/ApiInstance', async (importOriginal) => {
             systemConfigController: {
                 get: vi.fn(),
             },
-            pluginController: {
-                listPlugins: vi.fn(),
-                submitPluginTask: vi.fn(),
-            },
         },
     }
 })
@@ -36,14 +37,69 @@ vi.mock('@/ApiInstance', async (importOriginal) => {
 import { api } from '@/ApiInstance'
 import TasksView from '@/views/TasksView.vue'
 
-const listTaskLogsMock = vi.mocked(api.taskController.listTaskLogs)
-const executeScanTaskMock = vi.mocked(api.taskController.executeScanTask)
-const executeTranscodeTaskMock = vi.mocked(api.taskController.executeTranscodeTask)
+const getTaskStatisticsMock = vi.mocked(api.taskStatisticsController.getTaskStatistics)
+const listTaskDefinitionsMock = vi.mocked(api.taskDefinitionController.listTaskDefinitions)
+const createSubmissionMock = vi.mocked(api.taskSubmissionController.createSubmission)
 const listFileSystemStorageMock = vi.mocked(api.fileSystemStorageController.list)
 const listOssStorageMock = vi.mocked(api.ossStorageController.list)
 const getSystemConfigMock = vi.mocked(api.systemConfigController.get)
-const listPluginsMock = vi.mocked(api.pluginController.listPlugins)
-const submitPluginTaskMock = vi.mocked(api.pluginController.submitPluginTask)
+
+const BUILT_IN_NAMESPACE = 'app.unirhy.built-in'
+
+const counts = (partial: Partial<Omit<TaskStatusCounts, 'total'>> = {}): TaskStatusCounts => {
+    const active = partial.active ?? 0
+    const completed = partial.completed ?? 0
+    const failed = partial.failed ?? 0
+    const cancelled = partial.cancelled ?? 0
+    return { active, completed, failed, cancelled, total: active + completed + failed + cancelled }
+}
+
+const statsRow = (
+    namespace: string,
+    taskType: string,
+    tasks: Partial<Omit<TaskStatusCounts, 'total'>> = {},
+): TaskStatisticsResponse => ({
+    namespace,
+    taskType,
+    submissions: counts(),
+    tasks: counts(tasks),
+})
+
+const emptyBuiltInStats = () => [
+    statsRow(BUILT_IN_NAMESPACE, 'METADATA_PARSE'),
+    statsRow(BUILT_IN_NAMESPACE, 'TRANSCODE'),
+]
+
+const builtInDefinitions = [
+    {
+        namespace: BUILT_IN_NAMESPACE,
+        taskType: 'METADATA_PARSE',
+        name: '元数据解析',
+        formDefinition: {
+            schema: {
+                type: 'object',
+                properties: {},
+                required: [],
+                additionalProperties: false,
+            },
+            order: [],
+        },
+    },
+    {
+        namespace: BUILT_IN_NAMESPACE,
+        taskType: 'TRANSCODE',
+        name: '音频转码',
+        formDefinition: {
+            schema: {
+                type: 'object',
+                properties: {},
+                required: [],
+                additionalProperties: false,
+            },
+            order: [],
+        },
+    },
+]
 
 const flushView = async () => {
     await Promise.resolve()
@@ -95,66 +151,64 @@ describe('TasksView', () => {
         i18n.global.locale.value = 'zh-CN'
         setActivePinia(createPinia())
         setUser(true)
-        listTaskLogsMock.mockReset()
-        executeScanTaskMock.mockReset()
-        executeTranscodeTaskMock.mockReset()
+        getTaskStatisticsMock.mockReset()
+        listTaskDefinitionsMock.mockReset()
+        createSubmissionMock.mockReset()
         listFileSystemStorageMock.mockReset()
         listOssStorageMock.mockReset()
         getSystemConfigMock.mockReset()
-        listPluginsMock.mockReset()
-        submitPluginTaskMock.mockReset()
-        listPluginsMock.mockResolvedValue([])
+        listTaskDefinitionsMock.mockResolvedValue(builtInDefinitions)
         vi.useRealTimers()
     })
 
-    it('renders aggregated task status counts from the backend stats endpoint', async () => {
-        listTaskLogsMock.mockResolvedValueOnce([
-            { taskType: 'METADATA_PARSE', status: 'PENDING', count: 2 },
-            { taskType: 'METADATA_PARSE', status: 'RUNNING', count: 1 },
-            { taskType: 'METADATA_PARSE', status: 'COMPLETED', count: 5 },
-            { taskType: 'METADATA_PARSE', status: 'FAILED', count: 1 },
-            { taskType: 'TRANSCODE', status: 'PENDING', count: 3 },
-            { taskType: 'TRANSCODE', status: 'RUNNING', count: 0 },
-            { taskType: 'TRANSCODE', status: 'COMPLETED', count: 7 },
-            { taskType: 'TRANSCODE', status: 'FAILED', count: 0 },
+    it('renders aggregated task status counts from the statistics endpoint', async () => {
+        getTaskStatisticsMock.mockResolvedValueOnce([
+            statsRow(BUILT_IN_NAMESPACE, 'METADATA_PARSE', {
+                active: 3,
+                completed: 5,
+                failed: 1,
+            }),
+            statsRow(BUILT_IN_NAMESPACE, 'TRANSCODE', {
+                active: 3,
+                completed: 7,
+            }),
         ])
         const wrapper = mountWithModalHost()
 
         await flushView()
 
-        expect(listTaskLogsMock).toHaveBeenCalledTimes(1)
+        expect(getTaskStatisticsMock).toHaveBeenCalledTimes(1)
         expect(listFileSystemStorageMock).not.toHaveBeenCalled()
         expect(listOssStorageMock).not.toHaveBeenCalled()
         expect(getSystemConfigMock).not.toHaveBeenCalled()
         expect(wrapper.text()).toContain('6 个任务待处理或执行中')
         expect(wrapper.text()).toContain('元数据解析')
-        expect(wrapper.text()).toContain('媒体转码')
+        expect(wrapper.text()).toContain('音频转码')
         expect(wrapper.text()).toContain('状态概览')
         expect(wrapper.text()).toContain('任务类型分布')
-        expect(wrapper.text()).toMatch(/其中\s*5\s*个排队，1\s*个正在执行。?/u)
         expect(wrapper.text()).toMatch(/1\s*Failed\s*失败/u)
     })
 
     it('updates status labels when the locale changes', async () => {
-        listTaskLogsMock.mockResolvedValue([
-            { taskType: 'METADATA_PARSE', status: 'PENDING', count: 1 },
+        getTaskStatisticsMock.mockResolvedValue([
+            statsRow(BUILT_IN_NAMESPACE, 'METADATA_PARSE', { active: 1 }),
         ])
         const wrapper = mountWithModalHost()
 
         await flushView()
-        expect(wrapper.text()).toMatch(/Pending\s*待处理/u)
+        expect(wrapper.text()).toMatch(/Active\s*进行中/u)
 
         i18n.global.locale.value = 'en'
         await nextTick()
 
-        expect(wrapper.text()).toMatch(/Pending\s*Pending/u)
-        expect(wrapper.text()).not.toContain('待处理')
+        expect(wrapper.text()).toMatch(/Active\s*Active/u)
+        expect(wrapper.text()).not.toContain('进行中')
     })
 
     it('shows submit feedback on the action button for two seconds after a successful submission', async () => {
         vi.useFakeTimers()
-        listTaskLogsMock.mockResolvedValue([])
-        executeScanTaskMock.mockResolvedValue(undefined)
+        getTaskStatisticsMock.mockResolvedValue(emptyBuiltInStats())
+        createSubmissionMock.mockResolvedValue({ submissionId: 1 })
         listFileSystemStorageMock.mockResolvedValue([
             {
                 id: 1,
@@ -184,6 +238,7 @@ describe('TasksView', () => {
         await actionButton.trigger('click')
         await flushView()
 
+        expect(listTaskDefinitionsMock).toHaveBeenCalledTimes(1)
         expect(listFileSystemStorageMock).toHaveBeenCalledTimes(1)
         expect(listOssStorageMock).toHaveBeenCalledTimes(1)
         expect(getSystemConfigMock).toHaveBeenCalledTimes(1)
@@ -191,10 +246,13 @@ describe('TasksView', () => {
         await wrapper.get('[data-test="task-submit-button"]').trigger('click')
         await flushView()
 
-        expect(executeScanTaskMock).toHaveBeenCalledWith({
-            body: { providerType: 'FILE_SYSTEM', providerId: 1 },
+        expect(createSubmissionMock).toHaveBeenCalledWith({
+            body: {
+                namespace: BUILT_IN_NAMESPACE,
+                taskType: 'METADATA_PARSE',
+                params: { providerType: 'FILE_SYSTEM', providerId: 1 },
+            },
         })
-        expect(wrapper.text()).not.toContain('任务已加入后台队列，状态统计将在稍后刷新。')
         expect(actionButton.text()).toContain('任务已提交')
         expect(actionButton.attributes('disabled')).toBeDefined()
 
@@ -205,28 +263,28 @@ describe('TasksView', () => {
         expect(actionButton.attributes()).not.toHaveProperty('disabled')
     })
 
-    it('auto refreshes while there are pending or running tasks', async () => {
+    it('auto refreshes while there are active tasks', async () => {
         vi.useFakeTimers()
-        listTaskLogsMock
-            .mockResolvedValueOnce([{ taskType: 'METADATA_PARSE', status: 'PENDING', count: 1 }])
-            .mockResolvedValueOnce([])
+        getTaskStatisticsMock
+            .mockResolvedValueOnce([statsRow(BUILT_IN_NAMESPACE, 'METADATA_PARSE', { active: 1 })])
+            .mockResolvedValueOnce(emptyBuiltInStats())
 
         mountWithModalHost()
 
         await flushView()
-        expect(listTaskLogsMock).toHaveBeenCalledTimes(1)
+        expect(getTaskStatisticsMock).toHaveBeenCalledTimes(1)
 
         await vi.advanceTimersByTimeAsync(5000)
         await flushView()
-        expect(listTaskLogsMock).toHaveBeenCalledTimes(2)
+        expect(getTaskStatisticsMock).toHaveBeenCalledTimes(2)
 
         await vi.advanceTimersByTimeAsync(5000)
         await flushView()
-        expect(listTaskLogsMock).toHaveBeenCalledTimes(2)
+        expect(getTaskStatisticsMock).toHaveBeenCalledTimes(2)
     })
 
-    it('refreshes task counts once when the task modal closes', async () => {
-        listTaskLogsMock.mockResolvedValue([])
+    it('refreshes statistics once when the task modal closes', async () => {
+        getTaskStatisticsMock.mockResolvedValue(emptyBuiltInStats())
         listFileSystemStorageMock.mockResolvedValue([])
         listOssStorageMock.mockResolvedValue([])
         getSystemConfigMock.mockResolvedValue({
@@ -238,7 +296,7 @@ describe('TasksView', () => {
         const wrapper = mountWithModalHost()
 
         await flushView()
-        expect(listTaskLogsMock).toHaveBeenCalledTimes(1)
+        expect(getTaskStatisticsMock).toHaveBeenCalledTimes(1)
 
         await wrapper.get('[data-test="open-task-button"]').trigger('click')
         await flushView()
@@ -249,14 +307,14 @@ describe('TasksView', () => {
         await cancelButton!.trigger('click')
         await flushView()
 
-        expect(listTaskLogsMock).toHaveBeenCalledTimes(2)
+        expect(getTaskStatisticsMock).toHaveBeenCalledTimes(2)
         expect(listFileSystemStorageMock).toHaveBeenCalledTimes(1)
         expect(listOssStorageMock).toHaveBeenCalledTimes(1)
         expect(getSystemConfigMock).toHaveBeenCalledTimes(1)
     })
 
     it('reuses provider data when reopening the task modal', async () => {
-        listTaskLogsMock.mockResolvedValue([])
+        getTaskStatisticsMock.mockResolvedValue(emptyBuiltInStats())
         listFileSystemStorageMock.mockResolvedValue([])
         listOssStorageMock.mockResolvedValue([])
         getSystemConfigMock.mockResolvedValue({
@@ -287,13 +345,13 @@ describe('TasksView', () => {
 
     it('hides task submission entry for ordinary users while keeping status readable', async () => {
         setUser(false)
-        listTaskLogsMock.mockResolvedValue([])
+        getTaskStatisticsMock.mockResolvedValue(emptyBuiltInStats())
 
         const wrapper = mountWithModalHost()
 
         await flushView()
 
-        expect(listTaskLogsMock).toHaveBeenCalledTimes(1)
+        expect(getTaskStatisticsMock).toHaveBeenCalledTimes(1)
         expect(wrapper.find('[data-test="open-task-button"]').exists()).toBe(false)
         expect(wrapper.text()).toContain('状态概览')
         expect(wrapper.text()).toContain('任务类型分布')

@@ -4,7 +4,8 @@ import type {PluginInfoResponse} from '../model/static/';
 /**
  * 插件管理接口
  * 
- * 提供插件的上传、启停、删除、导出与插件任务提交能力
+ * 提供插件的上传、启停、并发调整、删除与导出能力；
+ * 任务提交经由统一的 `/api/task-submissions`
  */
 export class PluginController {
     
@@ -13,8 +14,8 @@ export class PluginController {
     /**
      * 删除插件
      * 
-     * 此接口用于删除指定 ID 的插件
-     * 需要用户登录认证才能访问
+     * 只允许删除已禁用的插件；存在活动 submission / task 时返回 409
+     * 需要管理员角色才能访问
      * 
      * @parameter {PluginControllerOptions['delete']} options
      * - id 插件 ID
@@ -31,7 +32,8 @@ export class PluginController {
     /**
      * 导出（下载）插件包
      * 
-     * 此接口用于将指定插件打包为 `.up` 文件并以附件形式下载
+     * 此接口用于将指定插件打包为 `.up` 文件并以附件形式下载；
+     * manifest 中的 `task.concurrency` 为当前并发值
      * 需要管理员角色才能访问
      * 
      * @parameter {PluginControllerOptions['download']} options
@@ -51,7 +53,7 @@ export class PluginController {
     /**
      * 获取插件列表
      * 
-     * 此接口用于获取系统中已安装的全部插件信息，并标记插件是否已加载可用
+     * 此接口用于获取系统中已安装的全部插件信息，并标记插件在本节点是否已加载可用
      * 需要用户登录认证才能访问
      * 
      * @return List<PluginInfoResponse> 返回插件信息列表
@@ -67,8 +69,8 @@ export class PluginController {
     /**
      * 启用或禁用插件
      * 
-     * 此接口用于切换指定插件的启用状态
-     * 需要用户登录认证才能访问
+     * 启用前完成 WASM 解析、实例化与导出函数校验；校验失败时插件保持禁用
+     * 需要管理员角色才能访问
      * 
      * @parameter {PluginControllerOptions['setEnabled']} options
      * - id 插件 ID
@@ -92,29 +94,37 @@ export class PluginController {
     }
     
     /**
-     * 提交插件任务
+     * 修改插件任务执行并发值
      * 
-     * 此接口用于按任务类型异步触发插件任务，参数以键值对方式透传给对应插件
-     * 需要用户登录认证才能访问
+     * 修改后无需重启服务，各节点在下一轮对账时生效
+     * 需要管理员角色才能访问
      * 
-     * @parameter {PluginControllerOptions['submitPluginTask']} options
-     * - taskType 任务类型（对应 TaskType 枚举值）
-     * - params 任务参数键值对
+     * @parameter {PluginControllerOptions['updateConcurrency']} options
+     * - id 插件 ID
+     * - concurrency 正整数并发值
      * 
      */
-    readonly submitPluginTask: (options: PluginControllerOptions['submitPluginTask']) => Promise<
+    readonly updateConcurrency: (options: PluginControllerOptions['updateConcurrency']) => Promise<
         void
     > = async(options) => {
-        let _uri = '/api/plugin-task-submissions/';
-        _uri += encodeURIComponent(options.taskType);
-        return (await this.executor({uri: _uri, method: 'POST', body: options.body})) as Promise<void>;
+        let _uri = '/api/plugins/';
+        _uri += encodeURIComponent(options.id);
+        _uri += '/concurrency';
+        let _separator = _uri.indexOf('?') === -1 ? '?' : '&';
+        let _value: any = undefined;
+        _value = options.concurrency;
+        _uri += _separator
+        _uri += 'concurrency='
+        _uri += encodeURIComponent(_value);
+        _separator = '&';
+        return (await this.executor({uri: _uri, method: 'PUT'})) as Promise<void>;
     }
     
     /**
      * 上传插件
      * 
-     * 此接口用于上传 `.up` 插件包并完成安装
-     * 需要用户登录认证才能访问
+     * 此接口用于上传 `.up` 插件包并完成安装；同 id 上传即覆盖升级，上传后保持禁用
+     * 需要管理员角色才能访问
      * 
      * @parameter {PluginControllerOptions['upload']} options
      * - file 插件包文件
@@ -149,6 +159,17 @@ export type PluginControllerOptions = {
          */
         readonly enabled: boolean
     }, 
+    'updateConcurrency': {
+        /**
+         * 插件 ID
+         */
+        readonly id: string, 
+        /**
+         * 正整数并发值
+         * 
+         */
+        readonly concurrency: number
+    }, 
     'delete': {
         /**
          * 插件 ID
@@ -161,16 +182,5 @@ export type PluginControllerOptions = {
          * 插件 ID
          */
         readonly id: string
-    }, 
-    'submitPluginTask': {
-        /**
-         * 任务类型（对应 TaskType 枚举值）
-         */
-        readonly taskType: string, 
-        /**
-         * 任务参数键值对
-         * 
-         */
-        readonly body: {readonly [key:string]: string}
     }
 }

@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { CheckCircle2, Download, Loader2, Puzzle, Trash2, Upload, XCircle } from 'lucide-vue-next'
 import type { PluginInfoResponse } from '@/__generated/model/static/PluginInfoResponse'
+import { parseFormDefinition } from '@/components/tasks/schemaForm'
 
 const props = defineProps<{
     plugins: ReadonlyArray<PluginInfoResponse>
@@ -11,6 +12,7 @@ const props = defineProps<{
     error: string
     onUpload: (file: File) => Promise<void>
     onSetEnabled: (id: string, enabled: boolean) => Promise<void>
+    onUpdateConcurrency: (id: string, concurrency: number) => Promise<void>
     onDelete: (id: string) => Promise<void>
     onDownload: (plugin: PluginInfoResponse) => Promise<void>
     canManage?: boolean
@@ -39,6 +41,31 @@ const handleSetEnabled = async (id: string, enabled: boolean) => {
         await props.onSetEnabled(id, enabled)
     } finally {
         togglingId.value = null
+    }
+}
+
+const editingConcurrency = ref<Record<string, number>>({})
+const savingConcurrencyId = ref<string | null>(null)
+
+const concurrencyValueOf = (plugin: PluginInfoResponse) =>
+    editingConcurrency.value[plugin.id] ?? plugin.concurrency
+
+const handleConcurrencyInput = (plugin: PluginInfoResponse, event: Event) => {
+    const value = Number((event.target as HTMLInputElement).value)
+    editingConcurrency.value = { ...editingConcurrency.value, [plugin.id]: value }
+}
+
+const handleConcurrencySave = async (plugin: PluginInfoResponse) => {
+    const value = concurrencyValueOf(plugin)
+    if (!Number.isInteger(value) || value <= 0 || value === plugin.concurrency) return
+    savingConcurrencyId.value = plugin.id
+    try {
+        await props.onUpdateConcurrency(plugin.id, value)
+        editingConcurrency.value = Object.fromEntries(
+            Object.entries(editingConcurrency.value).filter(([id]) => id !== plugin.id),
+        )
+    } finally {
+        savingConcurrencyId.value = null
     }
 }
 
@@ -142,6 +169,32 @@ const handleDownload = async (plugin: PluginInfoResponse) => {
                             <p class="mt-1 font-mono text-xs text-[#9C968B]">{{ plugin.id }}</p>
 
                             <div class="mt-2 flex flex-wrap items-center gap-3 text-xs">
+                                <div class="flex items-center gap-1.5">
+                                    <span class="text-[#9C968B]">{{
+                                        t('plugins.concurrency')
+                                    }}</span>
+                                    <template v-if="canManage">
+                                        <input
+                                            type="number"
+                                            min="1"
+                                            class="w-14 border border-[#E8E4D9] bg-white/70 px-1.5 py-0.5 font-mono text-[11px] text-[#2C2A28] outline-none focus:border-[#C27E46]"
+                                            :value="concurrencyValueOf(plugin)"
+                                            @input="handleConcurrencyInput(plugin, $event)"
+                                        />
+                                        <button
+                                            v-if="concurrencyValueOf(plugin) !== plugin.concurrency"
+                                            type="button"
+                                            class="border border-[#C27E46] px-1.5 py-0.5 text-[11px] text-[#C27E46] transition-colors hover:bg-[#C27E46] hover:text-white disabled:opacity-50"
+                                            :disabled="savingConcurrencyId === plugin.id"
+                                            @click="handleConcurrencySave(plugin)"
+                                        >
+                                            {{ t('common.save') }}
+                                        </button>
+                                    </template>
+                                    <span v-else class="font-mono text-[11px] text-[#8A8177]">
+                                        {{ plugin.concurrency }}
+                                    </span>
+                                </div>
                                 <div class="flex items-center gap-1">
                                     <CheckCircle2
                                         v-if="plugin.isAvailable"
@@ -215,7 +268,7 @@ const handleDownload = async (plugin: PluginInfoResponse) => {
                 </div>
 
                 <div
-                    v-if="plugin.form.fields.length > 0"
+                    v-if="parseFormDefinition(plugin.formDefinition).length > 0"
                     class="mt-4 border-t border-[#EBE6D9] pt-4"
                 >
                     <div class="mb-2 text-[11px] uppercase tracking-[0.24em] text-[#9C968B]">
@@ -223,12 +276,12 @@ const handleDownload = async (plugin: PluginInfoResponse) => {
                     </div>
                     <div class="grid gap-2 sm:grid-cols-2">
                         <div
-                            v-for="field in plugin.form.fields"
+                            v-for="field in parseFormDefinition(plugin.formDefinition)"
                             :key="field.name"
                             class="flex items-baseline gap-2 text-sm"
                         >
                             <span class="font-mono text-xs text-[#C27E46]">{{ field.type }}</span>
-                            <span class="text-[#2C2A28]">{{ field.label }}</span>
+                            <span class="text-[#2C2A28]">{{ field.title }}</span>
                             <span v-if="field.default !== undefined" class="text-xs text-[#9C968B]">
                                 {{ t('plugins.default', { value: field.default }) }}
                             </span>

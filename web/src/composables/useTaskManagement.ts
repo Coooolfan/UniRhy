@@ -2,13 +2,9 @@ import { ref } from 'vue'
 import { api } from '@/ApiInstance'
 import { i18n } from '@/i18n'
 import { resolveErrorMessage } from '@/i18n/errors'
-import { type FileProviderType } from '@/__generated/model/enums/FileProviderType'
-import type { PluginInfoResponse } from '@/__generated/model/static/PluginInfoResponse'
-import type {
-    AsyncTaskLogCountRow,
-    ScanTaskRequest,
-    TranscodeTaskRequest,
-} from '@/__generated/model/static'
+import type { TaskDefinitionView, TaskStatisticsResponse } from '@/__generated/model/static'
+
+export type FileProviderType = 'FILE_SYSTEM' | 'OSS'
 
 export type TaskProviderOption = {
     id: number
@@ -18,57 +14,47 @@ export type TaskProviderOption = {
     isSystemNode: boolean
 }
 
-const builtinTaskTypeLabel = (taskType: string): string | undefined => {
+export const BUILT_IN_NAMESPACE = 'app.unirhy.built-in'
+
+export const taskKeyOf = (namespace: string, taskType: string) => `${namespace}:${taskType}`
+
+const builtinTaskTypeLabel = (namespace: string, taskType: string): string | undefined => {
+    if (namespace !== BUILT_IN_NAMESPACE) return undefined
     if (taskType === 'METADATA_PARSE') return i18n.global.t('taskSubmission.metadataParse')
     if (taskType === 'TRANSCODE') return i18n.global.t('taskSubmission.transcode')
     return undefined
 }
 
 export const useTaskManagement = () => {
-    const taskCounts = ref<ReadonlyArray<AsyncTaskLogCountRow>>([])
+    const taskStatistics = ref<ReadonlyArray<TaskStatisticsResponse>>([])
+    const taskDefinitions = ref<ReadonlyArray<TaskDefinitionView>>([])
     const providerOptions = ref<TaskProviderOption[]>([])
-    const pluginList = ref<ReadonlyArray<PluginInfoResponse>>([])
     const hasLoadedProviders = ref(false)
 
-    const isLoadingTaskCounts = ref(false)
+    const isLoadingTaskStatistics = ref(false)
     const isLoadingProviders = ref(false)
-    const isLoadingPlugins = ref(false)
+    const isLoadingDefinitions = ref(false)
     const isSubmitting = ref(false)
 
     const taskError = ref('')
     const submitError = ref('')
 
-    const fetchTaskCounts = async () => {
-        isLoadingTaskCounts.value = true
+    const fetchTaskStatistics = async () => {
+        isLoadingTaskStatistics.value = true
         taskError.value = ''
         try {
-            taskCounts.value = await api.taskController.listTaskLogs()
+            taskStatistics.value = await api.taskStatisticsController.getTaskStatistics({})
         } catch (error) {
             taskError.value = resolveErrorMessage(error, 'errors.fallback.taskStatus')
         } finally {
-            isLoadingTaskCounts.value = false
+            isLoadingTaskStatistics.value = false
         }
     }
 
     const refreshSubmittedTaskData = () => {
         setTimeout(() => {
-            void fetchTaskCounts()
+            void fetchTaskStatistics()
         }, 1000)
-    }
-
-    const executeTask = async (executor: () => Promise<void>) => {
-        isSubmitting.value = true
-        submitError.value = ''
-        try {
-            await executor()
-            refreshSubmittedTaskData()
-            return true
-        } catch (error) {
-            submitError.value = resolveErrorMessage(error, 'errors.fallback.taskSubmit')
-            return false
-        } finally {
-            isSubmitting.value = false
-        }
     }
 
     const fetchProviders = async (force = false) => {
@@ -118,47 +104,51 @@ export const useTaskManagement = () => {
         }
     }
 
-    const fetchPlugins = async () => {
-        if (isLoadingPlugins.value) return
-        isLoadingPlugins.value = true
+    const fetchTaskDefinitions = async () => {
+        if (isLoadingDefinitions.value) return
+        isLoadingDefinitions.value = true
         try {
-            pluginList.value = await api.pluginController.listPlugins()
+            taskDefinitions.value = await api.taskDefinitionController.listTaskDefinitions()
         } catch (error) {
-            console.error('Failed to fetch plugins', error)
+            console.error('Failed to fetch task definitions', error)
         } finally {
-            isLoadingPlugins.value = false
+            isLoadingDefinitions.value = false
         }
     }
 
-    const startMetadataParseTask = (providerType: FileProviderType, providerId: number) => {
-        const request: ScanTaskRequest = { providerType, providerId }
-        return executeTask(() =>
-            api.taskController.executeScanTask({
-                body: request,
-            }),
-        )
+    const submitTask = async (
+        namespace: string,
+        taskType: string,
+        params: Record<string, unknown>,
+    ) => {
+        isSubmitting.value = true
+        submitError.value = ''
+        try {
+            await api.taskSubmissionController.createSubmission({
+                body: { namespace, taskType, params },
+            })
+            refreshSubmittedTaskData()
+            return true
+        } catch (error) {
+            submitError.value = resolveErrorMessage(error, 'errors.fallback.taskSubmit')
+            return false
+        } finally {
+            isSubmitting.value = false
+        }
     }
 
-    const startTranscodeTask = (request: TranscodeTaskRequest) =>
-        executeTask(() =>
-            api.taskController.executeTranscodeTask({
-                body: request,
-            }),
-        )
-
-    const startPluginTask = (taskType: string, params: Record<string, string>) =>
-        executeTask(() => api.pluginController.submitPluginTask({ taskType, body: params }))
-
-    const resolveTaskLabel = (taskType: string): string => {
-        const builtin = builtinTaskTypeLabel(taskType)
+    const resolveTaskLabel = (namespace: string, taskType: string): string => {
+        const builtin = builtinTaskTypeLabel(namespace, taskType)
         if (builtin) return builtin
-        const plugin = pluginList.value.find((p) => p.taskType === taskType)
-        return plugin?.name ?? plugin?.id ?? taskType
+        const definition = taskDefinitions.value.find(
+            (d) => d.namespace === namespace && d.taskType === taskType,
+        )
+        return definition?.name ?? taskKeyOf(namespace, taskType)
     }
 
     const init = () => {
-        void fetchTaskCounts()
-        void fetchPlugins()
+        void fetchTaskStatistics()
+        void fetchTaskDefinitions()
     }
 
     const clearSubmitError = () => {
@@ -166,21 +156,19 @@ export const useTaskManagement = () => {
     }
 
     return {
-        taskCounts,
+        taskStatistics,
+        taskDefinitions,
         providerOptions,
-        pluginList,
-        isLoadingTaskCounts,
+        isLoadingTaskStatistics,
         isLoadingProviders,
-        isLoadingPlugins,
+        isLoadingDefinitions,
         isSubmitting,
         taskError,
         submitError,
-        fetchTaskCounts,
+        fetchTaskStatistics,
         fetchProviders,
-        fetchPlugins,
-        startMetadataParseTask,
-        startTranscodeTask,
-        startPluginTask,
+        fetchTaskDefinitions,
+        submitTask,
         resolveTaskLabel,
         clearSubmitError,
         init,

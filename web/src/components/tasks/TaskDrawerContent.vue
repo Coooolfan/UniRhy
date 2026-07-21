@@ -2,25 +2,26 @@
 import { computed, ref, watch } from 'vue'
 import { api } from '@/ApiInstance'
 import { resolveErrorMessage } from '@/i18n/errors'
-import type { AsyncTaskLogDto } from '@/__generated/model/dto'
+import type { AsyncTaskDto } from '@/__generated/model/dto'
 import type { TaskStatus } from '@/__generated/model/enums/TaskStatus'
-import type { TaskType } from '@/__generated/model/enums/TaskType'
 import { useI18n } from 'vue-i18n'
 import { useUserStore } from '@/stores/user'
 import { useModal } from '@/composables/useModal'
-import { ChevronLeft, ChevronRight, Loader2, RotateCcw } from 'lucide-vue-next'
+import { ChevronLeft, ChevronRight, Loader2, RotateCcw, XCircle } from 'lucide-vue-next'
 
 const { t } = useI18n()
 
-type TaskLog = AsyncTaskLogDto['TaskController/DEFAULT_TASK_LOG_FETCHER']
+type TaskRow = AsyncTaskDto['TaskController/DEFAULT_TASK_FETCHER']
 
 type TaskOption = {
-    readonly taskType: TaskType
+    readonly taskKey: string
+    readonly namespace: string
+    readonly taskType: string
     readonly taskName: string
 }
 
 const props = defineProps<{
-    taskType: TaskType
+    taskKey: string
     statuses: ReadonlyArray<TaskStatus>
     tasks: ReadonlyArray<TaskOption>
     pageSize?: number
@@ -28,15 +29,25 @@ const props = defineProps<{
 
 const emit = defineEmits<{
     resetSuccess: []
-    'update:taskType': [value: TaskType]
+    'update:taskKey': [value: string]
     'update:statuses': [value: TaskStatus[]]
 }>()
 
-const STATUS_ORDER: readonly TaskStatus[] = ['PENDING', 'RUNNING', 'COMPLETED', 'FAILED']
+const STATUS_ORDER: readonly TaskStatus[] = [
+    'PENDING',
+    'RUNNING',
+    'COMPLETED',
+    'FAILED',
+    'CANCELLED',
+]
 
-const onTaskTypeChange = (event: Event) => {
+const activeOption = computed<TaskOption | undefined>(() =>
+    props.tasks.find((option) => option.taskKey === props.taskKey),
+)
+
+const onTaskKeyChange = (event: Event) => {
     const target = event.target as HTMLSelectElement
-    emit('update:taskType', target.value as TaskType)
+    emit('update:taskKey', target.value)
 }
 
 const isStatusSelected = (s: TaskStatus) => props.statuses.includes(s)
@@ -49,10 +60,11 @@ const toggleStatus = (target: TaskStatus) => {
 }
 
 const statusLabelMap = computed<Record<TaskStatus, string>>(() => ({
-    PENDING: t('taskLog.pending'),
-    RUNNING: t('taskLog.running'),
-    COMPLETED: t('taskLog.completed'),
-    FAILED: t('taskLog.failed'),
+    PENDING: t('taskDetails.pending'),
+    RUNNING: t('taskDetails.running'),
+    COMPLETED: t('taskDetails.completed'),
+    FAILED: t('taskDetails.failed'),
+    CANCELLED: t('taskDetails.cancelled'),
 }))
 
 const STATUS_BADGE_CLASS = 'border-[#DFD6C4] bg-[#F1EBDD] text-[#5A524A]'
@@ -61,21 +73,22 @@ const userStore = useUserStore()
 const modal = useModal()
 
 const pageIndex = ref(0)
-const rows = ref<ReadonlyArray<TaskLog>>([])
+const rows = ref<ReadonlyArray<TaskRow>>([])
 const totalPageCount = ref(0)
 const totalRowCount = ref(0)
 const loading = ref(false)
 const error = ref('')
-const resettingId = ref<number | null>(null)
+const patchingId = ref<number | null>(null)
 const expandedIds = ref<Set<number>>(new Set())
 
 const effectivePageSize = computed(() => props.pageSize ?? 20)
 
-const canResetRow = (row: TaskLog) =>
-    userStore.isAdmin && (row.status === 'FAILED' || row.status === 'COMPLETED')
+const canResetRow = (row: TaskRow) => userStore.isAdmin && row.status === 'FAILED'
+const canCancelRow = (row: TaskRow) => userStore.isAdmin && row.status === 'PENDING'
 
-const fetchLogs = async () => {
-    if (props.statuses.length === 0) {
+const fetchTasks = async () => {
+    const option = activeOption.value
+    if (props.statuses.length === 0 || !option) {
         rows.value = []
         totalPageCount.value = 0
         totalRowCount.value = 0
@@ -86,8 +99,9 @@ const fetchLogs = async () => {
     loading.value = true
     error.value = ''
     try {
-        const page = await api.taskController.listTaskLogDetails({
-            taskType: props.taskType,
+        const page = await api.taskController.listTasks({
+            namespace: option.namespace,
+            taskType: option.taskType,
             statuses: [...props.statuses],
             pageIndex: pageIndex.value,
             pageSize: effectivePageSize.value,
@@ -96,7 +110,7 @@ const fetchLogs = async () => {
         totalPageCount.value = page.totalPageCount
         totalRowCount.value = page.totalRowCount
     } catch (err) {
-        error.value = resolveErrorMessage(err, 'errors.fallback.taskLogLoad')
+        error.value = resolveErrorMessage(err, 'errors.fallback.taskDetailsLoad')
         rows.value = []
         totalPageCount.value = 0
         totalRowCount.value = 0
@@ -106,18 +120,18 @@ const fetchLogs = async () => {
 }
 
 watch(
-    () => [props.taskType, [...props.statuses].sort().join(',')] as const,
+    () => [props.taskKey, [...props.statuses].sort().join(',')] as const,
     () => {
         pageIndex.value = 0
         expandedIds.value = new Set()
-        void fetchLogs()
+        void fetchTasks()
     },
     { immediate: true },
 )
 
 watch(pageIndex, () => {
     expandedIds.value = new Set()
-    void fetchLogs()
+    void fetchTasks()
 })
 
 const goPrev = () => {
@@ -147,39 +161,56 @@ const formatTime = (value: string | undefined | null) => {
     return date.toLocaleString('zh-CN', { hour12: false })
 }
 
-const formatParams = (raw: string) => {
+const formatPayload = (payload: unknown) => {
     try {
-        return JSON.stringify(JSON.parse(raw), null, 2)
+        return JSON.stringify(payload, null, 2)
     } catch {
-        return raw
+        return String(payload)
     }
 }
 
-const resetTask = async (row: TaskLog) => {
-    if (!canResetRow(row) || resettingId.value !== null) return
+const patchTaskStatus = async (row: TaskRow, target: TaskStatus, fallbackKey: string) => {
+    if (patchingId.value !== null) return
+    patchingId.value = row.id
+    error.value = ''
+    try {
+        await api.taskController.patchTask({ id: row.id, body: { status: target } })
+        emit('resetSuccess')
+        await fetchTasks()
+    } catch (err) {
+        error.value = resolveErrorMessage(err, fallbackKey)
+    } finally {
+        patchingId.value = null
+    }
+}
+
+const resetTask = async (row: TaskRow) => {
+    if (!canResetRow(row)) return
     const confirmed = await modal.confirm({
-        title: t('taskLog.resetTitle'),
-        content: t('taskLog.resetConfirm', {
+        title: t('taskDetails.resetTitle'),
+        content: t('taskDetails.resetConfirm', {
             id: row.id,
             status: statusLabelMap.value[row.status],
         }),
-        confirmText: t('taskLog.reset'),
+        confirmText: t('taskDetails.reset'),
         cancelText: t('common.cancel'),
         tone: 'danger',
     })
     if (!confirmed) return
+    await patchTaskStatus(row, 'PENDING', 'errors.fallback.taskStatusPatch')
+}
 
-    resettingId.value = row.id
-    error.value = ''
-    try {
-        await api.taskController.resetTaskLogs({ ids: [row.id] })
-        emit('resetSuccess')
-        await fetchLogs()
-    } catch (err) {
-        error.value = resolveErrorMessage(err, 'errors.fallback.taskLogReset')
-    } finally {
-        resettingId.value = null
-    }
+const cancelTask = async (row: TaskRow) => {
+    if (!canCancelRow(row)) return
+    const confirmed = await modal.confirm({
+        title: t('taskDetails.cancelTitle'),
+        content: t('taskDetails.cancelConfirm', { id: row.id }),
+        confirmText: t('taskDetails.cancel'),
+        cancelText: t('common.cancel'),
+        tone: 'danger',
+    })
+    if (!confirmed) return
+    await patchTaskStatus(row, 'CANCELLED', 'errors.fallback.taskStatusPatch')
 }
 </script>
 
@@ -188,18 +219,18 @@ const resetTask = async (row: TaskLog) => {
         <div class="space-y-3 border-b border-[#EAE6DE] px-4 py-4 sm:px-6">
             <label class="block">
                 <span class="mb-1.5 block text-[10px] uppercase tracking-[0.24em] text-[#8A8177]">
-                    {{ t('taskLog.taskType') }}
+                    {{ t('taskDetails.taskType') }}
                 </span>
                 <div class="relative">
                     <select
-                        :value="taskType"
+                        :value="taskKey"
                         class="w-full appearance-none border border-[#EAE6DE] bg-[#F8F5EE] px-3 py-2 pr-8 text-sm text-[#2B221B] outline-none transition-colors focus:border-[#B86134]"
-                        @change="onTaskTypeChange"
+                        @change="onTaskKeyChange"
                     >
                         <option
                             v-for="option in tasks"
-                            :key="option.taskType"
-                            :value="option.taskType"
+                            :key="option.taskKey"
+                            :value="option.taskKey"
                         >
                             {{ option.taskName }}
                         </option>
@@ -226,7 +257,7 @@ const resetTask = async (row: TaskLog) => {
                 </button>
             </div>
             <div class="text-xs text-[#8A8177]">
-                {{ t('taskLog.totalCount', { count: totalRowCount }) }}
+                {{ t('taskDetails.totalCount', { count: totalRowCount }) }}
             </div>
         </div>
 
@@ -243,14 +274,14 @@ const resetTask = async (row: TaskLog) => {
                 class="flex items-center justify-center py-12 text-sm text-[#6B635B]"
             >
                 <Loader2 class="mr-2 h-4 w-4 animate-spin" />
-                {{ t('taskLog.loading') }}
+                {{ t('taskDetails.loading') }}
             </div>
 
             <div
                 v-else-if="rows.length === 0"
                 class="flex items-center justify-center py-12 text-sm text-[#8A8177]"
             >
-                {{ t('taskLog.noRecords') }}
+                {{ t('taskDetails.noRecords') }}
             </div>
 
             <ul v-else class="space-y-3">
@@ -274,7 +305,9 @@ const resetTask = async (row: TaskLog) => {
                                 <span class="hidden sm:inline">·</span>
                                 <span class="basis-full sm:basis-auto">
                                     {{
-                                        t('taskLog.createdAt', { time: formatTime(row.createdAt) })
+                                        t('taskDetails.createdAt', {
+                                            time: formatTime(row.createdAt),
+                                        })
                                     }}
                                 </span>
                             </div>
@@ -282,10 +315,12 @@ const resetTask = async (row: TaskLog) => {
                                 class="mt-1 grid grid-cols-1 gap-x-3 text-[11px] text-[#8A8177] sm:grid-cols-2"
                             >
                                 <span>{{
-                                    t('taskLog.startedAt', { time: formatTime(row.startedAt) })
+                                    t('taskDetails.startedAt', { time: formatTime(row.startedAt) })
                                 }}</span>
                                 <span>{{
-                                    t('taskLog.completedAt', { time: formatTime(row.completedAt) })
+                                    t('taskDetails.completedAt', {
+                                        time: formatTime(row.completedAt),
+                                    })
                                 }}</span>
                             </div>
                             <div
@@ -295,17 +330,36 @@ const resetTask = async (row: TaskLog) => {
                                 {{ row.completedReason }}
                             </div>
                         </div>
-                        <button
-                            v-if="canResetRow(row)"
-                            type="button"
-                            class="inline-flex shrink-0 items-center gap-1 border border-[#C67C4E] px-3 py-1.5 text-[11px] uppercase tracking-[0.18em] text-[#C67C4E] transition-colors hover:bg-[#C67C4E] hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
-                            :disabled="resettingId !== null"
-                            @click="resetTask(row)"
-                        >
-                            <Loader2 v-if="resettingId === row.id" class="h-3 w-3 animate-spin" />
-                            <RotateCcw v-else class="h-3 w-3" />
-                            <span>{{ t('taskLog.reset') }}</span>
-                        </button>
+                        <div class="flex shrink-0 flex-col items-end gap-2">
+                            <button
+                                v-if="canResetRow(row)"
+                                type="button"
+                                class="inline-flex items-center gap-1 border border-[#C67C4E] px-3 py-1.5 text-[11px] uppercase tracking-[0.18em] text-[#C67C4E] transition-colors hover:bg-[#C67C4E] hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+                                :disabled="patchingId !== null"
+                                @click="resetTask(row)"
+                            >
+                                <Loader2
+                                    v-if="patchingId === row.id"
+                                    class="h-3 w-3 animate-spin"
+                                />
+                                <RotateCcw v-else class="h-3 w-3" />
+                                <span>{{ t('taskDetails.reset') }}</span>
+                            </button>
+                            <button
+                                v-if="canCancelRow(row)"
+                                type="button"
+                                class="inline-flex items-center gap-1 border border-[#B8AFA3] px-3 py-1.5 text-[11px] uppercase tracking-[0.18em] text-[#8A8177] transition-colors hover:border-rose-400 hover:text-rose-500 disabled:cursor-not-allowed disabled:opacity-60"
+                                :disabled="patchingId !== null"
+                                @click="cancelTask(row)"
+                            >
+                                <Loader2
+                                    v-if="patchingId === row.id"
+                                    class="h-3 w-3 animate-spin"
+                                />
+                                <XCircle v-else class="h-3 w-3" />
+                                <span>{{ t('taskDetails.cancel') }}</span>
+                            </button>
+                        </div>
                     </div>
 
                     <button
@@ -315,14 +369,14 @@ const resetTask = async (row: TaskLog) => {
                     >
                         {{
                             expandedIds.has(row.id)
-                                ? t('taskLog.hideParams')
-                                : t('taskLog.viewParams')
+                                ? t('taskDetails.hideParams')
+                                : t('taskDetails.viewParams')
                         }}
                     </button>
                     <pre
                         v-if="expandedIds.has(row.id)"
                         class="mt-2 max-h-64 overflow-auto border border-[#EAE6DE] bg-[#F8F5EE] p-3 font-mono text-[11px] leading-relaxed text-[#2B221B]"
-                        >{{ formatParams(row.params) }}</pre
+                        >{{ formatPayload(row.payload) }}</pre
                     >
                 </li>
             </ul>
@@ -333,7 +387,7 @@ const resetTask = async (row: TaskLog) => {
         >
             <span>
                 {{
-                    t('taskLog.pageInfo', {
+                    t('taskDetails.pageInfo', {
                         current: totalPageCount === 0 ? 0 : pageIndex + 1,
                         total: totalPageCount,
                     })
@@ -347,7 +401,7 @@ const resetTask = async (row: TaskLog) => {
                     @click="goPrev"
                 >
                     <ChevronLeft class="h-3 w-3" />
-                    {{ t('taskLog.prevPage') }}
+                    {{ t('taskDetails.prevPage') }}
                 </button>
                 <button
                     type="button"
@@ -355,7 +409,7 @@ const resetTask = async (row: TaskLog) => {
                     :disabled="pageIndex + 1 >= totalPageCount || loading"
                     @click="goNext"
                 >
-                    {{ t('taskLog.nextPage') }}
+                    {{ t('taskDetails.nextPage') }}
                     <ChevronRight class="h-3 w-3" />
                 </button>
             </div>

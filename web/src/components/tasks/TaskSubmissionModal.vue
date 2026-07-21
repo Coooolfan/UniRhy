@@ -14,21 +14,31 @@ import {
     Puzzle,
     Settings,
 } from 'lucide-vue-next'
-import type { CodecType } from '@/__generated/model/enums/CodecType'
-import { type FileProviderType } from '@/__generated/model/enums/FileProviderType'
-import type { PluginInfoResponse } from '@/__generated/model/static/PluginInfoResponse'
-import type { TranscodeTaskRequest } from '@/__generated/model/static'
+import type { TaskDefinitionView } from '@/__generated/model/static'
 import { useI18n } from 'vue-i18n'
 import { resolveErrorMessage } from '@/i18n/errors'
 import { useModalContext } from '@/components/modals/modalContext'
-import type { TaskProviderOption } from '@/composables/useTaskManagement'
+import {
+    BUILT_IN_NAMESPACE,
+    taskKeyOf,
+    type FileProviderType,
+    type TaskProviderOption,
+} from '@/composables/useTaskManagement'
+import {
+    initialFormValues,
+    isFieldValid,
+    isFormValid,
+    parseFormDefinition,
+    toSubmissionParams,
+    type SchemaFormValues,
+} from '@/components/tasks/schemaForm'
 
 const { t } = useI18n()
 
-type BuiltinTaskKind = 'METADATA_PARSE' | 'TRANSCODE'
-
-type TaskDefinition = {
-    id: string
+type TaskOption = {
+    key: string
+    namespace: string
+    taskType: string
     name: string
     desc: string
     icon: Component
@@ -41,39 +51,22 @@ type TaskAvailability = {
     icon: Component
 }
 
-type ProviderSelectionPayload = {
-    providerType: FileProviderType
-    providerId: number
-}
-
 const props = defineProps<{
+    definitions: ReadonlyArray<TaskDefinitionView>
     loadProviders: () => Promise<TaskProviderOption[]>
-    plugins: ReadonlyArray<PluginInfoResponse>
-    submitMetadataParse: (payload: ProviderSelectionPayload) => Promise<void> | void
-    submitTranscode: (payload: TranscodeTaskRequest) => Promise<void> | void
-    submitPluginTask: (taskType: string, params: Record<string, string>) => Promise<void> | void
+    submitTask: (
+        namespace: string,
+        taskType: string,
+        params: Record<string, unknown>,
+    ) => Promise<void> | void
 }>()
 
-const BUILTIN_TASK_OPTIONS = computed<TaskDefinition[]>(() => [
-    {
-        id: 'METADATA_PARSE',
-        name: t('taskSubmission.metadataParse'),
-        desc: t('taskSubmission.metadataParseDesc'),
-        icon: FolderSearch,
-        isPlugin: false,
-    },
-    {
-        id: 'TRANSCODE',
-        name: t('taskSubmission.transcode'),
-        desc: t('taskSubmission.transcodeDesc'),
-        icon: FileAudio,
-        isPlugin: false,
-    },
-])
+const METADATA_PARSE_KEY = taskKeyOf(BUILT_IN_NAMESPACE, 'METADATA_PARSE')
+const TRANSCODE_KEY = taskKeyOf(BUILT_IN_NAMESPACE, 'TRANSCODE')
 
-const TARGET_CODEC_OPTIONS = computed<Array<{ value: CodecType; label: string; hint: string }>>(
-    () => [{ value: 'OPUS', label: 'Opus', hint: t('taskSubmission.opusHint') }],
-)
+const TARGET_CODEC_OPTIONS = computed<Array<{ value: string; label: string; hint: string }>>(() => [
+    { value: 'OPUS', label: 'Opus', hint: t('taskSubmission.opusHint') },
+])
 
 const PROVIDER_TYPE_LABEL_MAP = computed<Record<FileProviderType, string>>(() => ({
     FILE_SYSTEM: t('taskSubmission.localStorage'),
@@ -88,7 +81,7 @@ const PROVIDER_TYPE_ICON_MAP: Record<FileProviderType, Component> = {
 const modal = useModalContext<boolean>()
 const router = useRouter()
 
-const activeTaskId = ref<string>('METADATA_PARSE')
+const activeTaskKey = ref<string>(METADATA_PARSE_KEY)
 const mobileStep = ref<'select-type' | 'fill-form'>('select-type')
 const isMobile = ref(false)
 let mobileMediaQuery: MediaQueryList | null = null
@@ -99,48 +92,68 @@ const syncMobileViewport = (event?: MediaQueryListEvent) => {
 const metadataParseProviderValue = ref('')
 const transcodeSourceProviderValue = ref('')
 const transcodeDestinationProviderValue = ref('')
-const targetCodec = ref<CodecType>('OPUS')
-const pluginFormValues = ref<Record<string, string>>({})
+const targetCodec = ref('OPUS')
+const pluginFormValues = ref<SchemaFormValues>({})
 const providerOptions = ref<TaskProviderOption[]>([])
 const isLoadingProviders = ref(true)
 const isSubmitting = ref(false)
 const submitError = ref('')
 
-const pluginTaskOptions = computed<TaskDefinition[]>(() =>
-    props.plugins
-        .filter((p) => p.isAvailable && p.taskType !== undefined)
-        .map((p) => ({
-            id: p.taskType!,
-            name: p.name ?? p.id,
-            desc: t('taskSubmission.pluginDesc', { id: p.id, version: p.version }),
+const allTaskOptions = computed<TaskOption[]>(() =>
+    props.definitions.map((definition) => {
+        const key = taskKeyOf(definition.namespace, definition.taskType)
+        if (key === METADATA_PARSE_KEY) {
+            return {
+                key,
+                namespace: definition.namespace,
+                taskType: definition.taskType,
+                name: t('taskSubmission.metadataParse'),
+                desc: t('taskSubmission.metadataParseDesc'),
+                icon: FolderSearch,
+                isPlugin: false,
+            }
+        }
+        if (key === TRANSCODE_KEY) {
+            return {
+                key,
+                namespace: definition.namespace,
+                taskType: definition.taskType,
+                name: t('taskSubmission.transcode'),
+                desc: t('taskSubmission.transcodeDesc'),
+                icon: FileAudio,
+                isPlugin: false,
+            }
+        }
+        return {
+            key,
+            namespace: definition.namespace,
+            taskType: definition.taskType,
+            name: definition.name ?? key,
+            desc: t('taskSubmission.pluginDesc', { id: definition.namespace }),
             icon: Puzzle,
             isPlugin: true,
-        })),
+        }
+    }),
 )
 
-const allTaskOptions = computed<TaskDefinition[]>(() => [
-    ...BUILTIN_TASK_OPTIONS.value,
-    ...pluginTaskOptions.value,
-])
-
-const activeTaskOption = computed<TaskDefinition>(
-    () =>
-        allTaskOptions.value.find((o) => o.id === activeTaskId.value) ??
-        BUILTIN_TASK_OPTIONS.value[0]!,
+const activeTaskOption = computed<TaskOption | undefined>(() =>
+    allTaskOptions.value.find((o) => o.key === activeTaskKey.value),
 )
 
-const activePlugin = computed<PluginInfoResponse | null>(
-    () => props.plugins.find((p) => p.taskType === activeTaskId.value) ?? null,
+const activeDefinition = computed<TaskDefinitionView | undefined>(() =>
+    props.definitions.find((d) => taskKeyOf(d.namespace, d.taskType) === activeTaskKey.value),
 )
+
+const isPluginTask = computed(() => activeTaskOption.value?.isPlugin ?? false)
+
+const pluginFormFields = computed(() => {
+    if (!isPluginTask.value) return []
+    const definition = activeDefinition.value
+    return definition ? parseFormDefinition(definition.formDefinition) : []
+})
 
 const initPluginFormValues = () => {
-    const plugin = activePlugin.value
-    if (!plugin) return
-    const values: Record<string, string> = {}
-    for (const field of plugin.form.fields) {
-        values[field.name] = field.default ?? ''
-    }
-    pluginFormValues.value = values
+    pluginFormValues.value = initialFormValues(pluginFormFields.value)
 }
 
 const optionValueOf = (provider: TaskProviderOption) => `${provider.type}:${provider.id}`
@@ -183,7 +196,7 @@ const syncProviderSelections = () => {
     )
 }
 
-watch(activeTaskId, () => {
+watch(activeTaskKey, () => {
     syncProviderSelections()
     initPluginFormValues()
 })
@@ -204,39 +217,28 @@ const selectedTranscodeDestinationProvider = computed(() =>
     ),
 )
 
-const pluginFormValid = computed(() => {
-    const plugin = activePlugin.value
-    if (!plugin) return true
-    for (const field of plugin.form.fields) {
-        const raw = pluginFormValues.value[field.name] ?? ''
-        if (field.type === 'integer') {
-            const n = Number(raw)
-            if (!Number.isInteger(n)) return false
-            if (typeof field.min === 'number' && n < field.min) return false
-            if (typeof field.max === 'number' && n > field.max) return false
-        }
-    }
-    return true
-})
+const pluginFormValid = computed(() => isFormValid(pluginFormFields.value, pluginFormValues.value))
 
 const canSubmit = computed(() => {
-    if (activePlugin.value) return pluginFormValid.value
+    if (isPluginTask.value) return pluginFormValid.value
     if (isLoadingProviders.value) return false
-    if (activeTaskId.value === 'METADATA_PARSE') return Boolean(selectedMetadataParseProvider.value)
+    if (activeTaskKey.value === METADATA_PARSE_KEY) {
+        return Boolean(selectedMetadataParseProvider.value)
+    }
     return Boolean(
         selectedTranscodeSourceProvider.value && selectedTranscodeDestinationProvider.value,
     )
 })
 
 const submitButtonLabel = computed(() => {
-    if (activePlugin.value)
-        return t('taskSubmission.submitPluginTask', { name: activeTaskOption.value.name })
-    if (activeTaskId.value === 'METADATA_PARSE') return t('taskSubmission.submitMetadataTask')
+    if (isPluginTask.value)
+        return t('taskSubmission.submitPluginTask', { name: activeTaskOption.value?.name ?? '' })
+    if (activeTaskKey.value === METADATA_PARSE_KEY) return t('taskSubmission.submitMetadataTask')
     return t('taskSubmission.submitTranscodeTask')
 })
 
 const activeTaskAvailability = computed<TaskAvailability | null>(() => {
-    if (activePlugin.value) return null
+    if (isPluginTask.value) return null
 
     if (providerOptions.value.length === 0) {
         return {
@@ -247,7 +249,7 @@ const activeTaskAvailability = computed<TaskAvailability | null>(() => {
     }
 
     if (
-        activeTaskId.value === 'METADATA_PARSE' &&
+        activeTaskKey.value === METADATA_PARSE_KEY &&
         metadataParseProviderOptions.value.length === 0
     ) {
         return {
@@ -257,7 +259,10 @@ const activeTaskAvailability = computed<TaskAvailability | null>(() => {
         }
     }
 
-    if (activeTaskId.value === 'TRANSCODE' && transcodeSourceProviderOptions.value.length === 0) {
+    if (
+        activeTaskKey.value === TRANSCODE_KEY &&
+        transcodeSourceProviderOptions.value.length === 0
+    ) {
         return {
             title: t('taskSubmission.noTranscodeSourceTitle'),
             description: t('taskSubmission.noTranscodeSourceDesc'),
@@ -266,7 +271,7 @@ const activeTaskAvailability = computed<TaskAvailability | null>(() => {
     }
 
     if (
-        activeTaskId.value === 'TRANSCODE' &&
+        activeTaskKey.value === TRANSCODE_KEY &&
         transcodeDestinationProviderOptions.value.length === 0
     ) {
         return {
@@ -311,8 +316,8 @@ onUnmounted(() => {
     mobileMediaQuery?.removeEventListener('change', syncMobileViewport)
 })
 
-const selectTask = (taskId: string) => {
-    activeTaskId.value = taskId
+const selectTask = (taskKey: string) => {
+    activeTaskKey.value = taskKey
     if (isMobile.value) {
         mobileStep.value = 'fill-form'
     }
@@ -320,17 +325,23 @@ const selectTask = (taskId: string) => {
 
 const submit = async () => {
     if (!canSubmit.value || isSubmitting.value) return
+    const option = activeTaskOption.value
+    if (!option) return
 
     isSubmitting.value = true
     submitError.value = ''
 
     try {
-        if (activePlugin.value) {
-            await props.submitPluginTask(activeTaskId.value, { ...pluginFormValues.value })
-        } else if (activeTaskId.value === 'METADATA_PARSE') {
+        if (isPluginTask.value) {
+            await props.submitTask(
+                option.namespace,
+                option.taskType,
+                toSubmissionParams(pluginFormFields.value, pluginFormValues.value),
+            )
+        } else if (activeTaskKey.value === METADATA_PARSE_KEY) {
             const provider = selectedMetadataParseProvider.value
             if (!provider) return
-            await props.submitMetadataParse({
+            await props.submitTask(option.namespace, option.taskType, {
                 providerType: provider.type,
                 providerId: provider.id,
             })
@@ -338,7 +349,7 @@ const submit = async () => {
             const source = selectedTranscodeSourceProvider.value
             const destination = selectedTranscodeDestinationProvider.value
             if (!source || !destination) return
-            await props.submitTranscode({
+            await props.submitTask(option.namespace, option.taskType, {
                 srcProviderType: source.type,
                 srcProviderId: source.id,
                 dstProviderType: destination.type,
@@ -386,23 +397,23 @@ const submit = async () => {
                 <div>
                     <button
                         v-for="task in allTaskOptions"
-                        :key="task.id"
-                        :data-test="`task-type-${task.id.toLowerCase()}`"
+                        :key="task.key"
+                        :data-test="`task-type-${task.taskType.toLowerCase()}`"
                         type="button"
                         class="group flex w-full items-center gap-3 px-6 py-4 text-left transition-all duration-200 lg:px-8"
                         :class="
-                            activeTaskId === task.id
+                            activeTaskKey === task.key
                                 ? 'bg-[#F2EFE9] text-[#C27E46]'
                                 : 'border-transparent text-[#6B635B] hover:bg-[#F2EFE9]/80 hover:text-[#2C2C2C]'
                         "
                         :disabled="isSubmitting"
-                        @click="selectTask(task.id)"
+                        @click="selectTask(task.key)"
                     >
                         <component
                             :is="task.icon"
                             class="h-4 w-4 shrink-0"
                             :class="
-                                activeTaskId === task.id
+                                activeTaskKey === task.key
                                     ? 'text-[#C27E46]'
                                     : 'text-[#9C968B] group-hover:text-[#C27E46]'
                             "
@@ -433,10 +444,10 @@ const submit = async () => {
                     </div>
                 </div>
                 <h2 class="mt-3 font-serif text-2xl text-[#2C2C2C] lg:text-3xl">
-                    {{ activeTaskOption.name }}
+                    {{ activeTaskOption?.name }}
                 </h2>
                 <p class="mt-3 max-w-2xl text-sm leading-relaxed text-[#6B635B]">
-                    {{ activeTaskOption.desc }}
+                    {{ activeTaskOption?.desc }}
                 </p>
             </div>
 
@@ -449,7 +460,7 @@ const submit = async () => {
                 </div>
 
                 <div
-                    v-if="isLoadingProviders && !activePlugin"
+                    v-if="isLoadingProviders && !isPluginTask"
                     class="flex min-h-[280px] items-center justify-center text-sm text-[#6B635B]"
                 >
                     <Loader2 class="mr-2 h-4 w-4 animate-spin text-[#C27E46]" />
@@ -477,35 +488,54 @@ const submit = async () => {
                     </button>
                 </div>
 
-                <!-- 插件通用表单 -->
-                <div v-else-if="activePlugin" class="space-y-8">
+                <!-- 插件 Schema 表单 -->
+                <div v-else-if="isPluginTask" class="space-y-8">
                     <div class="grid gap-6">
-                        <div
-                            v-for="field in activePlugin.form.fields"
-                            :key="field.name"
-                            class="block"
-                        >
+                        <div v-for="field in pluginFormFields" :key="field.name" class="block">
                             <label>
                                 <span
                                     class="mb-2 block text-xs uppercase tracking-[0.24em] text-[#8A8A8A]"
                                 >
-                                    {{ field.label }}
+                                    {{ field.title }}
+                                    <span v-if="field.required" class="text-[#C27E46]">*</span>
                                 </span>
+                                <div v-if="field.type === 'boolean'">
+                                    <input
+                                        v-model="pluginFormValues[field.name]"
+                                        type="checkbox"
+                                        class="mt-1"
+                                    />
+                                </div>
+                                <div v-else-if="field.enum" class="relative">
+                                    <select
+                                        v-model="pluginFormValues[field.name]"
+                                        class="w-full appearance-none border-b border-[#D6D1C4] bg-[#F7F5F0] p-3 pr-10 text-sm text-[#2C2C2C] outline-none transition-colors focus:border-[#C27E46]"
+                                    >
+                                        <option v-if="!field.required" value="">—</option>
+                                        <option
+                                            v-for="candidate in field.enum"
+                                            :key="String(candidate)"
+                                            :value="String(candidate)"
+                                        >
+                                            {{ candidate }}
+                                        </option>
+                                    </select>
+                                    <ChevronDown
+                                        class="pointer-events-none absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 text-[#8A8A8A]"
+                                    />
+                                </div>
                                 <input
-                                    v-if="field.type === 'integer' || field.type === 'string'"
+                                    v-else
                                     v-model="pluginFormValues[field.name]"
-                                    :type="field.type === 'integer' ? 'number' : 'text'"
-                                    :min="field.min"
-                                    :max="field.max"
-                                    class="w-full border-b border-[#D6D1C4] bg-[#F7F5F0] p-3 text-sm text-[#2C2C2C] outline-none transition-colors focus:border-[#C27E46]"
-                                />
-                                <input
-                                    v-else-if="field.type === 'boolean'"
-                                    v-model="pluginFormValues[field.name]"
-                                    type="checkbox"
-                                    true-value="true"
-                                    false-value="false"
-                                    class="mt-1"
+                                    :type="field.type === 'string' ? 'text' : 'number'"
+                                    :min="field.minimum"
+                                    :max="field.maximum"
+                                    class="w-full border-b bg-[#F7F5F0] p-3 text-sm text-[#2C2C2C] outline-none transition-colors focus:border-[#C27E46]"
+                                    :class="
+                                        isFieldValid(field, pluginFormValues[field.name])
+                                            ? 'border-[#D6D1C4]'
+                                            : 'border-rose-300'
+                                    "
                                 />
                             </label>
                             <p
@@ -526,7 +556,7 @@ const submit = async () => {
                 </div>
 
                 <!-- 元数据解析 -->
-                <div v-else-if="activeTaskId === 'METADATA_PARSE'" class="space-y-8">
+                <div v-else-if="activeTaskKey === METADATA_PARSE_KEY" class="space-y-8">
                     <div class="grid gap-6">
                         <label class="block">
                             <span

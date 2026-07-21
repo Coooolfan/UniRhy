@@ -3,6 +3,7 @@ import { mount, flushPromises } from '@vue/test-utils'
 import TaskSubmissionModal from '@/components/tasks/TaskSubmissionModal.vue'
 import { modalContextKey, type ModalContext } from '@/components/modals/modalContext'
 import type { TaskProviderOption } from '@/composables/useTaskManagement'
+import type { TaskDefinitionView } from '@/__generated/model/static'
 
 vi.mock('vue-router', () => ({
     useRouter: () => ({
@@ -16,6 +17,71 @@ const getOptionTexts = (
 ) => {
     const options = selector.get(dataTest).findAll('option')
     return options.map((option: Readonly<{ text: () => string }>) => option.text())
+}
+
+const BUILT_IN_NAMESPACE = 'app.unirhy.built-in'
+
+const builtInDefinitions: TaskDefinitionView[] = [
+    {
+        namespace: BUILT_IN_NAMESPACE,
+        taskType: 'METADATA_PARSE',
+        name: '元数据解析',
+        formDefinition: {
+            schema: {
+                type: 'object',
+                properties: {},
+                required: [],
+                additionalProperties: false,
+            },
+            order: [],
+        },
+    },
+    {
+        namespace: BUILT_IN_NAMESPACE,
+        taskType: 'TRANSCODE',
+        name: '音频转码',
+        formDefinition: {
+            schema: {
+                type: 'object',
+                properties: {},
+                required: [],
+                additionalProperties: false,
+            },
+            order: [],
+        },
+    },
+]
+
+const pluginDefinition: TaskDefinitionView = {
+    namespace: 'com.example.cover',
+    taskType: 'FETCH_COVER',
+    name: '封面抓取',
+    formDefinition: {
+        schema: {
+            type: 'object',
+            properties: {
+                keyword: {
+                    type: 'string',
+                    title: '搜索关键字',
+                    minLength: 1,
+                },
+                limit: {
+                    type: 'integer',
+                    title: '数量上限',
+                    default: 10,
+                    minimum: 1,
+                },
+                dryRun: {
+                    type: 'boolean',
+                    title: '试运行',
+                    default: false,
+                },
+            },
+            required: ['keyword'],
+            additionalProperties: false,
+        },
+        order: ['keyword', 'limit', 'dryRun'],
+    },
 }
 
 const providerOptions: TaskProviderOption[] = [
@@ -42,9 +108,7 @@ const providerOptions: TaskProviderOption[] = [
     },
 ]
 
-const submitMetadataParseMock = vi.fn()
-const submitTranscodeMock = vi.fn()
-const submitPluginTaskMock = vi.fn()
+const submitTaskMock = vi.fn()
 const resolveMock = vi.fn()
 const closeMock = vi.fn()
 
@@ -63,11 +127,9 @@ const mountModal = async (
 ) => {
     const wrapper = mount(TaskSubmissionModal, {
         props: {
+            definitions: builtInDefinitions,
             loadProviders: () => Promise.resolve(providerOptions),
-            plugins: [],
-            submitMetadataParse: submitMetadataParseMock,
-            submitTranscode: submitTranscodeMock,
-            submitPluginTask: submitPluginTaskMock,
+            submitTask: submitTaskMock,
             ...overrides,
         },
         global: {
@@ -84,9 +146,7 @@ const mountModal = async (
 
 describe('TaskSubmissionModal', () => {
     beforeEach(() => {
-        submitMetadataParseMock.mockReset()
-        submitTranscodeMock.mockReset()
-        submitPluginTaskMock.mockReset()
+        submitTaskMock.mockReset()
         resolveMock.mockReset()
         closeMock.mockReset()
     })
@@ -97,7 +157,7 @@ describe('TaskSubmissionModal', () => {
         expect(wrapper.text()).toContain('元数据解析')
         await wrapper.get('[data-test="task-submit-button"]').trigger('click')
 
-        expect(submitMetadataParseMock).toHaveBeenCalledWith({
+        expect(submitTaskMock).toHaveBeenCalledWith(BUILT_IN_NAMESPACE, 'METADATA_PARSE', {
             providerType: 'FILE_SYSTEM',
             providerId: 1,
         })
@@ -173,7 +233,7 @@ describe('TaskSubmissionModal', () => {
         await wrapper.get('[data-test="transcode-source-select"]').setValue('FILE_SYSTEM:2')
         await wrapper.get('[data-test="task-submit-button"]').trigger('click')
 
-        expect(submitTranscodeMock).toHaveBeenCalledWith({
+        expect(submitTaskMock).toHaveBeenCalledWith(BUILT_IN_NAMESPACE, 'TRANSCODE', {
             srcProviderType: 'FILE_SYSTEM',
             srcProviderId: 2,
             dstProviderType: 'OSS',
@@ -189,12 +249,12 @@ describe('TaskSubmissionModal', () => {
         await wrapper.get('[data-test="metadata-parse-provider-select"]').setValue('OSS:3')
         await wrapper.get('[data-test="task-submit-button"]').trigger('click')
 
-        expect(submitMetadataParseMock).toHaveBeenCalledWith({
+        expect(submitTaskMock).toHaveBeenCalledWith(BUILT_IN_NAMESPACE, 'METADATA_PARSE', {
             providerType: 'OSS',
             providerId: 3,
         })
 
-        submitMetadataParseMock.mockReset()
+        submitTaskMock.mockReset()
         resolveMock.mockReset()
 
         await wrapper.get('[data-test="task-type-transcode"]').trigger('click')
@@ -202,12 +262,38 @@ describe('TaskSubmissionModal', () => {
         await wrapper.get('[data-test="transcode-destination-select"]').setValue('OSS:3')
         await wrapper.get('[data-test="task-submit-button"]').trigger('click')
 
-        expect(submitTranscodeMock).toHaveBeenCalledWith({
+        expect(submitTaskMock).toHaveBeenCalledWith(BUILT_IN_NAMESPACE, 'TRANSCODE', {
             srcProviderType: 'OSS',
             srcProviderId: 3,
             dstProviderType: 'OSS',
             dstProviderId: 3,
             targetCodec: 'OPUS',
         })
+    })
+
+    it('renders a schema-driven form for plugin tasks and submits typed params', async () => {
+        const wrapper = await mountModal({
+            definitions: [...builtInDefinitions, pluginDefinition],
+        })
+
+        await wrapper.get('[data-test="task-type-fetch_cover"]').trigger('click')
+        expect(wrapper.text()).toContain('搜索关键字')
+        expect(wrapper.text()).toContain('数量上限')
+
+        // 缺少 required 字段时禁止提交
+        const submitButton = wrapper.get('[data-test="task-submit-button"]')
+        expect(submitButton.attributes('disabled')).toBeDefined()
+
+        const keywordInput = wrapper.find('input[type="text"]')
+        expect(keywordInput.exists()).toBe(true)
+        await keywordInput.setValue('beethoven')
+        await submitButton.trigger('click')
+
+        expect(submitTaskMock).toHaveBeenCalledWith('com.example.cover', 'FETCH_COVER', {
+            keyword: 'beethoven',
+            limit: 10,
+            dryRun: false,
+        })
+        expect(resolveMock).toHaveBeenCalledWith(true)
     })
 })

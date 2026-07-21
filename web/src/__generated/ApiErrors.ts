@@ -68,7 +68,8 @@ export type AllErrors = {
         code: 'WASM_MISSING'
     } | {
         family: 'PLUGIN', 
-        code: 'INVALID_MANIFEST'
+        code: 'INVALID_MANIFEST', 
+        reason: string
     } | {
         family: 'PLUGIN', 
         code: 'UNSUPPORTED_RUNTIME'
@@ -77,17 +78,17 @@ export type AllErrors = {
         code: 'UNSUPPORTED_ABI'
     } | {
         family: 'PLUGIN', 
-        code: 'TASK_BINDING_MISSING'
-    } | {
-        family: 'PLUGIN', 
         code: 'NOT_FOUND'
     } | {
         family: 'PLUGIN', 
-        code: 'UNKNOWN_TASK_TYPE', 
-        taskType: string
+        code: 'LOAD_FAILED', 
+        reason: string
     } | {
         family: 'PLUGIN', 
-        code: 'INVALID_TASK_PARAMS'
+        code: 'INVALID_CONCURRENCY'
+    } | {
+        family: 'PLUGIN', 
+        code: 'DELETE_CONFLICT'
     } | {
         family: 'RECORDING', 
         code: 'NOT_FOUND'
@@ -106,6 +107,32 @@ export type AllErrors = {
     } | {
         family: 'SYSTEM', 
         code: 'SYSTEM_STORAGE_PROVIDER_CANNOT_BE_READONLY'
+    } | {
+        family: 'TASK', 
+        code: 'TASK_NOT_FOUND'
+    } | {
+        family: 'TASK', 
+        code: 'STATUS_CONFLICT'
+    } | {
+        family: 'TASK', 
+        code: 'PLUGIN_UNAVAILABLE'
+    } | {
+        family: 'TASK', 
+        code: 'DEFINITION_NOT_FOUND'
+    } | {
+        family: 'TASK', 
+        code: 'INVALID_TASK_KEY', 
+        reason: string
+    } | {
+        family: 'TASK', 
+        code: 'INVALID_PARAMS', 
+        reason: string
+    } | {
+        family: 'TASK', 
+        code: 'SUBMISSION_NOT_FOUND'
+    } | {
+        family: 'TASK', 
+        code: 'DELETE_CONFLICT'
     } | {
         family: 'COMMON', 
         code: 'NOT_FOUND'
@@ -391,10 +418,6 @@ export type ApiErrors = {
                 family: 'PLUGIN', 
                 code: 'UNSUPPORTED_ABI', 
                 readonly [key:string]: any
-            } | {
-                family: 'PLUGIN', 
-                code: 'TASK_BINDING_MISSING', 
-                readonly [key:string]: any
             }), 
         'setEnabled': AllErrors & ({
                 family: 'COMMON', 
@@ -403,6 +426,23 @@ export type ApiErrors = {
             } | {
                 family: 'PLUGIN', 
                 code: 'NOT_FOUND', 
+                readonly [key:string]: any
+            } | {
+                family: 'PLUGIN', 
+                code: 'LOAD_FAILED', 
+                readonly [key:string]: any
+            }), 
+        'updateConcurrency': AllErrors & ({
+                family: 'COMMON', 
+                code: 'FORBIDDEN', 
+                readonly [key:string]: any
+            } | {
+                family: 'PLUGIN', 
+                code: 'NOT_FOUND', 
+                readonly [key:string]: any
+            } | {
+                family: 'PLUGIN', 
+                code: 'INVALID_CONCURRENCY', 
                 readonly [key:string]: any
             }), 
         'delete': AllErrors & ({
@@ -413,6 +453,10 @@ export type ApiErrors = {
                 family: 'PLUGIN', 
                 code: 'NOT_FOUND', 
                 readonly [key:string]: any
+            } | {
+                family: 'PLUGIN', 
+                code: 'DELETE_CONFLICT', 
+                readonly [key:string]: any
             }), 
         'download': AllErrors & ({
                 family: 'COMMON', 
@@ -421,19 +465,6 @@ export type ApiErrors = {
             } | {
                 family: 'PLUGIN', 
                 code: 'NOT_FOUND', 
-                readonly [key:string]: any
-            }), 
-        'submitPluginTask': AllErrors & ({
-                family: 'COMMON', 
-                code: 'FORBIDDEN', 
-                readonly [key:string]: any
-            } | {
-                family: 'PLUGIN', 
-                code: 'UNKNOWN_TASK_TYPE', 
-                readonly [key:string]: any
-            } | {
-                family: 'PLUGIN', 
-                code: 'INVALID_TASK_PARAMS', 
                 readonly [key:string]: any
             })
     }, 
@@ -488,19 +519,125 @@ export type ApiErrors = {
             })
     }, 
     'taskController': {
-        'executeScanTask': AllErrors & ({
+        'getTask': AllErrors & ({
+                family: 'TASK', 
+                code: 'TASK_NOT_FOUND', 
+                readonly [key:string]: any
+            }), 
+        'patchTask': AllErrors & ({
                 family: 'COMMON', 
                 code: 'FORBIDDEN', 
                 readonly [key:string]: any
+            } | {
+                family: 'TASK', 
+                code: 'TASK_NOT_FOUND', 
+                readonly [key:string]: any
+            } | {
+                family: 'TASK', 
+                code: 'STATUS_CONFLICT', 
+                readonly [key:string]: any
+            } | {
+                family: 'TASK', 
+                code: 'PLUGIN_UNAVAILABLE', 
+                readonly [key:string]: any
             }), 
-        'executeTranscodeTask': AllErrors & ({
+        'patchTasks': AllErrors & ({
                 family: 'COMMON', 
                 code: 'FORBIDDEN', 
                 readonly [key:string]: any
-            }), 
-        'resetTaskLogs': AllErrors & ({
+            } | {
+                family: 'TASK', 
+                code: 'STATUS_CONFLICT', 
+                readonly [key:string]: any
+            })
+    }, 
+    'taskDefinitionController': {
+        'getTaskDefinition': AllErrors & ({
+                family: 'TASK', 
+                code: 'DEFINITION_NOT_FOUND', 
+                readonly [key:string]: any
+            } | {
+                family: 'TASK', 
+                code: 'INVALID_TASK_KEY', 
+                readonly [key:string]: any
+            })
+    }, 
+    'taskStatisticsController': {
+        'getTaskStatistics': AllErrors & ({
+                family: 'TASK', 
+                code: 'INVALID_TASK_KEY', 
+                readonly [key:string]: any
+            })
+    }, 
+    'taskSubmissionController': {
+        'createSubmission': AllErrors & ({
                 family: 'COMMON', 
                 code: 'FORBIDDEN', 
+                readonly [key:string]: any
+            } | {
+                family: 'TASK', 
+                code: 'INVALID_TASK_KEY', 
+                readonly [key:string]: any
+            } | {
+                family: 'TASK', 
+                code: 'INVALID_PARAMS', 
+                readonly [key:string]: any
+            } | {
+                family: 'TASK', 
+                code: 'DEFINITION_NOT_FOUND', 
+                readonly [key:string]: any
+            } | {
+                family: 'TASK', 
+                code: 'PLUGIN_UNAVAILABLE', 
+                readonly [key:string]: any
+            }), 
+        'getSubmission': AllErrors & ({
+                family: 'TASK', 
+                code: 'SUBMISSION_NOT_FOUND', 
+                readonly [key:string]: any
+            }), 
+        'listSubmissionTasks': AllErrors & ({
+                family: 'TASK', 
+                code: 'SUBMISSION_NOT_FOUND', 
+                readonly [key:string]: any
+            }), 
+        'patchSubmission': AllErrors & ({
+                family: 'COMMON', 
+                code: 'FORBIDDEN', 
+                readonly [key:string]: any
+            } | {
+                family: 'TASK', 
+                code: 'SUBMISSION_NOT_FOUND', 
+                readonly [key:string]: any
+            } | {
+                family: 'TASK', 
+                code: 'STATUS_CONFLICT', 
+                readonly [key:string]: any
+            } | {
+                family: 'TASK', 
+                code: 'PLUGIN_UNAVAILABLE', 
+                readonly [key:string]: any
+            }), 
+        'patchSubmissions': AllErrors & ({
+                family: 'COMMON', 
+                code: 'FORBIDDEN', 
+                readonly [key:string]: any
+            } | {
+                family: 'TASK', 
+                code: 'STATUS_CONFLICT', 
+                readonly [key:string]: any
+            }), 
+        'deleteSubmission': AllErrors & ({
+                family: 'COMMON', 
+                code: 'FORBIDDEN', 
+                readonly [key:string]: any
+            } | {
+                family: 'TASK', 
+                code: 'SUBMISSION_NOT_FOUND', 
+                readonly [key:string]: any
+            } | {
+                family: 'TASK', 
+                code: 'DELETE_CONFLICT', 
                 readonly [key:string]: any
             })
     }, 

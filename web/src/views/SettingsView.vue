@@ -52,6 +52,7 @@ const {
     fetch: fetchPlugins,
     upload,
     setEnabled,
+    updateConcurrency,
     deletePlugin,
     downloadPlugin,
 } = usePluginSettings()
@@ -157,6 +158,7 @@ onMounted(() => {
                 :error="pluginError"
                 :on-upload="upload"
                 :on-set-enabled="setEnabled"
+                :on-update-concurrency="updateConcurrency"
                 :on-delete="deletePlugin"
                 :on-download="downloadPlugin"
                 :can-manage="userStore.isAdmin"

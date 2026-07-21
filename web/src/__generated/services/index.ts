@@ -10,5 +10,8 @@ export {PluginController} from './PluginController';
 export {RecordingController} from './RecordingController';
 export {SystemConfigController} from './SystemConfigController';
 export {TaskController} from './TaskController';
+export {TaskDefinitionController} from './TaskDefinitionController';
+export {TaskStatisticsController} from './TaskStatisticsController';
+export {TaskSubmissionController} from './TaskSubmissionController';
 export {TokenController} from './TokenController';
 export {WorkController} from './WorkController';

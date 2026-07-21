@@ -6,11 +6,9 @@ import DecorativeLabel from '@/components/common/DecorativeLabel.vue'
 import { useModal } from '@/composables/useModal'
 import TaskSubmissionModal from '@/components/tasks/TaskSubmissionModal.vue'
 import SideDrawer from '@/components/SideDrawer.vue'
-import TaskLogDrawerContent from '@/components/tasks/TaskLogDrawerContent.vue'
+import TaskDrawerContent from '@/components/tasks/TaskDrawerContent.vue'
 import type { TaskStatus } from '@/__generated/model/enums/TaskStatus'
-import type { TaskType } from '@/__generated/model/enums/TaskType'
-import type { ScanTaskRequest, TranscodeTaskRequest } from '@/__generated/model/static'
-import { useTaskManagement } from '@/composables/useTaskManagement'
+import { taskKeyOf, useTaskManagement } from '@/composables/useTaskManagement'
 import {
     AlertCircle,
     ArrowRight,
@@ -29,13 +27,14 @@ type SubmitFeedbackStatus = 'idle' | 'success'
 type SummaryTone = 'idle' | 'working' | 'failed' | 'done'
 
 type TaskSummaryRow = {
+    taskKey: string
+    namespace: string
     taskType: string
     taskName: string
-    pendingCount: number
-    runningCount: number
+    activeCount: number
     completedCount: number
     failedCount: number
-    activeCount: number
+    cancelledCount: number
     totalCount: number
     tone: SummaryTone
 }
@@ -43,35 +42,18 @@ type TaskSummaryRow = {
 const SUBMIT_FEEDBACK_DURATION_MS = 2000
 const TASK_AUTO_REFRESH_INTERVAL_MS = 2000
 
-const statusLabelMap = computed<Record<TaskStatus, string>>(() => ({
-    PENDING: t('tasks.pending'),
-    RUNNING: t('tasks.running'),
-    COMPLETED: t('tasks.completed'),
-    FAILED: t('tasks.failed'),
-}))
-
-const summaryToneClassMap: Record<SummaryTone, string> = {
-    idle: 'border-[#EAE6DE] bg-[#F8F5EE] text-[#8A8A8A]',
-    working: 'border-[#F0D3B8] bg-[#FFF7EE] text-[#C67C4E]',
-    failed: 'border-rose-200 bg-rose-50 text-rose-600',
-    done: 'border-emerald-200 bg-emerald-50 text-emerald-600',
-}
-
 const {
-    taskCounts,
+    taskStatistics,
+    taskDefinitions,
     providerOptions,
-    pluginList,
-    isLoadingTaskCounts,
-    isLoadingProviders,
+    isLoadingTaskStatistics,
     isSubmitting,
     taskError,
     submitError,
-    fetchTaskCounts,
+    fetchTaskStatistics,
     fetchProviders,
-    fetchPlugins,
-    startMetadataParseTask,
-    startTranscodeTask,
-    startPluginTask,
+    fetchTaskDefinitions,
+    submitTask,
     resolveTaskLabel,
     clearSubmitError,
     init,
@@ -104,46 +86,45 @@ const isTaskActionButtonDisabled = computed(
     () => !userStore.isAdmin || isSubmitting.value || submitFeedbackStatus.value === 'success',
 )
 
-const totalCountByStatus = (status: TaskStatus) =>
-    taskCounts.value.filter((row) => row.status === status).reduce((sum, row) => sum + row.count, 0)
+const sumTaskCounts = (selector: (row: (typeof taskStatistics.value)[number]) => number) =>
+    taskStatistics.value.reduce((sum, row) => sum + selector(row), 0)
 
-const pendingTaskCount = computed(() => totalCountByStatus('PENDING'))
-const runningTaskCount = computed(() => totalCountByStatus('RUNNING'))
-const completedTaskCount = computed(() => totalCountByStatus('COMPLETED'))
-const failedTaskCount = computed(() => totalCountByStatus('FAILED'))
-const activeTaskCount = computed(() => pendingTaskCount.value + runningTaskCount.value)
-const totalTaskCount = computed(() => taskCounts.value.reduce((sum, row) => sum + row.count, 0))
+const activeTaskCount = computed(() => sumTaskCounts((row) => row.tasks.active))
+const completedTaskCount = computed(() => sumTaskCounts((row) => row.tasks.completed))
+const failedTaskCount = computed(() => sumTaskCounts((row) => row.tasks.failed))
+const cancelledTaskCount = computed(() => sumTaskCounts((row) => row.tasks.cancelled))
+const totalTaskCount = computed(() => sumTaskCounts((row) => row.tasks.total))
 
 const statusOverviewItems = computed(() => [
     {
         key: 'COMPLETED',
         count: completedTaskCount.value,
-        label: statusLabelMap.value.COMPLETED,
+        label: t('tasks.completed'),
         eyebrow: 'Completed',
         valueClass: 'text-[#2B221B]',
         eyebrowClass: 'text-[#8A8177]',
     },
     {
-        key: 'RUNNING',
-        count: runningTaskCount.value,
-        label: statusLabelMap.value.RUNNING,
-        eyebrow: 'Running',
+        key: 'ACTIVE',
+        count: activeTaskCount.value,
+        label: t('tasks.active'),
+        eyebrow: 'Active',
         valueClass: 'text-[#2B221B]',
         eyebrowClass: 'text-[#B86134]/70',
     },
     {
-        key: 'PENDING',
-        count: pendingTaskCount.value,
-        label: statusLabelMap.value.PENDING,
-        eyebrow: 'Pending',
+        key: 'FAILED',
+        count: failedTaskCount.value,
+        label: t('tasks.failed'),
+        eyebrow: 'Failed',
         valueClass: 'text-[#2B221B]',
         eyebrowClass: 'text-[#8A8177]',
     },
     {
-        key: 'FAILED',
-        count: failedTaskCount.value,
-        label: statusLabelMap.value.FAILED,
-        eyebrow: 'Failed',
+        key: 'CANCELLED',
+        count: cancelledTaskCount.value,
+        label: t('tasks.cancelled'),
+        eyebrow: 'Cancelled',
         valueClass: 'text-[#2B221B]',
         eyebrowClass: 'text-[#8A8177]',
     },
@@ -157,65 +138,45 @@ const statusOverviewItems = computed(() => [
     },
 ])
 
-const getTaskCount = (taskType: string, status: TaskStatus) =>
-    taskCounts.value.find((row) => row.taskType === taskType && row.status === status)?.count ?? 0
-
-// 显示 taskCounts 中出现的所有类型，顺序：内置类型优先，其余按首次出现
+// 显示统计中出现的所有 TaskKey，内建任务优先
 const taskSummaryRows = computed<TaskSummaryRow[]>(() => {
-    const seen = new Set<string>()
-    const builtinOrder = ['METADATA_PARSE', 'TRANSCODE']
-    const allTypes = [
-        ...builtinOrder,
-        ...taskCounts.value.map((r) => r.taskType).filter((type) => !builtinOrder.includes(type)),
-    ]
-    return allTypes
-        .filter((type) => {
-            if (seen.has(type)) return false
-            seen.add(type)
-            return true
-        })
-        .map((taskType) => {
-            const pendingCount = getTaskCount(taskType, 'PENDING')
-            const runningCount = getTaskCount(taskType, 'RUNNING')
-            const completedCount = getTaskCount(taskType, 'COMPLETED')
-            const failedCount = getTaskCount(taskType, 'FAILED')
-            const activeCount = pendingCount + runningCount
-            const totalCount = activeCount + completedCount + failedCount
+    const builtinFirst = [...taskStatistics.value].sort((a, b) => {
+        const aBuiltin = a.namespace === 'app.unirhy.built-in' ? 0 : 1
+        const bBuiltin = b.namespace === 'app.unirhy.built-in' ? 0 : 1
+        if (aBuiltin !== bBuiltin) return aBuiltin - bBuiltin
+        return taskKeyOf(a.namespace, a.taskType).localeCompare(taskKeyOf(b.namespace, b.taskType))
+    })
+    return builtinFirst.map((row) => {
+        const activeCount = row.tasks.active
+        const completedCount = row.tasks.completed
+        const failedCount = row.tasks.failed
+        const cancelledCount = row.tasks.cancelled
 
-            let tone: SummaryTone = 'idle'
-            if (failedCount > 0) tone = 'failed'
-            else if (activeCount > 0) tone = 'working'
-            else if (completedCount > 0) tone = 'done'
+        let tone: SummaryTone = 'idle'
+        if (failedCount > 0) tone = 'failed'
+        else if (activeCount > 0) tone = 'working'
+        else if (completedCount > 0) tone = 'done'
 
-            return {
-                taskType,
-                taskName: resolveTaskLabel(taskType),
-                pendingCount,
-                runningCount,
-                completedCount,
-                failedCount,
-                activeCount,
-                totalCount,
-                tone,
-            }
-        })
+        return {
+            taskKey: taskKeyOf(row.namespace, row.taskType),
+            namespace: row.namespace,
+            taskType: row.taskType,
+            taskName: resolveTaskLabel(row.namespace, row.taskType),
+            activeCount,
+            completedCount,
+            failedCount,
+            cancelledCount,
+            totalCount: row.tasks.total,
+            tone,
+        }
+    })
 })
 
 const queueSummaryText = computed(() => {
     if (activeTaskCount.value === 0) {
         return t('tasks.noTasksHint')
     }
-    if (pendingTaskCount.value > 0 && runningTaskCount.value > 0) {
-        return t('tasks.tasksWaitingOrRunning', {
-            count: activeTaskCount.value,
-            pending: pendingTaskCount.value,
-            running: runningTaskCount.value,
-        })
-    }
-    if (pendingTaskCount.value > 0) {
-        return t('tasks.tasksPendingCount', { count: pendingTaskCount.value })
-    }
-    return t('tasks.tasksRunningCount', { count: runningTaskCount.value })
+    return t('tasks.tasksActiveCount', { count: activeTaskCount.value })
 })
 
 const progressWidth = (count: number, total: number) => {
@@ -235,9 +196,9 @@ const clearAutoRefreshTimer = () => {
     autoRefreshTimer = null
 }
 
-const refreshTaskCounts = () => {
-    if (isLoadingTaskCounts.value) return
-    void fetchTaskCounts()
+const refreshTaskStatistics = () => {
+    if (isLoadingTaskStatistics.value) return
+    void fetchTaskStatistics()
 }
 
 const ensureAutoRefresh = () => {
@@ -247,7 +208,7 @@ const ensureAutoRefresh = () => {
     }
     if (autoRefreshTimer) return
     autoRefreshTimer = setInterval(() => {
-        refreshTaskCounts()
+        refreshTaskStatistics()
     }, TASK_AUTO_REFRESH_INTERVAL_MS)
 }
 
@@ -260,7 +221,7 @@ const showSubmitFeedback = () => {
     }, SUBMIT_FEEDBACK_DURATION_MS)
 }
 
-watch(isLoadingTaskCounts, (newVal, oldVal) => {
+watch(isLoadingTaskStatistics, (newVal, oldVal) => {
     if (oldVal === true && newVal === false) {
         lastRefreshedAt.value = new Date()
         relativeTimeNow.value = Date.now()
@@ -292,66 +253,61 @@ const openTaskModal = async () => {
     clearSubmitFeedbackTimer()
     submitFeedbackStatus.value = 'idle'
     clearSubmitError()
-    await fetchPlugins()
+    await fetchTaskDefinitions()
 
     const submitted = await modal.open<boolean>(TaskSubmissionModal, {
         size: 'xl',
         bodyPadding: false,
         fitContent: false,
         props: {
-            plugins: pluginList.value,
+            definitions: taskDefinitions.value,
             loadProviders: async () => {
                 await fetchProviders()
                 return providerOptions.value
             },
-            submitMetadataParse: async (payload: ScanTaskRequest) => {
-                const submitOk = await startMetadataParseTask(
-                    payload.providerType,
-                    payload.providerId,
-                )
-                if (!submitOk) throw new Error(submitError.value || t('tasksView.submitFailed'))
-            },
-            submitTranscode: async (payload: TranscodeTaskRequest) => {
-                const submitOk = await startTranscodeTask(payload)
-                if (!submitOk) throw new Error(submitError.value || t('tasksView.submitFailed'))
-            },
-            submitPluginTask: async (taskType: string, params: Record<string, string>) => {
-                const submitOk = await startPluginTask(taskType, params)
+            submitTask: async (
+                namespace: string,
+                taskType: string,
+                params: Record<string, unknown>,
+            ) => {
+                const submitOk = await submitTask(namespace, taskType, params)
                 if (!submitOk) throw new Error(submitError.value || t('tasksView.submitFailed'))
             },
         },
     })
 
     clearSubmitError()
-    refreshTaskCounts()
+    refreshTaskStatistics()
     if (submitted) showSubmitFeedback()
 }
 
 const refreshAll = () => {
-    refreshTaskCounts()
+    refreshTaskStatistics()
 }
 
-const isLogDrawerOpen = ref(false)
-const drawerTaskType = ref<TaskType>('METADATA_PARSE')
+const isTaskDrawerOpen = ref(false)
+const drawerTaskKey = ref<string>(taskKeyOf('app.unirhy.built-in', 'METADATA_PARSE'))
 const drawerStatuses = ref<TaskStatus[]>(['PENDING'])
 
 const drawerTaskOptions = computed(() =>
     taskSummaryRows.value.map((row) => ({
-        taskType: row.taskType as TaskType,
+        taskKey: row.taskKey,
+        namespace: row.namespace,
+        taskType: row.taskType,
         taskName: row.taskName,
     })),
 )
 
 const drawerTaskName = computed(
     () =>
-        drawerTaskOptions.value.find((option) => option.taskType === drawerTaskType.value)
-            ?.taskName ?? drawerTaskType.value,
+        drawerTaskOptions.value.find((option) => option.taskKey === drawerTaskKey.value)
+            ?.taskName ?? drawerTaskKey.value,
 )
 
-const openLogDrawer = (taskType: string, statuses: TaskStatus[]) => {
-    drawerTaskType.value = taskType as TaskType
+const openTaskDrawer = (taskKey: string, statuses: TaskStatus[]) => {
+    drawerTaskKey.value = taskKey
     drawerStatuses.value = [...statuses]
-    isLogDrawerOpen.value = true
+    isTaskDrawerOpen.value = true
 }
 
 const drawerTitle = computed(() => drawerTaskName.value)
@@ -375,11 +331,14 @@ const drawerTitle = computed(() => drawerTaskName.value)
                 </div>
                 <button
                     class="text-[#8A8A8A] transition-colors hover:text-[#C67C4E] disabled:opacity-50"
-                    :disabled="isLoadingTaskCounts"
+                    :disabled="isLoadingTaskStatistics"
                     :title="t('tasksView.refreshStatus')"
                     @click="refreshAll"
                 >
-                    <RefreshCw class="h-5 w-5" :class="{ 'animate-spin': isLoadingTaskCounts }" />
+                    <RefreshCw
+                        class="h-5 w-5"
+                        :class="{ 'animate-spin': isLoadingTaskStatistics }"
+                    />
                 </button>
             </div>
         </div>
@@ -440,7 +399,7 @@ const drawerTitle = computed(() => drawerTaskName.value)
 
                     <div class="relative z-10 sm:pt-3">
                         <div
-                            v-if="isLoadingTaskCounts"
+                            v-if="isLoadingTaskStatistics"
                             class="mb-2 flex items-center text-[#C67C4E]"
                         >
                             <Loader2 class="mr-2 h-5 w-5 animate-spin" />
@@ -480,7 +439,7 @@ const drawerTitle = computed(() => drawerTaskName.value)
                 </div>
 
                 <div
-                    v-if="isLoadingTaskCounts && taskCounts.length === 0"
+                    v-if="isLoadingTaskStatistics && taskStatistics.length === 0"
                     class="flex items-center justify-center py-14 text-sm text-[#6B635B]"
                 >
                     <Loader2 class="mr-2 h-4 w-4 animate-spin" />
@@ -525,7 +484,7 @@ const drawerTitle = computed(() => drawerTaskName.value)
                 </div>
 
                 <div class="space-y-12">
-                    <div v-for="(row, index) in taskSummaryRows" :key="row.taskType" class="group">
+                    <div v-for="(row, index) in taskSummaryRows" :key="row.taskKey" class="group">
                         <div class="flex items-end justify-between gap-3">
                             <div class="flex min-w-0 items-center gap-3 sm:gap-4">
                                 <span class="shrink-0 font-mono text-sm text-[#BEB1A3]">
@@ -540,7 +499,7 @@ const drawerTitle = computed(() => drawerTaskName.value)
                                         </h4>
                                     </div>
                                     <p class="mt-1 font-serif text-xs italic text-[#9A9187]">
-                                        {{ row.taskType }}
+                                        {{ row.taskKey }}
                                     </p>
                                 </div>
                             </div>
@@ -549,11 +508,12 @@ const drawerTitle = computed(() => drawerTaskName.value)
                                 type="button"
                                 class="flex shrink-0 items-end gap-2 text-left sm:gap-3"
                                 @click="
-                                    openLogDrawer(row.taskType, [
+                                    openTaskDrawer(row.taskKey, [
                                         'PENDING',
                                         'RUNNING',
                                         'COMPLETED',
                                         'FAILED',
+                                        'CANCELLED',
                                     ])
                                 "
                             >
@@ -574,7 +534,7 @@ const drawerTitle = computed(() => drawerTaskName.value)
                             <button
                                 type="button"
                                 class="space-y-2 rounded-sm text-left"
-                                @click="openLogDrawer(row.taskType, ['COMPLETED'])"
+                                @click="openTaskDrawer(row.taskKey, ['COMPLETED'])"
                             >
                                 <div
                                     class="flex items-center justify-between text-xs text-[#83796D]"
@@ -601,59 +561,37 @@ const drawerTitle = computed(() => drawerTaskName.value)
                                 </div>
                             </button>
 
-                            <div class="space-y-2">
+                            <button
+                                type="button"
+                                class="space-y-2 rounded-sm text-left"
+                                @click="openTaskDrawer(row.taskKey, ['PENDING', 'RUNNING'])"
+                            >
                                 <div
-                                    class="flex items-center justify-between gap-2 text-xs text-[#83796D]"
+                                    class="flex items-center justify-between text-xs text-[#83796D]"
                                 >
                                     <span class="text-[10px] uppercase tracking-[0.24em]">
                                         <DecorativeLabel>Active</DecorativeLabel>
                                     </span>
-                                    <div class="flex items-center gap-2 font-mono text-[11px]">
-                                        <button
-                                            type="button"
-                                            class="text-[#B86134]"
-                                            :title="
-                                                t('tasks.runningCount', { count: row.runningCount })
-                                            "
-                                            @click="openLogDrawer(row.taskType, ['RUNNING'])"
-                                        >
-                                            {{ row.runningCount }}
-                                        </button>
-                                        <span class="text-[#C7BEB2]">/</span>
-                                        <button
-                                            type="button"
-                                            class="text-[#4A4A4A]"
-                                            :title="
-                                                t('tasks.pendingCount', { count: row.pendingCount })
-                                            "
-                                            @click="openLogDrawer(row.taskType, ['PENDING'])"
-                                        >
-                                            {{ row.pendingCount }}
-                                        </button>
-                                    </div>
+                                    <span class="font-mono text-[11px] text-[#B86134]">
+                                        {{ row.activeCount }}
+                                    </span>
                                 </div>
                                 <div
-                                    class="flex h-1.5 w-full overflow-hidden rounded-full bg-[#E8DFD2]/60"
+                                    class="h-1.5 w-full overflow-hidden rounded-full bg-[#E8DFD2]/60"
                                 >
                                     <div
                                         class="h-full bg-[#B86134] transition-[width] duration-700"
                                         :style="{
-                                            width: progressWidth(row.runningCount, row.totalCount),
-                                        }"
-                                    />
-                                    <div
-                                        class="h-full bg-[#D8CEC2] transition-[width] duration-700"
-                                        :style="{
-                                            width: progressWidth(row.pendingCount, row.totalCount),
+                                            width: progressWidth(row.activeCount, row.totalCount),
                                         }"
                                     />
                                 </div>
-                            </div>
+                            </button>
 
                             <button
                                 type="button"
                                 class="space-y-2 rounded-sm text-left"
-                                @click="openLogDrawer(row.taskType, ['FAILED'])"
+                                @click="openTaskDrawer(row.taskKey, ['FAILED'])"
                             >
                                 <div
                                     class="flex items-center justify-between text-xs text-[#83796D]"
@@ -683,17 +621,17 @@ const drawerTitle = computed(() => drawerTaskName.value)
         </div>
 
         <SideDrawer
-            v-model:open="isLogDrawerOpen"
+            v-model:open="isTaskDrawerOpen"
             :title="drawerTitle"
             width="34rem"
             max-width="calc(100vw - 2rem)"
         >
-            <TaskLogDrawerContent
-                v-if="isLogDrawerOpen"
-                v-model:task-type="drawerTaskType"
+            <TaskDrawerContent
+                v-if="isTaskDrawerOpen"
+                v-model:task-key="drawerTaskKey"
                 v-model:statuses="drawerStatuses"
                 :tasks="drawerTaskOptions"
-                @reset-success="refreshTaskCounts"
+                @reset-success="refreshTaskStatistics"
             />
         </SideDrawer>
     </div>

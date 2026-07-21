@@ -1,10 +1,11 @@
 export type {AccountDto} from './AccountDto';
 export type {AlbumDto} from './AlbumDto';
 export type {ArtistDto} from './ArtistDto';
-export type {AsyncTaskLogDto} from './AsyncTaskLogDto';
+export type {AsyncTaskDto} from './AsyncTaskDto';
 export type {FileProviderFileSystemDto} from './FileProviderFileSystemDto';
 export type {FileProviderOssDto} from './FileProviderOssDto';
 export type {PlaylistDto} from './PlaylistDto';
 export type {RecordingDto} from './RecordingDto';
 export type {SystemConfigDto} from './SystemConfigDto';
+export type {TaskSubmissionDto} from './TaskSubmissionDto';
 export type {WorkDto} from './WorkDto';
