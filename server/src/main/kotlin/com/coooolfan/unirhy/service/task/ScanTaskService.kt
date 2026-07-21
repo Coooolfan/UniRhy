@@ -7,10 +7,14 @@ import com.coooolfan.unirhy.service.storage.StorageNode
 import com.coooolfan.unirhy.service.storage.StorageNodeObjectService
 import com.coooolfan.unirhy.service.storage.bindProvider
 import com.coooolfan.unirhy.service.storage.resolveWriteableStorageNode
-import com.coooolfan.unirhy.service.task.common.*
+import com.coooolfan.unirhy.service.task.spi.AsyncTaskHandler
+import com.coooolfan.unirhy.service.task.spi.TaskPlanner
+import com.coooolfan.unirhy.service.task.common.TaskKey
+import tools.jackson.databind.JsonNode
 import tools.jackson.databind.ObjectMapper
 import org.babyfish.jimmer.sql.ast.mutation.AssociatedSaveMode
 import org.babyfish.jimmer.sql.ast.mutation.SaveMode
+import org.babyfish.jimmer.sql.exception.SaveException
 import org.babyfish.jimmer.sql.kt.KSqlClient
 import org.babyfish.jimmer.sql.kt.ast.expression.eq
 import org.babyfish.jimmer.sql.kt.fetcher.newFetcher
@@ -19,119 +23,122 @@ import org.jaudiotagger.tag.FieldKey
 import org.jaudiotagger.tag.Tag
 import org.jaudiotagger.tag.images.Artwork
 import org.slf4j.LoggerFactory
-import org.springframework.stereotype.Service
+import org.springframework.jdbc.core.namedparam.MapSqlParameterSource
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate
+import org.springframework.stereotype.Component
+import org.springframework.transaction.PlatformTransactionManager
+import org.springframework.transaction.TransactionDefinition
 import org.springframework.transaction.support.TransactionTemplate
 import java.io.File
 import java.nio.file.Files
 import java.time.LocalDate
 
-@Service
-class ScanTaskService(
+/**
+ * 内建元数据扫描的规划器：解析 submission 参数、遍历存储节点并产出扫描 payload。
+ */
+@Component
+class ScanTaskPlanner(
+    private val objectMapper: ObjectMapper,
+    private val storageObjects: StorageNodeObjectService,
+) : TaskPlanner {
+
+    override val key: TaskKey = BuiltInTasks.METADATA_PARSE
+
+    override fun plan(params: JsonNode): Sequence<JsonNode> {
+        val request = objectMapper.treeToValue(params, ScanTaskRequest::class.java)
+        val provider = storageObjects.resolve(request.providerType, request.providerId)
+        return discoverScanFileTaskPayloads(provider).map { objectMapper.valueToTree(it) }
+    }
+}
+
+/**
+ * 内建元数据扫描的执行器：下载源文件、解析音频元数据并保存 Recording。
+ */
+@Component
+class ScanTaskHandler(
     private val sql: KSqlClient,
     private val objectMapper: ObjectMapper,
-    private val queueStore: AsyncTaskQueueStore,
-    private val transactionTemplate: TransactionTemplate,
     private val storageObjects: StorageNodeObjectService,
-) {
+    private val jdbc: NamedParameterJdbcTemplate,
+    transactionManager: PlatformTransactionManager,
+) : AsyncTaskHandler {
 
-    private val logger = LoggerFactory.getLogger(ScanTaskService::class.java)
+    private val logger = LoggerFactory.getLogger(ScanTaskHandler::class.java)
 
-    fun submit(request: ScanTaskRequest) {
-        val provider = validateRequest(request)
-
-        // 分批插入
-        val paramsJsonBatch = mutableListOf<String>()
-        for (payload in discoverScanFileTaskPayloads(provider)) {
-            paramsJsonBatch += objectMapper.writeValueAsString(payload)
-            if (paramsJsonBatch.size >= SCAN_ENQUEUE_BATCH_SIZE) {
-                queueStore.enqueueIgnoringConflicts(TaskType.METADATA_PARSE, paramsJsonBatch)
-                paramsJsonBatch.clear()
-            }
-        }
-        queueStore.enqueueIgnoringConflicts(TaskType.METADATA_PARSE, paramsJsonBatch)
+    /** 嵌套事务（savepoint）用于保存重试：唯一键冲突后回滚到 savepoint 再重试 */
+    private val nestedTransaction = TransactionTemplate(transactionManager).apply {
+        propagationBehavior = TransactionDefinition.PROPAGATION_NESTED
     }
 
-    fun consumePendingTask() {
-        // claim 使用独立短事务，下载与元数据解析等重 IO 在事务外执行；
-        // 崩溃遗留的 RUNNING 任务由启动期的 resetRunningTasksToPending 重新入队
-        val claimedTasks = try {
-            transactionTemplate.execute {
-                queueStore.claim(TaskType.METADATA_PARSE, METADATA_PARSE_CLAIM_LIMIT)
-            }.orEmpty()
-        } catch (ex: Throwable) {
-            logger.error("Failed to claim pending scan tasks", ex)
-            return
-        }
+    override val key: TaskKey = BuiltInTasks.METADATA_PARSE
 
-        for (claimedTask in claimedTasks) {
-            try {
-                val payload = objectMapper.readValue(claimedTask.params, ScanFileTaskPayload::class.java)
-                val prepared = prepare(payload)
-                transactionTemplate.executeWithoutResult {
-                    prepared.recording?.let(::saveScannedRecording)
-                    queueStore.completeTask(claimedTask.id, TaskStatus.COMPLETED, prepared.reason)
-                }
-            } catch (ex: Throwable) {
-                logger.error("Scan task failed, logId={}", claimedTask.id, ex)
-                completeTaskQuietly(claimedTask.id, failureReason(ex))
-            }
-        }
-    }
-
-    private fun completeTaskQuietly(logId: Long, reason: String) {
-        try {
-            transactionTemplate.executeWithoutResult {
-                queueStore.completeTask(logId, TaskStatus.FAILED, reason)
-            }
-        } catch (ex: Throwable) {
-            logger.error("Failed to mark scan task as failed, logId={}", logId, ex)
-        }
-    }
-
-    private fun validateRequest(request: ScanTaskRequest): StorageNode {
-        return storageObjects.resolve(request.providerType, request.providerId)
-    }
-
-    private data class PreparedScan(
-        val recording: Recording?,
-        val reason: String,
-    )
-
-    private fun prepare(payload: ScanFileTaskPayload): PreparedScan {
-        val provider = validateRequest(
-            ScanTaskRequest(
-                providerType = payload.providerType,
-                providerId = payload.providerId,
-            )
-        )
+    override fun run(payload: JsonNode) {
+        val scanPayload = objectMapper.treeToValue(payload, ScanFileTaskPayload::class.java)
+        val provider = storageObjects.resolve(scanPayload.providerType, scanPayload.providerId)
         val writeableProvider = sql.findOneById(SYSTEM_CONFIG_FETCHER, SYSTEM_CONFIG_ID)
             .resolveWriteableStorageNode(storageObjects)
 
-        val stat = runCatching { storageObjects.stat(provider, payload.objectKey) }.getOrNull()
+        val stat = runCatching { storageObjects.stat(provider, scanPayload.objectKey) }.getOrNull()
         if (stat == null) {
             logger.info(
                 "Skip scan task because source file is missing, providerId={}, objectKey={}",
                 provider.providerId,
-                payload.objectKey
+                scanPayload.objectKey,
             )
-            return PreparedScan(recording = null, reason = "SKIPPED: source file missing")
+            return
         }
 
-        if (audioMediaFileExists(provider.providerType, provider.providerId, payload.objectKey)) {
-            return PreparedScan(recording = null, reason = "SKIPPED: media file already scanned")
+        if (audioMediaFileExists(provider.providerType, provider.providerId, scanPayload.objectKey)) {
+            logger.info(
+                "Skip scan task because media file already scanned, providerId={}, objectKey={}",
+                provider.providerId,
+                scanPayload.objectKey,
+            )
+            return
         }
 
-        val scannedRecording = storageObjects.materializeTempFile(provider, payload.objectKey).use { tempFile ->
+        val scannedRecording = storageObjects.materializeTempFile(provider, scanPayload.objectKey).use { tempFile ->
             buildRecordingFromAudioFile(
                 file = tempFile.file,
-                objectKey = payload.objectKey,
+                objectKey = scanPayload.objectKey,
                 provider = provider,
                 writeableProvider = writeableProvider,
                 storageObjects = storageObjects,
                 size = stat.size,
             )
         }
-        return PreparedScan(recording = scannedRecording, reason = "SUCCESS")
+        saveScannedRecordingWithRetry(scannedRecording, scanPayload.objectKey)
+    }
+
+    /**
+     * 并发 Worker 可能同时按 key 创建相同的 Work / Album / Artist，而 Album / Artist
+     * 没有数据库唯一约束，APPEND_IF_ABSENT 的查询-插入窗口会产生重复行。
+     * 通过 advisory xact lock 串行化保存段（下载与元数据解析仍然并行），
+     * 锁随任务事务提交释放，保证后来的保存能看到先提交的行。
+     * Work 存在唯一键，与已提交事务的冲突通过回滚到 savepoint 后重试解决。
+     */
+    private fun saveScannedRecordingWithRetry(recording: Recording, objectKey: String) {
+        jdbc.queryForObject(
+            "SELECT pg_advisory_xact_lock(:key)",
+            MapSqlParameterSource("key", SCAN_SAVE_ADVISORY_LOCK_KEY),
+            Any::class.java,
+        )
+        var attempt = 1
+        while (true) {
+            try {
+                nestedTransaction.executeWithoutResult { saveScannedRecording(recording) }
+                return
+            } catch (ex: SaveException.NotUnique) {
+                if (attempt >= MAX_SAVE_ATTEMPTS) {
+                    throw ex
+                }
+                logger.info(
+                    "Retrying scan save after key conflict, objectKey={}, attempt={}: {}",
+                    objectKey, attempt, ex.message,
+                )
+                attempt++
+            }
+        }
     }
 
     private fun saveScannedRecording(recording: Recording) {
@@ -161,12 +168,16 @@ class ScanTaskService(
         }.execute().first() > 0
     }
 
+    private companion object {
+        private const val MAX_SAVE_ATTEMPTS = 3
+
+        /** 全局扫描保存锁的 advisory lock key（任意固定值，仅本用途使用） */
+        private const val SCAN_SAVE_ADVISORY_LOCK_KEY = 7_235_923_001_764_291_913L
+    }
 }
 
 private val COVER_EXTENSIONS = hashSetOf("jpg", "jpeg", "png", "gif")
 private val TAG_DATE_REGEX = Regex("""(\d{4})(?:[-./](\d{1,2})(?:[-./](\d{1,2}))?)?""")
-private const val SCAN_ENQUEUE_BATCH_SIZE = 512
-private const val METADATA_PARSE_CLAIM_LIMIT = 10L
 
 data class ScanTaskRequest(
     val providerType: FileProviderType,

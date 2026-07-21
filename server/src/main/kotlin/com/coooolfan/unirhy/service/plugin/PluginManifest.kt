@@ -1,91 +1,77 @@
 package com.coooolfan.unirhy.service.plugin
 
-import com.coooolfan.unirhy.service.task.common.TaskType
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties
-import tools.jackson.databind.ObjectMapper
-import tools.jackson.dataformat.yaml.YAMLMapper
-import tools.jackson.module.kotlin.kotlinModule
-import org.slf4j.LoggerFactory
-import java.nio.file.Files
-import java.nio.file.Path
+import com.coooolfan.unirhy.service.task.common.TaskFormSchema
+import com.coooolfan.unirhy.service.task.common.TaskKey
+import tools.jackson.databind.JsonNode
+import tools.jackson.databind.json.JsonMapper
 
 const val UNIRHY_WASM_ABI_V1 = "unirhy-wasm-abi-v1"
 
-@JsonIgnoreProperties(ignoreUnknown = true)
+/**
+ * 插件 manifest（plugin.yml）。
+ *
+ * - `id` 即任务命名空间（反向域名），`task.type` 为任务名段，`(id, task.type)` 构成任务身份二元组
+ * - 一个插件只声明一个任务，插件即该任务的唯一提供者
+ * - 不定义 permissions；所有已启用插件获得同一组 Host imports
+ */
 data class PluginManifest(
     val id: String,
     val name: String? = null,
     val version: String,
     val runtime: PluginRuntime,
-    val tasks: List<PluginTaskBinding>,
-    val permissions: PluginPermissions = PluginPermissions(),
-    val form: PluginForm = PluginForm(),
+    val task: PluginTaskSpec,
+    val form: PluginFormSpec? = null,
 ) {
-    fun networkAllowHosts(): Set<String> = permissions.network.allow.toSet()
+    val taskKey: TaskKey get() = TaskKey(id, task.type)
+
+    /** 组装持久化用的完整表单定义 `{schema, order}`；未声明 form 时使用空表单 */
+    fun formDefinition(): JsonNode {
+        val formSpec = form ?: return TaskFormSchema.emptyFormDefinition()
+        val mapper = JsonMapper.shared()
+        val node = mapper.createObjectNode()
+        node.set("schema", formSpec.schema)
+        node.set("order", mapper.valueToTree(formSpec.order))
+        return node
+    }
+
+    /**
+     * 校验 manifest 语义，返回首个错误信息；通过时返回 null。
+     * 运行时类型 / ABI 校验由调用方单独处理以映射到对应错误码。
+     */
+    fun validate(): String? {
+        if (!TaskKey.isValidNamespace(id)) {
+            return "invalid plugin id (must be a reverse-domain namespace): $id"
+        }
+        if (TaskKey.isReservedNamespace(id)) {
+            return "plugin id uses reserved namespace: $id"
+        }
+        if (!TaskKey.isValidTaskType(task.type)) {
+            return "invalid task type (must be an upper-case identifier): ${task.type}"
+        }
+        if (task.concurrency <= 0) {
+            return "task.concurrency must be a positive integer"
+        }
+        try {
+            TaskFormSchema.validateFormDefinition(formDefinition())
+        } catch (ex: IllegalArgumentException) {
+            return ex.message
+        }
+        return null
+    }
 }
 
-@JsonIgnoreProperties(ignoreUnknown = true)
-data class PluginForm(
-    val fields: List<PluginFormField> = emptyList(),
-)
-
-@JsonIgnoreProperties(ignoreUnknown = true)
-data class PluginFormField(
-    val name: String,
-    val type: String,
-    val label: String,
-    val description: String? = null,
-    val default: String? = null,
-    val min: Long? = null,
-    val max: Long? = null,
-)
-
-@JsonIgnoreProperties(ignoreUnknown = true)
 data class PluginRuntime(
     val type: String,
-    val target: String? = null,
-    val wasi: String? = null,
     val abi: String,
 )
 
-@JsonIgnoreProperties(ignoreUnknown = true)
-data class PluginTaskBinding(
-    val type: TaskType,
-    val extension: String,
+data class PluginTaskSpec(
+    val type: String,
+    /** 首次安装时的任务执行并发初始值 */
+    val concurrency: Int,
 )
 
-@JsonIgnoreProperties(ignoreUnknown = true)
-data class PluginPermissions(
-    val network: PluginNetworkPermission = PluginNetworkPermission(),
+data class PluginFormSpec(
+    val schema: JsonNode,
+    val order: List<String> = emptyList(),
 )
-
-@JsonIgnoreProperties(ignoreUnknown = true)
-data class PluginNetworkPermission(
-    val allow: List<String> = emptyList(),
-)
-
-private val logger = LoggerFactory.getLogger(PluginManifest::class.java)
-private val yamlMapper: ObjectMapper = YAMLMapper.builder().addModule(kotlinModule()).build()
-
-fun loadPluginManifest(path: Path): PluginManifest? {
-    if (!Files.isRegularFile(path)) return null
-    val manifest = try {
-        yamlMapper.readValue(path.toFile(), PluginManifest::class.java)
-    } catch (ex: Exception) {
-        logger.warn("Failed to parse plugin manifest at {}: {}", path, ex.message)
-        return null
-    }
-    if (manifest.runtime.type != "wasm") {
-        logger.warn("Plugin manifest at {} rejected: runtime.type={} (expected wasm)", path, manifest.runtime.type)
-        return null
-    }
-    if (manifest.runtime.abi != UNIRHY_WASM_ABI_V1) {
-        logger.warn("Plugin manifest at {} rejected: runtime.abi={} (expected {})", path, manifest.runtime.abi, UNIRHY_WASM_ABI_V1)
-        return null
-    }
-    if (manifest.tasks.isEmpty()) {
-        logger.warn("Plugin manifest at {} rejected: no task bindings", path)
-        return null
-    }
-    return manifest
-}

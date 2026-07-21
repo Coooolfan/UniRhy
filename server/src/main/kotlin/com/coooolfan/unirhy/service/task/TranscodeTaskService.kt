@@ -5,38 +5,44 @@ import com.coooolfan.unirhy.model.storage.FileProviderType
 import com.coooolfan.unirhy.service.storage.StorageNode
 import com.coooolfan.unirhy.service.storage.StorageNodeObjectService
 import com.coooolfan.unirhy.service.storage.bindProvider
-import com.coooolfan.unirhy.service.task.common.AsyncTaskQueueStore
-import com.coooolfan.unirhy.service.task.common.TaskStatus
-import com.coooolfan.unirhy.service.task.common.TaskType
-import com.coooolfan.unirhy.service.task.common.failureReason
+import com.coooolfan.unirhy.service.task.common.TaskKey
+import com.coooolfan.unirhy.service.task.spi.AsyncTaskHandler
+import com.coooolfan.unirhy.service.task.spi.TaskPlanner
+import tools.jackson.databind.JsonNode
 import tools.jackson.databind.ObjectMapper
 import org.babyfish.jimmer.sql.ast.mutation.AssociatedSaveMode
 import org.babyfish.jimmer.sql.ast.mutation.SaveMode
 import org.babyfish.jimmer.sql.kt.KSqlClient
 import org.babyfish.jimmer.sql.kt.ast.expression.eq
 import org.slf4j.LoggerFactory
-import org.springframework.stereotype.Service
-import org.springframework.transaction.support.TransactionTemplate
+import org.springframework.stereotype.Component
 import java.io.File
 import java.io.IOException
 import java.util.*
 
-@Service
-class TranscodeTaskService(
+/**
+ * 内建转码任务的规划器：按源存储节点上的音频 Asset 产出转码 payload。
+ */
+@Component
+class TranscodeTaskPlanner(
     private val sql: KSqlClient,
     private val objectMapper: ObjectMapper,
-    private val queueStore: AsyncTaskQueueStore,
-    private val transactionTemplate: TransactionTemplate,
     private val storageObjects: StorageNodeObjectService,
-) {
+) : TaskPlanner {
 
-    private val logger = LoggerFactory.getLogger(TranscodeTaskService::class.java)
-    private val consumerEnabled = detectFfmpegAvailability()
+    override val key: TaskKey = BuiltInTasks.TRANSCODE
 
-    fun isConsumerEnabled(): Boolean = consumerEnabled
+    override fun plan(params: JsonNode): Sequence<JsonNode> {
+        val request = objectMapper.treeToValue(params, TranscodeTaskRequest::class.java)
+        if (request.targetCodec != CodecType.OPUS) {
+            error("Unsupported target codec: ${request.targetCodec}")
+        }
+        val srcProvider = storageObjects.resolve(request.srcProviderType, request.srcProviderId)
+        val dstProvider = storageObjects.resolve(request.dstProviderType, request.dstProviderId)
+        if (dstProvider.readonly) {
+            error("Destination provider is readonly")
+        }
 
-    fun submit(request: TranscodeTaskRequest) {
-        val (srcProvider, dstProvider) = resolveAndValidateProviders(request)
         val audioFiles = sql.createQuery(Asset::class) {
             when (srcProvider.providerType) {
                 FileProviderType.FILE_SYSTEM -> where(table.mediaFile.fsProviderId eq srcProvider.providerId)
@@ -51,57 +57,44 @@ class TranscodeTaskService(
             recordingAssetMap.putIfAbsent(recordingId, objectKey)
         }
 
-        val payloads = recordingAssetMap.entries.map { entry ->
-            TranscodeTaskPayload(
-                recordingId = entry.key,
-                srcObjectKey = entry.value,
-                srcProviderType = srcProvider.providerType,
-                srcProviderId = srcProvider.providerId,
-                dstProviderType = dstProvider.providerType,
-                dstProviderId = request.dstProviderId,
-                targetCodec = request.targetCodec,
+        return recordingAssetMap.entries.asSequence().map { entry ->
+            objectMapper.valueToTree(
+                TranscodeTaskPayload(
+                    recordingId = entry.key,
+                    srcObjectKey = entry.value,
+                    srcProviderType = srcProvider.providerType,
+                    srcProviderId = srcProvider.providerId,
+                    dstProviderType = dstProvider.providerType,
+                    dstProviderId = request.dstProviderId,
+                    targetCodec = request.targetCodec,
+                )
             )
         }
-        val paramsJsonList = payloads.map(objectMapper::writeValueAsString)
-        queueStore.enqueueIgnoringConflicts(TaskType.TRANSCODE, paramsJsonList)
     }
+}
 
-    fun consumePendingTask() {
-        if (!consumerEnabled) {
-            return
-        }
-        // claim 使用独立短事务，下载、ffmpeg 转码与上传等重 IO 在事务外执行；
-        // 崩溃遗留的 RUNNING 任务由启动期的 resetRunningTasksToPending 重新入队
-        val claimedTask = try {
-            transactionTemplate.execute {
-                queueStore.claim(TaskType.TRANSCODE, TRANSCODE_CLAIM_LIMIT)
-            }.orEmpty().firstOrNull()
-        } catch (ex: Throwable) {
-            logger.error("Failed to claim pending transcode task", ex)
-            return
-        } ?: return
+/**
+ * 内建转码任务的执行器：下载源文件、调用 ffmpeg 转码并保存新 Asset。
+ *
+ * ffmpeg 不可用的节点不注册该 Handler，对应任务保持 PENDING 由其他节点消费。
+ */
+@Component
+class TranscodeTaskHandler(
+    private val sql: KSqlClient,
+    private val objectMapper: ObjectMapper,
+    private val storageObjects: StorageNodeObjectService,
+) : AsyncTaskHandler {
 
-        try {
-            val payload = objectMapper.readValue(claimedTask.params, TranscodeTaskPayload::class.java)
-            val transcodedAsset = prepareTranscodedAsset(payload)
-            transactionTemplate.executeWithoutResult {
-                saveTranscodedAsset(transcodedAsset)
-                queueStore.completeTask(claimedTask.id, TaskStatus.COMPLETED, "SUCCESS")
-            }
-        } catch (ex: Throwable) {
-            logger.error("Transcode task failed, logId={}", claimedTask.id, ex)
-            completeTaskQuietly(claimedTask.id, failureReason(ex))
-        }
-    }
+    private val logger = LoggerFactory.getLogger(TranscodeTaskHandler::class.java)
 
-    private fun completeTaskQuietly(logId: Long, reason: String) {
-        try {
-            transactionTemplate.executeWithoutResult {
-                queueStore.completeTask(logId, TaskStatus.FAILED, reason)
-            }
-        } catch (ex: Throwable) {
-            logger.error("Failed to mark transcode task as failed, logId={}", logId, ex)
-        }
+    val ffmpegAvailable: Boolean = detectFfmpegAvailability()
+
+    override val key: TaskKey = BuiltInTasks.TRANSCODE
+
+    override fun run(payload: JsonNode) {
+        val transcodePayload = objectMapper.treeToValue(payload, TranscodeTaskPayload::class.java)
+        val transcodedAsset = prepareTranscodedAsset(transcodePayload)
+        saveTranscodedAsset(transcodedAsset)
     }
 
     private fun detectFfmpegAvailability(): Boolean {
@@ -130,12 +123,11 @@ class TranscodeTaskService(
         if (payload.targetCodec != CodecType.OPUS) {
             error("Unsupported target codec: ${payload.targetCodec}")
         }
-        val (srcProvider, dstProvider) = resolveProviders(
-            payload.srcProviderType,
-            payload.srcProviderId,
-            payload.dstProviderType,
-            payload.dstProviderId,
-        )
+        val srcProvider = storageObjects.resolve(payload.srcProviderType, payload.srcProviderId)
+        val dstProvider = storageObjects.resolve(payload.dstProviderType, payload.dstProviderId)
+        if (dstProvider.readonly) {
+            error("Destination provider is readonly")
+        }
         val dstObjectKey = "${UUID.randomUUID()}.opus"
         val outputFile = createOutputFile()
 
@@ -182,34 +174,6 @@ class TranscodeTaskService(
             error("Failed to prepare transcode output file: ${outputFile.absolutePath}")
         }
         return outputFile
-    }
-
-    private fun resolveAndValidateProviders(request: TranscodeTaskRequest): Pair<StorageNode, StorageNode> {
-        if (request.targetCodec != CodecType.OPUS) {
-            error("Unsupported target codec: ${request.targetCodec}")
-        }
-
-        val srcProvider = storageObjects.resolve(request.srcProviderType, request.srcProviderId)
-        val dstProvider = storageObjects.resolve(request.dstProviderType, request.dstProviderId)
-
-        if (dstProvider.readonly) {
-            error("Destination provider is readonly")
-        }
-        return Pair(srcProvider, dstProvider)
-    }
-
-    private fun resolveProviders(
-        srcProviderType: FileProviderType,
-        srcProviderId: Long,
-        dstProviderType: FileProviderType,
-        dstProviderId: Long,
-    ): Pair<StorageNode, StorageNode> {
-        val srcProvider = storageObjects.resolve(srcProviderType, srcProviderId)
-        val dstProvider = storageObjects.resolve(dstProviderType, dstProviderId)
-        if (dstProvider.readonly) {
-            error("Destination provider is readonly")
-        }
-        return Pair(srcProvider, dstProvider)
     }
 
     private fun buildFfmpegCommand(
@@ -316,11 +280,9 @@ class TranscodeTaskService(
     }
 
     private companion object {
-        private const val TRANSCODE_CLAIM_LIMIT = 1L
         private const val MAX_PROCESS_ERROR_SUMMARY_LENGTH = 300
         private val WHITESPACE_REGEX = "\\s+".toRegex()
     }
-
 }
 
 data class TranscodeTaskRequest(

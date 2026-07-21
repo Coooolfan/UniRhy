@@ -27,6 +27,9 @@ class GlobalExceptionHandler {
             "RECORDING:TARGET_NOT_FOUND",
             "PLAYBACK_QUEUE:INDEX_NOT_FOUND",
             "PLUGIN:NOT_FOUND",
+            "TASK:SUBMISSION_NOT_FOUND",
+            "TASK:TASK_NOT_FOUND",
+            "TASK:DEFINITION_NOT_FOUND",
             -> 404
             "COMMON:AUTHENTICATION_FAILED" -> 401
             "COMMON:FORBIDDEN",
@@ -43,6 +46,10 @@ class GlobalExceptionHandler {
             "PLAYBACK_QUEUE:RECORDING_NOT_FOUND",
             "PLAYBACK_QUEUE:RECORDING_NOT_PLAYABLE",
             "PLAYBACK_QUEUE:VERSION_CONFLICT",
+            "PLUGIN:DELETE_CONFLICT",
+            "TASK:PLUGIN_UNAVAILABLE",
+            "TASK:STATUS_CONFLICT",
+            "TASK:DELETE_CONFLICT",
             -> 409
             "COMMON:INVALID_REQUEST",
             "ACCOUNT:CREDENTIAL_UPDATE_REQUIRED",
@@ -60,9 +67,10 @@ class GlobalExceptionHandler {
             "PLUGIN:INVALID_MANIFEST",
             "PLUGIN:UNSUPPORTED_RUNTIME",
             "PLUGIN:UNSUPPORTED_ABI",
-            "PLUGIN:TASK_BINDING_MISSING",
-            "PLUGIN:UNKNOWN_TASK_TYPE",
-            "PLUGIN:INVALID_TASK_PARAMS",
+            "PLUGIN:LOAD_FAILED",
+            "PLUGIN:INVALID_CONCURRENCY",
+            "TASK:INVALID_TASK_KEY",
+            "TASK:INVALID_PARAMS",
             -> 400
             else -> {
                 ex.printStackTrace()

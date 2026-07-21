@@ -1,47 +1,73 @@
 package com.coooolfan.unirhy.service.plugin
 
-import com.dylibso.chicory.runtime.ExportFunction
-import com.dylibso.chicory.runtime.HostFunction
-import com.dylibso.chicory.runtime.ImportValues
-import com.dylibso.chicory.runtime.Instance
-import com.dylibso.chicory.wasm.Parser
-import org.slf4j.LoggerFactory
+import run.endive.runtime.HostFunction
+import run.endive.runtime.ImportValues
+import run.endive.runtime.Instance
+import run.endive.wasm.Parser
+import run.endive.wasm.WasmModule
+import tools.jackson.databind.json.JsonMapper
 import java.io.ByteArrayInputStream
-import java.nio.file.Files
-import java.nio.file.Path
 
+/**
+ * 已加载的 WASM 插件：缓存解析后的 Module，每次 `plan()` / `run()` 调用创建独立 Instance。
+ *
+ * Instance 不跨调用共享，也不使用 Instance 池；模块声明的线性内存 initial / maximum
+ * 原样生效，Host 不施加额外内存 cap，也不设置调用 deadline。
+ */
 class WasmPlugin private constructor(
-    val manifest: PluginManifest,
-    private val instance: Instance,
+    val pluginId: String,
+    private val module: WasmModule,
+    private val hostFunctionsFactory: (instanceRef: () -> Instance) -> List<HostFunction>,
 ) {
-    private val alloc: ExportFunction = instance.export("alloc")
-    private val dealloc: ExportFunction = instance.export("dealloc")
 
+    /** 将一次表单提交拆分为若干任务载荷 JSON */
     fun plan(paramsJson: ByteArray): List<String> {
-        val result = callJson("plan", paramsJson)
+        val result = withInstance { instance -> callJson(instance, "plan", paramsJson) }
         return try {
-            val node = tools.jackson.databind.json.JsonMapper().readTree(result)
+            val node = JsonMapper.shared().readTree(result)
             node.values().map { it.toString() }
         } catch (ex: Exception) {
             throw WasmPluginException("failed to parse plan() result: ${ex.message}", ex)
         }
     }
 
+    /** 执行单个任务载荷 */
     fun run(payloadJson: ByteArray) {
-        val export = instance.export("run")
-        val len = payloadJson.size
-        val ptr = alloc.apply(len.toLong())[0].toInt()
-        try {
-            instance.memory().write(ptr, payloadJson)
-            export.apply(ptr.toLong(), len.toLong())
-        } catch (ex: Exception) {
-            throw WasmPluginException("plugin run() failed: ${ex.message}", ex)
-        } finally {
-            dealloc.apply(ptr.toLong(), len.toLong())
+        withInstance { instance ->
+            val alloc = instance.export("alloc")
+            val dealloc = instance.export("dealloc")
+            val len = payloadJson.size
+            val ptr = alloc.apply(len.toLong())[0].toInt()
+            try {
+                instance.memory().write(ptr, payloadJson)
+                instance.export("run").apply(ptr.toLong(), len.toLong())
+            } catch (ex: Exception) {
+                throw WasmPluginException("plugin run() failed: ${ex.message}", ex)
+            } finally {
+                dealloc.apply(ptr.toLong(), len.toLong())
+            }
         }
     }
 
-    fun callJson(exportName: String, inputJson: ByteArray): ByteArray {
+    private fun <T> withInstance(block: (Instance) -> T): T = block(newInstance())
+
+    private fun newInstance(): Instance {
+        val instanceHolder = arrayOfNulls<Instance>(1)
+        val hostFunctions =
+            hostFunctionsFactory { instanceHolder[0] ?: error("plugin instance not initialized yet") }
+        val imports = ImportValues.builder().addFunction(*hostFunctions.toTypedArray()).build()
+        val instance = try {
+            Instance.builder(module).withImportValues(imports).build()
+        } catch (ex: Exception) {
+            throw WasmPluginException("failed to instantiate wasm for plugin $pluginId: ${ex.message}", ex)
+        }
+        instanceHolder[0] = instance
+        return instance
+    }
+
+    private fun callJson(instance: Instance, exportName: String, inputJson: ByteArray): ByteArray {
+        val alloc = instance.export("alloc")
+        val dealloc = instance.export("dealloc")
         val export = instance.export(exportName)
         val inputLen = inputJson.size
         val inputPtr = alloc.apply(inputLen.toLong())[0].toInt()
@@ -64,64 +90,36 @@ class WasmPlugin private constructor(
     }
 
     companion object {
-        private val logger = LoggerFactory.getLogger(WasmPlugin::class.java)
+        private val REQUIRED_EXPORTS = listOf("alloc", "dealloc", "plan", "run")
 
-        fun load(
-            manifest: PluginManifest,
-            wasmBytes: ByteArray,
-            hostFunctionsFactory: (manifest: PluginManifest, instanceRef: () -> Instance) -> List<HostFunction>,
-        ): WasmPlugin? {
-            val module = try {
+        /** 仅解析模块字节，用于上传时的格式检查 */
+        fun parseModule(wasmBytes: ByteArray): WasmModule =
+            try {
                 Parser.parse(ByteArrayInputStream(wasmBytes))
             } catch (ex: Exception) {
-                logger.warn("Failed to parse wasm bytes for plugin {}: {}", manifest.id, ex.message)
-                return null
+                throw WasmPluginException("failed to parse wasm module: ${ex.message}", ex)
             }
-            val instanceHolder = arrayOfNulls<Instance>(1)
-            val hostFunctions =
-                hostFunctionsFactory(manifest) { instanceHolder[0] ?: error("plugin instance not initialized yet") }
-            val imports = ImportValues.builder().addFunction(*hostFunctions.toTypedArray()).build()
-            val instance = try {
-                Instance.builder(module).withImportValues(imports).build()
-            } catch (ex: Exception) {
-                logger.warn("Failed to instantiate wasm for plugin {}: {}", manifest.id, ex.message)
-                return null
-            }
-            instanceHolder[0] = instance
-            return WasmPlugin(manifest, instance)
-        }
 
+        /**
+         * 解析、实例化并校验导出函数；任一步失败抛出 [WasmPluginException]。
+         * 校验用 Instance 即弃，后续调用各自创建新 Instance。
+         */
         fun load(
-            pluginDir: Path,
-            hostFunctionsFactory: (manifest: PluginManifest, instanceRef: () -> Instance) -> List<HostFunction>,
-        ): WasmPlugin? {
-            val manifestPath = pluginDir.resolve("plugin.yml")
-            val wasmPath = pluginDir.resolve("plugin.wasm")
-            val manifest = loadPluginManifest(manifestPath) ?: return null
-            if (!Files.isRegularFile(wasmPath)) {
-                logger.warn("Plugin wasm file not found at {}", wasmPath)
-                return null
+            pluginId: String,
+            wasmBytes: ByteArray,
+            hostFunctionsFactory: (instanceRef: () -> Instance) -> List<HostFunction>,
+        ): WasmPlugin {
+            val module = parseModule(wasmBytes)
+            val plugin = WasmPlugin(pluginId, module, hostFunctionsFactory)
+            val probeInstance = plugin.newInstance()
+            for (exportName in REQUIRED_EXPORTS) {
+                try {
+                    probeInstance.export(exportName)
+                } catch (ex: Exception) {
+                    throw WasmPluginException("plugin $pluginId missing required export: $exportName", ex)
+                }
             }
-            val module = try {
-                Parser.parse(wasmPath.toFile())
-            } catch (ex: Exception) {
-                logger.warn("Failed to parse wasm at {}: {}", wasmPath, ex.message)
-                return null
-            }
-
-            val instanceHolder = arrayOfNulls<Instance>(1)
-            val hostFunctions =
-                hostFunctionsFactory(manifest) { instanceHolder[0] ?: error("plugin instance not initialized yet") }
-            val imports = ImportValues.builder().addFunction(*hostFunctions.toTypedArray()).build()
-
-            val instance = try {
-                Instance.builder(module).withImportValues(imports).build()
-            } catch (ex: Exception) {
-                logger.warn("Failed to instantiate wasm at {}: {}", wasmPath, ex.message)
-                return null
-            }
-            instanceHolder[0] = instance
-            return WasmPlugin(manifest, instance)
+            return plugin
         }
     }
 }

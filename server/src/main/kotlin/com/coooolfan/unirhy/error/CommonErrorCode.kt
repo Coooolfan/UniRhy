@@ -88,13 +88,40 @@ enum class PluginErrorCode {
     WASM_TOO_LARGE,
     MANIFEST_MISSING,
     WASM_MISSING,
+
+    @ErrorField(name = "reason", type = String::class)
     INVALID_MANIFEST,
+
     UNSUPPORTED_RUNTIME,
     UNSUPPORTED_ABI,
-    TASK_BINDING_MISSING,
 
-    @ErrorField(name = "taskType", type = String::class)
-    UNKNOWN_TASK_TYPE,
+    @ErrorField(name = "reason", type = String::class)
+    LOAD_FAILED,
 
-    INVALID_TASK_PARAMS,
+    INVALID_CONCURRENCY,
+
+    /** 删除前置条件不满足：插件仍启用，或存在活动 submission / task */
+    DELETE_CONFLICT,
+}
+
+@ErrorFamily
+enum class TaskErrorCode {
+    SUBMISSION_NOT_FOUND,
+    TASK_NOT_FOUND,
+    DEFINITION_NOT_FOUND,
+
+    @ErrorField(name = "reason", type = String::class)
+    INVALID_TASK_KEY,
+
+    @ErrorField(name = "reason", type = String::class)
+    INVALID_PARAMS,
+
+    /** 插件已安装但被禁用或当前不可用 */
+    PLUGIN_UNAVAILABLE,
+
+    /** 非法状态迁移，或资源正被 Worker 锁定 */
+    STATUS_CONFLICT,
+
+    /** submission 或其子任务存在非终态记录，拒绝删除 */
+    DELETE_CONFLICT,
 }

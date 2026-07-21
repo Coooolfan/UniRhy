@@ -4,10 +4,10 @@ import com.coooolfan.unirhy.model.Artist
 import com.coooolfan.unirhy.model.by
 import com.coooolfan.unirhy.model.dto.ArtistMergeReq
 import com.coooolfan.unirhy.service.ArtistService
-import com.dylibso.chicory.runtime.HostFunction
-import com.dylibso.chicory.runtime.Instance
-import com.dylibso.chicory.wasm.types.FunctionType
-import com.dylibso.chicory.wasm.types.ValType
+import run.endive.runtime.HostFunction
+import run.endive.runtime.Instance
+import run.endive.wasm.types.FunctionType
+import run.endive.wasm.types.ValType
 import tools.jackson.core.type.TypeReference
 import tools.jackson.databind.ObjectMapper
 import org.babyfish.jimmer.sql.fetcher.Fetcher

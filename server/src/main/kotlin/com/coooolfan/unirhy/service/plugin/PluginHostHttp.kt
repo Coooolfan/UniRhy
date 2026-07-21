@@ -1,9 +1,9 @@
 package com.coooolfan.unirhy.service.plugin
 
-import com.dylibso.chicory.runtime.HostFunction
-import com.dylibso.chicory.runtime.Instance
-import com.dylibso.chicory.wasm.types.FunctionType
-import com.dylibso.chicory.wasm.types.ValType
+import run.endive.runtime.HostFunction
+import run.endive.runtime.Instance
+import run.endive.wasm.types.FunctionType
+import run.endive.wasm.types.ValType
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.net.URI
@@ -19,8 +19,13 @@ private val sharedHttpClient: HttpClient = HttpClient.newBuilder()
     .followRedirects(HttpClient.Redirect.NEVER)
     .build()
 
-fun buildDefaultHostFunctions(manifest: PluginManifest, instanceRef: () -> Instance): List<HostFunction> {
-    val allowedHosts = manifest.networkAllowHosts()
+/**
+ * 所有已启用插件获得的默认 Host imports。
+ *
+ * 网络 Host API 只校验 URL 结构与自身支持的协议，不检查插件级 allowlist；
+ * 部署者信任其安装插件发起的网络访问。
+ */
+fun buildDefaultHostFunctions(instanceRef: () -> Instance): List<HostFunction> {
 
     val hostLog = HostFunction(
         "env",
@@ -48,23 +53,21 @@ fun buildDefaultHostFunctions(manifest: PluginManifest, instanceRef: () -> Insta
         val ptr = args[0].toInt()
         val len = args[1].toInt()
         val url = instanceRef().memory().readString(ptr, len)
-        val status = checkUrl(url, allowedHosts)
+        val status = checkUrl(url)
         longArrayOf(status.toLong())
     }
 
     return listOf(hostLog, hostHttpCheck)
 }
 
-private fun checkUrl(url: String, allowedHosts: Set<String>): Int {
+private fun checkUrl(url: String): Int {
     val uri = try {
         URI.create(url)
     } catch (_: Exception) {
         return -1
     }
-    val host = uri.host ?: return -1
-    if (host !in allowedHosts) {
-        logger.warn("Plugin network access denied: host={} not in allow list", host)
-        return -2
+    if (uri.host == null || uri.scheme !in setOf("http", "https")) {
+        return -1
     }
     return try {
         val request = HttpRequest.newBuilder(uri).timeout(Duration.ofSeconds(5)).GET().build()

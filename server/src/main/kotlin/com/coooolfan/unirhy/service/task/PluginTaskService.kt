@@ -1,158 +1,147 @@
 package com.coooolfan.unirhy.service.task
 
 import com.coooolfan.unirhy.model.Plugin
+import com.coooolfan.unirhy.model.concurrency
 import com.coooolfan.unirhy.model.enabled
+import com.coooolfan.unirhy.model.id
+import com.coooolfan.unirhy.model.taskType
+import com.coooolfan.unirhy.model.updatedAt
 import com.coooolfan.unirhy.service.ArtistService
-import com.coooolfan.unirhy.service.plugin.PluginManifest
-import com.coooolfan.unirhy.service.plugin.PluginNetworkPermission
-import com.coooolfan.unirhy.service.plugin.PluginPermissions
-import com.coooolfan.unirhy.service.plugin.PluginRuntime
-import com.coooolfan.unirhy.service.plugin.PluginTaskBinding
 import com.coooolfan.unirhy.service.plugin.WasmPlugin
 import com.coooolfan.unirhy.service.plugin.buildArtistHostFunctions
 import com.coooolfan.unirhy.service.plugin.buildDefaultHostFunctions
-import com.coooolfan.unirhy.service.task.common.AsyncTaskQueueStore
-import com.coooolfan.unirhy.service.task.common.TaskStatus
-import com.coooolfan.unirhy.service.task.common.TaskType
-import com.coooolfan.unirhy.service.task.common.failureReason
+import com.coooolfan.unirhy.service.task.common.TaskKey
+import com.coooolfan.unirhy.service.task.dispatch.TaskCapacityManager
+import com.coooolfan.unirhy.service.task.spi.AsyncTaskHandler
+import com.coooolfan.unirhy.service.task.spi.AsyncTaskHandlerRegistry
+import com.coooolfan.unirhy.service.task.spi.TaskPlanner
+import com.coooolfan.unirhy.service.task.spi.TaskPlannerRegistry
+import tools.jackson.databind.JsonNode
 import tools.jackson.databind.ObjectMapper
 import org.babyfish.jimmer.sql.kt.KSqlClient
-import org.babyfish.jimmer.sql.kt.ast.expression.eq
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
-import org.springframework.transaction.support.TransactionTemplate
-import java.util.concurrent.locks.ReentrantReadWriteLock
-import kotlin.concurrent.read
-import kotlin.concurrent.write
+import java.time.Instant
 
+/**
+ * WASM 插件运行时：按插件 id 维护本地已加载状态，将 `plan()` / `run()`
+ * 适配为 [TaskPlanner] / [AsyncTaskHandler] 并成对注册。
+ *
+ * 各节点通过固定轮询 tick 调用 [reconcile]，根据
+ * `plugin.id/enabled/task_type/concurrency/updated_at` 与本地快照对齐，
+ * 不依赖处理管理请求的节点推送状态。
+ */
 @Service
 class PluginTaskService(
     private val sql: KSqlClient,
     private val objectMapper: ObjectMapper,
-    private val queueStore: AsyncTaskQueueStore,
-    private val transactionTemplate: TransactionTemplate,
     private val artistService: ArtistService,
+    private val plannerRegistry: TaskPlannerRegistry,
+    private val handlerRegistry: AsyncTaskHandlerRegistry,
+    private val capacityManager: TaskCapacityManager,
 ) {
     private val logger = LoggerFactory.getLogger(PluginTaskService::class.java)
-    private val lock = ReentrantReadWriteLock()
-    private val plugins: MutableMap<TaskType, WasmPlugin> = loadFromDb().toMutableMap()
 
-    fun isConsumerEnabled(): Boolean = lock.read { plugins.isNotEmpty() }
+    private data class LoadedSnapshot(
+        val key: TaskKey,
+        val updatedAt: Instant,
+    )
 
-    fun getLoadedTaskTypes(): Set<TaskType> = lock.read { plugins.keys.toSet() }
+    /** 仅在单线程 tick 与管理操作中访问，用锁保证可见性 */
+    private val loaded = mutableMapOf<String, LoadedSnapshot>()
+    private val lock = Any()
 
-    fun submit(taskType: TaskType, formParamsJson: ByteArray) {
-        val plugin = lock.read { plugins[taskType] }
-            ?: throw IllegalArgumentException("no plugin loaded for task type: $taskType")
-        val payloads = plugin.plan(formParamsJson)
-        if (payloads.isEmpty()) {
-            logger.info("Plugin plan() returned no tasks for taskType={}", taskType)
-            return
+    fun isLoaded(pluginId: String): Boolean = synchronized(lock) { pluginId in loaded }
+
+    /** 装载插件并成对注册 Planner / Handler；失败抛出异常且不产生半注册状态 */
+    fun install(plugin: Plugin) {
+        val key = TaskKey(plugin.id, plugin.taskType)
+        val wasmPlugin = loadWasmPlugin(plugin.id, plugin.wasm)
+        synchronized(lock) {
+            loaded[plugin.id]?.let { previous ->
+                if (previous.key != key) {
+                    plannerRegistry.unregister(previous.key)
+                    handlerRegistry.unregister(previous.key)
+                    capacityManager.removeHandler(previous.key)
+                }
+            }
+            plannerRegistry.replace(WasmTaskPlanner(key, wasmPlugin, objectMapper))
+            handlerRegistry.replace(WasmTaskHandler(key, wasmPlugin))
+            capacityManager.setHandlerLimit(key, plugin.concurrency)
+            loaded[plugin.id] = LoadedSnapshot(key = key, updatedAt = plugin.updatedAt)
         }
-        val inserted = queueStore.enqueueIgnoringConflicts(taskType, payloads)
-        logger.info("Plugin submit: taskType={}, batches={}, inserted={}", taskType, payloads.size, inserted)
+        logger.info("Plugin runtime installed: id={}, key={}, concurrency={}", plugin.id, key, plugin.concurrency)
     }
 
-    fun reloadPlugin(id: String) {
-        val dbPlugin = sql.findById(Plugin::class, id) ?: run {
-            logger.warn("Plugin {} not found in DB for reload", id)
-            return
+    /** 成对移除 Planner / Handler 与本地容量 */
+    fun uninstall(pluginId: String) {
+        synchronized(lock) {
+            val snapshot = loaded.remove(pluginId) ?: return
+            plannerRegistry.unregister(snapshot.key)
+            handlerRegistry.unregister(snapshot.key)
+            capacityManager.removeHandler(snapshot.key)
         }
-        val taskType = runCatching { TaskType.valueOf(dbPlugin.taskType) }.getOrElse {
-            logger.warn("Plugin {} has unknown taskType {}, skipping reload", id, dbPlugin.taskType)
-            return
-        }
-        val manifest = dbPlugin.toManifest()
-        val plugin = WasmPlugin.load(manifest, dbPlugin.wasm) { m, instanceRef ->
-            buildDefaultHostFunctions(m, instanceRef) +
-                buildArtistHostFunctions(artistService, objectMapper, instanceRef)
-        } ?: run {
-            logger.warn("Failed to instantiate wasm for plugin {}", id)
-            return
-        }
-        lock.write {
-            plugins[taskType] = plugin
-        }
-        logger.info("Plugin hot-reloaded: id={}, taskType={}", id, taskType)
+        logger.info("Plugin runtime uninstalled: id={}", pluginId)
     }
 
-    fun unloadPlugin(taskType: TaskType) {
-        lock.write { plugins.remove(taskType) }
-        logger.info("Plugin unloaded: taskType={}", taskType)
-    }
-
-    fun consumePendingTasks() {
-        val snapshot = lock.read { plugins.toMap() }
-        for ((taskType, plugin) in snapshot) {
-            consumeForType(taskType, plugin)
-        }
-    }
-
-    private fun loadFromDb(): Map<TaskType, WasmPlugin> {
-        val enabledPlugins = sql.createQuery(Plugin::class) {
-            where(table.enabled eq true)
-            select(table)
+    /** 每轮 tick 根据数据库插件元数据对齐本地 Registry */
+    fun reconcile() {
+        val rows = sql.createQuery(Plugin::class) {
+            select(table.id, table.enabled, table.taskType, table.concurrency, table.updatedAt)
         }.execute()
 
-        if (enabledPlugins.isEmpty()) {
-            logger.info("No enabled plugins found in DB")
-            return emptyMap()
+        val enabledRows = rows.filter { it._2 }.associateBy { it._1 }
+
+        val staleIds = synchronized(lock) { loaded.keys.filter { it !in enabledRows } }
+        for (pluginId in staleIds) {
+            uninstall(pluginId)
         }
 
-        val result = mutableMapOf<TaskType, WasmPlugin>()
-        for (dbPlugin in enabledPlugins) {
-            val taskType = runCatching { TaskType.valueOf(dbPlugin.taskType) }.getOrElse {
-                logger.warn("Plugin {} has unknown taskType {}, skipping", dbPlugin.id, dbPlugin.taskType)
+        for ((pluginId, row) in enabledRows) {
+            val snapshot = synchronized(lock) { loaded[pluginId] }
+            if (snapshot != null && snapshot.updatedAt == row._5) {
                 continue
             }
-            val manifest = dbPlugin.toManifest()
-            val plugin = WasmPlugin.load(manifest, dbPlugin.wasm) { m, instanceRef ->
-                buildDefaultHostFunctions(m, instanceRef) +
-                    buildArtistHostFunctions(artistService, objectMapper, instanceRef)
+            val plugin = sql.findById(Plugin::class, pluginId) ?: continue
+            if (!plugin.enabled) {
+                continue
             }
-            if (plugin != null) {
-                result[taskType] = plugin
-                logger.info("Plugin loaded from DB: id={}, taskType={}", dbPlugin.id, taskType)
+            try {
+                install(plugin)
+            } catch (ex: Exception) {
+                logger.error("Failed to load plugin runtime during reconcile: id={}", pluginId, ex)
             }
         }
-        return result
     }
 
-    private fun consumeForType(taskType: TaskType, plugin: WasmPlugin) {
-        val claimedTask = try {
-            transactionTemplate.execute { queueStore.claim(taskType, 1).firstOrNull() }
-        } catch (ex: Throwable) {
-            logger.error("Failed to claim task for type={}", taskType, ex)
-            return
-        } ?: return
-
-        val reason = try {
-            plugin.run(claimedTask.params.toByteArray(Charsets.UTF_8))
-            "SUCCESS"
-        } catch (ex: Throwable) {
-            logger.error("Plugin run failed, taskType={}, logId={}", taskType, claimedTask.id, ex)
-            failureReason(ex)
+    private fun loadWasmPlugin(pluginId: String, wasmBytes: ByteArray): WasmPlugin =
+        WasmPlugin.load(pluginId, wasmBytes) { instanceRef ->
+            buildDefaultHostFunctions(instanceRef) +
+                buildArtistHostFunctions(artistService, objectMapper, instanceRef)
         }
 
-        try {
-            transactionTemplate.executeWithoutResult {
-                queueStore.completeTask(
-                    logId = claimedTask.id,
-                    status = if (reason == "SUCCESS") TaskStatus.COMPLETED else TaskStatus.FAILED,
-                    reason = reason,
-                )
-            }
-        } catch (ex: Throwable) {
-            logger.error("Failed to update task status, logId={}", claimedTask.id, ex)
-        }
+    /** 上传时的加载校验：完整执行解析、实例化与导出函数检查后即弃 */
+    fun verifyLoadable(pluginId: String, wasmBytes: ByteArray) {
+        loadWasmPlugin(pluginId, wasmBytes)
     }
 }
 
-private fun Plugin.toManifest(): PluginManifest = PluginManifest(
-    id = id,
-    name = name,
-    version = version,
-    runtime = PluginRuntime(type = "wasm", abi = abi),
-    tasks = listOf(PluginTaskBinding(type = TaskType.valueOf(taskType), extension = extension)),
-    permissions = PluginPermissions(network = PluginNetworkPermission(allow = networkAllow)),
-)
+private class WasmTaskPlanner(
+    override val key: TaskKey,
+    private val wasmPlugin: WasmPlugin,
+    private val objectMapper: ObjectMapper,
+) : TaskPlanner {
+    override fun plan(params: JsonNode): Sequence<JsonNode> {
+        val payloads = wasmPlugin.plan(params.toString().toByteArray(Charsets.UTF_8))
+        return payloads.asSequence().map { objectMapper.readTree(it) }
+    }
+}
+
+private class WasmTaskHandler(
+    override val key: TaskKey,
+    private val wasmPlugin: WasmPlugin,
+) : AsyncTaskHandler {
+    override fun run(payload: JsonNode) {
+        wasmPlugin.run(payload.toString().toByteArray(Charsets.UTF_8))
+    }
+}
