@@ -227,7 +227,15 @@ CREATE UNIQUE INDEX uq_async_task_active_payload
 - `completed_reason` 使用不截断的 `TEXT`；`params`、`payload` 与失败原因不增加数据库长度 CHECK 或应用层额度列。
 - 活动 payload 唯一索引使用 `JSONB` 的规范化 binary send 表示计算 SHA-256；`jsonb_send(jsonb)` 与 `sha256(bytea)` 均为 PostgreSQL IMMUTABLE 内建函数，可直接用于表达式索引，不引入扩展或自定义函数。索引仅负责活动任务去重，哈希不作为表字段持久化。
 - discovery、claim、TaskKey / 状态过滤、submission 子任务分页和级联删除使用上面的固定索引，不再保留任何 `*_async_task_log_*` 或按内建 TaskType 拆分的索引。
-- 新 Flyway 迁移不得修改已发布的 `V0.0.1__init.sql`。迁移直接删除旧 `async_task_log` 及其索引，重建 `plugin`，再创建 `task_submission` 与 `async_task`；不转换旧任务记录或已安装插件数据。迁移文件使用实施版本对应的下一个合法 Flyway 版本号。
+- 新 Flyway 迁移不得修改已发布的 `V0.0.1__init.sql`。迁移直接执行 `DROP TABLE public.async_task_log` 与 `DROP TABLE public.plugin`，再按目标 DDL 创建 `plugin`、`task_submission` 与 `async_task`；表的附属索引和序列随旧表删除，不编写旧任务或已安装插件的数据转换。迁移文件使用实施版本对应的下一个合法 Flyway 版本号。
+
+### UniRhy 版本升级
+
+- 本次架构变更是破坏性升级，不支持旧版与新版服务节点混合运行或滚动升级。部署时先停止全部旧版后端节点，使其 Worker、事务和数据库连接退出，再启动新版节点执行 Flyway migration。
+- migration 直接删除全部旧任务记录和已安装插件；音乐、用户、Asset、播放等不属于上述两张旧表的业务数据不受影响。升级后由管理员使用新 manifest 格式重新安装所需插件，不自动转换或重新启用旧插件。
+- 旧 manifest、旧任务 API 及其前端生成客户端不保留兼容分支、别名或转换逻辑。后端、Web 与 Tauri 客户端按同一版本契约升级；旧版服务或客户端不允许继续连接迁移后的部署。
+- 不提供 down migration。需要回退时停止新版节点并恢复升级前的数据库备份，不允许旧版程序连接已经迁移的数据库。
+- 生效位置：新 Flyway migration（直接 drop / create）、插件 manifest 解析与安装流程、统一任务 API 及 Web / Tauri 生成客户端、部署与对应版本 Release Notes。
 
 ### 插件升级与任务兼容性
 
