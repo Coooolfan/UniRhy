@@ -81,9 +81,29 @@
   padding: 1.25rem;
   border-radius: 4px;
   overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #756d67 transparent;
   margin: 1.5rem 0;
   font-size: 0.9rem;
   line-height: 1.6;
+}
+
+.blog-prose pre::-webkit-scrollbar {
+  height: 8px;
+}
+
+.blog-prose pre::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.blog-prose pre::-webkit-scrollbar-thumb {
+  background-color: #756d67;
+  border: 2px solid #2c2825;
+  border-radius: 4px;
+}
+
+.blog-prose pre::-webkit-scrollbar-thumb:hover {
+  background-color: #90857d;
 }
 
 .blog-prose code {
@@ -139,12 +159,42 @@
   border: 1px solid #dcd6cc;
   border-radius: 6px;
   overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #c0bab0 transparent;
+}
+
+.blog-prose .diagram-figure::-webkit-scrollbar {
+  height: 8px;
+}
+
+.blog-prose .diagram-figure::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.blog-prose .diagram-figure::-webkit-scrollbar-thumb {
+  background-color: #c0bab0;
+  background-clip: padding-box;
+  border: 2px solid transparent;
+  border-radius: 4px;
+}
+
+.blog-prose .diagram-figure::-webkit-scrollbar-thumb:hover {
+  background-color: #a9a197;
 }
 
 .blog-prose .diagram-figure svg {
   max-width: 100%;
   height: auto;
   font-family: 'Georgia', 'Times New Roman', Times, serif;
+}
+
+.blog-prose .diagram-figure .plugin-flow-diagram {
+  width: 100%;
+  min-width: 640px;
+}
+
+.blog-prose .plugin-flow-figure {
+  justify-content: flex-start;
 }
 
 .blog-prose .sr-only {
