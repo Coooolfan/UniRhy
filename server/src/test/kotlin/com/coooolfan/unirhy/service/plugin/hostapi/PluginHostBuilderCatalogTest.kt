@@ -91,6 +91,13 @@ class PluginHostBuilderCatalogTest {
                 instanceRef = instanceRef,
                 callExecutor = callExecutor,
             ),
+            buildPluginDataHostFunctions(
+                pluginId = "com.example.test",
+                pluginDataService = mock(PluginDataService::class.java),
+                objectMapper = objectMapper,
+                instanceRef = instanceRef,
+                callExecutor = callExecutor,
+            ),
             buildMetadataHostFunctions(
                 sql = mock(KSqlClient::class.java),
                 isPluginLoaded = mockDependency<(String) -> Boolean>(),
@@ -100,7 +107,7 @@ class PluginHostBuilderCatalogTest {
             ),
         )
 
-        assertEquals(10, groups.size)
+        assertEquals(11, groups.size)
         val functions = groups.flatten()
         validatePluginHostFunctions(functions)
         assertEquals(PLUGIN_HOST_FUNCTION_NAMES, functions.map { it.name() }.toSet())

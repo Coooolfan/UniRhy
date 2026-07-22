@@ -7,6 +7,7 @@ import com.coooolfan.unirhy.service.plugin.PluginManifest
 import com.coooolfan.unirhy.service.plugin.UNIRHY_WASM_ABI_V1
 import com.coooolfan.unirhy.service.plugin.WasmPlugin
 import com.coooolfan.unirhy.service.plugin.WasmPluginException
+import com.coooolfan.unirhy.service.plugin.hostapi.PluginDataService
 import com.coooolfan.unirhy.service.task.PluginTaskService
 import tools.jackson.databind.ObjectMapper
 import tools.jackson.dataformat.yaml.YAMLMapper
@@ -36,6 +37,7 @@ class PluginService(
     private val objectMapper: ObjectMapper,
     private val jdbc: NamedParameterJdbcTemplate,
     private val pluginTaskService: PluginTaskService,
+    private val pluginDataService: PluginDataService,
     private val transactionTemplate: TransactionTemplate,
 ) {
     private val logger = LoggerFactory.getLogger(PluginService::class.java)
@@ -114,19 +116,24 @@ class PluginService(
         }
 
         val now = Instant.now()
-        sql.saveCommand(Plugin {
-            id = manifest.id
-            name = manifest.name
-            version = manifest.version
-            abi = manifest.runtime.abi
-            taskType = manifest.task.type
-            concurrency = existing?.concurrency ?: manifest.task.concurrency
-            formDefinition = manifest.formDefinition()
-            this.wasm = wasm
-            enabled = false
-            createdAt = existing?.createdAt ?: now
-            updatedAt = now
-        }).execute()
+        val configDefinition = manifest.configDefinition()
+        transactionTemplate.executeWithoutResult {
+            sql.saveCommand(Plugin {
+                id = manifest.id
+                name = manifest.name
+                version = manifest.version
+                abi = manifest.runtime.abi
+                taskType = manifest.task.type
+                concurrency = existing?.concurrency ?: manifest.task.concurrency
+                formDefinition = manifest.formDefinition()
+                this.configDefinition = configDefinition
+                this.wasm = wasm
+                enabled = false
+                createdAt = existing?.createdAt ?: now
+                updatedAt = now
+            }).execute()
+            pluginDataService.reconcileConfigEncryption(manifest.id, configDefinition)
+        }
 
         pluginTaskService.uninstall(manifest.id)
         logger.info("Plugin uploaded: id={}, version={}, taskType={}", manifest.id, manifest.version, manifest.task.type)
@@ -139,6 +146,7 @@ class PluginService(
     fun setEnabled(id: String, enabled: Boolean) {
         val plugin = getPlugin(id)
         if (enabled) {
+            pluginDataService.validateConfiguration(id)
             try {
                 pluginTaskService.verifyLoadable(plugin.id, plugin.wasm)
             } catch (ex: Exception) {
@@ -235,6 +243,10 @@ class PluginService(
             "form" to mapOf(
                 "schema" to plugin.formDefinition.get("schema"),
                 "order" to plugin.formDefinition.get("order"),
+            ),
+            "config" to mapOf(
+                "schema" to plugin.configDefinition.get("schema"),
+                "order" to plugin.configDefinition.get("order"),
             ),
         )
         return yamlMapper.writeValueAsString(data)

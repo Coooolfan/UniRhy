@@ -29,6 +29,8 @@ import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.test.fail
 
@@ -77,6 +79,11 @@ class PluginE2eTest {
         assertEquals(1, uploaded.path("concurrency").intValue(), "[plugins] concurrency should match manifest")
         assertFalse(uploaded.path("enabled").asBoolean(), "[plugins] uploaded plugin should start disabled")
         assertFalse(uploaded.path("isAvailable").asBoolean(), "[plugins] disabled plugin should not be loaded")
+        assertEquals(
+            0,
+            uploaded.path("configDefinition").path("schema").path("properties").size(),
+            "[plugins] plugin without config should expose an empty definition",
+        )
 
         val downloadResponse = state.api.getBytes("/api/plugins/$pluginId/package")
         E2eAssert.status(downloadResponse, 200, "[plugins] download should succeed")
@@ -205,6 +212,9 @@ class PluginE2eTest {
         val assetFixture = insertAssetFixture(recordingWorkId, fixtureSuffix)
         val objectKey = "plugin-host-e2e/$fixtureSuffix.bin"
         val objectBytes = "host-storage-$fixtureSuffix".toByteArray()
+        val pluginDataKey = "e2e.state.$fixtureSuffix"
+        val pluginDataValue = "persisted-$fixtureSuffix"
+        val apiKey = "secret-$fixtureSuffix"
         val wasm = PluginHostWasmFixture.build(
             artistName = artistName,
             workTitle = workTitle,
@@ -217,15 +227,80 @@ class PluginE2eTest {
             assetMediaFileId = assetFixture.mediaFileId,
             objectKey = objectKey,
             objectBytes = objectBytes,
+            pluginDataKey = pluginDataKey,
+            pluginDataValue = pluginDataValue,
         )
 
         val uploadResponse = state.api.postMultipartFile(
             path = "/api/plugins",
             fieldName = "file",
             fileName = "$pluginId.up",
-            fileBytes = pluginArchive(pluginId, wasm),
+            fileBytes = pluginArchive(pluginId, wasm, configured = true),
         )
         E2eAssert.status(uploadResponse, 201, "[plugin-host] complete Host import catalog should link")
+
+        val emptyConfigResponse = state.api.get("/api/plugins/$pluginId/configuration")
+        E2eAssert.status(emptyConfigResponse, 200, "[plugin-config] empty configuration should be readable")
+        val emptyConfig = E2eJson.mapper.readTree(emptyConfigResponse.body())
+        assertEquals(0, emptyConfig.path("values").size(), "[plugin-config] initial values should be empty")
+        assertEquals(
+            0,
+            emptyConfig.path("configuredSecretFields").size(),
+            "[plugin-config] initial secret state should be empty",
+        )
+
+        E2eAssert.apiError(
+            response = state.api.put(
+                path = "/api/plugins/$pluginId/enabled-state",
+                query = mapOf("enabled" to true),
+            ),
+            family = "PLUGIN",
+            code = "CONFIGURATION_REQUIRED",
+            expectedStatus = 409,
+            step = "[plugin-config] required configuration should block enable",
+        )
+
+        E2eAssert.apiError(
+            response = state.api.put(
+                path = "/api/plugins/$pluginId/configuration",
+                json = mapOf(
+                    "values" to mapOf("batchSize" to 7),
+                    "clearedSecretFields" to emptyList<String>(),
+                ),
+            ),
+            family = "PLUGIN",
+            code = "INVALID_CONFIGURATION",
+            expectedStatus = 400,
+            step = "[plugin-config] missing required secret should be rejected",
+        )
+
+        val updateConfigResponse = state.api.put(
+            path = "/api/plugins/$pluginId/configuration",
+            json = mapOf(
+                "values" to mapOf("apiKey" to apiKey, "batchSize" to 7),
+                "clearedSecretFields" to emptyList<String>(),
+            ),
+        )
+        E2eAssert.status(updateConfigResponse, 200, "[plugin-config] valid configuration should be saved")
+        val updatedConfig = E2eJson.mapper.readTree(updateConfigResponse.body())
+        assertFalse(updatedConfig.path("values").has("apiKey"), "[plugin-config] response should redact secret")
+        assertEquals(7, updatedConfig.path("values").path("batchSize").intValue())
+        assertEquals("apiKey", updatedConfig.path("configuredSecretFields")[0].asString())
+
+        val encryptedRow = jdbc.query(
+            """
+                SELECT value::text, encrypted_value
+                FROM plugin_data
+                WHERE plugin_id = :pluginId AND key = 'apiKey'
+            """.trimIndent(),
+            MapSqlParameterSource("pluginId", pluginId),
+        ) { rs, _ -> rs.getString(1) to rs.getBytes(2) }.single()
+        assertNull(encryptedRow.first, "[plugin-config] writeOnly value must not be stored as JSONB")
+        assertNotNull(encryptedRow.second, "[plugin-config] writeOnly value should have ciphertext")
+        assertFalse(
+            encryptedRow.second.toString(Charsets.UTF_8).contains(apiKey),
+            "[plugin-config] ciphertext should not contain the secret plaintext",
+        )
 
         E2eAssert.status(
             state.api.put(
@@ -303,6 +378,17 @@ class PluginE2eTest {
             "[plugin-host] stored bytes should match guest memory",
         )
 
+        val persistedData = jdbc.queryForObject(
+            """
+                SELECT value #>> '{}'
+                FROM plugin_data
+                WHERE plugin_id = :pluginId AND key = :key
+            """.trimIndent(),
+            MapSqlParameterSource().addValue("pluginId", pluginId).addValue("key", pluginDataKey),
+            String::class.java,
+        )
+        assertEquals(pluginDataValue, persistedData, "[plugin-host] guest data put should persist JSON value")
+
         E2eAssert.status(
             state.api.put(
                 path = "/api/plugins/$pluginId/enabled-state",
@@ -312,9 +398,39 @@ class PluginE2eTest {
             "[plugin-host] disable should succeed",
         )
         E2eAssert.status(
-            state.api.delete("/api/plugins/$pluginId"),
-            204,
-            "[plugin-host] delete should succeed",
+            state.api.postMultipartFile(
+                path = "/api/plugins",
+                fieldName = "file",
+                fileName = "$pluginId.up",
+                fileBytes = pluginArchive(pluginId, wasm, configured = true),
+            ),
+            201,
+            "[plugin-config] same-id upgrade should succeed",
+        )
+        val configAfterUpgradeResponse = state.api.get("/api/plugins/$pluginId/configuration")
+        E2eAssert.status(configAfterUpgradeResponse, 200, "[plugin-config] upgraded configuration should be readable")
+        val configAfterUpgrade = E2eJson.mapper.readTree(configAfterUpgradeResponse.body())
+        assertEquals(7, configAfterUpgrade.path("values").path("batchSize").intValue())
+        assertEquals("apiKey", configAfterUpgrade.path("configuredSecretFields")[0].asString())
+        assertEquals(
+            pluginDataValue,
+            jdbc.queryForObject(
+                "SELECT value #>> '{}' FROM plugin_data WHERE plugin_id = :pluginId AND key = :key",
+                MapSqlParameterSource().addValue("pluginId", pluginId).addValue("key", pluginDataKey),
+                String::class.java,
+            ),
+            "[plugin-data] same-id upgrade should preserve arbitrary data",
+        )
+
+        E2eAssert.status(state.api.delete("/api/plugins/$pluginId"), 204, "[plugin-host] delete should succeed")
+        assertEquals(
+            0L,
+            jdbc.queryForObject(
+                "SELECT COUNT(*) FROM plugin_data WHERE plugin_id = :pluginId",
+                MapSqlParameterSource("pluginId", pluginId),
+                Long::class.java,
+            ),
+            "[plugin-data] plugin deletion should cascade to all data",
         )
     }
 
@@ -422,7 +538,36 @@ class PluginE2eTest {
         fail("[plugin-host] submission $submissionId did not finish its task, last=$lastState")
     }
 
-    private fun pluginArchive(pluginId: String, wasm: ByteArray = minimalPlanningWasm()): ByteArray {
+    private fun pluginArchive(
+        pluginId: String,
+        wasm: ByteArray = minimalPlanningWasm(),
+        configured: Boolean = false,
+    ): ByteArray {
+        val config = if (configured) {
+            """
+            config:
+              schema:
+                type: object
+                properties:
+                  apiKey:
+                    type: string
+                    title: API Key
+                    writeOnly: true
+                    minLength: 1
+                  batchSize:
+                    type: integer
+                    title: Batch size
+                    minimum: 1
+                required:
+                  - apiKey
+                additionalProperties: false
+              order:
+                - apiKey
+                - batchSize
+            """.trimIndent()
+        } else {
+            ""
+        }
         val manifest = """
             id: $pluginId
             name: E2E plugin
@@ -444,7 +589,7 @@ class PluginE2eTest {
                 additionalProperties: false
               order:
                 - dryRun
-        """.trimIndent()
+        """.trimIndent() + if (config.isEmpty()) "" else "\n$config"
         return zip(
             "plugin.yml" to manifest.toByteArray(),
             "plugin.wasm" to wasm,

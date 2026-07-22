@@ -55,6 +55,114 @@ class PluginManifestTest {
     }
 
     @Test
+    fun `loads task form and plugin configuration independently`() {
+        val manifest = parse(
+            """
+                id: com.example.configured
+                version: 1.0.0
+                runtime:
+                  type: wasm
+                  abi: unirhy-wasm-abi-v1
+                task:
+                  type: IMPORT
+                  concurrency: 1
+                form:
+                  schema:
+                    type: object
+                    properties:
+                      url:
+                        type: string
+                        title: URL
+                    required:
+                      - url
+                    additionalProperties: false
+                  order:
+                    - url
+                config:
+                  schema:
+                    type: object
+                    properties:
+                      apiKey:
+                        type: string
+                        title: API Key
+                        writeOnly: true
+                    required:
+                      - apiKey
+                    additionalProperties: false
+                  order:
+                    - apiKey
+            """.trimIndent()
+        )
+
+        assertNull(manifest.validate())
+        assertEquals(setOf("url"), manifest.formDefinition().path("schema").path("properties").propertyNames().toSet())
+        assertEquals(
+            setOf("apiKey"),
+            manifest.configDefinition().path("schema").path("properties").propertyNames().toSet(),
+        )
+    }
+
+    @Test
+    fun `rejects writeOnly in submission form`() {
+        val manifest = parse(
+            """
+                id: com.example.invalid-secret-form
+                version: 1.0.0
+                runtime:
+                  type: wasm
+                  abi: unirhy-wasm-abi-v1
+                task:
+                  type: IMPORT
+                  concurrency: 1
+                form:
+                  schema:
+                    type: object
+                    properties:
+                      apiKey:
+                        type: string
+                        title: API Key
+                        writeOnly: true
+                    required: []
+                    additionalProperties: false
+                  order:
+                    - apiKey
+            """.trimIndent()
+        )
+
+        assertNotNull(manifest.validate())
+    }
+
+    @Test
+    fun `rejects writeOnly on non-string configuration`() {
+        val manifest = parse(
+            """
+                id: com.example.invalid-secret-config
+                version: 1.0.0
+                runtime:
+                  type: wasm
+                  abi: unirhy-wasm-abi-v1
+                task:
+                  type: IMPORT
+                  concurrency: 1
+                config:
+                  schema:
+                    type: object
+                    properties:
+                      retries:
+                        type: integer
+                        title: Retries
+                        writeOnly: true
+                    required: []
+                    additionalProperties: false
+                  order:
+                    - retries
+            """.trimIndent()
+        )
+
+        assertNotNull(manifest.validate())
+    }
+
+    @Test
     fun `manifest without form uses empty form definition`() {
         val manifest = parse(
             """

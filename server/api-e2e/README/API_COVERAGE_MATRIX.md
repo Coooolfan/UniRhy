@@ -5,7 +5,7 @@
 - 生成命令：`cd server && ./gradlew :api-e2e:generateCoverageMatrix`
 - 校验命令：`cd server && ./gradlew :api-e2e:test`
 - 统计口径：按 `HTTP 方法 + Path + headers 条件` 计数（媒体 Range/非Range 分开）。
-- 当前接口总数：`83`
+- 当前接口总数：`85`
 
 | # | 覆盖级别 | HTTP | Path | 条件 | 需登录 | Controller#method | 用例引用 | 备注 |
 |---|---|---|---|---|---|---|---|---|
@@ -50,45 +50,47 @@
 | 39 | FULL | POST | /api/plugins | - | Y | PluginController#upload | com.unirhy.e2e.PluginE2eTest#plugin lifecycle should support upload list download enable submit disable and delete | validation: com.unirhy.e2e.PluginE2eTest#plugin upload should reject invalid archives |
 | 40 | FULL | DELETE | /api/plugins/{id} | - | Y | PluginController#delete | com.unirhy.e2e.PluginE2eTest#plugin lifecycle should support upload list download enable submit disable and delete | error: missing plugin returns 404 |
 | 41 | FULL | PUT | /api/plugins/{id}/concurrency | - | Y | PluginController#updateConcurrency | com.unirhy.e2e.PluginE2eTest#plugin lifecycle should support upload list download enable submit disable and delete | validation: non-positive concurrency returns 400 |
-| 42 | FULL | PUT | /api/plugins/{id}/enabled-state | - | Y | PluginController#setEnabled | com.unirhy.e2e.PluginE2eTest#plugin lifecycle should support upload list download enable submit disable and delete | error: missing plugin returns 404 |
-| 43 | FULL | GET | /api/plugins/{id}/package | - | Y | PluginController#download | com.unirhy.e2e.PluginE2eTest#plugin lifecycle should support upload list download enable submit disable and delete | error: deleted plugin returns 404 |
-| 44 | FULL | POST | /api/recordings/merge-requests | - | Y | RecordingController#mergeRecording | com.unirhy.e2e.AccountPlaylistContentE2eTest#content endpoints should support search update recording update and merge flow | merge: source recording removed and relations moved to target |
-| 45 | FULL | GET | /api/recordings/{id} | - | Y | RecordingController#getRecording | com.unirhy.e2e.AccountPlaylistContentE2eTest#content endpoints should support search update recording update and merge flow | missing resource returns 404 |
-| 46 | FULL | PUT | /api/recordings/{id} | - | Y | RecordingController#updateRecording | com.unirhy.e2e.AccountPlaylistContentE2eTest#content endpoints should support search update recording update and merge flow | - |
-| 47 | FULL | GET | /api/storage/file-system-nodes | - | Y | FileSystemStorageController#list | com.unirhy.e2e.StorageConfigE2eTest#file system storage should support create get update list delete flow | - |
-| 48 | FULL | POST | /api/storage/file-system-nodes | - | Y | FileSystemStorageController#create | com.unirhy.e2e.StorageConfigE2eTest#file system storage should support create get update list delete flow | - |
-| 49 | FULL | DELETE | /api/storage/file-system-nodes/{id} | - | Y | FileSystemStorageController#delete | com.unirhy.e2e.StorageConfigE2eTest#file system storage should support create get update list delete flow | linkage: com.unirhy.e2e.StorageConfigE2eTest#system config should enforce storage linkage constraints |
-| 50 | FULL | GET | /api/storage/file-system-nodes/{id} | - | Y | FileSystemStorageController#get | com.unirhy.e2e.StorageConfigE2eTest#file system storage should support create get update list delete flow | - |
-| 51 | FULL | PUT | /api/storage/file-system-nodes/{id} | - | Y | FileSystemStorageController#update | com.unirhy.e2e.StorageConfigE2eTest#file system storage should support create get update list delete flow | - |
-| 52 | FULL | GET | /api/storage/oss-nodes | - | Y | OssStorageController#list | com.unirhy.e2e.StorageConfigE2eTest#oss storage should support create get update list delete flow | - |
-| 53 | FULL | POST | /api/storage/oss-nodes | - | Y | OssStorageController#create | com.unirhy.e2e.StorageConfigE2eTest#oss storage should support create get update list delete flow | - |
-| 54 | FULL | DELETE | /api/storage/oss-nodes/{id} | - | Y | OssStorageController#delete | com.unirhy.e2e.StorageConfigE2eTest#oss storage should support create get update list delete flow | - |
-| 55 | FULL | GET | /api/storage/oss-nodes/{id} | - | Y | OssStorageController#get | com.unirhy.e2e.StorageConfigE2eTest#oss storage should support create get update list delete flow | - |
-| 56 | FULL | PUT | /api/storage/oss-nodes/{id} | - | Y | OssStorageController#update | com.unirhy.e2e.StorageConfigE2eTest#oss storage should support create get update list delete flow | - |
-| 57 | FULL | GET | /api/system-config | - | Y | SystemConfigController#get | com.unirhy.e2e.SystemAuthE2eTest#initialize login get update logout should form closed session flow | - |
-| 58 | FULL | POST | /api/system-config | - | N | SystemConfigController#create | com.unirhy.e2e.SystemAuthE2eTest#initialize login get update logout should form closed session flow | - |
-| 59 | FULL | PUT | /api/system-config | - | N | SystemConfigController#update | com.unirhy.e2e.SystemAuthE2eTest#initialize login get update logout should form closed session flow | - |
-| 60 | FULL | GET | /api/system-config/status | - | N | SystemConfigController#isInitialized | com.unirhy.e2e.SystemAuthE2eTest#status and protected endpoints require authentication | - |
-| 61 | TODO | GET | /api/task-definitions | - | Y | TaskDefinitionController#listTaskDefinitions | - | - |
-| 62 | TODO | GET | /api/task-definitions/{namespace}/{taskType} | - | Y | TaskDefinitionController#getTaskDefinition | - | - |
-| 63 | FULL | GET | /api/task-statistics | - | Y | TaskStatisticsController#getTaskStatistics | com.unirhy.e2e.TaskContentReadE2eTest#scan submission should report metadata parse stats and accept incremental duplicate submission | stats: per task key submission/task status counts, transcode drain covered by com.unirhy.e2e.TaskContentReadE2eTest#transcode task should complete successfully and write opus files |
-| 64 | TODO | GET | /api/task-submissions | - | Y | TaskSubmissionController#listSubmissions | - | - |
-| 65 | TODO | PATCH | /api/task-submissions | - | Y | TaskSubmissionController#patchSubmissions | - | - |
-| 66 | FULL | POST | /api/task-submissions | - | Y | TaskSubmissionController#createSubmission | com.unirhy.e2e.TaskContentReadE2eTest#scan submission should report metadata parse stats and accept incremental duplicate submission | duplicate: repeated submission returns 202 and active payload dedup keeps task count stable; plugin: com.unirhy.e2e.PluginE2eTest#plugin lifecycle should support upload list download enable submit disable and delete covers plugin task keys, disabled plugin returns 409, unknown key returns 404, invalid key returns 400 |
-| 67 | TODO | DELETE | /api/task-submissions/{id} | - | Y | TaskSubmissionController#deleteSubmission | - | - |
-| 68 | FULL | GET | /api/task-submissions/{id} | - | Y | TaskSubmissionController#getSubmission | com.unirhy.e2e.PluginE2eTest#plugin lifecycle should support upload list download enable submit disable and delete | polling: submission reaches COMPLETED after async planning |
-| 69 | TODO | PATCH | /api/task-submissions/{id} | - | Y | TaskSubmissionController#patchSubmission | - | - |
-| 70 | TODO | GET | /api/task-submissions/{id}/tasks | - | Y | TaskSubmissionController#listSubmissionTasks | - | - |
-| 71 | TODO | GET | /api/tasks | - | Y | TaskController#listTasks | - | - |
-| 72 | TODO | PATCH | /api/tasks | - | Y | TaskController#patchTasks | - | - |
-| 73 | TODO | GET | /api/tasks/{id} | - | Y | TaskController#getTask | - | - |
-| 74 | TODO | PATCH | /api/tasks/{id} | - | Y | TaskController#patchTask | - | - |
-| 75 | FULL | POST | /api/tokens | - | N | TokenController#login | com.unirhy.e2e.SystemAuthE2eTest#duplicate init and wrong login return stable business errors | - |
-| 76 | FULL | DELETE | /api/tokens/current | - | N | TokenController#logout | com.unirhy.e2e.SystemAuthE2eTest#initialize login get update logout should form closed session flow | - |
-| 77 | FULL | GET | /api/works | - | Y | WorkController#listWork | com.unirhy.e2e.TaskContentReadE2eTest#works and albums should support read random and delete flow | - |
-| 78 | FULL | POST | /api/works/merge-requests | - | Y | WorkController#mergeWork | com.unirhy.e2e.AccountPlaylistContentE2eTest#content endpoints should support search update recording update and merge flow | merge: source work removed and recordings moved to target |
-| 79 | FULL | GET | /api/works/random-selection | - | Y | WorkController#randomWork | com.unirhy.e2e.TaskContentReadE2eTest#works and albums should support read random and delete flow | validation: length<=0 returns 400 |
-| 80 | FULL | GET | /api/works/search-results | - | Y | WorkController#getWorkByName | com.unirhy.e2e.AccountPlaylistContentE2eTest#content endpoints should support search update recording update and merge flow | validation: unknown keyword returns empty array |
-| 81 | FULL | DELETE | /api/works/{id} | - | Y | WorkController#deleteWork | com.unirhy.e2e.TaskContentReadE2eTest#works and albums should support read random and delete flow | - |
-| 82 | FULL | GET | /api/works/{id} | - | Y | WorkController#getWorkById | com.unirhy.e2e.TaskContentReadE2eTest#works and albums should support read random and delete flow | - |
-| 83 | FULL | PUT | /api/works/{id} | - | Y | WorkController#updateWork | com.unirhy.e2e.AccountPlaylistContentE2eTest#content endpoints should support search update recording update and merge flow | - |
+| 42 | FULL | GET | /api/plugins/{id}/configuration | - | Y | PluginController#getConfiguration | com.unirhy.e2e.PluginE2eTest#wasm plugin should link the complete host catalog and execute host calls | sensitive values are redacted |
+| 43 | FULL | PUT | /api/plugins/{id}/configuration | - | Y | PluginController#updateConfiguration | com.unirhy.e2e.PluginE2eTest#wasm plugin should link the complete host catalog and execute host calls | validation and encrypted writeOnly storage covered |
+| 44 | FULL | PUT | /api/plugins/{id}/enabled-state | - | Y | PluginController#setEnabled | com.unirhy.e2e.PluginE2eTest#plugin lifecycle should support upload list download enable submit disable and delete | error: missing plugin returns 404 |
+| 45 | FULL | GET | /api/plugins/{id}/package | - | Y | PluginController#download | com.unirhy.e2e.PluginE2eTest#plugin lifecycle should support upload list download enable submit disable and delete | error: deleted plugin returns 404 |
+| 46 | FULL | POST | /api/recordings/merge-requests | - | Y | RecordingController#mergeRecording | com.unirhy.e2e.AccountPlaylistContentE2eTest#content endpoints should support search update recording update and merge flow | merge: source recording removed and relations moved to target |
+| 47 | FULL | GET | /api/recordings/{id} | - | Y | RecordingController#getRecording | com.unirhy.e2e.AccountPlaylistContentE2eTest#content endpoints should support search update recording update and merge flow | missing resource returns 404 |
+| 48 | FULL | PUT | /api/recordings/{id} | - | Y | RecordingController#updateRecording | com.unirhy.e2e.AccountPlaylistContentE2eTest#content endpoints should support search update recording update and merge flow | - |
+| 49 | FULL | GET | /api/storage/file-system-nodes | - | Y | FileSystemStorageController#list | com.unirhy.e2e.StorageConfigE2eTest#file system storage should support create get update list delete flow | - |
+| 50 | FULL | POST | /api/storage/file-system-nodes | - | Y | FileSystemStorageController#create | com.unirhy.e2e.StorageConfigE2eTest#file system storage should support create get update list delete flow | - |
+| 51 | FULL | DELETE | /api/storage/file-system-nodes/{id} | - | Y | FileSystemStorageController#delete | com.unirhy.e2e.StorageConfigE2eTest#file system storage should support create get update list delete flow | linkage: com.unirhy.e2e.StorageConfigE2eTest#system config should enforce storage linkage constraints |
+| 52 | FULL | GET | /api/storage/file-system-nodes/{id} | - | Y | FileSystemStorageController#get | com.unirhy.e2e.StorageConfigE2eTest#file system storage should support create get update list delete flow | - |
+| 53 | FULL | PUT | /api/storage/file-system-nodes/{id} | - | Y | FileSystemStorageController#update | com.unirhy.e2e.StorageConfigE2eTest#file system storage should support create get update list delete flow | - |
+| 54 | FULL | GET | /api/storage/oss-nodes | - | Y | OssStorageController#list | com.unirhy.e2e.StorageConfigE2eTest#oss storage should support create get update list delete flow | - |
+| 55 | FULL | POST | /api/storage/oss-nodes | - | Y | OssStorageController#create | com.unirhy.e2e.StorageConfigE2eTest#oss storage should support create get update list delete flow | - |
+| 56 | FULL | DELETE | /api/storage/oss-nodes/{id} | - | Y | OssStorageController#delete | com.unirhy.e2e.StorageConfigE2eTest#oss storage should support create get update list delete flow | - |
+| 57 | FULL | GET | /api/storage/oss-nodes/{id} | - | Y | OssStorageController#get | com.unirhy.e2e.StorageConfigE2eTest#oss storage should support create get update list delete flow | - |
+| 58 | FULL | PUT | /api/storage/oss-nodes/{id} | - | Y | OssStorageController#update | com.unirhy.e2e.StorageConfigE2eTest#oss storage should support create get update list delete flow | - |
+| 59 | FULL | GET | /api/system-config | - | Y | SystemConfigController#get | com.unirhy.e2e.SystemAuthE2eTest#initialize login get update logout should form closed session flow | - |
+| 60 | FULL | POST | /api/system-config | - | N | SystemConfigController#create | com.unirhy.e2e.SystemAuthE2eTest#initialize login get update logout should form closed session flow | - |
+| 61 | FULL | PUT | /api/system-config | - | N | SystemConfigController#update | com.unirhy.e2e.SystemAuthE2eTest#initialize login get update logout should form closed session flow | - |
+| 62 | FULL | GET | /api/system-config/status | - | N | SystemConfigController#isInitialized | com.unirhy.e2e.SystemAuthE2eTest#status and protected endpoints require authentication | - |
+| 63 | TODO | GET | /api/task-definitions | - | Y | TaskDefinitionController#listTaskDefinitions | - | - |
+| 64 | TODO | GET | /api/task-definitions/{namespace}/{taskType} | - | Y | TaskDefinitionController#getTaskDefinition | - | - |
+| 65 | FULL | GET | /api/task-statistics | - | Y | TaskStatisticsController#getTaskStatistics | com.unirhy.e2e.TaskContentReadE2eTest#scan submission should report metadata parse stats and accept incremental duplicate submission | stats: per task key submission/task status counts, transcode drain covered by com.unirhy.e2e.TaskContentReadE2eTest#transcode task should complete successfully and write opus files |
+| 66 | TODO | GET | /api/task-submissions | - | Y | TaskSubmissionController#listSubmissions | - | - |
+| 67 | TODO | PATCH | /api/task-submissions | - | Y | TaskSubmissionController#patchSubmissions | - | - |
+| 68 | FULL | POST | /api/task-submissions | - | Y | TaskSubmissionController#createSubmission | com.unirhy.e2e.TaskContentReadE2eTest#scan submission should report metadata parse stats and accept incremental duplicate submission | duplicate: repeated submission returns 202 and active payload dedup keeps task count stable; plugin: com.unirhy.e2e.PluginE2eTest#plugin lifecycle should support upload list download enable submit disable and delete covers plugin task keys, disabled plugin returns 409, unknown key returns 404, invalid key returns 400 |
+| 69 | TODO | DELETE | /api/task-submissions/{id} | - | Y | TaskSubmissionController#deleteSubmission | - | - |
+| 70 | FULL | GET | /api/task-submissions/{id} | - | Y | TaskSubmissionController#getSubmission | com.unirhy.e2e.PluginE2eTest#plugin lifecycle should support upload list download enable submit disable and delete | polling: submission reaches COMPLETED after async planning |
+| 71 | TODO | PATCH | /api/task-submissions/{id} | - | Y | TaskSubmissionController#patchSubmission | - | - |
+| 72 | TODO | GET | /api/task-submissions/{id}/tasks | - | Y | TaskSubmissionController#listSubmissionTasks | - | - |
+| 73 | TODO | GET | /api/tasks | - | Y | TaskController#listTasks | - | - |
+| 74 | TODO | PATCH | /api/tasks | - | Y | TaskController#patchTasks | - | - |
+| 75 | TODO | GET | /api/tasks/{id} | - | Y | TaskController#getTask | - | - |
+| 76 | TODO | PATCH | /api/tasks/{id} | - | Y | TaskController#patchTask | - | - |
+| 77 | FULL | POST | /api/tokens | - | N | TokenController#login | com.unirhy.e2e.SystemAuthE2eTest#duplicate init and wrong login return stable business errors | - |
+| 78 | FULL | DELETE | /api/tokens/current | - | N | TokenController#logout | com.unirhy.e2e.SystemAuthE2eTest#initialize login get update logout should form closed session flow | - |
+| 79 | FULL | GET | /api/works | - | Y | WorkController#listWork | com.unirhy.e2e.TaskContentReadE2eTest#works and albums should support read random and delete flow | - |
+| 80 | FULL | POST | /api/works/merge-requests | - | Y | WorkController#mergeWork | com.unirhy.e2e.AccountPlaylistContentE2eTest#content endpoints should support search update recording update and merge flow | merge: source work removed and recordings moved to target |
+| 81 | FULL | GET | /api/works/random-selection | - | Y | WorkController#randomWork | com.unirhy.e2e.TaskContentReadE2eTest#works and albums should support read random and delete flow | validation: length<=0 returns 400 |
+| 82 | FULL | GET | /api/works/search-results | - | Y | WorkController#getWorkByName | com.unirhy.e2e.AccountPlaylistContentE2eTest#content endpoints should support search update recording update and merge flow | validation: unknown keyword returns empty array |
+| 83 | FULL | DELETE | /api/works/{id} | - | Y | WorkController#deleteWork | com.unirhy.e2e.TaskContentReadE2eTest#works and albums should support read random and delete flow | - |
+| 84 | FULL | GET | /api/works/{id} | - | Y | WorkController#getWorkById | com.unirhy.e2e.TaskContentReadE2eTest#works and albums should support read random and delete flow | - |
+| 85 | FULL | PUT | /api/works/{id} | - | Y | WorkController#updateWork | com.unirhy.e2e.AccountPlaylistContentE2eTest#content endpoints should support search update recording update and merge flow | - |

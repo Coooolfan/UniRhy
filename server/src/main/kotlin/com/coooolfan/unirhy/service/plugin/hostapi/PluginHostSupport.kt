@@ -86,6 +86,10 @@ internal val PLUGIN_HOST_FUNCTION_NAMES: Set<String> = setOf(
     "host_task_statistics",
     "host_plugin_list",
     "host_plugin_get",
+    "host_plugin_config_get",
+    "host_plugin_data_get",
+    "host_plugin_data_put",
+    "host_plugin_data_list",
     "host_account_list",
     "host_account_get",
 )
@@ -265,6 +269,9 @@ internal class PluginHostSupport(
 
     private fun mapError(ex: Exception): PluginHostException {
         if (ex is PluginHostException) return ex
+        if (ex is InvalidPluginConfigurationException) {
+            return PluginHostException(PluginHostErrorCode.CONFLICT, ex.message ?: "Plugin configuration is invalid", ex)
+        }
         if (ex is DataIntegrityViolationException) {
             return PluginHostException(PluginHostErrorCode.CONFLICT, "The operation conflicts with existing data", ex)
         }

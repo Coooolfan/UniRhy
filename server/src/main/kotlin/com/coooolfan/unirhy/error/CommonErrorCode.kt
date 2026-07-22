@@ -100,6 +100,12 @@ enum class PluginErrorCode {
 
     INVALID_CONCURRENCY,
 
+    @ErrorField(name = "reason", type = String::class)
+    INVALID_CONFIGURATION,
+
+    @ErrorField(name = "reason", type = String::class)
+    CONFIGURATION_REQUIRED,
+
     /** 删除前置条件不满足：插件仍启用，或存在活动 submission / task */
     DELETE_CONFLICT,
 }
