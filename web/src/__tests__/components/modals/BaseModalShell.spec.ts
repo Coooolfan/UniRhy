@@ -29,16 +29,23 @@ const mountShell = (
 describe('BaseModalShell', () => {
     it('renders the shell and default tone styles', () => {
         const wrapper = mountShell()
+        const closeButton = wrapper.get('[data-testid="app-modal-close"]')
 
         expect(wrapper.get('[data-testid="app-modal-root"]').text()).toContain('测试弹窗')
-        expect(wrapper.html()).toContain('bg-[#2B221B]/50')
-        expect(wrapper.html()).toContain('border-[#EAE6DE]')
+        expect(wrapper.html()).toContain('bg-[#2B221B]/45')
+        expect(wrapper.html()).toContain('border-[#E7E2D6]')
+        expect(wrapper.get('[data-testid="app-modal-backdrop"]').classes()).not.toContain(
+            'backdrop-blur-[3px]',
+        )
+        expect(closeButton.attributes('aria-label')).toBe('关闭')
+        expect(closeButton.classes()).not.toContain('rounded-full')
+        expect(closeButton.classes()).not.toContain('hover:rotate-90')
     })
 
     it('renders danger tone styles', () => {
         const wrapper = mountShell({ tone: 'danger' })
 
-        expect(wrapper.html()).toContain('bg-black/55')
+        expect(wrapper.html()).toContain('bg-[#241414]/55')
         expect(wrapper.html()).toContain('border-[#E3C8C8]')
     })
 

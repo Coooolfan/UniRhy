@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, useSlots, watch } from 'vue'
 import { X } from 'lucide-vue-next'
+import { useI18n } from 'vue-i18n'
 import { lockBodyScroll, unlockBodyScroll } from '@/components/modals/bodyScrollLock'
 import type { ModalSize, ModalTone } from '@/stores/modal'
 
@@ -37,6 +38,7 @@ const emit = defineEmits<{
     (event: 'close'): void
     (event: 'afterLeave'): void
 }>()
+const { t } = useI18n()
 const slots = useSlots()
 const modalContainerRef = ref<HTMLElement | null>(null)
 const focusableSelector = [
@@ -86,23 +88,35 @@ const panelFrameStyle = computed(() => {
 
 const shellClass = computed(() =>
     props.tone === 'danger'
-        ? 'border-[#E3C8C8] bg-[#FAF9F6] text-[#2B221B]'
-        : 'border-[#EAE6DE] bg-[#FAF9F6] text-[#2B221B]',
+        ? 'border-[#E3C8C8] bg-[#FBF8F4] text-[#2B221B]'
+        : 'border-[#E7E2D6] bg-[#FAF9F6] text-[#2B221B]',
 )
 
-const backdropClass = computed(() => (props.tone === 'danger' ? 'bg-black/55' : 'bg-[#2B221B]/50'))
+const backdropClass = computed(() =>
+    props.tone === 'danger' ? 'bg-[#241414]/55' : 'bg-[#2B221B]/45',
+)
+
+const headerClass = computed(() =>
+    props.tone === 'danger' ? 'border-[#EDD9D9]' : 'border-[#EAE6DE]',
+)
+
+const titleMarkClass = computed(() => (props.tone === 'danger' ? 'bg-[#B95D5D]' : 'bg-[#2B221B]'))
 
 const closeButtonClass = computed(() =>
     props.tone === 'danger'
-        ? 'text-[#9E5A5A] hover:bg-[#FFF2F2] hover:text-[#7B3434]'
-        : 'text-[#8C857B] hover:bg-[#F2EEE7] hover:text-[#2B221B]',
+        ? 'text-[#9E5A5A] hover:text-[#7B3434] focus-visible:ring-[#9E5A5A]'
+        : 'text-[#8A8A8A] hover:text-[#C27E46] focus-visible:ring-[#C27E46]',
 )
 
-const titleClass = computed(() => (props.tone === 'danger' ? 'text-[#2B221B]' : 'text-[#2B221B]'))
+const footerClass = computed(() =>
+    props.tone === 'danger'
+        ? 'border-[#EDD9D9] bg-[#F9F1EC]/70'
+        : 'border-[#EAE6DE] bg-[#F5F2EA]/70',
+)
 
 const bodyClass = computed(() =>
     props.bodyPadding
-        ? 'modal-body min-h-0 flex-1 overflow-y-auto px-8 py-8'
+        ? 'modal-body min-h-0 flex-1 overflow-y-auto px-7 py-6'
         : 'flex min-h-0 flex-1 overflow-hidden',
 )
 
@@ -364,11 +378,17 @@ onUnmounted(() => {
 
                 <div class="absolute inset-0 flex items-center justify-center p-4 sm:p-6">
                     <div
-                        class="app-modal-panel relative max-w-full pointer-events-auto transition-[width,height] duration-300 ease-out"
+                        class="app-modal-panel pointer-events-auto relative max-w-full transition-[width,height,transform,translate,scale] duration-300 ease-out"
+                        :class="isTopmost ? '' : 'translate-y-3 scale-[0.96]'"
                         :style="panelFrameStyle"
                     >
                         <div
-                            class="absolute inset-0 bg-[#F0EEE6] shadow-md transform -rotate-2"
+                            aria-hidden="true"
+                            class="absolute inset-0 translate-y-2 rotate-[0.75deg] border border-[#E3DED2] bg-[#F4F1E9]"
+                        ></div>
+                        <div
+                            aria-hidden="true"
+                            class="absolute inset-0 -rotate-1 bg-[#EDE9DE] shadow-md"
                         ></div>
 
                         <div
@@ -377,35 +397,41 @@ onUnmounted(() => {
                             tabindex="-1"
                             role="dialog"
                             aria-modal="true"
-                            class="relative flex max-h-[min(85vh,720px)] flex-col overflow-hidden border shadow-[0_20px_40px_-12px_rgba(43,34,27,0.16)]"
+                            :aria-label="title || undefined"
+                            class="relative flex max-h-[min(85vh,720px)] flex-col overflow-hidden border shadow-[0_24px_56px_-16px_rgba(43,34,27,0.28)]"
                             :class="shellClass"
                         >
                             <div
                                 v-if="shouldRenderHeader"
                                 data-testid="app-modal-header"
-                                class="flex items-start justify-between gap-4 border-b border-[#EAE6DE] px-8 py-6"
+                                class="flex items-center gap-4 border-b px-7 py-5"
+                                :class="headerClass"
                             >
                                 <slot v-if="hasCustomHeader" name="header" />
 
-                                <div v-else class="min-w-0">
+                                <template v-else>
+                                    <span
+                                        aria-hidden="true"
+                                        class="h-7 w-[3px] shrink-0"
+                                        :class="titleMarkClass"
+                                    ></span>
                                     <h2
-                                        class="font-serif text-3xl tracking-wide"
-                                        :class="titleClass"
+                                        class="min-w-0 truncate font-serif text-xl tracking-[0.15em]"
                                     >
                                         {{ title }}
                                     </h2>
-                                    <div class="mt-6 h-px w-full bg-[#2B221B]"></div>
-                                </div>
+                                </template>
 
                                 <button
                                     v-if="closable"
                                     type="button"
                                     data-testid="app-modal-close"
-                                    class="shrink-0 p-2 transition-colors"
+                                    class="ml-auto inline-flex h-8 w-8 shrink-0 items-center justify-center outline-none transition-colors focus-visible:ring-1 focus-visible:ring-offset-2"
                                     :class="closeButtonClass"
+                                    :aria-label="t('common.close')"
                                     @click="requestClose"
                                 >
-                                    <X :size="18" />
+                                    <X class="h-4 w-4" />
                                 </button>
                             </div>
 
@@ -413,7 +439,11 @@ onUnmounted(() => {
                                 <slot />
                             </div>
 
-                            <div v-if="$slots.footer" class="border-t border-[#EAE6DE] px-8 py-6">
+                            <div
+                                v-if="$slots.footer"
+                                class="border-t px-7 py-5"
+                                :class="footerClass"
+                            >
                                 <slot name="footer" />
                             </div>
                         </div>
@@ -425,13 +455,12 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-.app-modal-enter-active,
-.app-modal-leave-active {
-    transition: opacity 300ms ease;
+.app-modal-enter-active {
+    transition: opacity 240ms ease;
 }
 
 .app-modal-leave-active {
-    transition-duration: 200ms;
+    transition: opacity 160ms ease-in;
 }
 
 .app-modal-enter-from,
@@ -439,23 +468,39 @@ onUnmounted(() => {
     opacity: 0;
 }
 
-.app-modal-enter-active .app-modal-panel,
-.app-modal-leave-active .app-modal-panel {
+.app-modal-enter-active .app-modal-panel {
     transition:
-        transform 300ms ease,
-        opacity 300ms ease,
+        transform 340ms cubic-bezier(0.22, 1, 0.36, 1),
+        opacity 240ms ease,
         width 300ms ease-out,
         height 300ms ease-out;
 }
 
 .app-modal-leave-active .app-modal-panel {
-    transition-duration: 200ms;
+    transition:
+        transform 180ms ease-in,
+        opacity 160ms ease-in,
+        width 300ms ease-out,
+        height 300ms ease-out;
 }
 
-.app-modal-enter-from .app-modal-panel,
+.app-modal-enter-from .app-modal-panel {
+    opacity: 0;
+    transform: translateY(18px) scale(0.965);
+}
+
 .app-modal-leave-to .app-modal-panel {
     opacity: 0;
-    transform: translateY(1rem);
+    transform: translateY(10px) scale(0.98);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .app-modal-enter-active,
+    .app-modal-leave-active,
+    .app-modal-enter-active .app-modal-panel,
+    .app-modal-leave-active .app-modal-panel {
+        transition: none;
+    }
 }
 
 .modal-body {

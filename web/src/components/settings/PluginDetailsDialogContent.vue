@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { CheckCircle2, ChevronDown, Loader2, Save, XCircle } from 'lucide-vue-next'
+import { ChevronDown, Loader2, Save, XCircle } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 import type { PluginInfoResponse } from '@/__generated/model/static/PluginInfoResponse'
 import type { PluginConfigurationResponse } from '@/__generated/model/static/PluginConfigurationResponse'
@@ -100,22 +100,6 @@ const handleConcurrencySave = async () => {
                     <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
                         <span class="font-mono text-[#9C968B]">v{{ plugin.version }}</span>
                         <span class="font-mono text-[#8A8177]">{{ plugin.taskType }}</span>
-                        <span class="flex items-center gap-1">
-                            <CheckCircle2
-                                v-if="plugin.isAvailable"
-                                class="h-3.5 w-3.5 text-emerald-500"
-                            />
-                            <XCircle v-else class="h-3.5 w-3.5 text-[#C0BAB0]" />
-                            <span
-                                :class="plugin.isAvailable ? 'text-emerald-600' : 'text-[#9C968B]'"
-                            >
-                                {{
-                                    plugin.isAvailable
-                                        ? t('plugins.running')
-                                        : t('plugins.notLoaded')
-                                }}
-                            </span>
-                        </span>
                     </div>
                 </div>
 
@@ -149,6 +133,13 @@ const handleConcurrencySave = async () => {
                                 {{ enabled ? t('plugins.enabled') : t('plugins.disabled') }}
                             </span>
                         </label>
+                        <p
+                            v-if="enabled && !plugin.isAvailable"
+                            class="mt-3 flex items-center gap-1.5 text-xs text-[#B95D5D]"
+                        >
+                            <XCircle class="h-3.5 w-3.5 shrink-0" />
+                            {{ t('plugins.notLoaded') }}
+                        </p>
                     </section>
 
                     <section class="border-b border-[#E8E4D9] pb-5">

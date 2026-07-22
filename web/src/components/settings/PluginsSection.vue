@@ -1,16 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import {
-    CheckCircle2,
-    Download,
-    Loader2,
-    Puzzle,
-    Settings2,
-    Trash2,
-    Upload,
-    XCircle,
-} from 'lucide-vue-next'
+import { Download, Loader2, Puzzle, Settings2, Trash2, Upload, XCircle } from 'lucide-vue-next'
 import type { PluginInfoResponse } from '@/__generated/model/static/PluginInfoResponse'
 import type { PluginConfigurationResponse } from '@/__generated/model/static/PluginConfigurationResponse'
 import PluginDetailsDialogContent from '@/components/settings/PluginDetailsDialogContent.vue'
@@ -179,27 +170,21 @@ const handleDownload = async (plugin: PluginInfoResponse) => {
                                 </span>
                             </div>
 
-                            <div class="mt-2 flex items-center gap-1 text-xs">
-                                <div class="flex items-center gap-1">
-                                    <CheckCircle2
-                                        v-if="plugin.isAvailable"
-                                        class="h-3.5 w-3.5 text-emerald-500"
-                                    />
-                                    <XCircle v-else class="h-3.5 w-3.5 text-[#C0BAB0]" />
-                                    <span
-                                        :class="
-                                            plugin.isAvailable
-                                                ? 'text-emerald-600'
-                                                : 'text-[#9C968B]'
-                                        "
-                                    >
-                                        {{
-                                            plugin.isAvailable
-                                                ? t('plugins.running')
-                                                : t('plugins.notLoaded')
-                                        }}
-                                    </span>
-                                </div>
+                            <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                                <span :class="plugin.enabled ? 'text-[#5F7350]' : 'text-[#9C968B]'">
+                                    {{
+                                        plugin.enabled
+                                            ? t('plugins.enabled')
+                                            : t('plugins.disabled')
+                                    }}
+                                </span>
+                                <span
+                                    v-if="plugin.enabled && !plugin.isAvailable"
+                                    class="flex items-center gap-1 text-[#B95D5D]"
+                                >
+                                    <XCircle class="h-3.5 w-3.5" />
+                                    {{ t('plugins.notLoaded') }}
+                                </span>
                             </div>
                         </div>
                     </div>

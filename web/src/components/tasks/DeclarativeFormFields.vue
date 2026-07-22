@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ChevronDown, RotateCcw, X } from 'lucide-vue-next'
+import { useI18n } from 'vue-i18n'
 import { isFieldValid, type SchemaField, type SchemaFormValues } from './schemaForm'
 
 const props = withDefaults(
@@ -28,6 +29,20 @@ const emit = defineEmits<{
 const updateValue = (fieldName: string, value: string | boolean) => {
     emit('update:modelValue', { ...props.modelValue, [fieldName]: value })
 }
+
+const { t } = useI18n()
+
+const isSecretConfigured = (field: SchemaField) =>
+    field.writeOnly === true &&
+    props.configuredSecretFields.has(field.name) &&
+    !props.clearedSecretFields.has(field.name)
+
+const inputPlaceholder = (field: SchemaField) =>
+    isSecretConfigured(field) ? t('plugins.secretConfigured') : field.description
+
+const showDescriptionHint = (field: SchemaField) =>
+    Boolean(field.description) &&
+    (field.type === 'boolean' || Boolean(field.enum) || isSecretConfigured(field))
 
 const inputValue = (event: Event) => (event.target as HTMLInputElement).value
 const checkedValue = (event: Event) => (event.target as HTMLInputElement).checked
@@ -85,12 +100,10 @@ const checkedValue = (event: Event) => (event.target as HTMLInputElement).checke
                         :min="field.minimum"
                         :max="field.maximum"
                         :step="field.type === 'integer' ? 1 : field.multipleOf"
-                        class="w-full border-b bg-[#F7F5F0] p-3 text-sm text-[#2C2C2C] outline-none transition-colors focus:border-[#C27E46] disabled:opacity-60"
+                        :placeholder="inputPlaceholder(field)"
+                        class="w-full border-b bg-[#F7F5F0] p-3 text-sm text-[#2C2C2C] outline-none transition-colors placeholder:text-[#B4AC9C] focus:border-[#C27E46] disabled:opacity-60"
                         :class="
-                            isFieldValid(field, modelValue[field.name]) ||
-                            (field.writeOnly &&
-                                configuredSecretFields.has(field.name) &&
-                                !clearedSecretFields.has(field.name))
+                            isFieldValid(field, modelValue[field.name]) || isSecretConfigured(field)
                                 ? 'border-[#D6D1C4]'
                                 : 'border-rose-300'
                         "
@@ -99,11 +112,7 @@ const checkedValue = (event: Event) => (event.target as HTMLInputElement).checke
                         @input="updateValue(field.name, inputValue($event))"
                     />
                     <button
-                        v-if="
-                            field.writeOnly &&
-                            configuredSecretFields.has(field.name) &&
-                            !clearedSecretFields.has(field.name)
-                        "
+                        v-if="isSecretConfigured(field)"
                         type="button"
                         class="absolute top-1/2 right-2 -translate-y-1/2 p-1.5 text-[#9C968B] transition-colors hover:text-rose-500"
                         :disabled="disabled"
@@ -125,22 +134,14 @@ const checkedValue = (event: Event) => (event.target as HTMLInputElement).checke
                 </div>
             </label>
 
-            <p v-if="field.description" class="mt-2 text-xs leading-relaxed text-[#9C968B]">
+            <p
+                v-if="showDescriptionHint(field)"
+                class="mt-2 text-xs leading-relaxed text-[#9C968B]"
+            >
                 {{ field.description }}
             </p>
             <p
-                v-if="
-                    field.writeOnly &&
-                    configuredSecretFields.has(field.name) &&
-                    !clearedSecretFields.has(field.name) &&
-                    modelValue[field.name] === ''
-                "
-                class="mt-2 text-xs text-emerald-600"
-            >
-                {{ $t('plugins.secretConfigured') }}
-            </p>
-            <p
-                v-else-if="field.writeOnly && clearedSecretFields.has(field.name)"
+                v-if="field.writeOnly && clearedSecretFields.has(field.name)"
                 class="mt-2 text-xs text-rose-600"
             >
                 {{ $t('plugins.secretPendingClear') }}
