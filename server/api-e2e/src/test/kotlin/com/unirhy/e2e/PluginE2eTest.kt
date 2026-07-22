@@ -132,10 +132,10 @@ class PluginE2eTest {
             json = mapOf(
                 "namespace" to pluginId,
                 "taskType" to TASK_TYPE,
-                "params" to emptyMap<String, Any>(),
+                "params" to mapOf("tags" to listOf("classical", "instrumental")),
             ),
         )
-        E2eAssert.status(submitResponse, 202, "[plugins] submit should accept loaded plugin task")
+        E2eAssert.status(submitResponse, 202, "[plugins] submit should accept homogeneous array params")
         val submissionId = E2eJson.mapper.readTree(submitResponse.body()).path("submissionId").longValue()
         assertTrue(submissionId > 0, "[plugins] submit should return submissionId")
 
@@ -150,6 +150,16 @@ class PluginE2eTest {
             ),
         )
         E2eAssert.status(invalidParamsResponse, 400, "[plugins] params outside schema should fail")
+
+        val mixedArrayResponse = state.api.post(
+            path = "/api/task-submissions",
+            json = mapOf(
+                "namespace" to pluginId,
+                "taskType" to TASK_TYPE,
+                "params" to mapOf("tags" to listOf("classical", 2)),
+            ),
+        )
+        E2eAssert.status(mixedArrayResponse, 400, "[plugins] mixed array params should fail")
 
         val disableResponse = state.api.put(
             path = "/api/plugins/$pluginId/enabled-state",
@@ -585,10 +595,16 @@ class PluginE2eTest {
                   dryRun:
                     type: boolean
                     title: Dry run
+                  tags:
+                    type: array
+                    title: Tags
+                    items:
+                      type: string
                 required: []
                 additionalProperties: false
               order:
                 - dryRun
+                - tags
         """.trimIndent() + if (config.isEmpty()) "" else "\n$config"
         return zip(
             "plugin.yml" to manifest.toByteArray(),
