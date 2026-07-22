@@ -5,6 +5,8 @@ import run.endive.runtime.ImportValues
 import run.endive.runtime.Instance
 import run.endive.wasm.Parser
 import run.endive.wasm.WasmModule
+import run.endive.wasm.types.FunctionType
+import run.endive.wasm.types.ValType
 import tools.jackson.databind.json.JsonMapper
 import java.io.ByteArrayInputStream
 
@@ -31,20 +33,38 @@ class WasmPlugin private constructor(
         }
     }
 
-    /** 执行单个任务载荷 */
+    /** 执行单个任务载荷并读取结果信封。 */
     fun run(payloadJson: ByteArray) {
         withInstance { instance ->
             val alloc = instance.export("alloc")
             val dealloc = instance.export("dealloc")
             val len = payloadJson.size
             val ptr = alloc.apply(len.toLong())[0].toInt()
-            try {
+            val results = try {
                 instance.memory().write(ptr, payloadJson)
                 instance.export("run").apply(ptr.toLong(), len.toLong())
             } catch (ex: Exception) {
                 throw WasmPluginException("plugin run() failed: ${ex.message}", ex)
             } finally {
                 dealloc.apply(ptr.toLong(), len.toLong())
+            }
+            if (results.size != 1) {
+                throw WasmPluginException("plugin run() returned ${results.size} values; expected one")
+            }
+            val output = readPackedOutput(instance, results[0])
+            val result = try {
+                JsonMapper.shared().readTree(output)
+            } catch (ex: Exception) {
+                throw WasmPluginException("failed to parse run() result: ${ex.message}", ex)
+            }
+            val ok = result.get("ok")?.takeIf { it.isBoolean }?.booleanValue()
+                ?: throw WasmPluginException("plugin run() result must contain boolean field 'ok'")
+            if (!ok) {
+                val error = result.get("error")?.takeIf { it.isString }?.stringValue()?.trim()
+                if (error.isNullOrEmpty()) {
+                    throw WasmPluginException("plugin run() failed without an error message")
+                }
+                throw WasmPluginException("plugin run() failed: $error")
             }
         }
     }
@@ -74,23 +94,31 @@ class WasmPlugin private constructor(
         try {
             instance.memory().write(inputPtr, inputJson)
             val packed = export.apply(inputPtr.toLong(), inputLen.toLong())[0]
-            val outputPtr = (packed ushr 32).toInt()
-            val outputLen = (packed and 0xFFFF_FFFFL).toInt()
-            if (outputLen < 0) {
-                throw WasmPluginException("plugin returned negative output length: $outputLen")
-            }
-            val outputBytes = instance.memory().readBytes(outputPtr, outputLen)
-            if (outputLen > 0) {
-                dealloc.apply(outputPtr.toLong(), outputLen.toLong())
-            }
-            return outputBytes
+            return readPackedOutput(instance, packed)
         } finally {
             dealloc.apply(inputPtr.toLong(), inputLen.toLong())
         }
     }
 
+    private fun readPackedOutput(instance: Instance, packed: Long): ByteArray {
+        val outputPtr = (packed ushr 32).toInt()
+        val outputLen = (packed and 0xFFFF_FFFFL).toInt()
+        if (outputLen < 0) {
+            throw WasmPluginException("plugin returned negative output length: $outputLen")
+        }
+        val outputBytes = instance.memory().readBytes(outputPtr, outputLen)
+        if (outputLen > 0) {
+            instance.export("dealloc").apply(outputPtr.toLong(), outputLen.toLong())
+        }
+        return outputBytes
+    }
+
     companion object {
         private val REQUIRED_EXPORTS = listOf("alloc", "dealloc", "plan", "run")
+        private val RUN_FUNCTION_TYPE = FunctionType.of(
+            arrayOf(ValType.I32, ValType.I32),
+            arrayOf(ValType.I64),
+        )
 
         /** 仅解析模块字节，用于上传时的格式检查 */
         fun parseModule(wasmBytes: ByteArray): WasmModule =
@@ -118,6 +146,12 @@ class WasmPlugin private constructor(
                 } catch (ex: Exception) {
                     throw WasmPluginException("plugin $pluginId missing required export: $exportName", ex)
                 }
+            }
+            val runType = probeInstance.exportType("run")
+            if (!runType.typesMatch(RUN_FUNCTION_TYPE)) {
+                throw WasmPluginException(
+                    "plugin $pluginId export 'run' must have signature (i32, i32) -> i64, got $runType",
+                )
             }
             return plugin
         }

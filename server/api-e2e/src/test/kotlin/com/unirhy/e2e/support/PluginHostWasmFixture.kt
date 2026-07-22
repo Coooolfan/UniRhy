@@ -27,6 +27,7 @@ object PluginHostWasmFixture {
     private const val DATA_GET_REQUEST_PTR = 15360
     private const val DATA_LIST_REQUEST_PTR = 16384
     private const val STORAGE_DATA_PTR = 17408
+    private const val RUN_RESULT_PTR = 19456
     private const val ALLOC_PTR = 20480
     private const val RESPONSE_OK_VALUE_OFFSET = 6
     private const val RESPONSE_DATA_ARRAY_ITEM_OFFSET = 19
@@ -123,6 +124,7 @@ object PluginHostWasmFixture {
         check(hostFunctionNames.size == 71 && hostFunctionNames.distinct().size == 71)
 
         val plan = "[{}]".toByteArray()
+        val runResult = "{\"ok\":true}".toByteArray()
         val artistRequest = E2eJson.mapper.writeValueAsBytes(mapOf("displayName" to artistName))
         val workRequest = E2eJson.mapper.writeValueAsBytes(mapOf("title" to workTitle))
         val recordingRequest = E2eJson.mapper.writeValueAsBytes(
@@ -204,7 +206,8 @@ object PluginHostWasmFixture {
         requireFits(DATA_PUT_REQUEST_PTR, DATA_GET_REQUEST_PTR, dataPutRequest)
         requireFits(DATA_GET_REQUEST_PTR, DATA_LIST_REQUEST_PTR, dataGetRequest)
         requireFits(DATA_LIST_REQUEST_PTR, STORAGE_DATA_PTR, dataListRequest)
-        requireFits(STORAGE_DATA_PTR, ALLOC_PTR, objectBytes)
+        requireFits(STORAGE_DATA_PTR, RUN_RESULT_PTR, objectBytes)
+        requireFits(RUN_RESULT_PTR, ALLOC_PTR, runResult)
 
         val artistCreateIndex = hostFunctionNames.indexOf("host_artist_create")
         val workCreateIndex = hostFunctionNames.indexOf("host_work_create")
@@ -252,7 +255,7 @@ object PluginHostWasmFixture {
                     unsignedLeb128(ALLOC_TYPE),
                     unsignedLeb128(VOID_BINARY_TYPE),
                     unsignedLeb128(JSON_TYPE),
-                    unsignedLeb128(VOID_BINARY_TYPE),
+                    unsignedLeb128(JSON_TYPE),
                 ),
             )
             writeSection(5, vector(bytes(byteArrayOf(0x00), unsignedLeb128(1))))
@@ -333,6 +336,7 @@ object PluginHostWasmFixture {
                         objectBytes.mapIndexed { index, byte ->
                             assertMemoryByte(ALLOC_PTR + index, byte.toInt() and 0xFF)
                         }.let(::bytes),
+                        i64Const(pack(RUN_RESULT_PTR, runResult.size)),
                         END,
                     ),
                 ),
@@ -357,6 +361,7 @@ object PluginHostWasmFixture {
                     dataSegment(DATA_GET_REQUEST_PTR, dataGetRequest),
                     dataSegment(DATA_LIST_REQUEST_PTR, dataListRequest),
                     dataSegment(STORAGE_DATA_PTR, objectBytes),
+                    dataSegment(RUN_RESULT_PTR, runResult),
                 ),
             )
         }.toByteArray()
