@@ -23,6 +23,7 @@ export default defineConfig({
     tailwindcss(),
   ],
   server: {
+    host: true,
     allowedHosts: ['mini.home.coooolfan.com'],
   },
   resolve: {
