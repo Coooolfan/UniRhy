@@ -14,39 +14,48 @@ import org.springframework.transaction.annotation.Transactional
 
 @Service
 class PlaylistService(private val sql: KSqlClient) {
-    fun getPlaylists(fetcher: Fetcher<Playlist>): List<Playlist> {
-        val accountId = StpUtil.getLoginIdAsLong()
+    fun getPlaylists(fetcher: Fetcher<Playlist>): List<Playlist> =
+        getPlaylists(StpUtil.getLoginIdAsLong(), fetcher)
+
+    fun getPlaylists(ownerId: Long?, fetcher: Fetcher<Playlist>): List<Playlist> {
         return sql.createQuery(Playlist::class) {
-            where(table.ownerId eq accountId)
+            ownerId?.let { where(table.ownerId eq it) }
             orderBy(table.id)
             select(table.fetch(fetcher))
         }.execute()
     }
 
-    fun getPlaylist(playlistId: Long, fetcher: Fetcher<Playlist>): Playlist {
-        val accountId = StpUtil.getLoginIdAsLong()
+    fun getPlaylist(playlistId: Long, fetcher: Fetcher<Playlist>): Playlist =
+        getPlaylist(playlistId, StpUtil.getLoginIdAsLong(), fetcher)
+
+    fun getPlaylist(playlistId: Long, ownerId: Long?, fetcher: Fetcher<Playlist>): Playlist {
         return sql.createQuery(Playlist::class) {
             where(table.id eq playlistId)
-            where(table.ownerId eq accountId)
+            ownerId?.let { where(table.ownerId eq it) }
             select(table.fetch(fetcher))
         }.execute().firstOrNull()
             ?: throw PlaylistException.NotFound()
     }
 
-    fun createPlaylist(create: Playlist, fetcher: Fetcher<Playlist>): Playlist {
+    fun createPlaylist(create: Playlist, fetcher: Fetcher<Playlist>): Playlist =
+        createPlaylist(create, StpUtil.getLoginIdAsLong(), fetcher)
+
+    fun createPlaylist(create: Playlist, ownerId: Long, fetcher: Fetcher<Playlist>): Playlist {
         val entity = Playlist(create) {
-            ownerId = StpUtil.getLoginIdAsLong()
+            this.ownerId = ownerId
         }
         return sql.saveCommand(entity, SaveMode.INSERT_ONLY).execute(fetcher).modifiedEntity
     }
 
-    fun updatePlaylist(input: Playlist, fetcher: Fetcher<Playlist>): Playlist {
-        val accountId = StpUtil.getLoginIdAsLong()
+    fun updatePlaylist(input: Playlist, fetcher: Fetcher<Playlist>): Playlist =
+        updatePlaylist(input, StpUtil.getLoginIdAsLong(), fetcher)
+
+    fun updatePlaylist(input: Playlist, ownerId: Long?, fetcher: Fetcher<Playlist>): Playlist {
         val hasName = ImmutableObjects.isLoaded(input, "name")
         val hasComment = ImmutableObjects.isLoaded(input, "comment")
 
         if (!hasName && !hasComment) {
-            return getPlaylist(input.id, fetcher)
+            return getPlaylist(input.id, ownerId, fetcher)
         }
 
         val affectedRows = sql.createUpdate(Playlist::class) {
@@ -57,21 +66,23 @@ class PlaylistService(private val sql: KSqlClient) {
                 set(table.comment, input.comment)
             }
             where(table.id eq input.id)
-            where(table.ownerId eq accountId)
+            ownerId?.let { where(table.ownerId eq it) }
         }.execute()
 
         if (affectedRows == 0) {
             throw PlaylistException.NotFound()
         }
 
-        return getPlaylist(input.id, fetcher)
+        return getPlaylist(input.id, ownerId, fetcher)
     }
 
-    fun deletePlaylist(playlistId: Long) {
-        val accountId = StpUtil.getLoginIdAsLong()
+    fun deletePlaylist(playlistId: Long) =
+        deletePlaylist(playlistId, StpUtil.getLoginIdAsLong())
+
+    fun deletePlaylist(playlistId: Long, ownerId: Long?) {
         val affectedRows = sql.createDelete(Playlist::class) {
             where(table.id eq playlistId)
-            where(table.ownerId eq accountId)
+            ownerId?.let { where(table.ownerId eq it) }
         }.execute()
 
         if (affectedRows == 0) {
@@ -80,8 +91,12 @@ class PlaylistService(private val sql: KSqlClient) {
     }
 
     @Transactional
-    fun addRecordingToPlaylist(playlistId: Long, recordingId: Long) {
-        requirePlaylistOwned(playlistId)
+    fun addRecordingToPlaylist(playlistId: Long, recordingId: Long) =
+        addRecordingToPlaylist(playlistId, recordingId, StpUtil.getLoginIdAsLong())
+
+    @Transactional
+    fun addRecordingToPlaylist(playlistId: Long, recordingId: Long, ownerId: Long?) {
+        requirePlaylistAccessible(playlistId, ownerId)
 
         val alreadyExists = sql.createQuery(PlaylistRecording::class) {
             where(table.playlistId eq playlistId)
@@ -107,8 +122,12 @@ class PlaylistService(private val sql: KSqlClient) {
     }
 
     @Transactional
-    fun removeRecordingFromPlaylist(playlistId: Long, recordingId: Long) {
-        requirePlaylistOwned(playlistId)
+    fun removeRecordingFromPlaylist(playlistId: Long, recordingId: Long) =
+        removeRecordingFromPlaylist(playlistId, recordingId, StpUtil.getLoginIdAsLong())
+
+    @Transactional
+    fun removeRecordingFromPlaylist(playlistId: Long, recordingId: Long, ownerId: Long?) {
+        requirePlaylistAccessible(playlistId, ownerId)
 
         sql.createDelete(PlaylistRecording::class) {
             where(table.playlistId eq playlistId)
@@ -116,25 +135,33 @@ class PlaylistService(private val sql: KSqlClient) {
         }.execute()
     }
 
-    private fun requirePlaylistOwned(playlistId: Long) {
+    private fun requirePlaylistAccessible(playlistId: Long, ownerId: Long?) {
         val exists = sql.executeQuery(Playlist::class) {
             where(table.id eq playlistId)
-            where(table.ownerId eq StpUtil.getLoginIdAsLong())
+            ownerId?.let { where(table.ownerId eq it) }
             selectCount()
         }.first() > 0L
         if (!exists) throw PlaylistException.NotFound()
     }
 
     @Transactional
-    fun reorderPlaylistRecordings(playlistId: Long, recordingIds: List<Long>) {
+    fun reorderPlaylistRecordings(playlistId: Long, recordingIds: List<Long>) =
+        reorderPlaylistRecordings(playlistId, recordingIds, StpUtil.getLoginIdAsLong())
+
+    @Transactional
+    fun reorderPlaylistRecordings(playlistId: Long, recordingIds: List<Long>, ownerId: Long?) {
         val requestedSet = recordingIds.toSet()
         if (requestedSet.size != recordingIds.size) {
             throw PlaylistException.RecordingIdsContainDuplicates()
         }
 
+        if (ownerId == null) {
+            requirePlaylistAccessible(playlistId, null)
+        }
+
         val currentIds = sql.createQuery(PlaylistRecording::class) {
             where(table.playlistId eq playlistId)
-            where(table.playlist.ownerId eq StpUtil.getLoginIdAsLong())
+            ownerId?.let { where(table.playlist.ownerId eq it) }
             select(table.recordingId)
         }.execute()
 

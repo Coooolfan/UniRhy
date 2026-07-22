@@ -36,9 +36,7 @@ data class FileSystemStorageNode(val provider: FileProviderFileSystem) : Storage
     fun file(objectKey: String): File {
         val rootPath = Path(provider.parentPath).toAbsolutePath().normalize()
         val targetPath = rootPath.resolve(objectKey).normalize()
-        if (!targetPath.startsWith(rootPath)) {
-            error("Invalid object key: $objectKey")
-        }
+        require(targetPath.startsWith(rootPath)) { "Invalid object key: $objectKey" }
         return targetPath.toFile()
     }
 }
@@ -73,10 +71,8 @@ data class OssStorageNode(val provider: FileProviderOss) : StorageNode {
     }
 
     fun storageKey(objectKey: String): String {
-        val normalized = objectKey.trimStart('/')
-        if (normalized.contains("..")) {
-            error("Invalid object key: $objectKey")
-        }
+        val normalized = objectKey.trimStart('/').replace('\\', '/')
+        require(normalized.split('/').none { it == ".." }) { "Invalid object key: $objectKey" }
         return prefix + normalized
     }
 

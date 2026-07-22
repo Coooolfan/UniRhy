@@ -6,10 +6,28 @@ import com.coooolfan.unirhy.model.enabled
 import com.coooolfan.unirhy.model.id
 import com.coooolfan.unirhy.model.taskType
 import com.coooolfan.unirhy.model.updatedAt
+import com.coooolfan.unirhy.service.AlbumService
 import com.coooolfan.unirhy.service.ArtistService
+import com.coooolfan.unirhy.service.PlaylistService
+import com.coooolfan.unirhy.service.RecordingService
+import com.coooolfan.unirhy.service.WorkService
 import com.coooolfan.unirhy.service.plugin.WasmPlugin
-import com.coooolfan.unirhy.service.plugin.buildArtistHostFunctions
-import com.coooolfan.unirhy.service.plugin.buildDefaultHostFunctions
+import com.coooolfan.unirhy.service.plugin.hostapi.NestedPluginHostCallExecutor
+import com.coooolfan.unirhy.service.plugin.hostapi.PluginMediaService
+import com.coooolfan.unirhy.service.plugin.hostapi.buildAlbumHostFunctions
+import com.coooolfan.unirhy.service.plugin.hostapi.buildArtistHostFunctions
+import com.coooolfan.unirhy.service.plugin.hostapi.buildDefaultHostFunctions
+import com.coooolfan.unirhy.service.plugin.hostapi.buildMediaHostFunctions
+import com.coooolfan.unirhy.service.plugin.hostapi.buildMetadataHostFunctions
+import com.coooolfan.unirhy.service.plugin.hostapi.buildPlaylistHostFunctions
+import com.coooolfan.unirhy.service.plugin.hostapi.buildRecordingHostFunctions
+import com.coooolfan.unirhy.service.plugin.hostapi.buildStorageHostFunctions
+import com.coooolfan.unirhy.service.plugin.hostapi.buildTaskHostFunctions
+import com.coooolfan.unirhy.service.plugin.hostapi.buildWorkHostFunctions
+import com.coooolfan.unirhy.service.plugin.hostapi.validatePluginHostFunctions
+import com.coooolfan.unirhy.service.storage.FileSystemStorageService
+import com.coooolfan.unirhy.service.storage.OssStorageService
+import com.coooolfan.unirhy.service.storage.StorageNodeObjectService
 import com.coooolfan.unirhy.service.task.common.TaskKey
 import com.coooolfan.unirhy.service.task.dispatch.TaskCapacityManager
 import com.coooolfan.unirhy.service.task.spi.AsyncTaskHandler
@@ -21,6 +39,7 @@ import tools.jackson.databind.ObjectMapper
 import org.babyfish.jimmer.sql.kt.KSqlClient
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
+import org.springframework.transaction.PlatformTransactionManager
 import java.time.Instant
 
 /**
@@ -36,11 +55,25 @@ class PluginTaskService(
     private val sql: KSqlClient,
     private val objectMapper: ObjectMapper,
     private val artistService: ArtistService,
+    private val workService: WorkService,
+    private val recordingService: RecordingService,
+    private val albumService: AlbumService,
+    private val playlistService: PlaylistService,
+    private val fileSystemStorageService: FileSystemStorageService,
+    private val ossStorageService: OssStorageService,
+    private val storageObjects: StorageNodeObjectService,
+    private val mediaService: PluginMediaService,
+    private val taskDefinitionService: TaskDefinitionService,
+    private val taskSubmissionService: TaskSubmissionService,
+    private val asyncTaskService: AsyncTaskService,
+    private val taskStatisticsService: TaskStatisticsService,
+    transactionManager: PlatformTransactionManager,
     private val plannerRegistry: TaskPlannerRegistry,
     private val handlerRegistry: AsyncTaskHandlerRegistry,
     private val capacityManager: TaskCapacityManager,
 ) {
     private val logger = LoggerFactory.getLogger(PluginTaskService::class.java)
+    private val hostCallExecutor = NestedPluginHostCallExecutor(transactionManager)
 
     private data class LoadedSnapshot(
         val key: TaskKey,
@@ -116,8 +149,33 @@ class PluginTaskService(
 
     private fun loadWasmPlugin(pluginId: String, wasmBytes: ByteArray): WasmPlugin =
         WasmPlugin.load(pluginId, wasmBytes) { instanceRef ->
-            buildDefaultHostFunctions(instanceRef) +
-                buildArtistHostFunctions(artistService, objectMapper, instanceRef)
+            val functions = buildDefaultHostFunctions(storageObjects, objectMapper, instanceRef, hostCallExecutor) +
+                buildArtistHostFunctions(artistService, objectMapper, instanceRef, hostCallExecutor) +
+                buildWorkHostFunctions(workService, objectMapper, instanceRef, hostCallExecutor) +
+                buildRecordingHostFunctions(recordingService, objectMapper, instanceRef, hostCallExecutor) +
+                buildAlbumHostFunctions(albumService, objectMapper, instanceRef, hostCallExecutor) +
+                buildMediaHostFunctions(mediaService, storageObjects, objectMapper, instanceRef, hostCallExecutor) +
+                buildStorageHostFunctions(
+                    fileSystemStorageService,
+                    ossStorageService,
+                    storageObjects,
+                    objectMapper,
+                    instanceRef,
+                    hostCallExecutor,
+                ) +
+                buildPlaylistHostFunctions(playlistService, objectMapper, instanceRef, hostCallExecutor) +
+                buildTaskHostFunctions(
+                    taskDefinitionService,
+                    taskSubmissionService,
+                    asyncTaskService,
+                    taskStatisticsService,
+                    objectMapper,
+                    instanceRef,
+                    hostCallExecutor,
+                ) +
+                buildMetadataHostFunctions(sql, { id -> isLoaded(id) }, objectMapper, instanceRef, hostCallExecutor)
+            validatePluginHostFunctions(functions)
+            functions
         }
 
     /** 上传时的加载校验：完整执行解析、实例化与导出函数检查后即弃 */

@@ -3,10 +3,12 @@ package com.coooolfan.unirhy.service
 import com.coooolfan.unirhy.error.RecordingException
 import com.coooolfan.unirhy.model.*
 import com.coooolfan.unirhy.model.dto.RecordingMergeReq
+import org.babyfish.jimmer.Page
 import org.babyfish.jimmer.sql.ast.mutation.SaveMode
 import org.babyfish.jimmer.sql.fetcher.Fetcher
 import org.babyfish.jimmer.sql.kt.KSqlClient
 import org.babyfish.jimmer.sql.kt.ast.expression.count
+import org.babyfish.jimmer.sql.kt.ast.expression.eq
 import org.babyfish.jimmer.sql.kt.ast.expression.valueIn
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate
 import org.springframework.stereotype.Service
@@ -19,6 +21,25 @@ class RecordingService(
 ) {
     fun getRecording(id: Long, fetcher: Fetcher<Recording>): Recording {
         return sql.findById(fetcher, id) ?: throw RecordingException.NotFound()
+    }
+
+    fun listRecordings(
+        pageIndex: Int,
+        pageSize: Int,
+        ids: List<Long>?,
+        workId: Long?,
+        fetcher: Fetcher<Recording>,
+    ): Page<Recording> {
+        return sql.createQuery(Recording::class) {
+            if (ids != null) {
+                where(table.id valueIn ids)
+            }
+            if (workId != null) {
+                where(table.workId eq workId)
+            }
+            orderBy(table.id)
+            select(table.fetch(fetcher))
+        }.fetchPage(pageIndex, pageSize)
     }
 
     fun updateRecording(input: Recording) {

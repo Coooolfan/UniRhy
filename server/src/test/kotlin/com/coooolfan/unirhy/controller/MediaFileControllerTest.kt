@@ -25,6 +25,7 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers.header
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import org.springframework.test.web.servlet.setup.MockMvcBuilders
 import org.springframework.web.server.ResponseStatusException
+import tools.jackson.module.kotlin.jacksonObjectMapper
 import java.io.ByteArrayInputStream
 import java.io.File
 import java.nio.file.Files
@@ -245,7 +246,7 @@ class MediaFileControllerTest {
 
     private class StubMediaFileResolver : MediaFileAccessService(
         mock(KSqlClient::class.java),
-        StorageNodeObjectService(mock(KSqlClient::class.java)),
+        StorageNodeObjectService(mock(KSqlClient::class.java), jacksonObjectMapper()),
     ) {
         var handler: (Long) -> ResolvedMediaFile = { error("handler not configured") }
         override fun load(id: Long): ResolvedMediaFile = handler(id)
