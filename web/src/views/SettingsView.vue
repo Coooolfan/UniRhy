@@ -53,6 +53,8 @@ const {
     upload,
     setEnabled,
     updateConcurrency,
+    loadConfiguration,
+    saveConfiguration,
     deletePlugin,
     downloadPlugin,
 } = usePluginSettings()
@@ -159,6 +161,8 @@ onMounted(() => {
                 :on-upload="upload"
                 :on-set-enabled="setEnabled"
                 :on-update-concurrency="updateConcurrency"
+                :on-load-configuration="loadConfiguration"
+                :on-save-configuration="saveConfiguration"
                 :on-delete="deletePlugin"
                 :on-download="downloadPlugin"
                 :can-manage="userStore.isAdmin"

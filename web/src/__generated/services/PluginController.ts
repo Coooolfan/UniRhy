@@ -1,5 +1,5 @@
 import type {Executor} from '../';
-import type {PluginInfoResponse} from '../model/static/';
+import type {PluginConfigurationResponse, PluginConfigurationUpdateRequest, PluginInfoResponse} from '../model/static/';
 
 /**
  * 插件管理接口
@@ -48,6 +48,15 @@ export class PluginController {
         _uri += encodeURIComponent(options.id);
         _uri += '/package';
         return (await this.executor({uri: _uri, method: 'GET'})) as Promise<void>;
+    }
+    
+    readonly getConfiguration: (options: PluginControllerOptions['getConfiguration']) => Promise<
+        PluginConfigurationResponse
+    > = async(options) => {
+        let _uri = '/api/plugins/';
+        _uri += encodeURIComponent(options.id);
+        _uri += '/configuration';
+        return (await this.executor({uri: _uri, method: 'GET'})) as Promise<PluginConfigurationResponse>;
     }
     
     /**
@@ -120,6 +129,15 @@ export class PluginController {
         return (await this.executor({uri: _uri, method: 'PUT'})) as Promise<void>;
     }
     
+    readonly updateConfiguration: (options: PluginControllerOptions['updateConfiguration']) => Promise<
+        PluginConfigurationResponse
+    > = async(options) => {
+        let _uri = '/api/plugins/';
+        _uri += encodeURIComponent(options.id);
+        _uri += '/configuration';
+        return (await this.executor({uri: _uri, method: 'PUT', body: options.body})) as Promise<PluginConfigurationResponse>;
+    }
+    
     /**
      * 上传插件
      * 
@@ -158,6 +176,13 @@ export type PluginControllerOptions = {
          * 
          */
         readonly enabled: boolean
+    }, 
+    'getConfiguration': {
+        readonly id: string
+    }, 
+    'updateConfiguration': {
+        readonly id: string, 
+        readonly body: PluginConfigurationUpdateRequest
     }, 
     'updateConcurrency': {
         /**

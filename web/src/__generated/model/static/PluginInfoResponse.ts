@@ -7,4 +7,5 @@ export interface PluginInfoResponse {
     readonly isAvailable: boolean;
     readonly enabled: boolean;
     readonly formDefinition: any;
+    readonly configDefinition: any;
 }

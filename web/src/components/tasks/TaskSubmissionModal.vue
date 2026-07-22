@@ -26,12 +26,12 @@ import {
 } from '@/composables/useTaskManagement'
 import {
     initialFormValues,
-    isFieldValid,
     isFormValid,
     parseFormDefinition,
     toSubmissionParams,
     type SchemaFormValues,
 } from '@/components/tasks/schemaForm'
+import DeclarativeFormFields from '@/components/tasks/DeclarativeFormFields.vue'
 
 const { t } = useI18n()
 
@@ -490,68 +490,17 @@ const submit = async () => {
 
                 <!-- 插件 Schema 表单 -->
                 <div v-else-if="isPluginTask" class="space-y-8">
-                    <div class="grid gap-6">
-                        <div v-for="field in pluginFormFields" :key="field.name" class="block">
-                            <label>
-                                <span
-                                    class="mb-2 block text-xs uppercase tracking-[0.24em] text-[#8A8A8A]"
-                                >
-                                    {{ field.title }}
-                                    <span v-if="field.required" class="text-[#C27E46]">*</span>
-                                </span>
-                                <div v-if="field.type === 'boolean'">
-                                    <input
-                                        v-model="pluginFormValues[field.name]"
-                                        type="checkbox"
-                                        class="mt-1"
-                                    />
-                                </div>
-                                <div v-else-if="field.enum" class="relative">
-                                    <select
-                                        v-model="pluginFormValues[field.name]"
-                                        class="w-full appearance-none border-b border-[#D6D1C4] bg-[#F7F5F0] p-3 pr-10 text-sm text-[#2C2C2C] outline-none transition-colors focus:border-[#C27E46]"
-                                    >
-                                        <option v-if="!field.required" value="">—</option>
-                                        <option
-                                            v-for="candidate in field.enum"
-                                            :key="String(candidate)"
-                                            :value="String(candidate)"
-                                        >
-                                            {{ candidate }}
-                                        </option>
-                                    </select>
-                                    <ChevronDown
-                                        class="pointer-events-none absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 text-[#8A8A8A]"
-                                    />
-                                </div>
-                                <input
-                                    v-else
-                                    v-model="pluginFormValues[field.name]"
-                                    :type="field.type === 'string' ? 'text' : 'number'"
-                                    :min="field.minimum"
-                                    :max="field.maximum"
-                                    class="w-full border-b bg-[#F7F5F0] p-3 text-sm text-[#2C2C2C] outline-none transition-colors focus:border-[#C27E46]"
-                                    :class="
-                                        isFieldValid(field, pluginFormValues[field.name])
-                                            ? 'border-[#D6D1C4]'
-                                            : 'border-rose-300'
-                                    "
-                                />
-                            </label>
-                            <p
-                                v-if="field.description"
-                                class="mt-2 text-xs leading-relaxed text-[#9C968B]"
-                            >
-                                {{ field.description }}
-                            </p>
-                        </div>
+                    <DeclarativeFormFields
+                        v-model="pluginFormValues"
+                        :fields="pluginFormFields"
+                        :disabled="isSubmitting"
+                    />
 
-                        <div class="flex items-start gap-2 text-sm text-[#6B635B]">
-                            <Puzzle class="mt-0.5 h-4 w-4 shrink-0 text-[#C27E46]" />
-                            <span>
-                                {{ t('taskSubmission.pluginTaskHint') }}
-                            </span>
-                        </div>
+                    <div class="flex items-start gap-2 text-sm text-[#6B635B]">
+                        <Puzzle class="mt-0.5 h-4 w-4 shrink-0 text-[#C27E46]" />
+                        <span>
+                            {{ t('taskSubmission.pluginTaskHint') }}
+                        </span>
                     </div>
                 </div>
 
