@@ -9,7 +9,7 @@ import java.math.BigDecimal
  *
  * - 表单定义为 `{ "schema": <根 Schema>, "order": [字段名...] }`
  * - 根 Schema 必须声明 `type: object`、`properties`、`required` 与 `additionalProperties: false`
- * - 字段仅支持 string / integer / number / boolean 标量类型
+ * - 字段支持 string / integer / number / boolean 标量，以及同质的 string / integer / number 数组
  * - 未列入白名单的关键字直接拒绝，不静默忽略
  */
 object TaskFormSchema {
@@ -22,7 +22,9 @@ object TaskFormSchema {
     private val FIELD_STRING_KEYS = FIELD_COMMON_KEYS + setOf("minLength", "maxLength")
     private val FIELD_NUMERIC_KEYS =
         FIELD_COMMON_KEYS + setOf("minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum", "multipleOf")
-    private val FIELD_TYPES = setOf("string", "integer", "number", "boolean")
+    private val FIELD_ARRAY_KEYS = setOf("type", "title", "description", "default", "items", "minItems", "maxItems")
+    private val SCALAR_FIELD_TYPES = setOf("string", "integer", "number", "boolean")
+    private val ARRAY_ITEM_TYPES = setOf("string", "integer", "number")
 
     /** 未声明 form 时使用的空表单定义：不接受任何字段 */
     fun emptyFormDefinition(): JsonNode = JsonMapper.shared().readTree(
@@ -33,15 +35,15 @@ object TaskFormSchema {
      * 校验完整表单定义 `{schema, order}`，非法时抛出 [IllegalArgumentException]。
      */
     fun validateFormDefinition(formDefinition: JsonNode) {
-        validateDefinition(formDefinition, allowWriteOnly = false)
+        validateDefinition(formDefinition, allowWriteOnly = false, allowArrays = true)
     }
 
     /** 配置表单沿用任务表单子集，并允许字符串字段声明 `writeOnly`。 */
     fun validateConfigDefinition(formDefinition: JsonNode) {
-        validateDefinition(formDefinition, allowWriteOnly = true)
+        validateDefinition(formDefinition, allowWriteOnly = true, allowArrays = false)
     }
 
-    private fun validateDefinition(formDefinition: JsonNode, allowWriteOnly: Boolean) {
+    private fun validateDefinition(formDefinition: JsonNode, allowWriteOnly: Boolean, allowArrays: Boolean) {
         require(formDefinition.isObject) { "form definition must be an object" }
         val unknownKeys = formDefinition.propertyNames() - setOf("schema", "order")
         require(unknownKeys.isEmpty()) { "form definition contains unknown keys: $unknownKeys" }
@@ -50,11 +52,11 @@ object TaskFormSchema {
             ?: throw IllegalArgumentException("form definition missing 'schema'")
         val order = formDefinition.get("order")
             ?: throw IllegalArgumentException("form definition missing 'order'")
-        validateSchema(schema, allowWriteOnly)
+        validateSchema(schema, allowWriteOnly, allowArrays)
         validateOrder(order, schema)
     }
 
-    private fun validateSchema(schema: JsonNode, allowWriteOnly: Boolean) {
+    private fun validateSchema(schema: JsonNode, allowWriteOnly: Boolean, allowArrays: Boolean) {
         require(schema.isObject) { "form.schema must be an object" }
         val unknownKeys = schema.propertyNames() - ROOT_ALLOWED_KEYS
         require(unknownKeys.isEmpty()) { "form.schema contains unsupported keywords: $unknownKeys" }
@@ -77,7 +79,7 @@ object TaskFormSchema {
             ?: throw IllegalArgumentException("form.schema must declare properties")
         require(properties.isObject) { "form.schema properties must be an object" }
         for ((name, fieldSchema) in properties.properties()) {
-            validateFieldSchema(name, fieldSchema, allowWriteOnly)
+            validateFieldSchema(name, fieldSchema, allowWriteOnly, allowArrays)
         }
 
         val required = schema.get("required")
@@ -92,16 +94,23 @@ object TaskFormSchema {
         }
     }
 
-    private fun validateFieldSchema(name: String, fieldSchema: JsonNode, allowWriteOnly: Boolean) {
+    private fun validateFieldSchema(
+        name: String,
+        fieldSchema: JsonNode,
+        allowWriteOnly: Boolean,
+        allowArrays: Boolean,
+    ) {
         require(fieldSchema.isObject) { "field '$name' schema must be an object" }
         val type = fieldSchema.get("type")
-        require(type != null && type.isString && type.stringValue() in FIELD_TYPES) {
-            "field '$name' must declare type as one of $FIELD_TYPES"
+        val allowedTypes = if (allowArrays) SCALAR_FIELD_TYPES + "array" else SCALAR_FIELD_TYPES
+        require(type != null && type.isString && type.stringValue() in allowedTypes) {
+            "field '$name' must declare type as one of $allowedTypes"
         }
         val typeName = type.stringValue()
         var allowedKeys = when (typeName) {
             "string" -> FIELD_STRING_KEYS
             "integer", "number" -> FIELD_NUMERIC_KEYS
+            "array" -> FIELD_ARRAY_KEYS
             else -> FIELD_COMMON_KEYS
         }
         if (allowWriteOnly && typeName == "string") {
@@ -115,9 +124,17 @@ object TaskFormSchema {
         fieldSchema.get("writeOnly")?.let {
             require(it.isBoolean) { "field '$name' writeOnly must be a boolean" }
         }
+        if (typeName == "array") {
+            validateArrayFieldSchema(name, fieldSchema)
+        }
 
-        fieldSchema.get("default")?.let {
-            require(matchesType(it, typeName)) { "field '$name' default does not match declared type" }
+        fieldSchema.get("default")?.let { defaultValue ->
+            require(matchesType(defaultValue, typeName)) { "field '$name' default does not match declared type" }
+            if (typeName == "array") {
+                require(validateArrayValue(name, fieldSchema, defaultValue).isEmpty()) {
+                    "field '$name' default does not satisfy declared array schema"
+                }
+            }
         }
         fieldSchema.get("enum")?.let { enum ->
             require(enum.isArray && enum.size() > 0) { "field '$name' enum must be a non-empty array" }
@@ -144,6 +161,34 @@ object TaskFormSchema {
                     require(it.isNumber && it.decimalValue() > BigDecimal.ZERO) { "field '$name' multipleOf must be a positive number" }
                 }
             }
+        }
+    }
+
+    private fun validateArrayFieldSchema(name: String, fieldSchema: JsonNode) {
+        val items = fieldSchema.get("items")
+            ?: throw IllegalArgumentException("field '$name' array must declare items")
+        require(items.isObject) { "field '$name' items must be an object" }
+        val unknownItemKeys = items.propertyNames() - setOf("type")
+        require(unknownItemKeys.isEmpty()) { "field '$name' items contains unsupported keywords: $unknownItemKeys" }
+        val itemType = items.get("type")
+        require(itemType != null && itemType.isString && itemType.stringValue() in ARRAY_ITEM_TYPES) {
+            "field '$name' items must declare type as one of $ARRAY_ITEM_TYPES"
+        }
+
+        val minItems = fieldSchema.get("minItems")?.let {
+            require(it.canConvertToExactIntegral() && it.intValue() >= 0) {
+                "field '$name' minItems must be a non-negative integer"
+            }
+            it.intValue()
+        }
+        val maxItems = fieldSchema.get("maxItems")?.let {
+            require(it.canConvertToExactIntegral() && it.intValue() >= 0) {
+                "field '$name' maxItems must be a non-negative integer"
+            }
+            it.intValue()
+        }
+        if (minItems != null && maxItems != null) {
+            require(minItems <= maxItems) { "field '$name' minItems must be <= maxItems" }
         }
     }
 
@@ -241,6 +286,25 @@ object TaskFormSchema {
                     }
                 }
             }
+
+            "array" -> errors += validateArrayValue(name, fieldSchema, value)
+        }
+        return errors
+    }
+
+    private fun validateArrayValue(name: String, fieldSchema: JsonNode, value: JsonNode): List<String> {
+        val errors = mutableListOf<String>()
+        fieldSchema.get("minItems")?.let {
+            if (value.size() < it.intValue()) errors += "field '$name' must contain at least ${it.intValue()} items"
+        }
+        fieldSchema.get("maxItems")?.let {
+            if (value.size() > it.intValue()) errors += "field '$name' must contain at most ${it.intValue()} items"
+        }
+        val itemType = fieldSchema.path("items").path("type").stringValue()
+        for ((index, item) in value.withIndex()) {
+            if (!matchesType(item, itemType)) {
+                errors += "field '$name' item $index must be of type $itemType"
+            }
         }
         return errors
     }
@@ -250,6 +314,7 @@ object TaskFormSchema {
         "boolean" -> value.isBoolean
         "integer" -> value.isNumber && value.canConvertToExactIntegral()
         "number" -> value.isNumber
+        "array" -> value.isArray
         else -> false
     }
 }
