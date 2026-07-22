@@ -12,9 +12,20 @@ object PluginHostWasmFixture {
 
     private const val PLAN_PTR = 1024
     private const val ARTIST_REQUEST_PTR = 2048
-    private const val STORAGE_META_PTR = 3072
-    private const val STORAGE_DATA_PTR = 4096
-    private const val ALLOC_PTR = 8192
+    private const val WORK_REQUEST_PTR = 3072
+    private const val RECORDING_REQUEST_PTR = 4096
+    private const val DEFAULT_NODE_REQUEST_PTR = 5120
+    private const val STORAGE_META_PTR = 6144
+    private const val MEDIA_CREATE_REQUEST_PTR = 7168
+    private const val MEDIA_LOCATION_REQUEST_PTR = 8192
+    private const val OSS_MEDIA_LOCATION_REQUEST_PTR = 9216
+    private const val ASSET_BY_MEDIA_REQUEST_PTR = 10240
+    private const val ASSET_AND_REQUEST_PTR = 11264
+    private const val ASSET_MISMATCH_REQUEST_PTR = 12288
+    private const val STORAGE_DATA_PTR = 13312
+    private const val ALLOC_PTR = 16384
+    private const val RESPONSE_OK_VALUE_OFFSET = 6
+    private const val RESPONSE_DATA_ARRAY_ITEM_OFFSET = 19
 
     private val hostFunctionNames = listOf(
         "host_log",
@@ -30,12 +41,14 @@ object PluginHostWasmFixture {
         "host_work_list",
         "host_work_get",
         "host_work_search",
+        "host_work_create",
         "host_work_random",
         "host_work_update",
         "host_work_delete",
         "host_work_merge",
         "host_recording_get",
         "host_recording_list",
+        "host_recording_create",
         "host_recording_update",
         "host_recording_merge",
         "host_album_list",
@@ -44,6 +57,7 @@ object PluginHostWasmFixture {
         "host_album_update",
         "host_album_reorder_recordings",
         "host_media_file_get",
+        "host_media_file_get_by_location",
         "host_media_file_create",
         "host_media_file_delete",
         "host_asset_list",
@@ -51,6 +65,7 @@ object PluginHostWasmFixture {
         "host_asset_delete",
         "host_storage_fs_node_list",
         "host_storage_oss_node_list",
+        "host_storage_default_write_node_get",
         "host_storage_object_list",
         "host_storage_object_stat",
         "host_storage_object_read",
@@ -84,26 +99,98 @@ object PluginHostWasmFixture {
 
     fun build(
         artistName: String,
+        workTitle: String,
+        recordingWorkId: Long,
+        recordingTitle: String,
+        ossNodeId: Long,
+        ossObjectKey: String,
+        assetRecordingId: Long,
+        otherRecordingId: Long,
+        assetMediaFileId: Long,
         objectKey: String,
         objectBytes: ByteArray,
     ): ByteArray {
-        check(hostFunctionNames.size == 63 && hostFunctionNames.distinct().size == 63)
+        check(hostFunctionNames.size == 67 && hostFunctionNames.distinct().size == 67)
 
         val plan = "[{}]".toByteArray()
         val artistRequest = E2eJson.mapper.writeValueAsBytes(mapOf("displayName" to artistName))
+        val workRequest = E2eJson.mapper.writeValueAsBytes(mapOf("title" to workTitle))
+        val recordingRequest = E2eJson.mapper.writeValueAsBytes(
+            mapOf(
+                "workId" to recordingWorkId,
+                "artistIds" to emptyList<Long>(),
+                "label" to listOf("Fixture"),
+                "title" to recordingTitle,
+                "comment" to "Created by the real WASM Host API fixture",
+                "durationMs" to 1234,
+                "defaultInWork" to false,
+                "coverId" to null,
+            ),
+        )
+        val defaultNodeRequest = E2eJson.mapper.writeValueAsBytes(emptyMap<String, Any>())
+        val node = mapOf("type" to "FS", "id" to 0)
         val storageMeta = E2eJson.mapper.writeValueAsBytes(
             mapOf(
-                "node" to mapOf("type" to "FS", "id" to 0),
+                "node" to node,
                 "objectKey" to objectKey,
                 "contentType" to "application/octet-stream",
             ),
         )
+        val mediaCreateRequest = E2eJson.mapper.writeValueAsBytes(
+            mapOf(
+                "node" to node,
+                "objectKey" to objectKey,
+                "mimeType" to "application/octet-stream",
+            ),
+        )
+        val mediaLocationRequest = E2eJson.mapper.writeValueAsBytes(
+            mapOf(
+                "node" to node,
+                "objectKey" to objectKey,
+            ),
+        )
+        val ossMediaLocationRequest = E2eJson.mapper.writeValueAsBytes(
+            mapOf(
+                "node" to mapOf("type" to "OSS", "id" to ossNodeId),
+                "objectKey" to ossObjectKey,
+            ),
+        )
+        val assetByMediaRequest = E2eJson.mapper.writeValueAsBytes(
+            mapOf("mediaFileId" to assetMediaFileId),
+        )
+        val assetAndRequest = E2eJson.mapper.writeValueAsBytes(
+            mapOf(
+                "recordingId" to assetRecordingId,
+                "mediaFileId" to assetMediaFileId,
+            ),
+        )
+        val assetMismatchRequest = E2eJson.mapper.writeValueAsBytes(
+            mapOf(
+                "recordingId" to otherRecordingId,
+                "mediaFileId" to assetMediaFileId,
+            ),
+        )
         requireFits(PLAN_PTR, ARTIST_REQUEST_PTR, plan)
-        requireFits(ARTIST_REQUEST_PTR, STORAGE_META_PTR, artistRequest)
-        requireFits(STORAGE_META_PTR, STORAGE_DATA_PTR, storageMeta)
+        requireFits(ARTIST_REQUEST_PTR, WORK_REQUEST_PTR, artistRequest)
+        requireFits(WORK_REQUEST_PTR, RECORDING_REQUEST_PTR, workRequest)
+        requireFits(RECORDING_REQUEST_PTR, DEFAULT_NODE_REQUEST_PTR, recordingRequest)
+        requireFits(DEFAULT_NODE_REQUEST_PTR, STORAGE_META_PTR, defaultNodeRequest)
+        requireFits(STORAGE_META_PTR, MEDIA_CREATE_REQUEST_PTR, storageMeta)
+        requireFits(MEDIA_CREATE_REQUEST_PTR, MEDIA_LOCATION_REQUEST_PTR, mediaCreateRequest)
+        requireFits(MEDIA_LOCATION_REQUEST_PTR, OSS_MEDIA_LOCATION_REQUEST_PTR, mediaLocationRequest)
+        requireFits(OSS_MEDIA_LOCATION_REQUEST_PTR, ASSET_BY_MEDIA_REQUEST_PTR, ossMediaLocationRequest)
+        requireFits(ASSET_BY_MEDIA_REQUEST_PTR, ASSET_AND_REQUEST_PTR, assetByMediaRequest)
+        requireFits(ASSET_AND_REQUEST_PTR, ASSET_MISMATCH_REQUEST_PTR, assetAndRequest)
+        requireFits(ASSET_MISMATCH_REQUEST_PTR, STORAGE_DATA_PTR, assetMismatchRequest)
         requireFits(STORAGE_DATA_PTR, ALLOC_PTR, objectBytes)
 
         val artistCreateIndex = hostFunctionNames.indexOf("host_artist_create")
+        val workCreateIndex = hostFunctionNames.indexOf("host_work_create")
+        val recordingCreateIndex = hostFunctionNames.indexOf("host_recording_create")
+        val defaultNodeGetIndex = hostFunctionNames.indexOf("host_storage_default_write_node_get")
+        val mediaFileCreateIndex = hostFunctionNames.indexOf("host_media_file_create")
+        val mediaFileGetByLocationIndex = hostFunctionNames.indexOf("host_media_file_get_by_location")
+        val assetListIndex = hostFunctionNames.indexOf("host_asset_list")
         val storageReadIndex = hostFunctionNames.indexOf("host_storage_object_read")
         val storageWriteIndex = hostFunctionNames.indexOf("host_storage_object_write")
         val firstDefinedFunctionIndex = hostFunctionNames.size
@@ -160,16 +247,54 @@ object PluginHostWasmFixture {
                     functionBody(END),
                     functionBody(i64Const(pack(PLAN_PTR, plan.size)), END),
                     functionBody(
-                        i32Const(ARTIST_REQUEST_PTR),
-                        i32Const(artistRequest.size),
-                        call(artistCreateIndex),
-                        assertNonZeroI64(),
+                        callJsonAndAssertSuccess(ARTIST_REQUEST_PTR, artistRequest, artistCreateIndex),
+                        callJsonAndAssertSuccess(WORK_REQUEST_PTR, workRequest, workCreateIndex),
+                        callJsonAndAssertSuccess(RECORDING_REQUEST_PTR, recordingRequest, recordingCreateIndex),
+                        callJsonAndAssertSuccess(
+                            DEFAULT_NODE_REQUEST_PTR,
+                            defaultNodeRequest,
+                            defaultNodeGetIndex,
+                        ),
                         i32Const(STORAGE_META_PTR),
                         i32Const(storageMeta.size),
                         i32Const(STORAGE_DATA_PTR),
                         i32Const(objectBytes.size),
                         call(storageWriteIndex),
                         assertNonZeroI64(),
+                        assertMemoryByte(ALLOC_PTR + RESPONSE_OK_VALUE_OFFSET, 't'.code),
+                        callJsonAndAssertSuccess(
+                            MEDIA_CREATE_REQUEST_PTR,
+                            mediaCreateRequest,
+                            mediaFileCreateIndex,
+                        ),
+                        callJsonAndAssertSuccess(
+                            MEDIA_LOCATION_REQUEST_PTR,
+                            mediaLocationRequest,
+                            mediaFileGetByLocationIndex,
+                        ),
+                        callJsonAndAssertSuccess(
+                            OSS_MEDIA_LOCATION_REQUEST_PTR,
+                            ossMediaLocationRequest,
+                            mediaFileGetByLocationIndex,
+                        ),
+                        callJsonAndAssertArrayResult(
+                            ASSET_BY_MEDIA_REQUEST_PTR,
+                            assetByMediaRequest,
+                            assetListIndex,
+                            nonEmpty = true,
+                        ),
+                        callJsonAndAssertArrayResult(
+                            ASSET_AND_REQUEST_PTR,
+                            assetAndRequest,
+                            assetListIndex,
+                            nonEmpty = true,
+                        ),
+                        callJsonAndAssertArrayResult(
+                            ASSET_MISMATCH_REQUEST_PTR,
+                            assetMismatchRequest,
+                            assetListIndex,
+                            nonEmpty = false,
+                        ),
                         i32Const(STORAGE_META_PTR),
                         i32Const(storageMeta.size),
                         call(storageReadIndex),
@@ -187,7 +312,16 @@ object PluginHostWasmFixture {
                 vector(
                     dataSegment(PLAN_PTR, plan),
                     dataSegment(ARTIST_REQUEST_PTR, artistRequest),
+                    dataSegment(WORK_REQUEST_PTR, workRequest),
+                    dataSegment(RECORDING_REQUEST_PTR, recordingRequest),
+                    dataSegment(DEFAULT_NODE_REQUEST_PTR, defaultNodeRequest),
                     dataSegment(STORAGE_META_PTR, storageMeta),
+                    dataSegment(MEDIA_CREATE_REQUEST_PTR, mediaCreateRequest),
+                    dataSegment(MEDIA_LOCATION_REQUEST_PTR, mediaLocationRequest),
+                    dataSegment(OSS_MEDIA_LOCATION_REQUEST_PTR, ossMediaLocationRequest),
+                    dataSegment(ASSET_BY_MEDIA_REQUEST_PTR, assetByMediaRequest),
+                    dataSegment(ASSET_AND_REQUEST_PTR, assetAndRequest),
+                    dataSegment(ASSET_MISMATCH_REQUEST_PTR, assetMismatchRequest),
                     dataSegment(STORAGE_DATA_PTR, objectBytes),
                 ),
             )
@@ -226,6 +360,24 @@ object PluginHostWasmFixture {
     private fun i64Const(value: Long): ByteArray = bytes(byteArrayOf(0x42), signedLeb128(value))
 
     private fun call(index: Int): ByteArray = bytes(byteArrayOf(0x10), unsignedLeb128(index))
+
+    private fun callJsonAndAssertSuccess(pointer: Int, request: ByteArray, functionIndex: Int): ByteArray = bytes(
+        i32Const(pointer),
+        i32Const(request.size),
+        call(functionIndex),
+        assertNonZeroI64(),
+        assertMemoryByte(ALLOC_PTR + RESPONSE_OK_VALUE_OFFSET, 't'.code),
+    )
+
+    private fun callJsonAndAssertArrayResult(
+        pointer: Int,
+        request: ByteArray,
+        functionIndex: Int,
+        nonEmpty: Boolean,
+    ): ByteArray = bytes(
+        callJsonAndAssertSuccess(pointer, request, functionIndex),
+        assertMemoryByte(ALLOC_PTR + RESPONSE_DATA_ARRAY_ITEM_OFFSET, if (nonEmpty) '{'.code else ']'.code),
+    )
 
     private fun assertNonZeroI64(): ByteArray = bytes(I64_EQZ, TRAP_IF_TRUE)
 

@@ -2,6 +2,7 @@ package com.coooolfan.unirhy.service.plugin.hostapi
 
 import com.coooolfan.unirhy.service.plugin.WasmPluginException
 import org.babyfish.jimmer.error.CodeBasedRuntimeException
+import org.babyfish.jimmer.sql.exception.SaveException
 import org.slf4j.LoggerFactory
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.transaction.PlatformTransactionManager
@@ -33,12 +34,14 @@ internal val PLUGIN_HOST_FUNCTION_NAMES: Set<String> = setOf(
     "host_work_list",
     "host_work_get",
     "host_work_search",
+    "host_work_create",
     "host_work_random",
     "host_work_update",
     "host_work_delete",
     "host_work_merge",
     "host_recording_get",
     "host_recording_list",
+    "host_recording_create",
     "host_recording_update",
     "host_recording_merge",
     "host_album_list",
@@ -47,6 +50,7 @@ internal val PLUGIN_HOST_FUNCTION_NAMES: Set<String> = setOf(
     "host_album_update",
     "host_album_reorder_recordings",
     "host_media_file_get",
+    "host_media_file_get_by_location",
     "host_media_file_create",
     "host_media_file_delete",
     "host_asset_list",
@@ -54,6 +58,7 @@ internal val PLUGIN_HOST_FUNCTION_NAMES: Set<String> = setOf(
     "host_asset_delete",
     "host_storage_fs_node_list",
     "host_storage_oss_node_list",
+    "host_storage_default_write_node_get",
     "host_storage_object_list",
     "host_storage_object_stat",
     "host_storage_object_read",
@@ -261,6 +266,9 @@ internal class PluginHostSupport(
     private fun mapError(ex: Exception): PluginHostException {
         if (ex is PluginHostException) return ex
         if (ex is DataIntegrityViolationException) {
+            return PluginHostException(PluginHostErrorCode.CONFLICT, "The operation conflicts with existing data", ex)
+        }
+        if (ex is SaveException.NotUnique) {
             return PluginHostException(PluginHostErrorCode.CONFLICT, "The operation conflicts with existing data", ex)
         }
         if (ex is java.nio.file.FileAlreadyExistsException) {

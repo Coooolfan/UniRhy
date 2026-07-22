@@ -56,9 +56,10 @@ internal data class HostDownloadDestination(
 
 internal data class HostHttpDownloadResponse(
     val status: Int,
+    val stored: Boolean,
     val bytesWritten: Long,
     val contentType: String?,
-    val sha256: String,
+    val sha256: String?,
     val destination: HostDownloadDestination,
 )
 
@@ -138,6 +139,7 @@ internal fun downloadToStorage(
     val initialUri = parseHttpUri(request.requiredText("url"))
     val initialMethod = parseMethod(request.optionalText("method") ?: "GET")
     val headers = request.requestHeaders()
+    val maxBytes = request.optionalPositiveLong("maxBytes")
     val destinationRequest = request.requiredObject("destination")
     val nodeRequest = destinationRequest.requiredObject("node")
     val node = resolveHostStorageNode(nodeRequest, storageObjects)
@@ -146,15 +148,38 @@ internal fun downloadToStorage(
     val nodeId = nodeRequest.requiredLong("id")
     val objectKey = destinationRequest.requiredObjectKey("objectKey")
     val overwrite = request.optionalBoolean("overwrite") ?: false
+    val destination = HostDownloadDestination(
+        node = HostStorageNodeReference(type = nodeType, id = nodeId),
+        objectKey = objectKey,
+    )
 
     val tempFile = Files.createTempFile("unirhy-plugin-download-", ".part")
     try {
         val response = sendFollowingRedirects(initialUri, initialMethod, headers)
         val contentType = response.headers().firstValue("Content-Type").orElse(null)
+        if (response.statusCode() !in 200..299) {
+            response.body().close()
+            return HostHttpDownloadResponse(
+                status = response.statusCode(),
+                stored = false,
+                bytesWritten = 0,
+                contentType = contentType,
+                sha256 = null,
+                destination = destination,
+            )
+        }
+
         val digest = MessageDigest.getInstance("SHA-256")
         val bytesWritten = response.body().use { input ->
+            val contentLength = response.knownContentLength()
+            if (maxBytes != null && contentLength != null && contentLength > maxBytes) {
+                responseTooLarge("HTTP response exceeds maxBytes ($maxBytes bytes)")
+            }
             Files.newOutputStream(tempFile).use { output ->
-                transferWithIdleTimeout(input) { buffer, count, _ ->
+                transferWithIdleTimeout(input) { buffer, count, bytesWritten ->
+                    if (maxBytes != null && count.toLong() > maxBytes - bytesWritten) {
+                        responseTooLarge("HTTP response exceeds maxBytes ($maxBytes bytes)")
+                    }
                     output.write(buffer, 0, count)
                     digest.update(buffer, 0, count)
                 }
@@ -175,13 +200,11 @@ internal fun downloadToStorage(
 
         return HostHttpDownloadResponse(
             status = response.statusCode(),
+            stored = true,
             bytesWritten = bytesWritten,
             contentType = contentType,
             sha256 = HexFormat.of().formatHex(digest.digest()),
-            destination = HostDownloadDestination(
-                node = HostStorageNodeReference(type = nodeType, id = nodeId),
-                objectKey = objectKey,
-            ),
+            destination = destination,
         )
     } finally {
         runCatching { Files.deleteIfExists(tempFile) }
@@ -202,10 +225,11 @@ internal fun sendFollowingRedirects(
 ): HttpResponse<InputStream> {
     var uri = initialUri
     var method = initialMethod
+    var requestHeaders = headers
     var redirectCount = 0
 
     while (true) {
-        val response = send(uri, method, headers, body = null)
+        val response = send(uri, method, requestHeaders, body = null)
         val location = if (response.statusCode() in REDIRECT_STATUS_CODES) {
             response.headers().firstValue("Location").orElse(null)
         } else {
@@ -237,6 +261,11 @@ internal fun sendFollowingRedirects(
             )
         }
 
+        if (!uri.hasSameHttpAuthority(nextUri)) {
+            requestHeaders = requestHeaders.filterNot { header ->
+                header.name.lowercase() in SENSITIVE_REDIRECT_HEADERS
+            }
+        }
         method = redirectedMethod(response.statusCode(), method)
         uri = nextUri
         redirectCount += 1
@@ -371,6 +400,17 @@ private fun ObjectNode.requestHeaders(): List<RequestHeader> {
     }
 }
 
+private fun ObjectNode.optionalPositiveLong(name: String): Long? {
+    val value = get(name) ?: return null
+    if (value.isNull) return null
+    if (!value.isIntegralNumber || !value.canConvertToLong()) {
+        invalidArgument("Field '$name' must be a positive integer")
+    }
+    return value.longValue().also {
+        if (it <= 0) invalidArgument("Field '$name' must be a positive integer")
+    }
+}
+
 private fun HttpResponse<*>.knownContentLength(): Long? =
     headers().firstValue("Content-Length").orElse(null)
         ?.toLongOrNull()
@@ -382,5 +422,20 @@ private fun redirectedMethod(status: Int, method: String): String = when (status
     else -> method
 }
 
+private fun URI.hasSameHttpAuthority(other: URI): Boolean =
+    host.equals(other.host, ignoreCase = true) && effectiveHttpPort() == other.effectiveHttpPort()
+
+private fun URI.effectiveHttpPort(): Int = when {
+    port >= 0 -> port
+    scheme.equals("http", ignoreCase = true) -> 80
+    else -> 443
+}
+
 private val HTTP_SCHEMES = setOf("http", "https")
 private val REDIRECT_STATUS_CODES = setOf(301, 302, 303, 307, 308)
+private val SENSITIVE_REDIRECT_HEADERS = setOf(
+    "authorization",
+    "cookie",
+    "cookie2",
+    "proxy-authorization",
+)

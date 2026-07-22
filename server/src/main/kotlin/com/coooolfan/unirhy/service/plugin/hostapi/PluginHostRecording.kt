@@ -77,6 +77,44 @@ internal fun buildRecordingHostFunctions(
         ).toHostData()
     }
 
+    val hostRecordingCreate = support.jsonFunction("host_recording_create") { request ->
+        val durationMs = request.requiredLong("durationMs")
+        if (durationMs < 0L) invalidArgument("durationMs must be greater than or equal to 0")
+
+        val artistIds = if (request.has("artistIds")) {
+            request.requiredLongList("artistIds").distinct()
+        } else {
+            emptyList()
+        }
+        val labels = if (request.has("label")) {
+            request.requiredTextList("label").distinct()
+        } else {
+            emptyList()
+        }
+        val defaultInWork = if (request.has("defaultInWork")) {
+            request.optionalBoolean("defaultInWork")
+                ?: invalidArgument("Field 'defaultInWork' must be a boolean")
+        } else {
+            false
+        }
+
+        recordingService.createRecording(
+            Recording {
+                workId = request.requiredLong("workId")
+                artists = artistIds.map { artistId ->
+                    com.coooolfan.unirhy.model.Artist { id = artistId }
+                }
+                label = labels
+                title = request.optionalText("title")
+                comment = if (request.has("comment")) request.requiredText("comment") else ""
+                this.durationMs = durationMs
+                this.defaultInWork = defaultInWork
+                coverId = request.optionalLong("coverId")
+            },
+            HOST_RECORDING_SUMMARY_FETCHER,
+        )
+    }
+
     val hostRecordingUpdate = support.jsonFunction("host_recording_update") { request ->
         val id = request.requiredLong("id")
         recordingService.getRecording(id, HOST_RECORDING_SUMMARY_FETCHER)
@@ -110,6 +148,7 @@ internal fun buildRecordingHostFunctions(
     return listOf(
         hostRecordingGet,
         hostRecordingList,
+        hostRecordingCreate,
         hostRecordingUpdate,
         hostRecordingMerge,
     )

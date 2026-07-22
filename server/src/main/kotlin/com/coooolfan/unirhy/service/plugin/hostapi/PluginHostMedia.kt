@@ -17,6 +17,10 @@ internal fun buildMediaHostFunctions(
         support.jsonFunction("host_media_file_get") { request ->
             mediaService.getMediaFile(request.requiredLong("id"))
         },
+        support.jsonFunction("host_media_file_get_by_location") { request ->
+            val node = resolveHostStorageNode(request.requiredObject("node"), storageObjects)
+            mediaService.getMediaFileByLocation(node, request.requiredObjectKey("objectKey"))
+        },
         support.jsonFunction("host_media_file_create") { request ->
             val node = resolveHostStorageNode(request.requiredObject("node"), storageObjects)
             mediaService.createMediaFile(
@@ -30,7 +34,12 @@ internal fun buildMediaHostFunctions(
             null
         },
         support.jsonFunction("host_asset_list") { request ->
-            mediaService.listAssets(request.requiredLong("recordingId"))
+            val recordingId = request.optionalLong("recordingId")
+            val mediaFileId = request.optionalLong("mediaFileId")
+            if (recordingId == null && mediaFileId == null) {
+                invalidArgument("At least one of 'recordingId' or 'mediaFileId' must be provided")
+            }
+            mediaService.listAssets(recordingId, mediaFileId)
         },
         support.jsonFunction("host_asset_create") { request ->
             mediaService.createAsset(

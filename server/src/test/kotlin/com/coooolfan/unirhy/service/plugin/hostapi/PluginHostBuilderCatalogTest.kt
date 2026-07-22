@@ -4,6 +4,7 @@ import com.coooolfan.unirhy.service.AlbumService
 import com.coooolfan.unirhy.service.ArtistService
 import com.coooolfan.unirhy.service.PlaylistService
 import com.coooolfan.unirhy.service.RecordingService
+import com.coooolfan.unirhy.service.SystemConfigService
 import com.coooolfan.unirhy.service.WorkService
 import com.coooolfan.unirhy.service.storage.FileSystemStorageService
 import com.coooolfan.unirhy.service.storage.OssStorageService
@@ -69,6 +70,7 @@ class PluginHostBuilderCatalogTest {
             buildStorageHostFunctions(
                 fileSystemStorageService = mock(FileSystemStorageService::class.java),
                 ossStorageService = mock(OssStorageService::class.java),
+                systemConfigService = mock(SystemConfigService::class.java),
                 storageObjects = storageObjects,
                 objectMapper = objectMapper,
                 instanceRef = instanceRef,

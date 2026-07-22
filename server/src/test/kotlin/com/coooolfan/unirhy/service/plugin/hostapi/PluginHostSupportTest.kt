@@ -27,7 +27,7 @@ class PluginHostSupportTest {
 
     @Test
     fun `catalog contains exactly the documented imports`() {
-        assertEquals(63, PLUGIN_HOST_FUNCTION_NAMES.size)
+        assertEquals(67, PLUGIN_HOST_FUNCTION_NAMES.size)
         assertFalse("host_http_check" in PLUGIN_HOST_FUNCTION_NAMES)
         assertFalse("host_list_artist_ids" in PLUGIN_HOST_FUNCTION_NAMES)
         assertFalse("host_get_artists_by_ids" in PLUGIN_HOST_FUNCTION_NAMES)

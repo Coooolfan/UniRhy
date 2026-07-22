@@ -13,8 +13,11 @@ import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
 import org.junit.jupiter.api.TestMethodOrder
+import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.web.server.LocalServerPort
+import org.springframework.jdbc.core.namedparam.MapSqlParameterSource
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate
 import org.springframework.test.annotation.DirtiesContext
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
@@ -41,6 +44,9 @@ class PluginE2eTest {
 
     @LocalServerPort
     private var port: Int = 0
+
+    @Autowired
+    private lateinit var jdbc: NamedParameterJdbcTemplate
 
     @AfterAll
     fun cleanup() {
@@ -192,10 +198,23 @@ class PluginE2eTest {
         val fixtureSuffix = suffix()
         val pluginId = "com.unirhy-e2e.host-$fixtureSuffix"
         val artistName = "host-artist-$fixtureSuffix"
+        val workTitle = "host-work-$fixtureSuffix"
+        val recordingWorkId = insertWork("host-recording-work-$fixtureSuffix")
+        val recordingTitle = "host-recording-$fixtureSuffix"
+        val ossMediaFixture = insertOssMediaFixture(fixtureSuffix)
+        val assetFixture = insertAssetFixture(recordingWorkId, fixtureSuffix)
         val objectKey = "plugin-host-e2e/$fixtureSuffix.bin"
         val objectBytes = "host-storage-$fixtureSuffix".toByteArray()
         val wasm = PluginHostWasmFixture.build(
             artistName = artistName,
+            workTitle = workTitle,
+            recordingWorkId = recordingWorkId,
+            recordingTitle = recordingTitle,
+            ossNodeId = ossMediaFixture.nodeId,
+            ossObjectKey = ossMediaFixture.objectKey,
+            assetRecordingId = assetFixture.recordingId,
+            otherRecordingId = assetFixture.otherRecordingId,
+            assetMediaFileId = assetFixture.mediaFileId,
             objectKey = objectKey,
             objectBytes = objectBytes,
         )
@@ -239,6 +258,43 @@ class PluginE2eTest {
             E2eJson.mapper.readTree(artistResponse.body()).any { it.path("displayName").asString() == artistName },
             "[plugin-host] JSON Host call should create the artist",
         )
+
+        val workResponse = state.api.get(
+            path = "/api/works/search-results",
+            query = mapOf("name" to workTitle),
+        )
+        E2eAssert.status(workResponse, 200, "[plugin-host] work search should succeed")
+        assertTrue(
+            E2eJson.mapper.readTree(workResponse.body()).any { it.path("title").asString() == workTitle },
+            "[plugin-host] host_work_create should create the work",
+        )
+
+        val recordingCount = jdbc.queryForObject(
+            """
+                SELECT COUNT(*)
+                FROM recording
+                WHERE work_id = :workId
+                  AND title = :title
+                  AND duration_ms = 1234
+            """.trimIndent(),
+            MapSqlParameterSource()
+                .addValue("workId", recordingWorkId)
+                .addValue("title", recordingTitle),
+            Long::class.java,
+        )
+        assertEquals(1L, recordingCount, "[plugin-host] host_recording_create should create the recording")
+
+        val mediaFileCount = jdbc.queryForObject(
+            """
+                SELECT COUNT(*)
+                FROM media_file
+                WHERE fs_provider_id = 0
+                  AND object_key = :objectKey
+            """.trimIndent(),
+            MapSqlParameterSource("objectKey", objectKey),
+            Long::class.java,
+        )
+        assertEquals(1L, mediaFileCount, "[plugin-host] location lookup should find the registered media file")
 
         val storedObject = state.runtime.scanWorkspace.resolve(objectKey)
         assertTrue(Files.isRegularFile(storedObject), "[plugin-host] binary Host call should create the storage object")
@@ -394,6 +450,79 @@ class PluginE2eTest {
             "plugin.wasm" to wasm,
         )
     }
+
+    private fun insertWork(title: String): Long = jdbc.queryForObject(
+        "INSERT INTO work(title) VALUES (:title) RETURNING id",
+        MapSqlParameterSource("title", title),
+        Long::class.java,
+    ) ?: fail("[plugin-host] failed to insert recording work fixture")
+
+    private fun insertAssetFixture(workId: Long, suffix: String): HostAssetFixture {
+        val recordingId = insertRecording(workId, "host-asset-recording-$suffix")
+        val otherRecordingId = insertRecording(workId, "host-asset-other-recording-$suffix")
+        val mediaFileId = jdbc.queryForObject(
+            """
+                INSERT INTO media_file(object_key, mime_type, size, fs_provider_id)
+                VALUES (:objectKey, 'audio/mp4', 1, 0)
+                RETURNING id
+            """.trimIndent(),
+            MapSqlParameterSource("objectKey", "plugin-host-asset/$suffix.m4a"),
+            Long::class.java,
+        ) ?: fail("[plugin-host] failed to insert asset media fixture")
+        jdbc.update(
+            "INSERT INTO asset(recording_id, media_file_id) VALUES (:recordingId, :mediaFileId)",
+            MapSqlParameterSource()
+                .addValue("recordingId", recordingId)
+                .addValue("mediaFileId", mediaFileId),
+        )
+        return HostAssetFixture(recordingId, otherRecordingId, mediaFileId)
+    }
+
+    private fun insertRecording(workId: Long, title: String): Long = jdbc.queryForObject(
+        """
+            INSERT INTO recording(work_id, title, duration_ms)
+            VALUES (:workId, :title, 1)
+            RETURNING id
+        """.trimIndent(),
+        MapSqlParameterSource()
+            .addValue("workId", workId)
+            .addValue("title", title),
+        Long::class.java,
+    ) ?: fail("[plugin-host] failed to insert recording fixture")
+
+    private fun insertOssMediaFixture(suffix: String): OssMediaFixture {
+        val nodeId = jdbc.queryForObject(
+            """
+                INSERT INTO file_provider_oss(name, host, bucket, access_key, secret_key, readonly)
+                VALUES (:name, 'https://oss.example.invalid', 'music', 'test-access', 'test-secret', false)
+                RETURNING id
+            """.trimIndent(),
+            MapSqlParameterSource("name", "host-oss-$suffix"),
+            Long::class.java,
+        ) ?: fail("[plugin-host] failed to insert OSS node fixture")
+        val objectKey = "plugin-host-oss/$suffix.m4a"
+        jdbc.update(
+            """
+                INSERT INTO media_file(object_key, mime_type, size, oss_provider_id)
+                VALUES (:objectKey, 'audio/mp4', 1, :nodeId)
+            """.trimIndent(),
+            MapSqlParameterSource()
+                .addValue("objectKey", objectKey)
+                .addValue("nodeId", nodeId),
+        )
+        return OssMediaFixture(nodeId, objectKey)
+    }
+
+    private data class HostAssetFixture(
+        val recordingId: Long,
+        val otherRecordingId: Long,
+        val mediaFileId: Long,
+    )
+
+    private data class OssMediaFixture(
+        val nodeId: Long,
+        val objectKey: String,
+    )
 
     private fun invalidPluginArchive(): ByteArray {
         return zip(

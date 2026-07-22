@@ -70,6 +70,13 @@ internal fun buildWorkHostFunctions(
         workService.getWorkByName(request.requiredText("name"), HOST_WORK_DETAIL_FETCHER)
     }
 
+    val hostWorkCreate = support.jsonFunction("host_work_create") { request ->
+        workService.createWork(
+            title = request.requiredNonBlankText("title"),
+            fetcher = HOST_WORK_LIST_FETCHER,
+        )
+    }
+
     val hostWorkRandom = support.jsonFunction("host_work_random") { request ->
         workService.randomWork(
             timestamp = request.optionalLong("timestamp"),
@@ -118,6 +125,7 @@ internal fun buildWorkHostFunctions(
         hostWorkList,
         hostWorkGet,
         hostWorkSearch,
+        hostWorkCreate,
         hostWorkRandom,
         hostWorkUpdate,
         hostWorkDelete,

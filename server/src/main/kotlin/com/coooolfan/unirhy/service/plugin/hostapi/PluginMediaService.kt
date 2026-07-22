@@ -47,6 +47,19 @@ class PluginMediaService(
     internal fun getMediaFile(id: Long): HostMediaFileView = findMediaFile(id)?.toHostView()
         ?: notFound("Media file $id was not found")
 
+    internal fun getMediaFileByLocation(node: StorageNode, objectKey: String): HostMediaFileView {
+        val mediaFile = sql.createQuery(MediaFile::class) {
+            where(table.objectKey eq objectKey)
+            when (node) {
+                is FileSystemStorageNode -> where(table.fsProviderId eq node.providerId)
+                is OssStorageNode -> where(table.ossProviderId eq node.providerId)
+            }
+            select(table.fetch(MEDIA_FILE_FETCHER))
+        }.execute().firstOrNull()
+            ?: notFound("Media file at '$objectKey' was not found")
+        return mediaFile.toHostView()
+    }
+
     @Transactional
     internal fun createMediaFile(node: StorageNode, objectKey: String, mimeType: String): HostMediaFileView {
         val stat = storageObjects.statOrNull(node, objectKey)
@@ -62,7 +75,10 @@ class PluginMediaService(
             },
             SaveMode.INSERT_ONLY,
         ).execute(MEDIA_FILE_FETCHER).modifiedEntity
-        return created.toHostView()
+        // Jimmer may return the saved entity without materializing nullable provider
+        // associations; reload with the same fetcher before exposing the Host view.
+        return findMediaFile(created.id)?.toHostView()
+            ?: notFound("Media file ${created.id} was not found")
     }
 
     @Transactional
@@ -83,12 +99,16 @@ class PluginMediaService(
         sql.deleteById(MediaFile::class, id)
     }
 
-    internal fun listAssets(recordingId: Long): List<HostAssetView> {
-        if (sql.findById(Recording::class, recordingId) == null) {
+    internal fun listAssets(recordingId: Long?, mediaFileId: Long?): List<HostAssetView> {
+        if (recordingId == null && mediaFileId == null) {
+            invalidArgument("At least one of 'recordingId' or 'mediaFileId' must be provided")
+        }
+        if (recordingId != null && sql.findById(Recording::class, recordingId) == null) {
             notFound("Recording $recordingId was not found")
         }
         return sql.createQuery(Asset::class) {
-            where(table.recording.id eq recordingId)
+            recordingId?.let { where(table.recording.id eq it) }
+            mediaFileId?.let { where(table.mediaFile.id eq it) }
             orderBy(table.id)
             select(table.fetch(ASSET_FETCHER))
         }.execute().map { it.toHostView() }
