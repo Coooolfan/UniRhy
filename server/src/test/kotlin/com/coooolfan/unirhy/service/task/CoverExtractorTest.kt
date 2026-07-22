@@ -8,6 +8,7 @@ import org.jaudiotagger.tag.images.ArtworkFactory
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import org.mockito.Mockito.mock
+import tools.jackson.module.kotlin.jacksonObjectMapper
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.test.assertContentEquals
@@ -21,7 +22,7 @@ class CoverExtractorTest {
     @TempDir
     lateinit var tempDir: Path
 
-    private val storageObjects = StorageNodeObjectService(mock(KSqlClient::class.java))
+    private val storageObjects = StorageNodeObjectService(mock(KSqlClient::class.java), jacksonObjectMapper())
 
     @Test
     fun fetchCoverPrefersSidecarCover() {

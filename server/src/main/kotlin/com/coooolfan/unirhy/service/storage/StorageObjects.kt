@@ -11,6 +11,17 @@ data class StorageObjectStat(
     val fileName: String,
     val size: Long,
     val lastModified: Instant,
+    val contentType: String?,
+)
+
+data class StorageObjectListItem(
+    val objectKey: String,
+    val size: Long,
+)
+
+data class StorageObjectPage(
+    val objects: List<StorageObjectListItem>,
+    val nextCursor: String?,
 )
 
 data class TemporaryStorageFile(val file: File) : Closeable {

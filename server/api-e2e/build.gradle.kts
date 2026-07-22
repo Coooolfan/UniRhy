@@ -21,6 +21,7 @@ dependencies {
     testImplementation(libs.jimmer.spring.boot.starter)
     testImplementation(libs.sa.token.starter)
     testImplementation(libs.jAudioTagger)
+    testImplementation(libs.endive.runtime)
     testImplementation(libs.test.kotlin)
     testRuntimeOnly(libs.test.launcher)
 }

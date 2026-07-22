@@ -4,6 +4,7 @@ import com.coooolfan.unirhy.UnirhyApplication
 import com.unirhy.e2e.support.E2eAssert
 import com.unirhy.e2e.support.E2eJson
 import com.unirhy.e2e.support.E2eRuntime
+import com.unirhy.e2e.support.PluginHostWasmFixture
 import com.unirhy.e2e.support.bootstrapAdminSession
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.MethodOrderer
@@ -18,6 +19,7 @@ import org.springframework.test.annotation.DirtiesContext
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import java.io.ByteArrayOutputStream
+import java.nio.file.Files
 import java.util.UUID
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
@@ -185,6 +187,83 @@ class PluginE2eTest {
 
     @Test
     @Order(3)
+    fun `wasm plugin should link the complete host catalog and execute host calls`() {
+        val state = bootstrapAdminSession(baseUrl())
+        val fixtureSuffix = suffix()
+        val pluginId = "com.unirhy-e2e.host-$fixtureSuffix"
+        val artistName = "host-artist-$fixtureSuffix"
+        val objectKey = "plugin-host-e2e/$fixtureSuffix.bin"
+        val objectBytes = "host-storage-$fixtureSuffix".toByteArray()
+        val wasm = PluginHostWasmFixture.build(
+            artistName = artistName,
+            objectKey = objectKey,
+            objectBytes = objectBytes,
+        )
+
+        val uploadResponse = state.api.postMultipartFile(
+            path = "/api/plugins",
+            fieldName = "file",
+            fileName = "$pluginId.up",
+            fileBytes = pluginArchive(pluginId, wasm),
+        )
+        E2eAssert.status(uploadResponse, 201, "[plugin-host] complete Host import catalog should link")
+
+        E2eAssert.status(
+            state.api.put(
+                path = "/api/plugins/$pluginId/enabled-state",
+                query = mapOf("enabled" to true),
+            ),
+            204,
+            "[plugin-host] enable should succeed",
+        )
+
+        val submitResponse = state.api.post(
+            path = "/api/task-submissions",
+            json = mapOf(
+                "namespace" to pluginId,
+                "taskType" to TASK_TYPE,
+                "params" to emptyMap<String, Any>(),
+            ),
+        )
+        E2eAssert.status(submitResponse, 202, "[plugin-host] submission should be accepted")
+        val submissionId = E2eJson.mapper.readTree(submitResponse.body()).path("submissionId").longValue()
+
+        awaitSingleTaskCompleted(state, submissionId)
+
+        val artistResponse = state.api.get(
+            path = "/api/artists/search-results",
+            query = mapOf("name" to artistName),
+        )
+        E2eAssert.status(artistResponse, 200, "[plugin-host] artist search should succeed")
+        assertTrue(
+            E2eJson.mapper.readTree(artistResponse.body()).any { it.path("displayName").asString() == artistName },
+            "[plugin-host] JSON Host call should create the artist",
+        )
+
+        val storedObject = state.runtime.scanWorkspace.resolve(objectKey)
+        assertTrue(Files.isRegularFile(storedObject), "[plugin-host] binary Host call should create the storage object")
+        assertTrue(
+            Files.readAllBytes(storedObject).contentEquals(objectBytes),
+            "[plugin-host] stored bytes should match guest memory",
+        )
+
+        E2eAssert.status(
+            state.api.put(
+                path = "/api/plugins/$pluginId/enabled-state",
+                query = mapOf("enabled" to false),
+            ),
+            204,
+            "[plugin-host] disable should succeed",
+        )
+        E2eAssert.status(
+            state.api.delete("/api/plugins/$pluginId"),
+            204,
+            "[plugin-host] delete should succeed",
+        )
+    }
+
+    @Test
+    @Order(4)
     fun `plugin upload should reject invalid archives`() {
         val state = bootstrapAdminSession(baseUrl())
         val response = state.api.postMultipartFile(
@@ -205,7 +284,7 @@ class PluginE2eTest {
     }
 
     @Test
-    @Order(4)
+    @Order(5)
     fun `task submission should reject unknown task key`() {
         val state = bootstrapAdminSession(baseUrl())
         E2eAssert.status(
@@ -250,7 +329,44 @@ class PluginE2eTest {
         fail("[plugins] submission $submissionId did not reach terminal state, last=$lastStatus")
     }
 
-    private fun pluginArchive(pluginId: String): ByteArray {
+    private fun awaitSingleTaskCompleted(state: com.unirhy.e2e.support.E2eAdminSession, submissionId: Long) {
+        val deadline = System.currentTimeMillis() + SUBMISSION_WAIT_TIMEOUT_MILLIS
+        var lastState = "<none>"
+        while (System.currentTimeMillis() <= deadline) {
+            val detailResponse = state.api.get("/api/task-submissions/$submissionId")
+            E2eAssert.status(detailResponse, 200, "[plugin-host] submission detail should succeed")
+            val detail = E2eJson.mapper.readTree(detailResponse.body())
+            val submissionStatus = detail.path("submission").path("status").asString()
+            val taskCounts = detail.path("taskCounts")
+            val active = taskCounts.path("active").longValue()
+            val completed = taskCounts.path("completed").longValue()
+            val failed = taskCounts.path("failed").longValue()
+            val cancelled = taskCounts.path("cancelled").longValue()
+            val total = taskCounts.path("total").longValue()
+            lastState = "submission=$submissionStatus, active=$active, completed=$completed, " +
+                "failed=$failed, cancelled=$cancelled, total=$total"
+
+            if (submissionStatus in setOf("FAILED", "CANCELLED")) {
+                fail("[plugin-host] submission did not complete: $lastState")
+            }
+            if (submissionStatus == "COMPLETED" && total == 1L && active == 0L) {
+                assertEquals(1L, completed, "[plugin-host] the guest task should complete")
+                assertEquals(0L, failed, "[plugin-host] the guest task should not fail")
+                assertEquals(0L, cancelled, "[plugin-host] the guest task should not be cancelled")
+
+                val tasksResponse = state.api.get("/api/task-submissions/$submissionId/tasks")
+                E2eAssert.status(tasksResponse, 200, "[plugin-host] task list should succeed")
+                val rows = E2eJson.mapper.readTree(tasksResponse.body()).path("rows")
+                assertEquals(1, rows.size(), "[plugin-host] plan should enqueue exactly one task")
+                assertEquals("COMPLETED", rows[0].path("status").asString(), "[plugin-host] task should be completed")
+                return
+            }
+            Thread.sleep(200L)
+        }
+        fail("[plugin-host] submission $submissionId did not finish its task, last=$lastState")
+    }
+
+    private fun pluginArchive(pluginId: String, wasm: ByteArray = minimalPlanningWasm()): ByteArray {
         val manifest = """
             id: $pluginId
             name: E2E plugin
@@ -275,7 +391,7 @@ class PluginE2eTest {
         """.trimIndent()
         return zip(
             "plugin.yml" to manifest.toByteArray(),
-            "plugin.wasm" to minimalPlanningWasm(),
+            "plugin.wasm" to wasm,
         )
     }
 
