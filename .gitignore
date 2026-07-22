@@ -21,7 +21,11 @@ server/api-e2e/build
 server/data/
 server/tmp/
 server/test-output/
-server/src/main/resources
+server/src/main/resources/*
+!server/src/main/resources/db/
+server/src/main/resources/db/*
+!server/src/main/resources/db/migration/
+!server/src/main/resources/db/migration/*.sql
 !server/gradle/wrapper/gradle-wrapper.jar
 
 website/.vscode
