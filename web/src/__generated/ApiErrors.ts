@@ -85,6 +85,14 @@ export type AllErrors = {
         reason: string
     } | {
         family: 'PLUGIN', 
+        code: 'CONFIGURATION_REQUIRED', 
+        reason: string
+    } | {
+        family: 'PLUGIN', 
+        code: 'INVALID_CONFIGURATION', 
+        reason: string
+    } | {
+        family: 'PLUGIN', 
         code: 'INVALID_CONCURRENCY'
     } | {
         family: 'PLUGIN', 
@@ -430,6 +438,32 @@ export type ApiErrors = {
             } | {
                 family: 'PLUGIN', 
                 code: 'LOAD_FAILED', 
+                readonly [key:string]: any
+            } | {
+                family: 'PLUGIN', 
+                code: 'CONFIGURATION_REQUIRED', 
+                readonly [key:string]: any
+            }), 
+        'getConfiguration': AllErrors & ({
+                family: 'COMMON', 
+                code: 'FORBIDDEN', 
+                readonly [key:string]: any
+            } | {
+                family: 'PLUGIN', 
+                code: 'NOT_FOUND', 
+                readonly [key:string]: any
+            }), 
+        'updateConfiguration': AllErrors & ({
+                family: 'COMMON', 
+                code: 'FORBIDDEN', 
+                readonly [key:string]: any
+            } | {
+                family: 'PLUGIN', 
+                code: 'NOT_FOUND', 
+                readonly [key:string]: any
+            } | {
+                family: 'PLUGIN', 
+                code: 'INVALID_CONFIGURATION', 
                 readonly [key:string]: any
             }), 
         'updateConcurrency': AllErrors & ({

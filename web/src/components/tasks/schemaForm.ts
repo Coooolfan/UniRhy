@@ -12,6 +12,7 @@ export type SchemaField = {
     title: string
     description?: string
     required: boolean
+    writeOnly: boolean
     default?: string | number | boolean
     enum?: Array<string | number>
     minLength?: number
@@ -65,6 +66,7 @@ export const parseFormDefinition = (formDefinition: unknown): SchemaField[] => {
             title: asString(fieldSchema.title) ?? name,
             description: asString(fieldSchema.description),
             required: required.has(name),
+            writeOnly: fieldSchema.writeOnly === true,
             default:
                 typeof defaultValue === 'string' ||
                 typeof defaultValue === 'number' ||
@@ -87,11 +89,18 @@ export const parseFormDefinition = (formDefinition: unknown): SchemaField[] => {
 /** 表单值以字符串保存（checkbox 为 boolean），提交时按字段类型转换 */
 export type SchemaFormValues = Record<string, string | boolean>
 
-export const initialFormValues = (fields: SchemaField[]): SchemaFormValues => {
+export const initialFormValues = (
+    fields: SchemaField[],
+    source: Record<string, unknown> = {},
+): SchemaFormValues => {
     const values: SchemaFormValues = {}
     for (const field of fields) {
+        const sourceValue = source[field.name]
         if (field.type === 'boolean') {
-            values[field.name] = field.default === true
+            values[field.name] =
+                typeof sourceValue === 'boolean' ? sourceValue : field.default === true
+        } else if (typeof sourceValue === 'string' || typeof sourceValue === 'number') {
+            values[field.name] = String(sourceValue)
         } else if (field.default === undefined) {
             values[field.name] = ''
         } else {
@@ -137,8 +146,16 @@ export const isFieldValid = (field: SchemaField, raw: string | boolean | undefin
     return true
 }
 
-export const isFormValid = (fields: SchemaField[], values: SchemaFormValues): boolean =>
-    fields.every((field) => isFieldValid(field, values[field.name]))
+export const isFormValid = (
+    fields: SchemaField[],
+    values: SchemaFormValues,
+    configuredSecretFields: ReadonlySet<string> = new Set(),
+): boolean =>
+    fields.every((field) => {
+        const raw = values[field.name]
+        if (field.writeOnly && configuredSecretFields.has(field.name) && raw === '') return true
+        return isFieldValid(field, raw)
+    })
 
 /** 转换为提交用 params；未填写的可选字段不写入（服务端不自动填 default） */
 export const toSubmissionParams = (

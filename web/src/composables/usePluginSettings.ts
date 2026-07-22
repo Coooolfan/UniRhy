@@ -5,8 +5,22 @@ import { resolveErrorMessage } from '@/i18n/errors'
 import { buildApiUrl } from '@/runtime/platform'
 import { runtimeFetch } from '@/runtime/http'
 import type { PluginInfoResponse } from '@/__generated/model/static/PluginInfoResponse'
+import type { PluginConfigurationResponse } from '@/__generated/model/static/PluginConfigurationResponse'
 
 const TOKEN_HEADER_NAME = 'unirhy-token'
+
+const loadConfiguration = (id: string): Promise<PluginConfigurationResponse> =>
+    api.pluginController.getConfiguration({ id })
+
+const saveConfiguration = (
+    id: string,
+    values: Record<string, unknown>,
+    clearedSecretFields: ReadonlyArray<string>,
+): Promise<PluginConfigurationResponse> =>
+    api.pluginController.updateConfiguration({
+        id,
+        body: { values, clearedSecretFields },
+    })
 
 export const usePluginSettings = () => {
     const plugins = ref<ReadonlyArray<PluginInfoResponse>>([])
@@ -101,6 +115,8 @@ export const usePluginSettings = () => {
         upload,
         setEnabled,
         updateConcurrency,
+        loadConfiguration,
+        saveConfiguration,
         deletePlugin,
         downloadPlugin,
     }
