@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ChevronDown, RotateCcw, X } from 'lucide-vue-next'
+import { ChevronDown, Plus, RotateCcw, Trash2, X } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 import { isFieldValid, type SchemaField, type SchemaFormValues } from './schemaForm'
 
@@ -26,8 +26,43 @@ const emit = defineEmits<{
     'restore-secret': [fieldName: string]
 }>()
 
-const updateValue = (fieldName: string, value: string | boolean) => {
+const updateValue = (fieldName: string, value: string | boolean | string[]) => {
     emit('update:modelValue', { ...props.modelValue, [fieldName]: value })
+}
+
+const arrayValue = (fieldName: string) => {
+    const value = props.modelValue[fieldName]
+    return Array.isArray(value) && value.length > 0 ? value : ['']
+}
+
+const addArrayItem = (field: SchemaField) => {
+    const value = arrayValue(field.name)
+    const [lastItem] = value.slice(-1)
+    if (lastItem === '' || (field.maxItems !== undefined && value.length >= field.maxItems)) {
+        return
+    }
+    updateValue(field.name, [...value, ''])
+}
+
+const updateArrayItem = (fieldName: string, index: number, value: string) => {
+    const next = [...arrayValue(fieldName)]
+    next[index] = value
+    updateValue(fieldName, next)
+}
+
+const removeArrayItem = (fieldName: string, index: number) => {
+    const value = arrayValue(fieldName)
+    if (value.length <= 1) return
+    updateValue(
+        fieldName,
+        value.filter((_, itemIndex) => itemIndex !== index),
+    )
+}
+
+const canAddArrayItem = (field: SchemaField) => {
+    const value = arrayValue(field.name)
+    const [lastItem] = value.slice(-1)
+    return lastItem !== '' && (field.maxItems === undefined || value.length < field.maxItems)
 }
 
 const { t } = useI18n()
@@ -42,7 +77,10 @@ const inputPlaceholder = (field: SchemaField) =>
 
 const showDescriptionHint = (field: SchemaField) =>
     Boolean(field.description) &&
-    (field.type === 'boolean' || Boolean(field.enum) || isSecretConfigured(field))
+    (field.type === 'boolean' ||
+        field.type === 'array' ||
+        Boolean(field.enum) ||
+        isSecretConfigured(field))
 
 const inputValue = (event: Event) => (event.target as HTMLInputElement).value
 const checkedValue = (event: Event) => (event.target as HTMLInputElement).checked
@@ -51,88 +89,139 @@ const checkedValue = (event: Event) => (event.target as HTMLInputElement).checke
 <template>
     <div class="grid gap-6" :class="columns ? 'sm:grid-cols-2' : ''">
         <div v-for="field in fields" :key="field.name" class="block">
-            <label>
-                <span class="mb-2 block text-xs uppercase text-[#8A8A8A]">
-                    {{ field.title }}
-                    <span v-if="field.required" class="text-[#C27E46]">*</span>
-                </span>
+            <span class="mb-2 block text-xs uppercase text-[#8A8A8A]">
+                {{ field.title }}
+                <span v-if="field.required" class="text-[#C27E46]">*</span>
+            </span>
 
-                <div v-if="field.type === 'boolean'">
+            <div v-if="field.type === 'boolean'">
+                <label>
                     <input
                         type="checkbox"
                         class="mt-1"
+                        :aria-label="field.title"
                         :checked="modelValue[field.name] === true"
                         :disabled="disabled"
                         @change="updateValue(field.name, checkedValue($event))"
                     />
-                </div>
+                </label>
+            </div>
 
-                <div v-else-if="field.enum" class="relative">
-                    <select
-                        class="w-full appearance-none border-b border-[#D6D1C4] bg-[#F7F5F0] p-3 pr-10 text-sm text-[#2C2C2C] outline-none transition-colors focus:border-[#C27E46] disabled:opacity-60"
-                        :value="modelValue[field.name]"
-                        :disabled="disabled"
-                        @change="updateValue(field.name, inputValue($event))"
-                    >
-                        <option v-if="!field.required" value="">-</option>
-                        <option
-                            v-for="candidate in field.enum"
-                            :key="String(candidate)"
-                            :value="String(candidate)"
-                        >
-                            {{ candidate }}
-                        </option>
-                    </select>
-                    <ChevronDown
-                        class="pointer-events-none absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 text-[#8A8A8A]"
-                    />
-                </div>
-
-                <div v-else class="relative">
+            <div
+                v-else-if="field.type === 'array'"
+                class="space-y-2"
+                :data-test="`schema-array-${field.name}`"
+            >
+                <div
+                    v-for="(_, index) in arrayValue(field.name)"
+                    :key="index"
+                    class="flex min-w-0 items-center gap-2"
+                >
                     <input
-                        :type="
-                            field.writeOnly
-                                ? 'password'
-                                : field.type === 'string'
-                                  ? 'text'
-                                  : 'number'
-                        "
-                        :min="field.minimum"
-                        :max="field.maximum"
-                        :step="field.type === 'integer' ? 1 : field.multipleOf"
+                        :type="field.items?.type === 'string' ? 'text' : 'number'"
+                        :step="field.items?.type === 'integer' ? 1 : 'any'"
                         :placeholder="inputPlaceholder(field)"
-                        class="w-full border-b bg-[#F7F5F0] p-3 text-sm text-[#2C2C2C] outline-none transition-colors placeholder:text-[#B4AC9C] focus:border-[#C27E46] disabled:opacity-60"
-                        :class="
-                            isFieldValid(field, modelValue[field.name]) || isSecretConfigured(field)
-                                ? 'border-[#D6D1C4]'
-                                : 'border-rose-300'
+                        :aria-label="
+                            t('taskSubmission.arrayItemLabel', {
+                                title: field.title,
+                                index: index + 1,
+                            })
                         "
-                        :value="modelValue[field.name]"
+                        class="min-w-0 flex-1 border-b border-[#D6D1C4] bg-[#F7F5F0] p-3 text-sm text-[#2C2C2C] outline-none transition-colors placeholder:text-[#B4AC9C] focus:border-[#C27E46] disabled:opacity-60"
+                        :value="arrayValue(field.name)[index]"
                         :disabled="disabled"
-                        @input="updateValue(field.name, inputValue($event))"
+                        @input="updateArrayItem(field.name, index, inputValue($event))"
                     />
                     <button
-                        v-if="isSecretConfigured(field)"
+                        v-if="index === arrayValue(field.name).length - 1"
                         type="button"
-                        class="absolute top-1/2 right-2 -translate-y-1/2 p-1.5 text-[#9C968B] transition-colors hover:text-rose-500"
-                        :disabled="disabled"
-                        :title="$t('plugins.clearSecret')"
-                        @click="emit('clear-secret', field.name)"
+                        class="inline-flex h-10 w-10 shrink-0 items-center justify-center text-[#8A8A8A] transition-colors hover:text-[#C27E46] disabled:cursor-not-allowed disabled:opacity-40"
+                        :disabled="disabled || !canAddArrayItem(field)"
+                        :title="t('taskSubmission.addArrayItem')"
+                        :data-test="`schema-array-${field.name}-add`"
+                        @click="addArrayItem(field)"
                     >
-                        <X class="h-4 w-4" />
+                        <Plus class="h-4 w-4" />
                     </button>
                     <button
-                        v-else-if="field.writeOnly && clearedSecretFields.has(field.name)"
+                        v-else
                         type="button"
-                        class="absolute top-1/2 right-2 -translate-y-1/2 p-1.5 text-[#9C968B] transition-colors hover:text-[#C27E46]"
+                        class="inline-flex h-10 w-10 shrink-0 items-center justify-center text-[#9C968B] transition-colors hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-40"
                         :disabled="disabled"
-                        :title="$t('plugins.restoreSecret')"
-                        @click="emit('restore-secret', field.name)"
+                        :title="t('taskSubmission.removeArrayItem')"
+                        @click="removeArrayItem(field.name, index)"
                     >
-                        <RotateCcw class="h-4 w-4" />
+                        <Trash2 class="h-4 w-4" />
                     </button>
                 </div>
-            </label>
+            </div>
+
+            <div v-else-if="field.enum" class="relative">
+                <select
+                    class="w-full appearance-none border-b border-[#D6D1C4] bg-[#F7F5F0] p-3 pr-10 text-sm text-[#2C2C2C] outline-none transition-colors focus:border-[#C27E46] disabled:opacity-60"
+                    :aria-label="field.title"
+                    :value="modelValue[field.name]"
+                    :disabled="disabled"
+                    @change="updateValue(field.name, inputValue($event))"
+                >
+                    <option v-if="!field.required" value="">-</option>
+                    <option
+                        v-for="candidate in field.enum"
+                        :key="String(candidate)"
+                        :value="String(candidate)"
+                    >
+                        {{ candidate }}
+                    </option>
+                </select>
+                <ChevronDown
+                    class="pointer-events-none absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 text-[#8A8A8A]"
+                />
+            </div>
+
+            <div v-else class="relative">
+                <input
+                    :type="
+                        field.writeOnly ? 'password' : field.type === 'string' ? 'text' : 'number'
+                    "
+                    :min="field.minimum"
+                    :max="field.maximum"
+                    :step="field.type === 'integer' ? 1 : field.multipleOf"
+                    :placeholder="inputPlaceholder(field)"
+                    :aria-label="field.title"
+                    class="w-full border-b bg-[#F7F5F0] p-3 text-sm text-[#2C2C2C] outline-none transition-colors placeholder:text-[#B4AC9C] focus:border-[#C27E46] disabled:opacity-60"
+                    :class="
+                        isFieldValid(field, modelValue[field.name]) || isSecretConfigured(field)
+                            ? 'border-[#D6D1C4]'
+                            : 'border-rose-300'
+                    "
+                    :value="modelValue[field.name]"
+                    :disabled="disabled"
+                    @input="updateValue(field.name, inputValue($event))"
+                />
+                <span v-if="isSecretConfigured(field)" class="sr-only">
+                    {{ t('plugins.secretConfigured') }}
+                </span>
+                <button
+                    v-if="isSecretConfigured(field)"
+                    type="button"
+                    class="absolute top-1/2 right-2 -translate-y-1/2 p-1.5 text-[#9C968B] transition-colors hover:text-rose-500"
+                    :disabled="disabled"
+                    :title="$t('plugins.clearSecret')"
+                    @click="emit('clear-secret', field.name)"
+                >
+                    <X class="h-4 w-4" />
+                </button>
+                <button
+                    v-else-if="field.writeOnly && clearedSecretFields.has(field.name)"
+                    type="button"
+                    class="absolute top-1/2 right-2 -translate-y-1/2 p-1.5 text-[#9C968B] transition-colors hover:text-[#C27E46]"
+                    :disabled="disabled"
+                    :title="$t('plugins.restoreSecret')"
+                    @click="emit('restore-secret', field.name)"
+                >
+                    <RotateCcw class="h-4 w-4" />
+                </button>
+            </div>
 
             <p
                 v-if="showDescriptionHint(field)"

@@ -4,7 +4,12 @@
  * 客户端校验只用于交互反馈，服务端在创建 submission 前执行权威校验。
  */
 
-export type SchemaFieldType = 'string' | 'integer' | 'number' | 'boolean'
+export type SchemaFieldType = 'string' | 'integer' | 'number' | 'boolean' | 'array'
+export type SchemaArrayItemType = 'string' | 'integer' | 'number'
+
+export type SchemaArrayItems = {
+    type: SchemaArrayItemType
+}
 
 export type SchemaField = {
     name: string
@@ -13,7 +18,7 @@ export type SchemaField = {
     description?: string
     required: boolean
     writeOnly: boolean
-    default?: string | number | boolean
+    default?: string | number | boolean | Array<string | number>
     enum?: Array<string | number>
     minLength?: number
     maxLength?: number
@@ -22,15 +27,22 @@ export type SchemaField = {
     exclusiveMinimum?: number
     exclusiveMaximum?: number
     multipleOf?: number
+    items?: SchemaArrayItems
+    minItems?: number
+    maxItems?: number
 }
 
-const FIELD_TYPES: readonly SchemaFieldType[] = ['string', 'integer', 'number', 'boolean']
+const FIELD_TYPES: readonly SchemaFieldType[] = ['string', 'integer', 'number', 'boolean', 'array']
+const ARRAY_ITEM_TYPES: readonly SchemaArrayItemType[] = ['string', 'integer', 'number']
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
     typeof value === 'object' && value !== null && !Array.isArray(value)
 
 const isFieldType = (value: unknown): value is SchemaFieldType =>
     typeof value === 'string' && (FIELD_TYPES as readonly string[]).includes(value)
+
+const isArrayItemType = (value: unknown): value is SchemaArrayItemType =>
+    typeof value === 'string' && (ARRAY_ITEM_TYPES as readonly string[]).includes(value)
 
 const asNumber = (value: unknown): number | undefined =>
     typeof value === 'number' ? value : undefined
@@ -54,6 +66,8 @@ export const parseFormDefinition = (formDefinition: unknown): SchemaField[] => {
     for (const name of order) {
         const fieldSchema = properties[name]
         if (!isRecord(fieldSchema) || !isFieldType(fieldSchema.type)) continue
+        const items = isRecord(fieldSchema.items) ? fieldSchema.items : undefined
+        if (fieldSchema.type === 'array' && !isArrayItemType(items?.type)) continue
         const defaultValue = fieldSchema.default
         const enumValues = Array.isArray(fieldSchema.enum)
             ? fieldSchema.enum.filter(
@@ -70,7 +84,11 @@ export const parseFormDefinition = (formDefinition: unknown): SchemaField[] => {
             default:
                 typeof defaultValue === 'string' ||
                 typeof defaultValue === 'number' ||
-                typeof defaultValue === 'boolean'
+                typeof defaultValue === 'boolean' ||
+                (Array.isArray(defaultValue) &&
+                    defaultValue.every(
+                        (value) => typeof value === 'string' || typeof value === 'number',
+                    ))
                     ? defaultValue
                     : undefined,
             enum: enumValues,
@@ -81,13 +99,20 @@ export const parseFormDefinition = (formDefinition: unknown): SchemaField[] => {
             exclusiveMinimum: asNumber(fieldSchema.exclusiveMinimum),
             exclusiveMaximum: asNumber(fieldSchema.exclusiveMaximum),
             multipleOf: asNumber(fieldSchema.multipleOf),
+            items:
+                fieldSchema.type === 'array' && isArrayItemType(items?.type)
+                    ? { type: items.type }
+                    : undefined,
+            minItems: asNumber(fieldSchema.minItems),
+            maxItems: asNumber(fieldSchema.maxItems),
         })
     }
     return fields
 }
 
-/** 表单值以字符串保存（checkbox 为 boolean），提交时按字段类型转换 */
-export type SchemaFormValues = Record<string, string | boolean>
+/** 表单值以字符串保存（checkbox 为 boolean，数组为字符串列表），提交时按字段类型转换 */
+export type SchemaFormValue = string | boolean | string[]
+export type SchemaFormValues = Record<string, SchemaFormValue>
 
 export const initialFormValues = (
     fields: SchemaField[],
@@ -96,7 +121,18 @@ export const initialFormValues = (
     const values: SchemaFormValues = {}
     for (const field of fields) {
         const sourceValue = source[field.name]
-        if (field.type === 'boolean') {
+        if (field.type === 'array') {
+            let arrayValue: unknown[] = []
+            if (Array.isArray(sourceValue)) {
+                arrayValue = sourceValue
+            } else if (Array.isArray(field.default)) {
+                arrayValue = field.default
+            }
+            const normalizedValue = arrayValue
+                .filter((value) => typeof value === 'string' || typeof value === 'number')
+                .map(String)
+            values[field.name] = normalizedValue.length > 0 ? normalizedValue : ['']
+        } else if (field.type === 'boolean') {
             values[field.name] =
                 typeof sourceValue === 'boolean' ? sourceValue : field.default === true
         } else if (typeof sourceValue === 'string' || typeof sourceValue === 'number') {
@@ -125,7 +161,22 @@ const isNumericValueValid = (field: SchemaField, value: number): boolean => {
     return true
 }
 
-export const isFieldValid = (field: SchemaField, raw: string | boolean | undefined): boolean => {
+export const isFieldValid = (field: SchemaField, raw: SchemaFormValue | undefined): boolean => {
+    if (field.type === 'array') {
+        if (!Array.isArray(raw)) return !field.required
+        const items = raw.filter((item) => item !== '')
+        if (raw.length > 1 && items.length !== raw.length) return false
+        if (field.minItems !== undefined && items.length < field.minItems) return false
+        if (field.maxItems !== undefined && items.length > field.maxItems) return false
+        const itemType = field.items?.type
+        if (!itemType) return false
+        return items.every((item) => {
+            if (itemType === 'string') return true
+            const value = Number(item)
+            if (Number.isNaN(value)) return false
+            return itemType !== 'integer' || Number.isInteger(value)
+        })
+    }
     if (field.type === 'boolean') {
         return true
     }
@@ -165,6 +216,19 @@ export const toSubmissionParams = (
     const params: Record<string, unknown> = {}
     for (const field of fields) {
         const raw = values[field.name]
+        if (field.type === 'array') {
+            const items = Array.isArray(raw) ? raw.filter((item) => item !== '') : []
+            if (items.length === 0 && !field.required) continue
+            if (field.items?.type === 'string') {
+                params[field.name] = items
+            } else if (field.items) {
+                const converted = items.map(Number)
+                if (converted.every((value) => !Number.isNaN(value))) {
+                    params[field.name] = converted
+                }
+            }
+            continue
+        }
         if (field.type === 'boolean') {
             params[field.name] = raw === true || raw === 'true'
             continue

@@ -84,6 +84,34 @@ const pluginDefinition: TaskDefinitionView = {
     },
 }
 
+const arrayPluginDefinition: TaskDefinitionView = {
+    namespace: 'com.example.batch',
+    taskType: 'BATCH_IMPORT',
+    name: '批量导入',
+    formDefinition: {
+        schema: {
+            type: 'object',
+            properties: {
+                sources: {
+                    type: 'array',
+                    title: '来源',
+                    items: { type: 'string' },
+                    minItems: 1,
+                },
+                priorities: {
+                    type: 'array',
+                    title: '优先级',
+                    items: { type: 'integer' },
+                    maxItems: 2,
+                },
+            },
+            required: ['sources'],
+            additionalProperties: false,
+        },
+        order: ['sources', 'priorities'],
+    },
+}
+
 const providerOptions: TaskProviderOption[] = [
     {
         id: 1,
@@ -295,5 +323,40 @@ describe('TaskSubmissionModal', () => {
             dryRun: false,
         })
         expect(resolveMock).toHaveBeenCalledWith(true)
+    })
+
+    it('edits homogeneous arrays and submits native array params', async () => {
+        const wrapper = await mountModal({
+            definitions: [...builtInDefinitions, arrayPluginDefinition],
+        })
+
+        await wrapper.get('[data-test="task-type-batch_import"]').trigger('click')
+        const submitButton = wrapper.get<HTMLButtonElement>('[data-test="task-submit-button"]')
+        expect(submitButton.element.disabled).toBe(true)
+        expect(wrapper.findAll('[data-test="schema-array-sources"] input')).toHaveLength(1)
+        expect(
+            wrapper.get<HTMLButtonElement>('[data-test="schema-array-sources-add"]').element
+                .disabled,
+        ).toBe(true)
+
+        await wrapper.get('[data-test="schema-array-sources"] input').setValue('library-a')
+        await wrapper.get('[data-test="schema-array-priorities"] input').setValue('2')
+        await wrapper.get('[data-test="schema-array-priorities-add"]').trigger('click')
+
+        const priorityInputs = wrapper.findAll('[data-test="schema-array-priorities"] input')
+        await priorityInputs[1].setValue('5')
+
+        expect(submitButton.element.disabled).toBe(false)
+        expect(wrapper.findAll('button[title="删除此项"]')).toHaveLength(1)
+        expect(
+            wrapper.get<HTMLButtonElement>('[data-test="schema-array-priorities-add"]').element
+                .disabled,
+        ).toBe(true)
+        await submitButton.trigger('click')
+
+        expect(submitTaskMock).toHaveBeenCalledWith('com.example.batch', 'BATCH_IMPORT', {
+            sources: ['library-a'],
+            priorities: [2, 5],
+        })
     })
 })
