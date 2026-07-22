@@ -74,6 +74,16 @@ class WorkService(private val sql: KSqlClient) {
         }.execute()
     }
 
+    fun createWork(title: String, fetcher: Fetcher<Work>): Work {
+        val created = sql.saveCommand(
+            Work {
+                this.title = title
+            },
+            SaveMode.INSERT_ONLY,
+        ).execute(fetcher).modifiedEntity
+        return getWorkById(created.id, fetcher)
+    }
+
     @Transactional
     fun mergeWork(input: WorkMergeReq) {
         val workIdsNeedMerge = input.needMergeIds - input.targetId

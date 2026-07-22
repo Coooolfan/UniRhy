@@ -10,6 +10,7 @@ import com.coooolfan.unirhy.service.AlbumService
 import com.coooolfan.unirhy.service.ArtistService
 import com.coooolfan.unirhy.service.PlaylistService
 import com.coooolfan.unirhy.service.RecordingService
+import com.coooolfan.unirhy.service.SystemConfigService
 import com.coooolfan.unirhy.service.WorkService
 import com.coooolfan.unirhy.service.plugin.WasmPlugin
 import com.coooolfan.unirhy.service.plugin.hostapi.NestedPluginHostCallExecutor
@@ -57,6 +58,7 @@ class PluginTaskService(
     private val artistService: ArtistService,
     private val workService: WorkService,
     private val recordingService: RecordingService,
+    private val systemConfigService: SystemConfigService,
     private val albumService: AlbumService,
     private val playlistService: PlaylistService,
     private val fileSystemStorageService: FileSystemStorageService,
@@ -158,6 +160,7 @@ class PluginTaskService(
                 buildStorageHostFunctions(
                     fileSystemStorageService,
                     ossStorageService,
+                    systemConfigService,
                     storageObjects,
                     objectMapper,
                     instanceRef,

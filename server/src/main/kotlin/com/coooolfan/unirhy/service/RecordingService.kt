@@ -4,6 +4,7 @@ import com.coooolfan.unirhy.error.RecordingException
 import com.coooolfan.unirhy.model.*
 import com.coooolfan.unirhy.model.dto.RecordingMergeReq
 import org.babyfish.jimmer.Page
+import org.babyfish.jimmer.sql.ast.mutation.AssociatedSaveMode
 import org.babyfish.jimmer.sql.ast.mutation.SaveMode
 import org.babyfish.jimmer.sql.fetcher.Fetcher
 import org.babyfish.jimmer.sql.kt.KSqlClient
@@ -40,6 +41,42 @@ class RecordingService(
             orderBy(table.id)
             select(table.fetch(fetcher))
         }.fetchPage(pageIndex, pageSize)
+    }
+
+    @Transactional
+    fun createRecording(input: Recording, fetcher: Fetcher<Recording>): Recording {
+        val workId = input.work.id
+        if (sql.findById(Work::class, workId) == null) {
+            throw RecordingException.NotFound("Work $workId was not found")
+        }
+
+        val artistIds = input.artists.map { it.id }.toSet()
+        if (artistIds.isNotEmpty()) {
+            val existingArtistCount = sql.createQuery(Artist::class) {
+                where(table.id valueIn artistIds)
+                selectCount()
+            }.execute().first()
+            if (existingArtistCount != artistIds.size.toLong()) {
+                throw RecordingException.NotFound("One or more artists were not found")
+            }
+        }
+
+        val coverId = input.cover?.id
+        if (coverId != null && sql.findById(MediaFile::class, coverId) == null) {
+            throw RecordingException.NotFound("Media file $coverId was not found")
+        }
+
+        val normalized = Recording(input) {
+            artists = artists.distinctBy { it.id }
+            label = label.distinct()
+        }
+        val created = sql.saveCommand(normalized) {
+            setMode(SaveMode.INSERT_ONLY)
+            setAssociatedMode(Recording::work, AssociatedSaveMode.APPEND_IF_ABSENT)
+            setAssociatedMode(Recording::artists, AssociatedSaveMode.APPEND_IF_ABSENT)
+            setAssociatedMode(Recording::cover, AssociatedSaveMode.APPEND_IF_ABSENT)
+        }.execute(fetcher).modifiedEntity
+        return getRecording(created.id, fetcher)
     }
 
     fun updateRecording(input: Recording) {

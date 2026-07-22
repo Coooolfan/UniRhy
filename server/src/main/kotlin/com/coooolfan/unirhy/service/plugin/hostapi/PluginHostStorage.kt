@@ -1,13 +1,19 @@
 package com.coooolfan.unirhy.service.plugin.hostapi
 
+import com.coooolfan.unirhy.model.SystemConfig
+import com.coooolfan.unirhy.model.by as modelBy
 import com.coooolfan.unirhy.model.storage.FileProviderFileSystem
 import com.coooolfan.unirhy.model.storage.FileProviderOss
 import com.coooolfan.unirhy.model.storage.FileProviderType
 import com.coooolfan.unirhy.model.storage.by
 import com.coooolfan.unirhy.service.storage.FileSystemStorageService
+import com.coooolfan.unirhy.service.storage.FileSystemStorageNode
 import com.coooolfan.unirhy.service.storage.OssStorageService
+import com.coooolfan.unirhy.service.storage.OssStorageNode
 import com.coooolfan.unirhy.service.storage.StorageNode
 import com.coooolfan.unirhy.service.storage.StorageNodeObjectService
+import com.coooolfan.unirhy.service.storage.resolveWriteableStorageNode
+import com.coooolfan.unirhy.service.SystemConfigService
 import org.babyfish.jimmer.sql.exception.EmptyResultException
 import org.babyfish.jimmer.sql.fetcher.Fetcher
 import org.babyfish.jimmer.sql.kt.fetcher.newFetcher
@@ -19,6 +25,7 @@ import tools.jackson.databind.node.ObjectNode
 internal fun buildStorageHostFunctions(
     fileSystemStorageService: FileSystemStorageService,
     ossStorageService: OssStorageService,
+    systemConfigService: SystemConfigService,
     storageObjects: StorageNodeObjectService,
     objectMapper: ObjectMapper,
     instanceRef: () -> Instance,
@@ -47,6 +54,32 @@ internal fun buildStorageHostFunctions(
                     "readonly" to node.readonly,
                 )
             }
+        },
+        support.jsonFunction("host_storage_default_write_node_get") {
+            val systemConfig = try {
+                systemConfigService.get(HOST_SYSTEM_CONFIG_FETCHER)
+            } catch (ex: EmptyResultException) {
+                notFound("System storage provider is not configured")
+            }
+            if (systemConfig.fsProvider == null && systemConfig.ossProvider == null) {
+                notFound("System storage provider is not configured")
+            }
+            val node = try {
+                systemConfig.resolveWriteableStorageNode(storageObjects)
+            } catch (ex: EmptyResultException) {
+                notFound("System storage provider is not configured")
+            }
+            if (node.readonly) {
+                conflict("System storage provider is readonly")
+            }
+            mapOf(
+                "type" to when (node) {
+                    is FileSystemStorageNode -> "FS"
+                    is OssStorageNode -> "OSS"
+                },
+                "id" to node.providerId,
+                "name" to node.name,
+            )
         },
         support.jsonFunction("host_storage_object_list") { request ->
             val node = resolveHostStorageNode(request.requiredObject("node"), storageObjects)
@@ -102,6 +135,17 @@ internal fun buildStorageHostFunctions(
             null
         },
     )
+}
+
+private val HOST_SYSTEM_CONFIG_FETCHER: Fetcher<SystemConfig> = newFetcher(SystemConfig::class).modelBy {
+    fsProvider {
+        name()
+        readonly()
+    }
+    ossProvider {
+        name()
+        readonly()
+    }
 }
 
 internal fun resolveHostStorageNode(
