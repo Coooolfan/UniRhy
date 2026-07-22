@@ -67,6 +67,20 @@ export const DOCS_SECTIONS: readonly DocsSection[] = [
       },
     ],
   },
+  {
+    slug: 'development',
+    title: { zh: '开发', en: 'Development' },
+    description: {
+      zh: '使用 WASM 插件扩展 UniRhy。',
+      en: 'Extend UniRhy with WASM plugins.',
+    },
+    pages: [
+      {
+        slug: 'plugins',
+        title: { zh: '插件开发指南', en: 'Plugin Development' },
+      },
+    ],
+  },
 ] as const
 
 export function findSection(slug: string): DocsSection | undefined {
