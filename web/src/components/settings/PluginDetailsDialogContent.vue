@@ -5,7 +5,7 @@ import { useI18n } from 'vue-i18n'
 import type { PluginInfoResponse } from '@/__generated/model/static/PluginInfoResponse'
 import type { PluginConfigurationResponse } from '@/__generated/model/static/PluginConfigurationResponse'
 import PluginConfigurationSection from '@/components/settings/PluginConfigurationSection.vue'
-import { parseFormDefinition } from '@/components/tasks/schemaForm'
+import { parseFormDefinition, type SchemaField } from '@/components/tasks/schemaForm'
 import { resolveErrorMessage } from '@/i18n/errors'
 
 const props = defineProps<{
@@ -45,6 +45,9 @@ const canSaveConcurrency = computed(
         parsedConcurrency.value !== savedConcurrency.value &&
         !isSavingConcurrency.value,
 )
+
+const fieldTypeLabel = (field: SchemaField) =>
+    field.type === 'array' ? `${field.items?.type ?? 'unknown'}[]` : field.type
 
 const handleEnabledChange = async (event: Event) => {
     if (!props.canManage || isToggling.value) return
@@ -205,7 +208,9 @@ const handleConcurrencySave = async () => {
             <div v-if="isFormParamsExpanded" class="grid gap-x-6 gap-y-4 pt-2 sm:grid-cols-2">
                 <div v-for="field in formFields" :key="field.name" class="min-w-0">
                     <div class="flex flex-wrap items-baseline gap-2 text-sm">
-                        <span class="font-mono text-xs text-[#C27E46]">{{ field.type }}</span>
+                        <span class="font-mono text-xs text-[#C27E46]">
+                            {{ fieldTypeLabel(field) }}
+                        </span>
                         <span class="text-[#2C2A28]">
                             {{ field.title }}
                             <span v-if="field.required" class="text-[#C27E46]">*</span>

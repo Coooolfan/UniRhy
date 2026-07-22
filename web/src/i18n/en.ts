@@ -690,6 +690,9 @@ export default {
         outputStorageNode: 'Output Storage Node',
         outputNodeInfo: 'Output Node Info',
         targetEncodingFormat: 'Target Encoding Format',
+        addArrayItem: 'Add item',
+        removeArrayItem: 'Remove item',
+        arrayItemLabel: '{title} item {index}',
         submitting: 'Submitting...',
     },
     syncDebug: {

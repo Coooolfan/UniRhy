@@ -663,6 +663,9 @@ export default {
         outputStorageNode: '输出存储节点',
         outputNodeInfo: '输出节点信息',
         targetEncodingFormat: '目标编码格式',
+        addArrayItem: '添加一项',
+        removeArrayItem: '删除此项',
+        arrayItemLabel: '{title} 第 {index} 项',
         submitting: '提交中...',
     },
     syncDebug: {
