@@ -28,6 +28,7 @@ export const useModal = () => {
                 content: options.content,
                 confirmText: options.confirmText ?? i18n.global.t('common.confirm'),
                 mode: 'alert',
+                tone: options.tone ?? 'default',
             },
         })
     }
@@ -48,6 +49,7 @@ export const useModal = () => {
                 confirmText: options.confirmText ?? i18n.global.t('common.confirm'),
                 cancelText: options.cancelText ?? i18n.global.t('common.cancel'),
                 mode: 'confirm',
+                tone: options.tone ?? 'default',
             },
         })
 
