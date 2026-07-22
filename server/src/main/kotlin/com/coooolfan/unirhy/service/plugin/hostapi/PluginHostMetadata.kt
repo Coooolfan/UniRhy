@@ -21,6 +21,7 @@ private data class HostPluginMetadata(
     val isAvailable: Boolean,
     val enabled: Boolean,
     val formDefinition: JsonNode,
+    val configDefinition: JsonNode,
 )
 
 private data class HostAccountMetadata(
@@ -37,6 +38,7 @@ private val HOST_PLUGIN_METADATA_FETCHER: Fetcher<Plugin> = newFetcher(Plugin::c
     concurrency()
     enabled()
     formDefinition()
+    configDefinition()
 }
 
 private val HOST_ACCOUNT_METADATA_FETCHER: Fetcher<Account> = newFetcher(Account::class).by {
@@ -89,6 +91,7 @@ private fun Plugin.toHostMetadata(isPluginLoaded: (String) -> Boolean): HostPlug
     isAvailable = isPluginLoaded(id),
     enabled = enabled,
     formDefinition = formDefinition,
+    configDefinition = configDefinition,
 )
 
 private fun Account.toHostMetadata(): HostAccountMetadata = HostAccountMetadata(

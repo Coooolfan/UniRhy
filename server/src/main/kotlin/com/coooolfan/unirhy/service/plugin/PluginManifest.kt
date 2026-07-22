@@ -21,12 +21,22 @@ data class PluginManifest(
     val runtime: PluginRuntime,
     val task: PluginTaskSpec,
     val form: PluginFormSpec? = null,
+    val config: PluginFormSpec? = null,
 ) {
     val taskKey: TaskKey get() = TaskKey(id, task.type)
 
     /** 组装持久化用的完整表单定义 `{schema, order}`；未声明 form 时使用空表单 */
     fun formDefinition(): JsonNode {
-        val formSpec = form ?: return TaskFormSchema.emptyFormDefinition()
+        return definition(form)
+    }
+
+    /** 组装持久化用的插件级配置声明；未声明 config 时使用空定义 */
+    fun configDefinition(): JsonNode {
+        return definition(config)
+    }
+
+    private fun definition(spec: PluginFormSpec?): JsonNode {
+        val formSpec = spec ?: return TaskFormSchema.emptyFormDefinition()
         val mapper = JsonMapper.shared()
         val node = mapper.createObjectNode()
         node.set("schema", formSpec.schema)
@@ -53,6 +63,7 @@ data class PluginManifest(
         }
         try {
             TaskFormSchema.validateFormDefinition(formDefinition())
+            TaskFormSchema.validateConfigDefinition(configDefinition())
         } catch (ex: IllegalArgumentException) {
             return ex.message
         }

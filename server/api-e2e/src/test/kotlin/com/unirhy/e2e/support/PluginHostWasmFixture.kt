@@ -22,8 +22,12 @@ object PluginHostWasmFixture {
     private const val ASSET_BY_MEDIA_REQUEST_PTR = 10240
     private const val ASSET_AND_REQUEST_PTR = 11264
     private const val ASSET_MISMATCH_REQUEST_PTR = 12288
-    private const val STORAGE_DATA_PTR = 13312
-    private const val ALLOC_PTR = 16384
+    private const val CONFIG_REQUEST_PTR = 13312
+    private const val DATA_PUT_REQUEST_PTR = 14336
+    private const val DATA_GET_REQUEST_PTR = 15360
+    private const val DATA_LIST_REQUEST_PTR = 16384
+    private const val STORAGE_DATA_PTR = 17408
+    private const val ALLOC_PTR = 20480
     private const val RESPONSE_OK_VALUE_OFFSET = 6
     private const val RESPONSE_DATA_ARRAY_ITEM_OFFSET = 19
 
@@ -93,6 +97,10 @@ object PluginHostWasmFixture {
         "host_task_statistics",
         "host_plugin_list",
         "host_plugin_get",
+        "host_plugin_config_get",
+        "host_plugin_data_get",
+        "host_plugin_data_put",
+        "host_plugin_data_list",
         "host_account_list",
         "host_account_get",
     )
@@ -109,8 +117,10 @@ object PluginHostWasmFixture {
         assetMediaFileId: Long,
         objectKey: String,
         objectBytes: ByteArray,
+        pluginDataKey: String,
+        pluginDataValue: String,
     ): ByteArray {
-        check(hostFunctionNames.size == 67 && hostFunctionNames.distinct().size == 67)
+        check(hostFunctionNames.size == 71 && hostFunctionNames.distinct().size == 71)
 
         val plan = "[{}]".toByteArray()
         val artistRequest = E2eJson.mapper.writeValueAsBytes(mapOf("displayName" to artistName))
@@ -170,6 +180,14 @@ object PluginHostWasmFixture {
                 "mediaFileId" to assetMediaFileId,
             ),
         )
+        val configRequest = E2eJson.mapper.writeValueAsBytes(emptyMap<String, Any>())
+        val dataPutRequest = E2eJson.mapper.writeValueAsBytes(
+            mapOf("key" to pluginDataKey, "value" to pluginDataValue),
+        )
+        val dataGetRequest = E2eJson.mapper.writeValueAsBytes(mapOf("key" to pluginDataKey))
+        val dataListRequest = E2eJson.mapper.writeValueAsBytes(
+            mapOf("prefix" to pluginDataKey, "pageIndex" to 0, "pageSize" to 10),
+        )
         requireFits(PLAN_PTR, ARTIST_REQUEST_PTR, plan)
         requireFits(ARTIST_REQUEST_PTR, WORK_REQUEST_PTR, artistRequest)
         requireFits(WORK_REQUEST_PTR, RECORDING_REQUEST_PTR, workRequest)
@@ -181,7 +199,11 @@ object PluginHostWasmFixture {
         requireFits(OSS_MEDIA_LOCATION_REQUEST_PTR, ASSET_BY_MEDIA_REQUEST_PTR, ossMediaLocationRequest)
         requireFits(ASSET_BY_MEDIA_REQUEST_PTR, ASSET_AND_REQUEST_PTR, assetByMediaRequest)
         requireFits(ASSET_AND_REQUEST_PTR, ASSET_MISMATCH_REQUEST_PTR, assetAndRequest)
-        requireFits(ASSET_MISMATCH_REQUEST_PTR, STORAGE_DATA_PTR, assetMismatchRequest)
+        requireFits(ASSET_MISMATCH_REQUEST_PTR, CONFIG_REQUEST_PTR, assetMismatchRequest)
+        requireFits(CONFIG_REQUEST_PTR, DATA_PUT_REQUEST_PTR, configRequest)
+        requireFits(DATA_PUT_REQUEST_PTR, DATA_GET_REQUEST_PTR, dataPutRequest)
+        requireFits(DATA_GET_REQUEST_PTR, DATA_LIST_REQUEST_PTR, dataGetRequest)
+        requireFits(DATA_LIST_REQUEST_PTR, STORAGE_DATA_PTR, dataListRequest)
         requireFits(STORAGE_DATA_PTR, ALLOC_PTR, objectBytes)
 
         val artistCreateIndex = hostFunctionNames.indexOf("host_artist_create")
@@ -193,6 +215,10 @@ object PluginHostWasmFixture {
         val assetListIndex = hostFunctionNames.indexOf("host_asset_list")
         val storageReadIndex = hostFunctionNames.indexOf("host_storage_object_read")
         val storageWriteIndex = hostFunctionNames.indexOf("host_storage_object_write")
+        val configGetIndex = hostFunctionNames.indexOf("host_plugin_config_get")
+        val dataGetIndex = hostFunctionNames.indexOf("host_plugin_data_get")
+        val dataPutIndex = hostFunctionNames.indexOf("host_plugin_data_put")
+        val dataListIndex = hostFunctionNames.indexOf("host_plugin_data_list")
         val firstDefinedFunctionIndex = hostFunctionNames.size
 
         return ByteArrayOutputStream().apply {
@@ -295,6 +321,10 @@ object PluginHostWasmFixture {
                             assetListIndex,
                             nonEmpty = false,
                         ),
+                        callJsonAndAssertSuccess(CONFIG_REQUEST_PTR, configRequest, configGetIndex),
+                        callJsonAndAssertSuccess(DATA_PUT_REQUEST_PTR, dataPutRequest, dataPutIndex),
+                        callJsonAndAssertSuccess(DATA_GET_REQUEST_PTR, dataGetRequest, dataGetIndex),
+                        callJsonAndAssertSuccess(DATA_LIST_REQUEST_PTR, dataListRequest, dataListIndex),
                         i32Const(STORAGE_META_PTR),
                         i32Const(storageMeta.size),
                         call(storageReadIndex),
@@ -322,6 +352,10 @@ object PluginHostWasmFixture {
                     dataSegment(ASSET_BY_MEDIA_REQUEST_PTR, assetByMediaRequest),
                     dataSegment(ASSET_AND_REQUEST_PTR, assetAndRequest),
                     dataSegment(ASSET_MISMATCH_REQUEST_PTR, assetMismatchRequest),
+                    dataSegment(CONFIG_REQUEST_PTR, configRequest),
+                    dataSegment(DATA_PUT_REQUEST_PTR, dataPutRequest),
+                    dataSegment(DATA_GET_REQUEST_PTR, dataGetRequest),
+                    dataSegment(DATA_LIST_REQUEST_PTR, dataListRequest),
                     dataSegment(STORAGE_DATA_PTR, objectBytes),
                 ),
             )

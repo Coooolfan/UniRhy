@@ -42,6 +42,8 @@ object ApiCoverageRegistry {
         "com.unirhy.e2e.PluginE2eTest#plugin lifecycle should support upload list download enable submit disable and delete"
     private const val PLUGIN_UPLOAD_INVALID_CASE =
         "com.unirhy.e2e.PluginE2eTest#plugin upload should reject invalid archives"
+    private const val PLUGIN_HOST_CASE =
+        "com.unirhy.e2e.PluginE2eTest#wasm plugin should link the complete host catalog and execute host calls"
     private const val PLAYBACK_QUEUE_FLOW_CASE =
         "com.unirhy.e2e.PlaybackQueueE2eTest#playback queue should support full mutation flow and stable conflict branches"
 
@@ -278,6 +280,18 @@ object ApiCoverageRegistry {
             "/api/plugins/{id}/concurrency",
             testRef = PLUGIN_LIFECYCLE_CASE,
             note = "validation: non-positive concurrency returns 400",
+        ),
+        full(
+            "GET",
+            "/api/plugins/{id}/configuration",
+            testRef = PLUGIN_HOST_CASE,
+            note = "auth: $AUTH_GUARD_CASE; sensitive values are redacted",
+        ),
+        full(
+            "PUT",
+            "/api/plugins/{id}/configuration",
+            testRef = PLUGIN_HOST_CASE,
+            note = "auth: $AUTH_GUARD_CASE; validation and encrypted writeOnly storage covered",
         ),
         full(
             "POST",

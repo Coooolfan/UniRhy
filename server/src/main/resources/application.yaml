@@ -56,6 +56,8 @@ logging:
 unirhy:
   cors:
     allowed-origins: ${UNIRHY_CORS_ALLOWED_ORIGINS:http://localhost:5173,http://127.0.0.1:5173}
+  plugin-data:
+    encryption-key: ${UNIRHY_PLUGIN_DATA_ENCRYPTION_KEY:${UNIRHY_SECRET_KEY:${SA_TOKEN_JWT_SECRET_KEY:}}}
   media:
     signing-key: ${UNIRHY_MEDIA_SIGNING_KEY:${UNIRHY_SECRET_KEY:}}
     url-ttl-seconds: ${UNIRHY_MEDIA_URL_TTL_SECONDS:7200}

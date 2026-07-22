@@ -6,6 +6,7 @@ import com.coooolfan.unirhy.config.ROLE_ADMIN
 import com.coooolfan.unirhy.error.CommonException
 import com.coooolfan.unirhy.error.PluginException
 import com.coooolfan.unirhy.service.PluginService
+import com.coooolfan.unirhy.service.plugin.hostapi.PluginDataService
 import com.coooolfan.unirhy.service.task.PluginTaskService
 import jakarta.servlet.http.HttpServletResponse
 import tools.jackson.databind.JsonNode
@@ -16,6 +17,7 @@ import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
@@ -30,6 +32,17 @@ data class PluginInfoResponse(
     val isAvailable: Boolean,
     val enabled: Boolean,
     val formDefinition: JsonNode,
+    val configDefinition: JsonNode,
+)
+
+data class PluginConfigurationResponse(
+    val values: JsonNode,
+    val configuredSecretFields: List<String>,
+)
+
+data class PluginConfigurationUpdateRequest(
+    val values: JsonNode,
+    val clearedSecretFields: List<String> = emptyList(),
 )
 
 /**
@@ -44,6 +57,7 @@ data class PluginInfoResponse(
 class PluginController(
     private val pluginService: PluginService,
     private val pluginTaskService: PluginTaskService,
+    private val pluginDataService: PluginDataService,
 ) {
     /**
      * 获取插件列表
@@ -69,6 +83,7 @@ class PluginController(
                 isAvailable = pluginTaskService.isLoaded(plugin.id),
                 enabled = plugin.enabled,
                 formDefinition = plugin.formDefinition,
+                configDefinition = plugin.configDefinition,
             )
         }
     }
@@ -122,9 +137,33 @@ class PluginController(
         CommonException.Forbidden::class,
         PluginException.NotFound::class,
         PluginException.LoadFailed::class,
+        PluginException.ConfigurationRequired::class,
     )
     fun setEnabled(@PathVariable id: String, @RequestParam enabled: Boolean) {
         pluginService.setEnabled(id, enabled)
+    }
+
+    @GetMapping("/plugins/{id}/configuration")
+    @SaCheckRole(ROLE_ADMIN)
+    @Throws(CommonException.Forbidden::class, PluginException.NotFound::class)
+    fun getConfiguration(@PathVariable id: String): PluginConfigurationResponse {
+        val snapshot = pluginDataService.getConfiguration(id)
+        return PluginConfigurationResponse(snapshot.values, snapshot.configuredSecretFields)
+    }
+
+    @PutMapping("/plugins/{id}/configuration")
+    @SaCheckRole(ROLE_ADMIN)
+    @Throws(
+        CommonException.Forbidden::class,
+        PluginException.NotFound::class,
+        PluginException.InvalidConfiguration::class,
+    )
+    fun updateConfiguration(
+        @PathVariable id: String,
+        @RequestBody request: PluginConfigurationUpdateRequest,
+    ): PluginConfigurationResponse {
+        val snapshot = pluginDataService.updateConfiguration(id, request.values, request.clearedSecretFields)
+        return PluginConfigurationResponse(snapshot.values, snapshot.configuredSecretFields)
     }
 
     /**

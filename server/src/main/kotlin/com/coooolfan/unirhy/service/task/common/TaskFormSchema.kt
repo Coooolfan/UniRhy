@@ -33,6 +33,15 @@ object TaskFormSchema {
      * 校验完整表单定义 `{schema, order}`，非法时抛出 [IllegalArgumentException]。
      */
     fun validateFormDefinition(formDefinition: JsonNode) {
+        validateDefinition(formDefinition, allowWriteOnly = false)
+    }
+
+    /** 配置表单沿用任务表单子集，并允许字符串字段声明 `writeOnly`。 */
+    fun validateConfigDefinition(formDefinition: JsonNode) {
+        validateDefinition(formDefinition, allowWriteOnly = true)
+    }
+
+    private fun validateDefinition(formDefinition: JsonNode, allowWriteOnly: Boolean) {
         require(formDefinition.isObject) { "form definition must be an object" }
         val unknownKeys = formDefinition.propertyNames() - setOf("schema", "order")
         require(unknownKeys.isEmpty()) { "form definition contains unknown keys: $unknownKeys" }
@@ -41,11 +50,11 @@ object TaskFormSchema {
             ?: throw IllegalArgumentException("form definition missing 'schema'")
         val order = formDefinition.get("order")
             ?: throw IllegalArgumentException("form definition missing 'order'")
-        validateSchema(schema)
+        validateSchema(schema, allowWriteOnly)
         validateOrder(order, schema)
     }
 
-    private fun validateSchema(schema: JsonNode) {
+    private fun validateSchema(schema: JsonNode, allowWriteOnly: Boolean) {
         require(schema.isObject) { "form.schema must be an object" }
         val unknownKeys = schema.propertyNames() - ROOT_ALLOWED_KEYS
         require(unknownKeys.isEmpty()) { "form.schema contains unsupported keywords: $unknownKeys" }
@@ -68,7 +77,7 @@ object TaskFormSchema {
             ?: throw IllegalArgumentException("form.schema must declare properties")
         require(properties.isObject) { "form.schema properties must be an object" }
         for ((name, fieldSchema) in properties.properties()) {
-            validateFieldSchema(name, fieldSchema)
+            validateFieldSchema(name, fieldSchema, allowWriteOnly)
         }
 
         val required = schema.get("required")
@@ -83,23 +92,29 @@ object TaskFormSchema {
         }
     }
 
-    private fun validateFieldSchema(name: String, fieldSchema: JsonNode) {
+    private fun validateFieldSchema(name: String, fieldSchema: JsonNode, allowWriteOnly: Boolean) {
         require(fieldSchema.isObject) { "field '$name' schema must be an object" }
         val type = fieldSchema.get("type")
         require(type != null && type.isString && type.stringValue() in FIELD_TYPES) {
             "field '$name' must declare type as one of $FIELD_TYPES"
         }
         val typeName = type.stringValue()
-        val allowedKeys = when (typeName) {
+        var allowedKeys = when (typeName) {
             "string" -> FIELD_STRING_KEYS
             "integer", "number" -> FIELD_NUMERIC_KEYS
             else -> FIELD_COMMON_KEYS
+        }
+        if (allowWriteOnly && typeName == "string") {
+            allowedKeys = allowedKeys + "writeOnly"
         }
         val unknownKeys = fieldSchema.propertyNames() - allowedKeys
         require(unknownKeys.isEmpty()) { "field '$name' contains unsupported keywords: $unknownKeys" }
 
         require(fieldSchema.get("title")?.isString == true) { "field '$name' must declare a string title" }
         fieldSchema.get("description")?.let { require(it.isString) { "field '$name' description must be a string" } }
+        fieldSchema.get("writeOnly")?.let {
+            require(it.isBoolean) { "field '$name' writeOnly must be a boolean" }
+        }
 
         fieldSchema.get("default")?.let {
             require(matchesType(it, typeName)) { "field '$name' default does not match declared type" }
@@ -174,6 +189,15 @@ object TaskFormSchema {
         }
         return errors
     }
+
+    fun validateField(formDefinition: JsonNode, name: String, value: JsonNode): List<String> {
+        val fieldSchema = formDefinition.path("schema").path("properties").get(name)
+            ?: return listOf("unknown field: $name")
+        return validateFieldValue(name, fieldSchema, value)
+    }
+
+    fun isWriteOnly(formDefinition: JsonNode, name: String): Boolean =
+        formDefinition.path("schema").path("properties").path(name).path("writeOnly").asBoolean(false)
 
     private fun validateFieldValue(name: String, fieldSchema: JsonNode, value: JsonNode): List<String> {
         val typeName = fieldSchema.get("type").stringValue()

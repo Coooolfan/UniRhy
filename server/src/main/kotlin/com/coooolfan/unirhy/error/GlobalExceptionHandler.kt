@@ -46,6 +46,7 @@ class GlobalExceptionHandler {
             "PLAYBACK_QUEUE:RECORDING_NOT_FOUND",
             "PLAYBACK_QUEUE:RECORDING_NOT_PLAYABLE",
             "PLAYBACK_QUEUE:VERSION_CONFLICT",
+            "PLUGIN:CONFIGURATION_REQUIRED",
             "PLUGIN:DELETE_CONFLICT",
             "TASK:PLUGIN_UNAVAILABLE",
             "TASK:STATUS_CONFLICT",
@@ -69,6 +70,7 @@ class GlobalExceptionHandler {
             "PLUGIN:UNSUPPORTED_ABI",
             "PLUGIN:LOAD_FAILED",
             "PLUGIN:INVALID_CONCURRENCY",
+            "PLUGIN:INVALID_CONFIGURATION",
             "TASK:INVALID_TASK_KEY",
             "TASK:INVALID_PARAMS",
             -> 400

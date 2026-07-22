@@ -15,11 +15,13 @@ import com.coooolfan.unirhy.service.WorkService
 import com.coooolfan.unirhy.service.plugin.WasmPlugin
 import com.coooolfan.unirhy.service.plugin.hostapi.NestedPluginHostCallExecutor
 import com.coooolfan.unirhy.service.plugin.hostapi.PluginMediaService
+import com.coooolfan.unirhy.service.plugin.hostapi.PluginDataService
 import com.coooolfan.unirhy.service.plugin.hostapi.buildAlbumHostFunctions
 import com.coooolfan.unirhy.service.plugin.hostapi.buildArtistHostFunctions
 import com.coooolfan.unirhy.service.plugin.hostapi.buildDefaultHostFunctions
 import com.coooolfan.unirhy.service.plugin.hostapi.buildMediaHostFunctions
 import com.coooolfan.unirhy.service.plugin.hostapi.buildMetadataHostFunctions
+import com.coooolfan.unirhy.service.plugin.hostapi.buildPluginDataHostFunctions
 import com.coooolfan.unirhy.service.plugin.hostapi.buildPlaylistHostFunctions
 import com.coooolfan.unirhy.service.plugin.hostapi.buildRecordingHostFunctions
 import com.coooolfan.unirhy.service.plugin.hostapi.buildStorageHostFunctions
@@ -65,6 +67,7 @@ class PluginTaskService(
     private val ossStorageService: OssStorageService,
     private val storageObjects: StorageNodeObjectService,
     private val mediaService: PluginMediaService,
+    private val pluginDataService: PluginDataService,
     private val taskDefinitionService: TaskDefinitionService,
     private val taskSubmissionService: TaskSubmissionService,
     private val asyncTaskService: AsyncTaskService,
@@ -172,6 +175,13 @@ class PluginTaskService(
                     taskSubmissionService,
                     asyncTaskService,
                     taskStatisticsService,
+                    objectMapper,
+                    instanceRef,
+                    hostCallExecutor,
+                ) +
+                buildPluginDataHostFunctions(
+                    pluginId,
+                    pluginDataService,
                     objectMapper,
                     instanceRef,
                     hostCallExecutor,

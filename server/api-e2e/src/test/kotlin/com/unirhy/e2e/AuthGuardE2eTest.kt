@@ -174,6 +174,8 @@ class AuthGuardE2eTest {
             ProtectedEndpoint("POST", "/api/plugins", headers = mapOf("Content-Type" to "multipart/form-data; boundary=test")),
             ProtectedEndpoint("PUT", "/api/plugins/1/enabled-state"),
             ProtectedEndpoint("PUT", "/api/plugins/1/concurrency"),
+            ProtectedEndpoint("GET", "/api/plugins/1/configuration"),
+            ProtectedEndpoint("PUT", "/api/plugins/1/configuration"),
             ProtectedEndpoint("DELETE", "/api/plugins/1"),
             ProtectedEndpoint("GET", "/api/plugins/1/package"),
         )

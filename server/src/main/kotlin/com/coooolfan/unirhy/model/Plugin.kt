@@ -29,6 +29,10 @@ interface Plugin {
     @Serialized
     val formDefinition: JsonNode
 
+    /** 插件级配置声明 `{schema, order}`；实际配置值保存在 `plugin_data` */
+    @Serialized
+    val configDefinition: JsonNode
+
     val wasm: ByteArray
 
     val enabled: Boolean
