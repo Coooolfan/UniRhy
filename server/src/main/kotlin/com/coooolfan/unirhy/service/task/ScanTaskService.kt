@@ -34,7 +34,7 @@ import java.nio.file.Files
 import java.time.LocalDate
 
 /**
- * 内建元数据扫描的规划器：解析 submission 参数、遍历存储节点并产出扫描 payload。
+ * 内建元数据扫描的规划器：解析根任务参数、遍历存储节点并产出扫描 payload。
  */
 @Component
 class ScanTaskPlanner(
@@ -72,7 +72,7 @@ class ScanTaskHandler(
 
     override val key: TaskKey = BuiltInTasks.METADATA_PARSE
 
-    override fun run(payload: JsonNode) {
+    override fun run(taskId: Long, payload: JsonNode) {
         val scanPayload = objectMapper.treeToValue(payload, ScanFileTaskPayload::class.java)
         val provider = storageObjects.resolve(scanPayload.providerType, scanPayload.providerId)
         val writeableProvider = sql.findOneById(SYSTEM_CONFIG_FETCHER, SYSTEM_CONFIG_ID)

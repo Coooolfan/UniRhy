@@ -20,7 +20,7 @@ class TaskStatisticsController(
 ) {
 
     /**
-     * 按 TaskKey 统计 submission 与 async task 的状态计数
+     * 按 TaskKey 统计统一任务的状态计数
      *
      * @param taskKeys 紧凑序列化形式（`namespace:TASK_TYPE`）的 TaskKey，
      *   可重复传递以过滤多个；缺省返回全部当前定义或存在历史记录的 TaskKey

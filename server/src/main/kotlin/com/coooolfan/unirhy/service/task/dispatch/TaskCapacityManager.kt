@@ -9,8 +9,7 @@ import java.util.concurrent.atomic.AtomicInteger
  * 每节点的 TaskKey 本地并发容量。
  *
  * - Handler 容量：Dispatcher 在提交 Worker 前预留，Worker 在 `finally` 中释放；
- *   不限制集群总并发，降低并发值不中断已经执行的任务。
- * - Planner 容量：每 TaskKey single-flight，同一节点对同一 TaskKey 同时只规划一条 submission。
+ *   PLAN 与 RUN 共用 TaskKey 容量，不限制集群总并发。
  */
 @Component
 class TaskCapacityManager {
@@ -21,7 +20,6 @@ class TaskCapacityManager {
     }
 
     private val handlerCapacities = ConcurrentHashMap<TaskKey, HandlerCapacity>()
-    private val planningKeys = ConcurrentHashMap.newKeySet<TaskKey>()
 
     fun setHandlerLimit(key: TaskKey, limit: Int) {
         handlerCapacities.compute(key) { _, existing ->
@@ -54,11 +52,5 @@ class TaskCapacityManager {
 
     fun releaseHandlerSlot(key: TaskKey) {
         handlerCapacities[key]?.inUse?.decrementAndGet()
-    }
-
-    fun tryBeginPlanning(key: TaskKey): Boolean = planningKeys.add(key)
-
-    fun endPlanning(key: TaskKey) {
-        planningKeys.remove(key)
     }
 }

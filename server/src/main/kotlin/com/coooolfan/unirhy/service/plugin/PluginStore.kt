@@ -15,7 +15,7 @@ data class PluginAvailabilityRow(
  * 插件可用性的数据库权威读取。
  *
  * `plugin.enabled` 是所有节点判断插件可用性的权威状态，
- * Worker claim 与 submission 创建不能只依赖节点本地注册表。
+ * Worker claim 与根任务创建不能只依赖节点本地注册表。
  */
 @Component
 class PluginStore(
@@ -24,7 +24,7 @@ class PluginStore(
 
     /**
      * 共享锁定插件行并返回可用性信息；不存在返回 null。
-     * submission 创建事务持有该共享锁直到插入提交，防止并发删除遗漏新 submission。
+     * 根任务创建事务持有该共享锁直到插入完成，防止并发删除遗漏新任务。
      */
     fun lockForShare(pluginId: String): PluginAvailabilityRow? =
         jdbc.query(

@@ -4,7 +4,6 @@ import com.coooolfan.unirhy.error.TaskException
 import com.coooolfan.unirhy.service.task.common.AsyncTaskStore
 import com.coooolfan.unirhy.service.task.common.TaskKey
 import com.coooolfan.unirhy.service.task.common.TaskStatus
-import com.coooolfan.unirhy.service.task.common.TaskSubmissionStore
 import org.springframework.stereotype.Service
 
 /**
@@ -40,19 +39,17 @@ data class TaskStatusCounts(
 data class TaskStatisticsResponse(
     val namespace: String,
     val taskType: String,
-    val submissions: TaskStatusCounts,
     val tasks: TaskStatusCounts,
 )
 
 @Service
 class TaskStatisticsService(
-    private val submissionStore: TaskSubmissionStore,
     private val taskStore: AsyncTaskStore,
     private val definitionService: TaskDefinitionService,
 ) {
 
     /**
-     * 按 TaskKey 返回 submission 与 async task 的状态计数。
+     * 按 TaskKey 返回统一任务的状态计数。
      *
      * @param taskKeys 紧凑序列化形式的 TaskKey 集合；缺省时返回全部当前定义
      *   或存在历史记录的 TaskKey。重复值按首次出现去重并保持请求顺序，
@@ -64,11 +61,10 @@ class TaskStatisticsService(
                 ?: throw TaskException.invalidTaskKey(reason = "invalid task key: $compact")
         }?.distinct()
 
-        val submissionCounts = submissionStore.countByKeyAndStatus()
         val taskCounts = taskStore.countByKeyAndStatus()
 
         val keys = requestedKeys
-            ?: (definitionService.allDefinedKeys() + submissionCounts.keys + taskCounts.keys)
+            ?: (definitionService.allDefinedKeys() + taskCounts.keys)
                 .distinct()
                 .sortedWith(compareBy({ it.namespace }, { it.taskType }))
 
@@ -76,7 +72,6 @@ class TaskStatisticsService(
             TaskStatisticsResponse(
                 namespace = key.namespace,
                 taskType = key.taskType,
-                submissions = submissionCounts[key]?.let { TaskStatusCounts.from(it) } ?: TaskStatusCounts.ZERO,
                 tasks = taskCounts[key]?.let { TaskStatusCounts.from(it) } ?: TaskStatusCounts.ZERO,
             )
         }

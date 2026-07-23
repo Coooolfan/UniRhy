@@ -91,7 +91,7 @@ class TranscodeTaskHandler(
 
     override val key: TaskKey = BuiltInTasks.TRANSCODE
 
-    override fun run(payload: JsonNode) {
+    override fun run(taskId: Long, payload: JsonNode) {
         val transcodePayload = objectMapper.treeToValue(payload, TranscodeTaskPayload::class.java)
         val transcodedAsset = prepareTranscodedAsset(transcodePayload)
         saveTranscodedAsset(transcodedAsset)

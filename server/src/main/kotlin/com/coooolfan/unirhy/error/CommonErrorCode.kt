@@ -106,7 +106,7 @@ enum class PluginErrorCode {
     @ErrorField(name = "reason", type = String::class)
     CONFIGURATION_REQUIRED,
 
-    /** 删除前置条件不满足：插件仍启用，或存在活动 submission / task */
+    /** 删除前置条件不满足：插件仍启用，或存在活动任务 */
     DELETE_CONFLICT,
 }
 
@@ -128,6 +128,6 @@ enum class TaskErrorCode {
     /** 非法状态迁移，或资源正被 Worker 锁定 */
     STATUS_CONFLICT,
 
-    /** submission 或其子任务存在非终态记录，拒绝删除 */
+    /** 任务树存在非终态记录，拒绝删除 */
     DELETE_CONFLICT,
 }
