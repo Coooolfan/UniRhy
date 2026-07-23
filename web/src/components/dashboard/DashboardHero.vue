@@ -222,7 +222,7 @@ watch(
 
                 <!-- Content -->
                 <div
-                    class="relative flex h-full min-w-0 flex-1 flex-col justify-center overflow-hidden bg-[url('https://www.transparenttextures.com/patterns/cream-paper.png')] p-4 md:p-12"
+                    class="relative flex h-full min-w-0 flex-1 flex-col justify-center overflow-hidden p-4 md:p-12"
                 >
                     <!-- Background Decoration -->
                     <div
