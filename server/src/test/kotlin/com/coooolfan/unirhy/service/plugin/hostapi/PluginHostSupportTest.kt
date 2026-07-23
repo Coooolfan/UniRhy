@@ -27,7 +27,10 @@ class PluginHostSupportTest {
 
     @Test
     fun `catalog contains exactly the documented imports`() {
-        assertEquals(71, PLUGIN_HOST_FUNCTION_NAMES.size)
+        assertEquals(67, PLUGIN_HOST_FUNCTION_NAMES.size)
+        assertTrue("host_task_create" in PLUGIN_HOST_FUNCTION_NAMES)
+        assertTrue("host_task_enqueue" in PLUGIN_HOST_FUNCTION_NAMES)
+        assertFalse("host_task_submission_create" in PLUGIN_HOST_FUNCTION_NAMES)
         assertTrue("host_plugin_config_get" in PLUGIN_HOST_FUNCTION_NAMES)
         assertTrue("host_plugin_data_get" in PLUGIN_HOST_FUNCTION_NAMES)
         assertTrue("host_plugin_data_put" in PLUGIN_HOST_FUNCTION_NAMES)

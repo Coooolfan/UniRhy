@@ -13,6 +13,7 @@ import com.coooolfan.unirhy.service.RecordingService
 import com.coooolfan.unirhy.service.SystemConfigService
 import com.coooolfan.unirhy.service.WorkService
 import com.coooolfan.unirhy.service.plugin.WasmPlugin
+import com.coooolfan.unirhy.service.plugin.WasmExecutionContext
 import com.coooolfan.unirhy.service.plugin.hostapi.NestedPluginHostCallExecutor
 import com.coooolfan.unirhy.service.plugin.hostapi.PluginMediaService
 import com.coooolfan.unirhy.service.plugin.hostapi.PluginDataService
@@ -31,6 +32,7 @@ import com.coooolfan.unirhy.service.plugin.hostapi.validatePluginHostFunctions
 import com.coooolfan.unirhy.service.storage.FileSystemStorageService
 import com.coooolfan.unirhy.service.storage.OssStorageService
 import com.coooolfan.unirhy.service.storage.StorageNodeObjectService
+import com.coooolfan.unirhy.service.task.common.AsyncTaskStore
 import com.coooolfan.unirhy.service.task.common.TaskKey
 import com.coooolfan.unirhy.service.task.dispatch.TaskCapacityManager
 import com.coooolfan.unirhy.service.task.spi.AsyncTaskHandler
@@ -69,9 +71,9 @@ class PluginTaskService(
     private val mediaService: PluginMediaService,
     private val pluginDataService: PluginDataService,
     private val taskDefinitionService: TaskDefinitionService,
-    private val taskSubmissionService: TaskSubmissionService,
     private val asyncTaskService: AsyncTaskService,
     private val taskStatisticsService: TaskStatisticsService,
+    private val asyncTaskStore: AsyncTaskStore,
     transactionManager: PlatformTransactionManager,
     private val plannerRegistry: TaskPlannerRegistry,
     private val handlerRegistry: AsyncTaskHandlerRegistry,
@@ -153,7 +155,7 @@ class PluginTaskService(
     }
 
     private fun loadWasmPlugin(pluginId: String, wasmBytes: ByteArray): WasmPlugin =
-        WasmPlugin.load(pluginId, wasmBytes) { instanceRef ->
+        WasmPlugin.load(pluginId, wasmBytes) { instanceRef, executionContext ->
             val functions = buildDefaultHostFunctions(storageObjects, objectMapper, instanceRef, hostCallExecutor) +
                 buildArtistHostFunctions(artistService, objectMapper, instanceRef, hostCallExecutor) +
                 buildWorkHostFunctions(workService, objectMapper, instanceRef, hostCallExecutor) +
@@ -172,9 +174,11 @@ class PluginTaskService(
                 buildPlaylistHostFunctions(playlistService, objectMapper, instanceRef, hostCallExecutor) +
                 buildTaskHostFunctions(
                     taskDefinitionService,
-                    taskSubmissionService,
                     asyncTaskService,
                     taskStatisticsService,
+                    asyncTaskStore,
+                    pluginId,
+                    executionContext,
                     objectMapper,
                     instanceRef,
                     hostCallExecutor,
@@ -212,7 +216,7 @@ private class WasmTaskHandler(
     override val key: TaskKey,
     private val wasmPlugin: WasmPlugin,
 ) : AsyncTaskHandler {
-    override fun run(payload: JsonNode) {
-        wasmPlugin.run(payload.toString().toByteArray(Charsets.UTF_8))
+    override fun run(taskId: Long, payload: JsonNode) {
+        wasmPlugin.run(taskId, key.taskType, payload.toString().toByteArray(Charsets.UTF_8))
     }
 }

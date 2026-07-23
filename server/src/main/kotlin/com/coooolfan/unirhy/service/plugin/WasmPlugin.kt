@@ -10,6 +10,11 @@ import run.endive.wasm.types.ValType
 import tools.jackson.databind.json.JsonMapper
 import java.io.ByteArrayInputStream
 
+data class WasmExecutionContext(
+    val taskId: Long,
+    val taskType: String,
+)
+
 /**
  * 已加载的 WASM 插件：缓存解析后的 Module，每次 `plan()` / `run()` 调用创建独立 Instance。
  *
@@ -19,12 +24,15 @@ import java.io.ByteArrayInputStream
 class WasmPlugin private constructor(
     val pluginId: String,
     private val module: WasmModule,
-    private val hostFunctionsFactory: (instanceRef: () -> Instance) -> List<HostFunction>,
+    private val hostFunctionsFactory: (
+        instanceRef: () -> Instance,
+        executionContext: WasmExecutionContext?,
+    ) -> List<HostFunction>,
 ) {
 
     /** 将一次表单提交拆分为若干任务载荷 JSON */
     fun plan(paramsJson: ByteArray): List<String> {
-        val result = withInstance { instance -> callJson(instance, "plan", paramsJson) }
+        val result = withInstance(null) { instance -> callJson(instance, "plan", paramsJson) }
         return try {
             val node = JsonMapper.shared().readTree(result)
             node.values().map { it.toString() }
@@ -34,8 +42,8 @@ class WasmPlugin private constructor(
     }
 
     /** 执行单个任务载荷并读取结果信封。 */
-    fun run(payloadJson: ByteArray) {
-        withInstance { instance ->
+    fun run(taskId: Long, taskType: String, payloadJson: ByteArray) {
+        withInstance(WasmExecutionContext(taskId, taskType)) { instance ->
             val alloc = instance.export("alloc")
             val dealloc = instance.export("dealloc")
             val len = payloadJson.size
@@ -69,12 +77,16 @@ class WasmPlugin private constructor(
         }
     }
 
-    private fun <T> withInstance(block: (Instance) -> T): T = block(newInstance())
+    private fun <T> withInstance(context: WasmExecutionContext?, block: (Instance) -> T): T =
+        block(newInstance(context))
 
-    private fun newInstance(): Instance {
+    private fun newInstance(context: WasmExecutionContext? = null): Instance {
         val instanceHolder = arrayOfNulls<Instance>(1)
         val hostFunctions =
-            hostFunctionsFactory { instanceHolder[0] ?: error("plugin instance not initialized yet") }
+            hostFunctionsFactory(
+                { instanceHolder[0] ?: error("plugin instance not initialized yet") },
+                context,
+            )
         val imports = ImportValues.builder().addFunction(*hostFunctions.toTypedArray()).build()
         val instance = try {
             Instance.builder(module).withImportValues(imports).build()
@@ -135,7 +147,10 @@ class WasmPlugin private constructor(
         fun load(
             pluginId: String,
             wasmBytes: ByteArray,
-            hostFunctionsFactory: (instanceRef: () -> Instance) -> List<HostFunction>,
+            hostFunctionsFactory: (
+                instanceRef: () -> Instance,
+                executionContext: WasmExecutionContext?,
+            ) -> List<HostFunction>,
         ): WasmPlugin {
             val module = parseModule(wasmBytes)
             val plugin = WasmPlugin(pluginId, module, hostFunctionsFactory)

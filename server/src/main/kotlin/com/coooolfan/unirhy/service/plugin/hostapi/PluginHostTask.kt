@@ -1,13 +1,14 @@
 package com.coooolfan.unirhy.service.plugin.hostapi
 
 import com.coooolfan.unirhy.model.AsyncTask
-import com.coooolfan.unirhy.model.TaskSubmission
 import com.coooolfan.unirhy.model.by
+import com.coooolfan.unirhy.service.plugin.WasmExecutionContext
 import com.coooolfan.unirhy.service.task.AsyncTaskService
 import com.coooolfan.unirhy.service.task.TaskDefinitionService
 import com.coooolfan.unirhy.service.task.TaskStatisticsService
-import com.coooolfan.unirhy.service.task.TaskStatusCounts
-import com.coooolfan.unirhy.service.task.TaskSubmissionService
+import com.coooolfan.unirhy.service.task.common.AsyncTaskStore
+import com.coooolfan.unirhy.service.task.common.TaskAction
+import com.coooolfan.unirhy.service.task.common.TaskKey
 import com.coooolfan.unirhy.service.task.common.TaskStatus
 import org.babyfish.jimmer.Page
 import org.babyfish.jimmer.sql.fetcher.Fetcher
@@ -17,34 +18,22 @@ import run.endive.runtime.Instance
 import tools.jackson.databind.ObjectMapper
 import tools.jackson.databind.node.ObjectNode
 
-private data class HostPage<T>(
-    val rows: List<T>,
-    val totalRowCount: Long,
-)
-
-private data class HostTaskSubmissionCreated(
-    val submissionId: Long,
-)
-
-private data class HostTaskSubmissionDetail(
-    val submission: TaskSubmission,
-    val taskCounts: TaskStatusCounts,
-)
-
-private val HOST_SUBMISSION_FETCHER: Fetcher<TaskSubmission> = newFetcher(TaskSubmission::class).by {
-    allScalarFields()
-}
+private data class HostPage<T>(val rows: List<T>, val totalRowCount: Long)
+private data class HostTaskCreated(val taskId: Long)
+private data class HostTasksEnqueued(val enqueued: Int)
 
 private val HOST_TASK_FETCHER: Fetcher<AsyncTask> = newFetcher(AsyncTask::class).by {
     allScalarFields()
-    submissionId()
+    parentId()
 }
 
 internal fun buildTaskHostFunctions(
     taskDefinitionService: TaskDefinitionService,
-    taskSubmissionService: TaskSubmissionService,
     asyncTaskService: AsyncTaskService,
     taskStatisticsService: TaskStatisticsService,
+    asyncTaskStore: AsyncTaskStore,
+    pluginId: String,
+    executionContext: WasmExecutionContext?,
     objectMapper: ObjectMapper,
     instanceRef: () -> Instance,
     callExecutor: PluginHostCallExecutor = DIRECT_PLUGIN_HOST_CALL_EXECUTOR,
@@ -52,74 +41,44 @@ internal fun buildTaskHostFunctions(
     val support = PluginHostSupport(objectMapper, callExecutor, instanceRef)
 
     return listOf(
-        support.jsonFunction("host_task_definition_list") {
-            taskDefinitionService.list()
-        },
+        support.jsonFunction("host_task_definition_list") { taskDefinitionService.list() },
         support.jsonFunction("host_task_definition_get") { request ->
-            taskDefinitionService.get(
-                namespace = request.requiredText("namespace"),
-                taskType = request.requiredText("taskType"),
-            )
+            taskDefinitionService.get(request.requiredText("namespace"), request.requiredText("taskType"))
         },
-        support.jsonFunction("host_task_submission_create") { request ->
-            HostTaskSubmissionCreated(
-                submissionId = taskSubmissionService.create(
+        support.jsonFunction("host_task_create") { request ->
+            HostTaskCreated(
+                asyncTaskService.create(
                     namespace = request.requiredText("namespace"),
                     taskType = request.requiredText("taskType"),
-                    params = request.requiredObject("params"),
+                    payload = request.requiredObject("payload"),
                 ),
             )
         },
-        support.jsonFunction("host_task_submission_list") { request ->
-            val page = support.page(request)
-            taskSubmissionService.list(
-                namespace = request.optionalText("namespace"),
-                taskType = request.optionalText("taskType"),
-                statuses = request.statusFilter(),
-                pageIndex = page.pageIndex,
-                pageSize = page.pageSize,
-                fetcher = HOST_SUBMISSION_FETCHER,
-            ).toHostPage()
-        },
-        support.jsonFunction("host_task_submission_get") { request ->
-            val id = request.requiredLong("id")
-            HostTaskSubmissionDetail(
-                submission = taskSubmissionService.get(id, HOST_SUBMISSION_FETCHER),
-                taskCounts = TaskStatusCounts.from(taskSubmissionService.taskStatusCounts(id)),
+        support.jsonFunction("host_task_enqueue") { request ->
+            val context = executionContext
+                ?: conflict("Tasks can only be enqueued while a plugin task is running")
+            val namespace = request.optionalText("namespace") ?: pluginId
+            val taskType = request.optionalText("taskType") ?: context.taskType
+            val key = TaskKey.ofOrNull(namespace, taskType)
+                ?: invalidArgument("Invalid task key: $namespace:$taskType")
+            taskDefinitionService.find(key) ?: notFound("Task definition not found: $key")
+            val payloads = request.requiredObjectList("payloads")
+            HostTasksEnqueued(
+                asyncTaskStore.enqueueChildrenIgnoringConflicts(
+                    parentId = context.taskId,
+                    key = key,
+                    payloadJsonList = payloads.map { it.toString() },
+                ),
             )
-        },
-        support.jsonFunction("host_task_submission_tasks") { request ->
-            val id = request.requiredLong("id")
-            val page = support.page(request)
-            taskSubmissionService.get(id, HOST_SUBMISSION_FETCHER)
-            asyncTaskService.list(
-                submissionId = id,
-                namespace = null,
-                taskType = null,
-                statuses = request.statusFilter(),
-                pageIndex = page.pageIndex,
-                pageSize = page.pageSize,
-                fetcher = HOST_TASK_FETCHER,
-            ).toHostPage()
-        },
-        support.jsonFunction("host_task_submission_patch") { request ->
-            taskSubmissionService.patchStatus(
-                id = request.requiredLong("id"),
-                target = request.requiredTaskStatus(),
-                fetcher = HOST_SUBMISSION_FETCHER,
-            )
-            null
-        },
-        support.jsonFunction("host_task_submission_delete") { request ->
-            taskSubmissionService.delete(request.requiredLong("id"))
-            null
         },
         support.jsonFunction("host_task_list") { request ->
             val page = support.page(request)
             asyncTaskService.list(
-                submissionId = request.optionalLong("submissionId"),
+                parentId = request.optionalLong("parentId"),
+                rootsOnly = request.optionalBoolean("rootsOnly") ?: false,
                 namespace = request.optionalText("namespace"),
                 taskType = request.optionalText("taskType"),
+                actions = request.actionFilter(),
                 statuses = request.statusFilter(),
                 pageIndex = page.pageIndex,
                 pageSize = page.pageSize,
@@ -131,9 +90,7 @@ internal fun buildTaskHostFunctions(
         },
         support.jsonFunction("host_task_patch") { request ->
             asyncTaskService.patchStatus(
-                id = request.requiredLong("id"),
-                target = request.requiredTaskStatus(),
-                fetcher = HOST_TASK_FETCHER,
+                request.requiredLong("id"), request.requiredTaskStatus(), HOST_TASK_FETCHER,
             )
             null
         },
@@ -143,20 +100,33 @@ internal fun buildTaskHostFunctions(
     )
 }
 
-private fun ObjectNode.statusFilter(): List<TaskStatus> {
-    val value = get("status") ?: return emptyList()
-    if (value.isNull) return emptyList()
-    if (!value.isString) invalidArgument("Field 'status' must be a string")
-    return listOf(parseTaskStatus(value.stringValue()))
+private fun ObjectNode.requiredObjectList(name: String): List<ObjectNode> {
+    val value = requiredNode(name)
+    if (!value.isArray) invalidArgument("Field '$name' must be an array")
+    if (value.isEmpty) invalidArgument("Field '$name' must contain at least one item")
+    if (value.size() > HOST_MAX_ENQUEUE_BATCH_SIZE) {
+        invalidArgument("Field '$name' must contain at most $HOST_MAX_ENQUEUE_BATCH_SIZE items")
+    }
+    return value.mapIndexed { index, item ->
+        item as? ObjectNode ?: invalidArgument("Field '$name[$index]' must be an object")
+    }
 }
 
-private fun ObjectNode.requiredTaskStatus(): TaskStatus = parseTaskStatus(requiredText("status"))
+private fun ObjectNode.statusFilter(): List<TaskStatus> = optionalEnumFilter("status", TaskStatus.entries)
+private fun ObjectNode.actionFilter(): List<TaskAction> = optionalEnumFilter("action", TaskAction.entries)
 
-private fun parseTaskStatus(value: String): TaskStatus =
-    TaskStatus.entries.firstOrNull { it.name == value }
-        ?: invalidArgument("Unknown task status: $value")
+private fun <T : Enum<T>> ObjectNode.optionalEnumFilter(name: String, entries: List<T>): List<T> {
+    val value = get(name) ?: return emptyList()
+    if (value.isNull) return emptyList()
+    if (!value.isString) invalidArgument("Field '$name' must be a string")
+    return listOf(entries.firstOrNull { it.name == value.stringValue() }
+        ?: invalidArgument("Unknown $name: ${value.stringValue()}"))
+}
 
-private fun <T> Page<T>.toHostPage(): HostPage<T> = HostPage(
-    rows = rows,
-    totalRowCount = totalRowCount,
-)
+private fun ObjectNode.requiredTaskStatus(): TaskStatus =
+    TaskStatus.entries.firstOrNull { it.name == requiredText("status") }
+        ?: invalidArgument("Unknown task status")
+
+private fun <T> Page<T>.toHostPage(): HostPage<T> = HostPage(rows, totalRowCount)
+
+private const val HOST_MAX_ENQUEUE_BATCH_SIZE = 1000
