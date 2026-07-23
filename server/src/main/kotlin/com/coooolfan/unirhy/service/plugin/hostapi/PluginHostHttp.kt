@@ -29,6 +29,7 @@ import java.util.concurrent.TimeoutException
 private const val MAX_HTTP_RESPONSE_BYTES = 268_435_456L
 private const val MAX_HTTP_REDIRECTS = 5
 private const val HTTP_BUFFER_SIZE = 64 * 1024
+private val HTTP_REQUEST_TIMEOUT: Duration = Duration.ofSeconds(30)
 private val HTTP_BODY_IDLE_TIMEOUT: Duration = Duration.ofSeconds(30)
 
 private val logger: Logger = LoggerFactory.getLogger("PluginHostFunctions")
@@ -283,7 +284,10 @@ private fun send(
         builder.header(header.name, header.value)
     }
     val publisher = body?.let(HttpRequest.BodyPublishers::ofByteArray) ?: HttpRequest.BodyPublishers.noBody()
-    val request = builder.method(method, publisher).build()
+    val request = builder
+        .timeout(HTTP_REQUEST_TIMEOUT)
+        .method(method, publisher)
+        .build()
     return try {
         sharedHttpClient.send(request, HttpResponse.BodyHandlers.ofInputStream())
     } catch (ex: InterruptedException) {

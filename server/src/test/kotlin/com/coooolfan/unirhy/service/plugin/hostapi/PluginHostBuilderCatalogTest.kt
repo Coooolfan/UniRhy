@@ -6,13 +6,14 @@ import com.coooolfan.unirhy.service.PlaylistService
 import com.coooolfan.unirhy.service.RecordingService
 import com.coooolfan.unirhy.service.SystemConfigService
 import com.coooolfan.unirhy.service.WorkService
+import com.coooolfan.unirhy.service.plugin.WasmExecutionContext
 import com.coooolfan.unirhy.service.storage.FileSystemStorageService
 import com.coooolfan.unirhy.service.storage.OssStorageService
 import com.coooolfan.unirhy.service.storage.StorageNodeObjectService
 import com.coooolfan.unirhy.service.task.AsyncTaskService
 import com.coooolfan.unirhy.service.task.TaskDefinitionService
 import com.coooolfan.unirhy.service.task.TaskStatisticsService
-import com.coooolfan.unirhy.service.task.TaskSubmissionService
+import com.coooolfan.unirhy.service.task.common.AsyncTaskStore
 import org.babyfish.jimmer.sql.kt.KSqlClient
 import org.mockito.Mockito.mock
 import run.endive.runtime.Instance
@@ -84,9 +85,11 @@ class PluginHostBuilderCatalogTest {
             ),
             buildTaskHostFunctions(
                 taskDefinitionService = mock(TaskDefinitionService::class.java),
-                taskSubmissionService = mock(TaskSubmissionService::class.java),
                 asyncTaskService = mock(AsyncTaskService::class.java),
                 taskStatisticsService = mock(TaskStatisticsService::class.java),
+                asyncTaskStore = mock(AsyncTaskStore::class.java),
+                pluginId = "com.example.test",
+                executionContext = WasmExecutionContext(1L, "TEST_TASK"),
                 objectMapper = objectMapper,
                 instanceRef = instanceRef,
                 callExecutor = callExecutor,
