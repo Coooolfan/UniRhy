@@ -1306,7 +1306,7 @@ describe('audio store', () => {
 
     it('does not attach credentials to cross-host signed audio sources', async () => {
         const signedAudioUrl =
-            'https://cn-nb1.rains3.com/unirhy/audio.opus?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Signature=abc'
+            'https://storage.example.invalid/unirhy/audio.opus?signature=abc&expires=4102444800'
         getRecordingMock.mockResolvedValueOnce(
             buildRecordingMetadata(8, {
                 assets: [
@@ -1333,7 +1333,7 @@ describe('audio store', () => {
         client.emitMessage({
             type: 'ROOM_EVENT_LOAD_AUDIO_SOURCE',
             payload: {
-                commandId: 'cmd-play-s3',
+                commandId: 'cmd-play-signed-source',
                 currentIndex: 0,
                 recordingId: 8,
             },
