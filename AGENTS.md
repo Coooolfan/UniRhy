@@ -9,7 +9,7 @@ UniRhy (独一律) 是一个私有化的音乐流媒体平台
 
 - **后端**: 于 `./server` 文件夹. SpringBoot, Gradle, Kotlin, JVM 25.
   - 除非用户要求，每次更改后都应当在此项目中执行`./gradlew compileKotlin`以确保编译通过，如果因为JVM版本不兼容导致编译失败，请用户自行解决
-  - 测试约定见 [server/README/TESTING.md](server/README/TESTING.md)
+  - server 测试使用带项目路径的 Gradle 任务（如`./gradlew :test`），不要使用未限定的`./gradlew test`；测试约定见 [server/README/TESTING.md](server/README/TESTING.md)
 - **前端**: 于 `./web` 文件夹. Vue, TypeScript, Vite, Pinia, Tailwind CSS.
   - 除非用户要求，每次更改后都应当在此项目中执行`yarn verify && yarn format:check`以确保 Lint、类型检查与格式检查通过（若格式检查失败，先执行`yarn format`）
   - 此工程的 API 客户端(`/web/src/__generated`)由命令 `yarn api` 生成，在任何情况下都不允许改动此目录下的文件
