@@ -7,6 +7,7 @@
 
 ## 规则
 
+- Gradle 测试任务使用项目限定形式：单元测试用 `./gradlew :test`，E2E 测试用 `./gradlew :api-e2e:test`，避免根任务将过滤器传递给其他子项目。
 - 端到端测试不得放入 `server/src/test`。
 - 单元测试与切片测试不得放入 `server/api-e2e`。
 - CI 不运行 `api-e2e`。
