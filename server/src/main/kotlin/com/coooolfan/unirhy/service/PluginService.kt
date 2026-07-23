@@ -179,8 +179,8 @@ class PluginService(
     }
 
     /**
-     * 删除插件。只允许作用于已禁用的插件；存在活动 submission / task 时拒绝。
-     * 删除事务锁定插件行后再次校验，与 submission 创建事务的共享锁互斥。
+     * 删除插件。只允许作用于已禁用的插件；存在活动任务时拒绝。
+     * 删除事务锁定插件行后再次校验，与根任务创建事务的共享锁互斥。
      */
     fun delete(id: String) {
         transactionTemplate.executeWithoutResult {
@@ -194,9 +194,6 @@ class PluginService(
             val hasActive = jdbc.queryForObject(
                 """
                 SELECT EXISTS (
-                    SELECT 1 FROM public.task_submission
-                    WHERE namespace = :id AND status IN ('PENDING', 'RUNNING')
-                ) OR EXISTS (
                     SELECT 1 FROM public.async_task
                     WHERE namespace = :id AND status IN ('PENDING', 'RUNNING')
                 )

@@ -8,96 +8,110 @@ import com.coooolfan.unirhy.error.TaskException
 import com.coooolfan.unirhy.model.AsyncTask
 import com.coooolfan.unirhy.model.by
 import com.coooolfan.unirhy.service.task.AsyncTaskService
+import com.coooolfan.unirhy.service.task.TaskStatusCounts
+import com.coooolfan.unirhy.service.task.common.TaskAction
 import com.coooolfan.unirhy.service.task.common.TaskStatus
+import jakarta.servlet.http.HttpServletResponse
 import org.babyfish.jimmer.Page
 import org.babyfish.jimmer.client.FetchBy
 import org.babyfish.jimmer.sql.kt.fetcher.newFetcher
+import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.*
+import tools.jackson.databind.JsonNode
 
-/**
- * 任务执行资源管理接口
- *
- * 任务提交经由 `/api/task-submissions`；本接口只查询与管理单条执行任务
- */
+data class TaskCreateRequest(
+    val namespace: String,
+    val taskType: String,
+    val payload: JsonNode,
+)
+
+data class TaskCreatedResponse(val taskId: Long)
+
+data class TaskStatusPatchRequest(val status: TaskStatus)
+
+data class TaskStatusBatchPatchRequest(val ids: List<Long>, val status: TaskStatus)
+
+data class TaskDetailResponse(
+    val task: @FetchBy("DEFAULT_TASK_FETCHER", ownerType = TaskController::class) AsyncTask,
+    val childTaskCounts: TaskStatusCounts,
+)
+
+/** 统一任务资源管理接口。 */
 @SaCheckLogin
 @RestController
 @RequestMapping("/api/tasks")
 class TaskController(
-    private val asyncTaskService: AsyncTaskService,
+    private val taskService: AsyncTaskService,
 ) {
+    /** 创建一个 PLAN 根任务。 */
+    @PostMapping
+    @SaCheckRole(ROLE_ADMIN)
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    fun createTask(
+        @RequestBody request: TaskCreateRequest,
+        response: HttpServletResponse,
+    ): TaskCreatedResponse {
+        val id = taskService.create(request.namespace, request.taskType, request.payload)
+        response.setHeader("Location", "/api/tasks/$id")
+        return TaskCreatedResponse(id)
+    }
 
-    /**
-     * 分页查询任务
-     *
-     * @api GET /api/tasks
-     * @permission 需要登录认证
-     */
     @GetMapping
     fun listTasks(
-        @RequestParam(required = false) submissionId: Long?,
+        @RequestParam(required = false) parentId: Long?,
+        @RequestParam(required = false, defaultValue = "false") rootsOnly: Boolean,
         @RequestParam(required = false) namespace: String?,
         @RequestParam(required = false) taskType: String?,
+        @RequestParam(required = false) actions: List<TaskAction>?,
         @RequestParam(required = false) statuses: List<TaskStatus>?,
         @RequestParam(required = false) pageIndex: Int?,
         @RequestParam(required = false) pageSize: Int?,
     ): Page<@FetchBy("DEFAULT_TASK_FETCHER") AsyncTask> =
-        asyncTaskService.list(
-            submissionId = submissionId,
+        taskService.list(
+            parentId = parentId,
+            rootsOnly = rootsOnly,
             namespace = namespace,
             taskType = taskType,
+            actions = actions ?: emptyList(),
             statuses = statuses ?: emptyList(),
             pageIndex = pageIndex ?: 0,
             pageSize = pageSize ?: 20,
             fetcher = DEFAULT_TASK_FETCHER,
         )
 
-    /**
-     * 查询单条任务
-     *
-     * @api GET /api/tasks/{id}
-     * @permission 需要登录认证
-     */
     @GetMapping("/{id}")
-    @Throws(TaskException.TaskNotFound::class)
-    fun getTask(@PathVariable id: Long): @FetchBy("DEFAULT_TASK_FETCHER") AsyncTask =
-        asyncTaskService.get(id, DEFAULT_TASK_FETCHER)
+    fun getTask(@PathVariable id: Long): TaskDetailResponse = TaskDetailResponse(
+        task = taskService.get(id, DEFAULT_TASK_FETCHER),
+        childTaskCounts = TaskStatusCounts.from(taskService.childStatusCounts(id)),
+    )
 
-    /**
-     * 单项状态变更；只接受 `PENDING -> CANCELLED` 与 `FAILED -> PENDING`
-     *
-     * @api PATCH /api/tasks/{id}
-     * @permission 需要管理员权限
-     */
+    @GetMapping("/{id}/tree")
+    fun getTaskTree(@PathVariable id: Long): @FetchBy("TASK_TREE_FETCHER") AsyncTask =
+        taskService.get(id, TASK_TREE_FETCHER)
+
     @PatchMapping("/{id}")
     @SaCheckRole(ROLE_ADMIN)
-    @Throws(
-        CommonException.Forbidden::class,
-        TaskException.TaskNotFound::class,
-        TaskException.StatusConflict::class,
-        TaskException.PluginUnavailable::class,
-    )
     fun patchTask(
         @PathVariable id: Long,
         @RequestBody request: TaskStatusPatchRequest,
     ): @FetchBy("DEFAULT_TASK_FETCHER") AsyncTask =
-        asyncTaskService.patchStatus(id, request.status, DEFAULT_TASK_FETCHER)
+        taskService.patchStatus(id, request.status, DEFAULT_TASK_FETCHER)
 
-    /**
-     * 批量状态变更，返回实际更新数量
-     *
-     * @api PATCH /api/tasks
-     * @permission 需要管理员权限
-     */
     @PatchMapping
     @SaCheckRole(ROLE_ADMIN)
-    @Throws(CommonException.Forbidden::class, TaskException.StatusConflict::class)
     fun patchTasks(@RequestBody request: TaskStatusBatchPatchRequest): Int =
-        asyncTaskService.patchStatusBatch(request.ids, request.status)
+        taskService.patchStatusBatch(request.ids, request.status)
 
     companion object {
         val DEFAULT_TASK_FETCHER = newFetcher(AsyncTask::class).by {
             allScalarFields()
-            submissionId()
+            parentId()
+        }
+
+        val TASK_TREE_FETCHER = newFetcher(AsyncTask::class).by {
+            allScalarFields()
+            parentId()
+            `childTasks*`()
         }
     }
 }
