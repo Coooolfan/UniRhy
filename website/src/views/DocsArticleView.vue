@@ -348,7 +348,7 @@ useHead(() => {
   content: '';
   position: absolute;
   inset: 0;
-  background-image: url('https://www.transparenttextures.com/patterns/cream-paper.png');
+  background-image: url('/images/cream-paper.svg');
   opacity: 0.4;
   pointer-events: none;
   z-index: 0;
