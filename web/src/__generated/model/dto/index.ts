@@ -7,5 +7,4 @@ export type {FileProviderOssDto} from './FileProviderOssDto';
 export type {PlaylistDto} from './PlaylistDto';
 export type {RecordingDto} from './RecordingDto';
 export type {SystemConfigDto} from './SystemConfigDto';
-export type {TaskSubmissionDto} from './TaskSubmissionDto';
 export type {WorkDto} from './WorkDto';

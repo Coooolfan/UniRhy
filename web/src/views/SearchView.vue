@@ -328,6 +328,8 @@ const navigateToDetail = (item: SearchResultItem) => {
         router.push({ name: 'album-detail', params: { id: item.id } })
     } else if (item.type === 'work') {
         router.push({ name: 'work-detail', params: { id: item.id } })
+    } else if (item.type === 'artist') {
+        router.push({ name: 'artist-detail', params: { id: item.id } })
     }
 }
 
@@ -462,6 +464,7 @@ const playItem = async (item: SearchResultItem) => {
                             :subtitle="item.subtitle"
                             :selectable="userStore.isAdmin"
                             :selected="isArtistSelected(item)"
+                            @open="navigateToDetail(item)"
                             @toggle-select="toggleArtistSelection(item)"
                         />
                     </div>

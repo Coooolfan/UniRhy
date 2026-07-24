@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { api } from '@/ApiInstance'
 import { resolveErrorMessage } from '@/i18n/errors'
@@ -27,6 +28,7 @@ const emit = defineEmits<{
 
 const modal = useModal()
 const userStore = useUserStore()
+const router = useRouter()
 const { t } = useI18n()
 
 const isLoading = ref(false)
@@ -77,6 +79,10 @@ watch(
     },
     { immediate: true },
 )
+
+const openArtistDetail = (artist: ArtistItem) => {
+    void router.push({ name: 'artist-detail', params: { id: artist.id } })
+}
 
 const openEditModal = async (artist: ArtistItem) => {
     if (!userStore.isAdmin) {
@@ -140,8 +146,9 @@ const openEditModal = async (artist: ArtistItem) => {
                     :id="artist.id"
                     :title="artist.displayName"
                     :subtitle="subtitleOf(artist)"
-                    :openable="userStore.isAdmin"
-                    @open="openEditModal(artist)"
+                    :editable="userStore.isAdmin"
+                    @open="openArtistDetail(artist)"
+                    @edit="openEditModal(artist)"
                 />
             </div>
         </div>

@@ -6,6 +6,7 @@ import com.coooolfan.unirhy.config.ROLE_ADMIN
 import com.coooolfan.unirhy.error.ArtistException
 import com.coooolfan.unirhy.error.CommonException
 import com.coooolfan.unirhy.model.Artist
+import com.coooolfan.unirhy.model.Recording
 import com.coooolfan.unirhy.model.by
 import com.coooolfan.unirhy.model.dto.ArtistCreate
 import com.coooolfan.unirhy.model.dto.ArtistMergeReq
@@ -52,6 +53,48 @@ class ArtistController(private val service: ArtistService) {
         @RequestParam(required = false) pageSize: Int?,
     ): Page<@FetchBy("DEFAULT_ARTIST_FETCHER") Artist> {
         return service.listArtist(pageIndex ?: 0, pageSize ?: 10, DEFAULT_ARTIST_FETCHER)
+    }
+
+    /**
+     * 获取指定艺术家
+     *
+     * @param id 艺术家 ID
+     * @return Artist 返回艺术家详情（详情 fetcher，含头像 URL）
+     *
+     * @api GET /api/artists/{id}
+     * @permission 需要登录认证
+     * @description 调用ArtistService.getArtistById()方法获取艺术家详情
+     */
+    @GetMapping("/{id}")
+    @ResponseStatus(HttpStatus.OK)
+    @Throws(CommonException.NotFound::class)
+    fun getArtistById(
+        @PathVariable id: Long,
+    ): @FetchBy("ARTIST_DETAIL_FETCHER") Artist {
+        return service.getArtistById(id, ARTIST_DETAIL_FETCHER)
+    }
+
+    /**
+     * 获取指定艺术家的曲目分页列表
+     *
+     * @param id 艺术家 ID
+     * @param pageIndex 页码（从 0 开始）
+     * @param pageSize 每页条数
+     * @return Page<Recording> 返回曲目分页列表
+     *
+     * @api GET /api/artists/{id}/recordings
+     * @permission 需要登录认证
+     * @description 调用ArtistService.listArtistRecordings()方法获取艺术家的曲目列表
+     */
+    @GetMapping("/{id}/recordings")
+    @ResponseStatus(HttpStatus.OK)
+    @Throws(CommonException.NotFound::class)
+    fun listArtistRecordings(
+        @PathVariable id: Long,
+        @RequestParam(required = false) pageIndex: Int?,
+        @RequestParam(required = false) pageSize: Int?,
+    ): Page<@FetchBy("ARTIST_RECORDING_FETCHER") Recording> {
+        return service.listArtistRecordings(id, pageIndex ?: 0, pageSize ?: 10, ARTIST_RECORDING_FETCHER)
     }
 
     /**
@@ -138,6 +181,35 @@ class ArtistController(private val service: ArtistService) {
     companion object {
         val DEFAULT_ARTIST_FETCHER = newFetcher(Artist::class).by {
             allScalarFields()
+        }
+
+        val ARTIST_DETAIL_FETCHER = newFetcher(Artist::class).by {
+            allScalarFields()
+            avatar {
+                allScalarFields()
+                url()
+            }
+        }
+
+        val ARTIST_RECORDING_FETCHER = newFetcher(Recording::class).by {
+            allScalarFields()
+            work {
+                allScalarFields()
+            }
+            artists {
+                allScalarFields()
+            }
+            cover {
+                allScalarFields()
+                url()
+            }
+            assets {
+                allScalarFields()
+                mediaFile {
+                    allScalarFields()
+                    url()
+                }
+            }
         }
 
     }

@@ -14,7 +14,6 @@ import {
     TaskController, 
     TaskDefinitionController, 
     TaskStatisticsController, 
-    TaskSubmissionController, 
     TokenController, 
     WorkController
 } from './services/';
@@ -45,8 +44,6 @@ export class Api {
     
     readonly taskStatisticsController: TaskStatisticsController
     
-    readonly taskSubmissionController: TaskSubmissionController
-    
     readonly tokenController: TokenController
     
     readonly workController: WorkController
@@ -68,7 +65,6 @@ export class Api {
         this.taskController = new TaskController(executor);
         this.taskDefinitionController = new TaskDefinitionController(executor);
         this.taskStatisticsController = new TaskStatisticsController(executor);
-        this.taskSubmissionController = new TaskSubmissionController(executor);
         this.tokenController = new TokenController(executor);
         this.workController = new WorkController(executor);
         this.fileSystemStorageController = new FileSystemStorageController(executor);

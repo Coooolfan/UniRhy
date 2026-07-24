@@ -1,5 +1,5 @@
 import type {Executor} from '../';
-import type {ArtistDto} from '../model/dto/';
+import type {ArtistDto, RecordingDto} from '../model/dto/';
 import type {
     ArtistCreate, 
     ArtistMergeReq, 
@@ -41,6 +41,22 @@ export class ArtistController {
     }
     
     /**
+     * 获取指定艺术家
+     * 
+     * @parameter {ArtistControllerOptions['getArtistById']} options
+     * - id 艺术家 ID
+     * @return Artist 返回艺术家详情（详情 fetcher，含头像 URL）
+     * 
+     */
+    readonly getArtistById: (options: ArtistControllerOptions['getArtistById']) => Promise<
+        ArtistDto['ArtistController/ARTIST_DETAIL_FETCHER']
+    > = async(options) => {
+        let _uri = '/api/artists/';
+        _uri += encodeURIComponent(options.id);
+        return (await this.executor({uri: _uri, method: 'GET'})) as Promise<ArtistDto['ArtistController/ARTIST_DETAIL_FETCHER']>;
+    }
+    
+    /**
      * 根据艺术家名称搜索
      * 
      * @parameter {ArtistControllerOptions['getArtistByName']} options
@@ -60,6 +76,41 @@ export class ArtistController {
         _uri += encodeURIComponent(_value);
         _separator = '&';
         return (await this.executor({uri: _uri, method: 'GET'})) as Promise<ReadonlyArray<ArtistDto['ArtistController/DEFAULT_ARTIST_FETCHER']>>;
+    }
+    
+    /**
+     * 获取指定艺术家的曲目分页列表
+     * 
+     * @parameter {ArtistControllerOptions['listArtistRecordings']} options
+     * - id 艺术家 ID
+     * - pageIndex 页码（从 0 开始）
+     * - pageSize 每页条数
+     * @return Page<Recording> 返回曲目分页列表
+     * 
+     */
+    readonly listArtistRecordings: (options: ArtistControllerOptions['listArtistRecordings']) => Promise<
+        Page<RecordingDto['ArtistController/ARTIST_RECORDING_FETCHER']>
+    > = async(options) => {
+        let _uri = '/api/artists/';
+        _uri += encodeURIComponent(options.id);
+        _uri += '/recordings';
+        let _separator = _uri.indexOf('?') === -1 ? '?' : '&';
+        let _value: any = undefined;
+        _value = options.pageIndex;
+        if (_value !== undefined && _value !== null) {
+            _uri += _separator
+            _uri += 'pageIndex='
+            _uri += encodeURIComponent(_value);
+            _separator = '&';
+        }
+        _value = options.pageSize;
+        if (_value !== undefined && _value !== null) {
+            _uri += _separator
+            _uri += 'pageSize='
+            _uri += encodeURIComponent(_value);
+            _separator = '&';
+        }
+        return (await this.executor({uri: _uri, method: 'GET'})) as Promise<Page<RecordingDto['ArtistController/ARTIST_RECORDING_FETCHER']>>;
     }
     
     /**
@@ -130,6 +181,26 @@ export class ArtistController {
 
 export type ArtistControllerOptions = {
     'listArtists': {
+        /**
+         * 页码（从 0 开始）
+         */
+        readonly pageIndex?: number | undefined, 
+        /**
+         * 每页条数
+         */
+        readonly pageSize?: number | undefined
+    }, 
+    'getArtistById': {
+        /**
+         * 艺术家 ID
+         */
+        readonly id: number
+    }, 
+    'listArtistRecordings': {
+        /**
+         * 艺术家 ID
+         */
+        readonly id: number, 
         /**
          * 页码（从 0 开始）
          */

@@ -9,7 +9,7 @@ export class TaskStatisticsController {
     constructor(private executor: Executor) {}
     
     /**
-     * 按 TaskKey 统计 submission 与 async task 的状态计数
+     * 按 TaskKey 统计统一任务的状态计数
      * 
      * @parameter {TaskStatisticsControllerOptions['getTaskStatistics']} options
      * - taskKeys 紧凑序列化形式（`namespace:TASK_TYPE`）的 TaskKey，
