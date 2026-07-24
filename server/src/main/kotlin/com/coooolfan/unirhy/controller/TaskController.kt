@@ -30,6 +30,15 @@ data class TaskStatusPatchRequest(val status: TaskStatus)
 
 data class TaskStatusBatchPatchRequest(val ids: List<Long>, val status: TaskStatus)
 
+data class TaskStatusTransitionRequest(
+    val namespace: String,
+    val taskType: String,
+    val sourceStatuses: Set<TaskStatus>,
+    val targetStatus: TaskStatus,
+)
+
+data class TaskStatusTransitionResponse(val transitioned: Int)
+
 data class TaskDetailResponse(
     val task: @FetchBy("DEFAULT_TASK_FETCHER", ownerType = TaskController::class) AsyncTask,
     val childTaskCounts: TaskStatusCounts,
@@ -85,6 +94,19 @@ class TaskController(
     @GetMapping("/{id}/tree")
     fun getTaskTree(@PathVariable id: Long): @FetchBy("TASK_TREE_FETCHER") AsyncTask =
         taskService.get(id, TASK_TREE_FETCHER)
+
+    @PostMapping("/status-transitions")
+    @SaCheckRole(ROLE_ADMIN)
+    fun transitionTaskStatuses(
+        @RequestBody request: TaskStatusTransitionRequest,
+    ): TaskStatusTransitionResponse = TaskStatusTransitionResponse(
+        taskService.transitionStatuses(
+            namespace = request.namespace,
+            taskType = request.taskType,
+            sourceStatuses = request.sourceStatuses,
+            targetStatus = request.targetStatus,
+        ),
+    )
 
     @PatchMapping("/{id}")
     @SaCheckRole(ROLE_ADMIN)
