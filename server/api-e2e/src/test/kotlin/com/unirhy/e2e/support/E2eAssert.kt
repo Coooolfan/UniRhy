@@ -8,7 +8,9 @@ import kotlin.test.assertTrue
 
 object E2eAssert {
     fun status(response: HttpResponse<*>, expected: Int, step: String) {
-        assertEquals(expected, response.statusCode(), "$step unexpected http status")
+        val body = (response.body() as? String)?.take(2_000)
+        val bodySuffix = body?.let { ", body=$it" }.orEmpty()
+        assertEquals(expected, response.statusCode(), "$step unexpected http status$bodySuffix")
     }
 
     fun jsonAt(responseBody: String, jsonPointer: String, expected: Any?, step: String) {

@@ -86,12 +86,8 @@ object PluginHostWasmFixture {
         "host_playlist_reorder_recordings",
         "host_task_definition_list",
         "host_task_definition_get",
-        "host_task_submission_create",
-        "host_task_submission_list",
-        "host_task_submission_get",
-        "host_task_submission_tasks",
-        "host_task_submission_patch",
-        "host_task_submission_delete",
+        "host_task_create",
+        "host_task_enqueue",
         "host_task_list",
         "host_task_get",
         "host_task_patch",
@@ -121,7 +117,7 @@ object PluginHostWasmFixture {
         pluginDataKey: String,
         pluginDataValue: String,
     ): ByteArray {
-        check(hostFunctionNames.size == 71 && hostFunctionNames.distinct().size == 71)
+        check(hostFunctionNames.size == 67 && hostFunctionNames.distinct().size == 67)
 
         val plan = "[{}]".toByteArray()
         val runResult = "{\"ok\":true}".toByteArray()

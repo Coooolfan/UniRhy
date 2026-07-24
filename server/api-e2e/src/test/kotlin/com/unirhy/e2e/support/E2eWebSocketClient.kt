@@ -71,6 +71,43 @@ class E2eWebSocketClient private constructor(
         }
     }
 
+    fun awaitMessageMatching(
+        type: PlaybackSyncMessageType,
+        timeout: Duration = DEFAULT_TIMEOUT,
+        predicate: (E2eWebSocketMessage) -> Boolean,
+    ): E2eWebSocketMessage {
+        val deadlineNs = System.nanoTime() + timeout.toNanos()
+        val skipped = mutableListOf<E2eWebSocketMessage>()
+        val rejected = mutableListOf<E2eWebSocketMessage>()
+
+        try {
+            while (true) {
+                failIfErrored()
+                val remainingNs = deadlineNs - System.nanoTime()
+                if (remainingNs <= 0L) {
+                    val rejectedPayloads = rejected.joinToString { it.payload.toString() }
+                    fail(
+                        "Timed out waiting for matching WebSocket message type=${type.name}, " +
+                            "rejected=[$rejectedPayloads]",
+                    )
+                }
+                val next = messages.poll(remainingNs, TimeUnit.NANOSECONDS)
+                if (next == null) {
+                    failIfClosed()
+                    continue
+                }
+                if (next.type == type) {
+                    if (predicate(next)) return next
+                    rejected += next
+                    continue
+                }
+                skipped += next
+            }
+        } finally {
+            restoreSkipped(skipped)
+        }
+    }
+
     fun drainMessages(timeout: Duration = SHORT_TIMEOUT): List<E2eWebSocketMessage> {
         val drained = mutableListOf<E2eWebSocketMessage>()
         val first = messages.poll(timeout.toMillis(), TimeUnit.MILLISECONDS)

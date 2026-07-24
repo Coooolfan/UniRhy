@@ -19,7 +19,7 @@ object ApiCoverageRegistry {
     private const val TASK_TRANSCODE_SUCCESS_CASE =
         "com.unirhy.e2e.TaskContentReadE2eTest#transcode task should complete successfully and write opus files"
     private const val TASK_SCAN_LIFECYCLE_CASE =
-        "com.unirhy.e2e.TaskContentReadE2eTest#scan submission should report metadata parse stats and accept incremental duplicate submission"
+        "com.unirhy.e2e.TaskContentReadE2eTest#scan task should report metadata parse stats and accept incremental duplicate creation"
     private const val WORK_ALBUM_READ_CASE =
         "com.unirhy.e2e.TaskContentReadE2eTest#works and albums should support read random and delete flow"
     private const val MEDIA_READ_CASE =
@@ -295,16 +295,16 @@ object ApiCoverageRegistry {
         ),
         full(
             "POST",
-            "/api/task-submissions",
+            "/api/tasks",
             testRef = TASK_SCAN_LIFECYCLE_CASE,
-            note = "auth: $AUTH_GUARD_CASE; duplicate: repeated submission returns 202 and active payload dedup keeps task count stable; " +
+            note = "auth: $AUTH_GUARD_CASE; duplicate: repeated root task creation returns 202 and active payload dedup keeps task count stable; " +
                 "plugin: $PLUGIN_LIFECYCLE_CASE covers plugin task keys, disabled plugin returns 409, unknown key returns 404, invalid key returns 400",
         ),
         full(
             "GET",
-            "/api/task-submissions/{id}",
+            "/api/tasks/{id}",
             testRef = PLUGIN_LIFECYCLE_CASE,
-            note = "auth: $AUTH_GUARD_CASE; polling: submission reaches COMPLETED after async planning",
+            note = "auth: $AUTH_GUARD_CASE; polling: root task and its child tasks reach COMPLETED",
         ),
         full(
             "GET",
@@ -376,7 +376,7 @@ object ApiCoverageRegistry {
             "GET",
             "/api/task-statistics",
             testRef = TASK_SCAN_LIFECYCLE_CASE,
-            note = "auth: $AUTH_GUARD_CASE; stats: per task key submission/task status counts, transcode drain covered by $TASK_TRANSCODE_SUCCESS_CASE",
+            note = "auth: $AUTH_GUARD_CASE; stats: per TaskKey status counts, transcode drain covered by $TASK_TRANSCODE_SUCCESS_CASE",
         ),
         full(
             "GET",

@@ -128,35 +128,35 @@ class PluginE2eTest {
         )
 
         val submitResponse = state.api.post(
-            path = "/api/task-submissions",
+            path = "/api/tasks",
             json = mapOf(
                 "namespace" to pluginId,
                 "taskType" to TASK_TYPE,
-                "params" to mapOf("tags" to listOf("classical", "instrumental")),
+                "payload" to mapOf("tags" to listOf("classical", "instrumental")),
             ),
         )
         E2eAssert.status(submitResponse, 202, "[plugins] submit should accept homogeneous array params")
-        val submissionId = E2eJson.mapper.readTree(submitResponse.body()).path("submissionId").longValue()
-        assertTrue(submissionId > 0, "[plugins] submit should return submissionId")
+        val taskId = E2eJson.mapper.readTree(submitResponse.body()).path("taskId").longValue()
+        assertTrue(taskId > 0, "[plugins] submit should return taskId")
 
-        awaitSubmissionTerminal(state, submissionId)
+        awaitRootTaskTerminal(state, taskId)
 
         val invalidParamsResponse = state.api.post(
-            path = "/api/task-submissions",
+            path = "/api/tasks",
             json = mapOf(
                 "namespace" to pluginId,
                 "taskType" to TASK_TYPE,
-                "params" to mapOf("unknownField" to true),
+                "payload" to mapOf("unknownField" to true),
             ),
         )
         E2eAssert.status(invalidParamsResponse, 400, "[plugins] params outside schema should fail")
 
         val mixedArrayResponse = state.api.post(
-            path = "/api/task-submissions",
+            path = "/api/tasks",
             json = mapOf(
                 "namespace" to pluginId,
                 "taskType" to TASK_TYPE,
-                "params" to mapOf("tags" to listOf("classical", 2)),
+                "payload" to mapOf("tags" to listOf("classical", 2)),
             ),
         )
         E2eAssert.status(mixedArrayResponse, 400, "[plugins] mixed array params should fail")
@@ -168,11 +168,11 @@ class PluginE2eTest {
         E2eAssert.status(disableResponse, 204, "[plugins] disable should succeed")
 
         val submitAfterDisableResponse = state.api.post(
-            path = "/api/task-submissions",
+            path = "/api/tasks",
             json = mapOf(
                 "namespace" to pluginId,
                 "taskType" to TASK_TYPE,
-                "params" to emptyMap<String, Any>(),
+                "payload" to emptyMap<String, Any>(),
             ),
         )
         E2eAssert.status(submitAfterDisableResponse, 409, "[plugins] submit for disabled plugin should conflict")
@@ -322,17 +322,17 @@ class PluginE2eTest {
         )
 
         val submitResponse = state.api.post(
-            path = "/api/task-submissions",
+            path = "/api/tasks",
             json = mapOf(
                 "namespace" to pluginId,
                 "taskType" to TASK_TYPE,
-                "params" to emptyMap<String, Any>(),
+                "payload" to emptyMap<String, Any>(),
             ),
         )
-        E2eAssert.status(submitResponse, 202, "[plugin-host] submission should be accepted")
-        val submissionId = E2eJson.mapper.readTree(submitResponse.body()).path("submissionId").longValue()
+        E2eAssert.status(submitResponse, 202, "[plugin-host] root task should be accepted")
+        val taskId = E2eJson.mapper.readTree(submitResponse.body()).path("taskId").longValue()
 
-        awaitSingleTaskCompleted(state, submissionId)
+        awaitSingleChildTaskCompleted(state, taskId)
 
         val artistResponse = state.api.get(
             path = "/api/artists/search-results",
@@ -467,85 +467,88 @@ class PluginE2eTest {
 
     @Test
     @Order(5)
-    fun `task submission should reject unknown task key`() {
+    fun `task creation should reject unknown task key`() {
         val state = bootstrapAdminSession(baseUrl())
         E2eAssert.status(
             state.api.post(
-                path = "/api/task-submissions",
+                path = "/api/tasks",
                 json = mapOf(
                     "namespace" to "com.unirhy-e2e.not-installed",
                     "taskType" to "NOT_A_TASK",
-                    "params" to emptyMap<String, Any>(),
+                    "payload" to emptyMap<String, Any>(),
                 ),
             ),
             404,
-            "[submissions] unknown task key should return 404",
+            "[tasks] unknown task key should return 404",
         )
         E2eAssert.status(
             state.api.post(
-                path = "/api/task-submissions",
+                path = "/api/tasks",
                 json = mapOf(
                     "namespace" to "INVALID NAMESPACE",
                     "taskType" to "lower",
-                    "params" to emptyMap<String, Any>(),
+                    "payload" to emptyMap<String, Any>(),
                 ),
             ),
             400,
-            "[submissions] invalid task key format should return 400",
+            "[tasks] invalid task key format should return 400",
         )
     }
 
-    private fun awaitSubmissionTerminal(state: com.unirhy.e2e.support.E2eAdminSession, submissionId: Long) {
+    private fun awaitRootTaskTerminal(state: com.unirhy.e2e.support.E2eAdminSession, taskId: Long) {
         val deadline = System.currentTimeMillis() + SUBMISSION_WAIT_TIMEOUT_MILLIS
         var lastStatus = "<none>"
         while (System.currentTimeMillis() <= deadline) {
-            val response = state.api.get("/api/task-submissions/$submissionId")
-            E2eAssert.status(response, 200, "[plugins] submission detail should succeed")
-            lastStatus = E2eJson.mapper.readTree(response.body()).path("submission").path("status").asString()
+            val response = state.api.get("/api/tasks/$taskId")
+            E2eAssert.status(response, 200, "[plugins] root task detail should succeed")
+            lastStatus = E2eJson.mapper.readTree(response.body()).path("task").path("status").asString()
             if (lastStatus in setOf("COMPLETED", "FAILED", "CANCELLED")) {
-                assertEquals("COMPLETED", lastStatus, "[plugins] plan() returning empty list should complete submission")
+                assertEquals("COMPLETED", lastStatus, "[plugins] plan() returning empty list should complete root task")
                 return
             }
             Thread.sleep(200L)
         }
-        fail("[plugins] submission $submissionId did not reach terminal state, last=$lastStatus")
+        fail("[plugins] root task $taskId did not reach terminal state, last=$lastStatus")
     }
 
-    private fun awaitSingleTaskCompleted(state: com.unirhy.e2e.support.E2eAdminSession, submissionId: Long) {
+    private fun awaitSingleChildTaskCompleted(state: com.unirhy.e2e.support.E2eAdminSession, taskId: Long) {
         val deadline = System.currentTimeMillis() + SUBMISSION_WAIT_TIMEOUT_MILLIS
         var lastState = "<none>"
         while (System.currentTimeMillis() <= deadline) {
-            val detailResponse = state.api.get("/api/task-submissions/$submissionId")
-            E2eAssert.status(detailResponse, 200, "[plugin-host] submission detail should succeed")
+            val detailResponse = state.api.get("/api/tasks/$taskId")
+            E2eAssert.status(detailResponse, 200, "[plugin-host] root task detail should succeed")
             val detail = E2eJson.mapper.readTree(detailResponse.body())
-            val submissionStatus = detail.path("submission").path("status").asString()
-            val taskCounts = detail.path("taskCounts")
-            val active = taskCounts.path("active").longValue()
-            val completed = taskCounts.path("completed").longValue()
-            val failed = taskCounts.path("failed").longValue()
-            val cancelled = taskCounts.path("cancelled").longValue()
-            val total = taskCounts.path("total").longValue()
-            lastState = "submission=$submissionStatus, active=$active, completed=$completed, " +
+            val rootStatus = detail.path("task").path("status").asString()
+            val childCounts = detail.path("childTaskCounts")
+            val active = childCounts.path("active").longValue()
+            val completed = childCounts.path("completed").longValue()
+            val failed = childCounts.path("failed").longValue()
+            val cancelled = childCounts.path("cancelled").longValue()
+            val total = childCounts.path("total").longValue()
+            lastState = "root=$rootStatus, active=$active, completed=$completed, " +
                 "failed=$failed, cancelled=$cancelled, total=$total"
 
-            if (submissionStatus in setOf("FAILED", "CANCELLED")) {
-                fail("[plugin-host] submission did not complete: $lastState")
+            if (rootStatus in setOf("FAILED", "CANCELLED")) {
+                fail("[plugin-host] root task did not complete: $lastState")
             }
-            if (submissionStatus == "COMPLETED" && total == 1L && active == 0L) {
+            if (rootStatus == "COMPLETED" && total == 1L && active == 0L) {
                 assertEquals(1L, completed, "[plugin-host] the guest task should complete")
                 assertEquals(0L, failed, "[plugin-host] the guest task should not fail")
                 assertEquals(0L, cancelled, "[plugin-host] the guest task should not be cancelled")
 
-                val tasksResponse = state.api.get("/api/task-submissions/$submissionId/tasks")
-                E2eAssert.status(tasksResponse, 200, "[plugin-host] task list should succeed")
+                val tasksResponse = state.api.get(
+                    path = "/api/tasks",
+                    query = mapOf("parentId" to taskId, "pageSize" to 20),
+                )
+                E2eAssert.status(tasksResponse, 200, "[plugin-host] child task list should succeed")
                 val rows = E2eJson.mapper.readTree(tasksResponse.body()).path("rows")
-                assertEquals(1, rows.size(), "[plugin-host] plan should enqueue exactly one task")
-                assertEquals("COMPLETED", rows[0].path("status").asString(), "[plugin-host] task should be completed")
+                assertEquals(1, rows.size(), "[plugin-host] plan should enqueue exactly one child task")
+                assertEquals("COMPLETED", rows[0].path("status").asString(), "[plugin-host] child task should be completed")
                 return
             }
             Thread.sleep(200L)
         }
-        fail("[plugin-host] submission $submissionId did not finish its task, last=$lastState")
+        fail("[plugin-host] root task $taskId did not finish its child task, last=$lastState")
     }
 
     private fun pluginArchive(
@@ -733,7 +736,7 @@ class PluginE2eTest {
             0x60, 0x02, 0x7F, 0x7F, 0x00,
             0x60, 0x02, 0x7F, 0x7F, 0x01, 0x7E,
             0x60, 0x02, 0x7F, 0x7F, 0x00,
-            0x03, 0x05, 0x04, 0x00, 0x01, 0x02, 0x03,
+            0x03, 0x05, 0x04, 0x00, 0x01, 0x02, 0x02,
             0x05, 0x03, 0x01, 0x00, 0x01,
             0x07, 0x29, 0x05,
             0x05, 0x61, 0x6C, 0x6C, 0x6F, 0x63, 0x00, 0x00,
@@ -741,11 +744,11 @@ class PluginE2eTest {
             0x04, 0x70, 0x6C, 0x61, 0x6E, 0x00, 0x02,
             0x03, 0x72, 0x75, 0x6E, 0x00, 0x03,
             0x06, 0x6D, 0x65, 0x6D, 0x6F, 0x72, 0x79, 0x02, 0x00,
-            0x0A, 0x17, 0x04,
+            0x0A, 0x1F, 0x04,
             0x04, 0x00, 0x20, 0x00, 0x0B,
             0x02, 0x00, 0x0B,
             0x0A, 0x00, 0x42, 0x82, 0x80, 0x80, 0x80, 0x80, 0x80, 0x02, 0x0B,
-            0x02, 0x00, 0x0B,
+            0x0A, 0x00, 0x42, 0x82, 0x80, 0x80, 0x80, 0x80, 0x80, 0x02, 0x0B,
             0x0B, 0x09, 0x01, 0x00, 0x41, 0x80, 0x10, 0x0B, 0x02, 0x5B, 0x5D,
         )
         return bytes.map { it.toByte() }.toByteArray()

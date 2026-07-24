@@ -246,15 +246,11 @@ JSON Host 函数的签名为：
 |---|---|---|
 | `host_task_definition_list` | `{}` -> `TaskDefinition[]` | 列出插件任务和内建任务定义 |
 | `host_task_definition_get` | `{namespace, taskType}` -> `TaskDefinition` | 按 TaskKey 查询任务定义 |
-| `host_task_submission_create` | `{namespace, taskType, params}` -> `{submissionId}` | 提交任务；`params` 必须是 JSON Object |
-| `host_task_submission_list` | 分页 + `{namespace?, taskType?, status?}` -> `{rows: TaskSubmission[], totalRowCount}` | 筛选并分页列出任务提交 |
-| `host_task_submission_get` | `{id}` -> `{submission, taskCounts}` | 查询任务提交及其子任务状态计数 |
-| `host_task_submission_tasks` | 分页 + `{id, status?}` -> `{rows: AsyncTask[], totalRowCount}` | 分页列出指定提交的子任务 |
-| `host_task_submission_patch` | `{id, status}` -> `null` | 允许 `PENDING -> CANCELLED` 或 `FAILED -> PENDING` |
-| `host_task_submission_delete` | `{id}` -> `null` | 删除任务提交及其子任务 |
-| `host_task_list` | 分页 + `{submissionId?, namespace?, taskType?, status?}` -> `{rows: AsyncTask[], totalRowCount}` | 筛选并分页列出子任务 |
-| `host_task_get` | `{id}` -> `AsyncTask` | 查询子任务详情 |
-| `host_task_patch` | `{id, status}` -> `null` | 允许 `PENDING -> CANCELLED` 或 `FAILED -> PENDING` |
+| `host_task_create` | `{namespace, taskType, payload}` -> `{taskId}` | 创建根任务；`payload` 必须是 JSON Object |
+| `host_task_enqueue` | `{namespace?, taskType?, payloads}` -> `{enqueued}` | 在当前插件任务下批量创建子任务；默认沿用当前 TaskKey，最多 1000 个 payload |
+| `host_task_list` | 分页 + `{parentId?, rootsOnly?, namespace?, taskType?, status?}` -> `{rows: AsyncTask[], totalRowCount}` | 筛选并分页列出任务 |
+| `host_task_get` | `{id}` -> `AsyncTask` | 查询任务详情 |
+| `host_task_patch` | `{id, status}` -> `null` | 允许 `PENDING -> CANCELLED`，以及 `FAILED` / `CANCELLED -> PENDING` |
 | `host_task_statistics` | `{taskKeys?: string[]}` -> `TaskStatistics` | 查询全部或指定 TaskKey 的任务统计 |
 
 ### 插件元数据（2，只读）
