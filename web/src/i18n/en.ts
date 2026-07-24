@@ -15,6 +15,7 @@ export default {
         saving: 'Saving...',
         loading: 'Loading...',
         retry: 'Retry',
+        pageInfo: 'Page {current} / {total}',
         close: 'Close',
         edit: 'Edit',
         delete: 'Delete',
@@ -179,6 +180,8 @@ export default {
         removing: 'Removing',
         trackCount: '{count} tracks',
         tracks: 'Tracks',
+        gridView: 'Grid view',
+        listView: 'List view',
         playNow: 'Play Now',
         pausePlayback: 'Pause Playback',
     },
@@ -383,8 +386,6 @@ export default {
         artistLabel: 'Artist',
         editArtist: 'Edit Artist',
         emptyTracks: 'No tracks for this artist yet',
-        gridView: 'Grid view',
-        listView: 'List view',
     },
     account: {
         admin: 'Admin',
@@ -590,7 +591,6 @@ export default {
         librarySubtitle: 'All melodies belong here',
         loading: 'Loading...',
         retry: 'Retry',
-        pageInfo: 'Page {current} / {total}',
     },
     tasksView: {
         submitFailed: 'Failed to submit task',

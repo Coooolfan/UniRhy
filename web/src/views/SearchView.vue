@@ -6,6 +6,7 @@ import ArtistCard from '@/components/artist/ArtistCard.vue'
 import DashboardTopBar from '@/components/dashboard/DashboardTopBar.vue'
 import LibraryEmptyHint from '@/components/dashboard/LibraryEmptyHint.vue'
 import AlbumGridCard from '@/components/media/AlbumGridCard.vue'
+import MediaGrid from '@/components/media/MediaGrid.vue'
 import WorkGridCard from '@/components/media/WorkGridCard.vue'
 import { useModal } from '@/composables/useModal'
 import MergeSelectModal from '@/components/modals/MergeSelectModal.vue'
@@ -453,9 +454,7 @@ const playItem = async (item: SearchResultItem) => {
                     <h3 v-if="activeTab === 'All'" class="text-xl font-serif text-[#2C2420] mb-6">
                         {{ t('search.tabArtists') }}
                     </h3>
-                    <div
-                        class="grid grid-cols-2 gap-5 sm:gap-8 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6"
-                    >
+                    <MediaGrid variant="dense">
                         <ArtistCard
                             v-for="item in filteredResults.artists"
                             :key="item.id"
@@ -467,16 +466,14 @@ const playItem = async (item: SearchResultItem) => {
                             @open="navigateToDetail(item)"
                             @toggle-select="toggleArtistSelection(item)"
                         />
-                    </div>
+                    </MediaGrid>
                 </div>
 
                 <div v-if="filteredResults.albums.length > 0">
                     <h3 v-if="activeTab === 'All'" class="text-xl font-serif text-[#2C2420] mb-6">
                         {{ t('search.tabAlbums') }}
                     </h3>
-                    <div
-                        class="grid grid-cols-2 gap-x-5 gap-y-10 sm:gap-x-8 sm:gap-y-12 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 xl:gap-x-12 xl:gap-y-16"
-                    >
+                    <MediaGrid>
                         <AlbumGridCard
                             v-for="item in filteredResults.albums"
                             :key="item.id"
@@ -488,16 +485,14 @@ const playItem = async (item: SearchResultItem) => {
                             @open="navigateToDetail(item)"
                             @play="playItem(item)"
                         />
-                    </div>
+                    </MediaGrid>
                 </div>
 
                 <div v-if="filteredResults.works.length > 0">
                     <h3 v-if="activeTab === 'All'" class="text-xl font-serif text-[#2C2420] mb-6">
                         {{ t('search.tabWorks') }}
                     </h3>
-                    <div
-                        class="grid grid-cols-2 gap-x-5 gap-y-10 sm:gap-x-8 sm:gap-y-12 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 xl:gap-x-12 xl:gap-y-16"
-                    >
+                    <MediaGrid>
                         <WorkGridCard
                             v-for="item in filteredResults.works"
                             :key="item.id"
@@ -513,7 +508,7 @@ const playItem = async (item: SearchResultItem) => {
                             @play="playItem(item)"
                             @toggle-select="toggleWorkSelection(item)"
                         />
-                    </div>
+                    </MediaGrid>
                 </div>
             </div>
         </div>

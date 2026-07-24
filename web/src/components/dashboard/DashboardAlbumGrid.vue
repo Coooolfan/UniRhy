@@ -6,6 +6,7 @@ import { api } from '@/ApiInstance'
 import { resolveArtistName, resolveCover } from '@/composables/recordingMedia'
 import { useAudioStore } from '@/stores/audio'
 import LibraryEmptyHint from '@/components/dashboard/LibraryEmptyHint.vue'
+import MediaGrid from '@/components/media/MediaGrid.vue'
 import {
     peekResolvedPlayableTrack,
     resolveAlbumPlayableTrack,
@@ -94,10 +95,7 @@ onMounted(() => {
     <div class="mb-8">
         <LibraryEmptyHint v-if="showAlbumEmptyNote" :has-error="hasAlbumError" />
 
-        <div
-            v-else
-            class="grid grid-cols-2 gap-5 px-1 sm:grid-cols-3 sm:gap-8 sm:px-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6"
-        >
+        <MediaGrid v-else variant="dense" class="px-1 sm:px-2">
             <div
                 v-for="(album, idx) in albums"
                 :key="idx"
@@ -141,6 +139,6 @@ onMounted(() => {
                 </h4>
                 <p class="text-xs text-[#9C968B] mt-1">{{ album.artist }}</p>
             </div>
-        </div>
+        </MediaGrid>
     </div>
 </template>

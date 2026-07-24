@@ -6,6 +6,7 @@ import { api } from '@/ApiInstance'
 import { resolveErrorMessage } from '@/i18n/errors'
 import ArtistCard from '@/components/artist/ArtistCard.vue'
 import ArtistEditModal, { type ArtistEditForm } from '@/components/artist/ArtistEditModal.vue'
+import MediaGrid from '@/components/media/MediaGrid.vue'
 import LibraryEmptyHint from '@/components/dashboard/LibraryEmptyHint.vue'
 import { useModal } from '@/composables/useModal'
 import { useUserStore } from '@/stores/user'
@@ -136,10 +137,7 @@ const openEditModal = async (artist: ArtistItem) => {
                 :title="t('artistLibrary.emptyTitle')"
                 :description="[t('artistLibrary.emptyDescription')]"
             />
-            <div
-                v-else
-                class="grid grid-cols-2 gap-5 sm:gap-8 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6"
-            >
+            <MediaGrid v-else variant="dense">
                 <ArtistCard
                     v-for="artist in artists"
                     :key="artist.id"
@@ -150,7 +148,7 @@ const openEditModal = async (artist: ArtistItem) => {
                     @open="openArtistDetail(artist)"
                     @edit="openEditModal(artist)"
                 />
-            </div>
+            </MediaGrid>
         </div>
     </div>
 </template>
