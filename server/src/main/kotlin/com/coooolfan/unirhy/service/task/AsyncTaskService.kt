@@ -77,7 +77,7 @@ class AsyncTaskService(
     fun patchStatus(id: Long, target: TaskStatus, fetcher: Fetcher<AsyncTask>): AsyncTask {
         val updated = when (target) {
             TaskStatus.CANCELLED -> taskStore.cancelPending(listOf(id), CANCELLED_BY_ADMIN_REASON)
-            TaskStatus.PENDING -> requeueFailed(listOf(id))
+            TaskStatus.PENDING -> requeueTerminal(listOf(id))
             else -> throw TaskException.statusConflict()
         }
         val current = taskStore.findById(id, fetcher) ?: throw TaskException.taskNotFound()
@@ -89,12 +89,33 @@ class AsyncTaskService(
         val distinctIds = ids.distinct()
         return when (target) {
             TaskStatus.CANCELLED -> taskStore.cancelPending(distinctIds, CANCELLED_BY_ADMIN_REASON).size
-            TaskStatus.PENDING -> requeueFailed(distinctIds).size
+            TaskStatus.PENDING -> requeueTerminal(distinctIds).size
             else -> throw TaskException.statusConflict()
         }
     }
 
-    private fun requeueFailed(ids: List<Long>): List<Long> {
+    fun transitionStatuses(
+        namespace: String,
+        taskType: String,
+        sourceStatuses: Set<TaskStatus>,
+        targetStatus: TaskStatus,
+    ): Int {
+        val key = TaskKey.ofOrNull(namespace, taskType)
+            ?: throw TaskException.invalidTaskKey(reason = "invalid task key: $namespace:$taskType")
+        return when {
+            targetStatus == TaskStatus.PENDING &&
+                sourceStatuses.isNotEmpty() &&
+                sourceStatuses.all { it in REQUEUEABLE_STATUSES } -> {
+                if (definitionService.find(key) == null) throw TaskException.pluginUnavailable()
+                taskStore.requeueByKey(key, sourceStatuses)
+            }
+            targetStatus == TaskStatus.CANCELLED && sourceStatuses == setOf(TaskStatus.PENDING) ->
+                taskStore.cancelPendingByKey(key, CANCELLED_BY_ADMIN_REASON)
+            else -> throw TaskException.statusConflict()
+        }
+    }
+
+    private fun requeueTerminal(ids: List<Long>): List<Long> {
         val requeueable = ids.filter { id ->
             val task = taskStore.findById(id, TASK_KEY_FETCHER) ?: return@filter false
             val key = TaskKey.ofOrNull(task.namespace, task.taskType) ?: return@filter false
@@ -102,13 +123,14 @@ class AsyncTaskService(
         }
         if (requeueable.isEmpty() && ids.size == 1) {
             val task = taskStore.findById(ids[0], TASK_KEY_FETCHER)
-            if (task != null && task.status == TaskStatus.FAILED) throw TaskException.pluginUnavailable()
+            if (task != null && task.status in REQUEUEABLE_STATUSES) throw TaskException.pluginUnavailable()
         }
-        return taskStore.requeueFailed(requeueable)
+        return taskStore.requeueTerminal(requeueable)
     }
 
     companion object {
         private const val CANCELLED_BY_ADMIN_REASON = "CANCELLED_BY_ADMIN"
+        private val REQUEUEABLE_STATUSES = setOf(TaskStatus.FAILED, TaskStatus.CANCELLED)
         private val TASK_ID_FETCHER = newFetcher(AsyncTask::class).by {}
         private val TASK_KEY_FETCHER = newFetcher(AsyncTask::class).by {
             namespace()

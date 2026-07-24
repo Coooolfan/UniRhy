@@ -185,6 +185,7 @@ class AsyncTaskStore(
             UPDATE public.async_task t
             SET status = 'CANCELLED', completed_at = now(), completed_reason = :reason
             WHERE t.id IN (SELECT id FROM grabbed)
+              AND t.status = 'PENDING'
             RETURNING t.id
         """.trimIndent()
         return jdbc.query(
@@ -193,20 +194,66 @@ class AsyncTaskStore(
         ) { rs, _ -> rs.getLong(1) }
     }
 
-    fun requeueFailed(ids: Collection<Long>): List<Long> {
+    fun requeueTerminal(ids: Collection<Long>): List<Long> {
         if (ids.isEmpty()) return emptyList()
         val sql = """
             WITH grabbed AS (
                 SELECT id FROM public.async_task
-                WHERE id IN (:ids) AND status = 'FAILED'
+                WHERE id IN (:ids) AND status IN ('FAILED', 'CANCELLED')
                 FOR UPDATE SKIP LOCKED
             )
             UPDATE public.async_task t
             SET status = 'PENDING', started_at = NULL, completed_at = NULL, completed_reason = NULL
             WHERE t.id IN (SELECT id FROM grabbed)
+              AND t.status IN ('FAILED', 'CANCELLED')
             RETURNING t.id
         """.trimIndent()
         return jdbc.query(sql, MapSqlParameterSource("ids", ids)) { rs, _ -> rs.getLong(1) }
+    }
+
+    fun cancelPendingByKey(key: TaskKey, reason: String): Int {
+        val sql = """
+            WITH grabbed AS (
+                SELECT id FROM public.async_task
+                WHERE namespace = :namespace
+                  AND task_type = :taskType
+                  AND status = 'PENDING'
+                ORDER BY created_at, id
+                FOR UPDATE SKIP LOCKED
+            )
+            UPDATE public.async_task t
+            SET status = 'CANCELLED', completed_at = now(), completed_reason = :reason
+            WHERE t.id IN (SELECT id FROM grabbed)
+              AND t.status = 'PENDING'
+        """.trimIndent()
+        val params = MapSqlParameterSource()
+            .addValue("namespace", key.namespace)
+            .addValue("taskType", key.taskType)
+            .addValue("reason", reason)
+        return jdbc.update(sql, params)
+    }
+
+    fun requeueByKey(key: TaskKey, sourceStatuses: Collection<TaskStatus>): Int {
+        if (sourceStatuses.isEmpty()) return 0
+        val sql = """
+            WITH grabbed AS (
+                SELECT id FROM public.async_task
+                WHERE namespace = :namespace
+                  AND task_type = :taskType
+                  AND status IN (:sourceStatuses)
+                ORDER BY created_at, id
+                FOR UPDATE SKIP LOCKED
+            )
+            UPDATE public.async_task t
+            SET status = 'PENDING', started_at = NULL, completed_at = NULL, completed_reason = NULL
+            WHERE t.id IN (SELECT id FROM grabbed)
+              AND t.status IN (:sourceStatuses)
+        """.trimIndent()
+        val params = MapSqlParameterSource()
+            .addValue("namespace", key.namespace)
+            .addValue("taskType", key.taskType)
+            .addValue("sourceStatuses", sourceStatuses.map { it.name })
+        return jdbc.update(sql, params)
     }
 
     fun hasActiveByNamespace(namespace: String): Boolean =

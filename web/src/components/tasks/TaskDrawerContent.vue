@@ -2,19 +2,24 @@
 import { computed, ref, watch } from 'vue'
 import { api } from '@/ApiInstance'
 import { resolveErrorMessage } from '@/i18n/errors'
+import { transitionTaskStatuses } from '@/services/taskStatusTransitions'
 import type { AsyncTaskDto } from '@/__generated/model/dto'
 import type { TaskStatus } from '@/__generated/model/enums/TaskStatus'
 import { useI18n } from 'vue-i18n'
 import { useUserStore } from '@/stores/user'
 import { useModal } from '@/composables/useModal'
 import {
+    ArrowRight,
+    CheckCircle2,
     ChevronDown,
     ChevronLeft,
     ChevronRight,
     ChevronUp,
+    ListChecks,
     ListTree,
     Loader2,
     RotateCcw,
+    X,
     XCircle,
 } from 'lucide-vue-next'
 
@@ -27,6 +32,20 @@ type TaskOption = {
     readonly namespace: string
     readonly taskType: string
     readonly taskName: string
+}
+
+type BatchCommandKey =
+    | 'REQUEUE_FAILED'
+    | 'REQUEUE_CANCELLED'
+    | 'REQUEUE_RECOVERABLE'
+    | 'CANCEL_PENDING'
+
+type BatchCommand = {
+    key: BatchCommandKey
+    sourceStatuses: readonly TaskStatus[]
+    targetStatus: TaskStatus
+    sourceLabel: string
+    label: string
 }
 
 const props = defineProps<{
@@ -92,11 +111,81 @@ const loading = ref(false)
 const error = ref('')
 const patchingId = ref<number | null>(null)
 const expandedIds = ref<Set<number>>(new Set())
+const batchOpen = ref(false)
+const batchCommandKey = ref<BatchCommandKey>('REQUEUE_RECOVERABLE')
+const batchRunning = ref(false)
+const batchFeedback = ref('')
 
 const effectivePageSize = computed(() => props.pageSize ?? 20)
 
-const canResetRow = (row: TaskRow) => userStore.isAdmin && row.status === 'FAILED'
+const batchCommands = computed<readonly BatchCommand[]>(() => [
+    {
+        key: 'REQUEUE_FAILED',
+        sourceStatuses: ['FAILED'],
+        targetStatus: 'PENDING',
+        sourceLabel: statusLabelMap.value.FAILED,
+        label: t('taskDetails.bulkRequeueFailed'),
+    },
+    {
+        key: 'REQUEUE_CANCELLED',
+        sourceStatuses: ['CANCELLED'],
+        targetStatus: 'PENDING',
+        sourceLabel: statusLabelMap.value.CANCELLED,
+        label: t('taskDetails.bulkRequeueCancelled'),
+    },
+    {
+        key: 'REQUEUE_RECOVERABLE',
+        sourceStatuses: ['FAILED', 'CANCELLED'],
+        targetStatus: 'PENDING',
+        sourceLabel: t('taskDetails.bulkRecoverable'),
+        label: t('taskDetails.bulkRequeueRecoverable'),
+    },
+    {
+        key: 'CANCEL_PENDING',
+        sourceStatuses: ['PENDING'],
+        targetStatus: 'CANCELLED',
+        sourceLabel: statusLabelMap.value.PENDING,
+        label: t('taskDetails.bulkCancelPending'),
+    },
+])
+
+const activeBatchCommand = computed(
+    () =>
+        batchCommands.value.find((command) => command.key === batchCommandKey.value) ??
+        batchCommands.value[0]!,
+)
+
+const canResetRow = (row: TaskRow) =>
+    userStore.isAdmin && (row.status === 'FAILED' || row.status === 'CANCELLED')
 const canCancelRow = (row: TaskRow) => userStore.isAdmin && row.status === 'PENDING'
+
+const inferredBatchCommand = (): BatchCommandKey => {
+    if (
+        props.statuses.includes('PENDING') &&
+        props.statuses.every((status) => status === 'PENDING' || status === 'RUNNING')
+    ) {
+        return 'CANCEL_PENDING'
+    }
+    if (props.statuses.length === 1 && props.statuses[0] === 'FAILED') return 'REQUEUE_FAILED'
+    if (props.statuses.length === 1 && props.statuses[0] === 'CANCELLED') {
+        return 'REQUEUE_CANCELLED'
+    }
+    if (
+        props.statuses.includes('FAILED') &&
+        props.statuses.includes('CANCELLED') &&
+        props.statuses.every((status) => status === 'FAILED' || status === 'CANCELLED')
+    ) {
+        return 'REQUEUE_RECOVERABLE'
+    }
+    return 'REQUEUE_RECOVERABLE'
+}
+
+const toggleBatchPanel = () => {
+    if (batchRunning.value) return
+    if (!batchOpen.value) batchCommandKey.value = inferredBatchCommand()
+    batchFeedback.value = ''
+    batchOpen.value = !batchOpen.value
+}
 
 const fetchTasks = async () => {
     const option = activeOption.value
@@ -136,6 +225,8 @@ watch(
     () => {
         pageIndex.value = 0
         expandedIds.value = new Set()
+        batchOpen.value = false
+        batchFeedback.value = ''
         void fetchTasks()
     },
     { immediate: true },
@@ -144,6 +235,10 @@ watch(
 watch(pageIndex, () => {
     expandedIds.value = new Set()
     void fetchTasks()
+})
+
+watch(batchCommandKey, () => {
+    batchFeedback.value = ''
 })
 
 const goPrev = () => {
@@ -182,7 +277,7 @@ const formatPayload = (payload: unknown) => {
 }
 
 const patchTaskStatus = async (row: TaskRow, target: TaskStatus, fallbackKey: string) => {
-    if (patchingId.value !== null) return
+    if (patchingId.value !== null || batchRunning.value) return
     patchingId.value = row.id
     error.value = ''
     try {
@@ -224,6 +319,60 @@ const cancelTask = async (row: TaskRow) => {
     if (!confirmed) return
     await patchTaskStatus(row, 'CANCELLED', 'errors.fallback.taskStatusPatch')
 }
+
+const executeBatchCommand = async () => {
+    const option = activeOption.value
+    const command = activeBatchCommand.value
+    if (!userStore.isAdmin || !option || !command || batchRunning.value) return
+
+    const cancelling = command.targetStatus === 'CANCELLED'
+    const confirmed = await modal.confirm({
+        title: command.label,
+        content: cancelling
+            ? t('taskDetails.bulkCancelConfirm', { task: option.taskName })
+            : t('taskDetails.bulkRequeueConfirm', {
+                  task: option.taskName,
+                  source: command.sourceLabel,
+              }),
+        confirmText: command.label,
+        cancelText: t('common.cancel'),
+        tone: cancelling ? 'danger' : 'default',
+    })
+    if (!confirmed) return
+
+    batchRunning.value = true
+    batchFeedback.value = ''
+    error.value = ''
+    try {
+        const result = await transitionTaskStatuses({
+            namespace: option.namespace,
+            taskType: option.taskType,
+            sourceStatuses: [...command.sourceStatuses],
+            targetStatus: command.targetStatus,
+        })
+        if (result.transitioned === 0) {
+            batchFeedback.value = t('taskDetails.bulkNoChanges')
+        } else if (cancelling) {
+            batchFeedback.value = t('taskDetails.bulkCancelResult', {
+                count: result.transitioned,
+            })
+        } else {
+            batchFeedback.value = t('taskDetails.bulkRequeueResult', {
+                count: result.transitioned,
+            })
+        }
+        emit('resetSuccess')
+        if (pageIndex.value === 0) {
+            await fetchTasks()
+        } else {
+            pageIndex.value = 0
+        }
+    } catch (err) {
+        error.value = resolveErrorMessage(err, 'errors.fallback.taskStatusPatch')
+    } finally {
+        batchRunning.value = false
+    }
+}
 </script>
 
 <template>
@@ -236,7 +385,8 @@ const cancelTask = async (row: TaskRow) => {
                 <div class="relative">
                     <select
                         :value="taskKey"
-                        class="w-full appearance-none border border-[#EAE6DE] bg-[#F8F5EE] px-3 py-2 pr-8 text-sm text-[#2B221B] outline-none transition-colors focus:border-[#B86134]"
+                        class="w-full appearance-none border border-[#EAE6DE] bg-[#F8F5EE] px-3 py-2 pr-8 text-sm text-[#2B221B] outline-none transition-colors focus:border-[#B86134] disabled:cursor-not-allowed disabled:opacity-60"
+                        :disabled="batchRunning"
                         @change="onTaskKeyChange"
                     >
                         <option
@@ -257,19 +407,113 @@ const cancelTask = async (row: TaskRow) => {
                     v-for="s in STATUS_ORDER"
                     :key="s"
                     type="button"
-                    class="flex-1 border px-2 py-1.5 text-[10px] font-semibold uppercase tracking-[0.2em]"
+                    class="flex-1 border px-2 py-1.5 text-[10px] font-semibold uppercase tracking-[0.2em] disabled:cursor-not-allowed"
                     :class="
                         isStatusSelected(s)
                             ? `${STATUS_BADGE_CLASS} ring-1 ring-inset ring-[#8A7F6D]/40`
                             : 'border-[#EAE6DE] bg-white/40 font-normal text-[#B8AFA3] opacity-70'
                     "
+                    :disabled="batchRunning"
                     @click="toggleStatus(s)"
                 >
                     {{ statusLabelMap[s] }}
                 </button>
             </div>
-            <div class="text-xs text-[#8A8177]">
-                {{ t('taskDetails.totalCount', { count: totalRowCount }) }}
+            <div class="flex items-center justify-between gap-3 text-xs text-[#8A8177]">
+                <span>{{ t('taskDetails.totalCount', { count: totalRowCount }) }}</span>
+                <button
+                    v-if="userStore.isAdmin"
+                    data-test="task-batch-toggle"
+                    type="button"
+                    class="inline-flex h-7 items-center gap-1.5 border border-[#D6CEC2] px-2.5 text-[11px] text-[#6B635B] transition-colors hover:border-[#B86134] hover:text-[#B86134] disabled:cursor-not-allowed disabled:opacity-50"
+                    :disabled="batchRunning"
+                    @click="toggleBatchPanel"
+                >
+                    <X v-if="batchOpen" class="h-3 w-3" />
+                    <ListChecks v-else class="h-3 w-3" />
+                    <span>{{
+                        t(batchOpen ? 'taskDetails.bulkClose' : 'taskDetails.bulkActions')
+                    }}</span>
+                </button>
+            </div>
+
+            <div
+                v-if="userStore.isAdmin && batchOpen"
+                class="space-y-3 border-t border-[#EAE6DE] pt-3"
+            >
+                <div class="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-end gap-2">
+                    <label class="min-w-0">
+                        <span
+                            class="mb-1.5 block text-[10px] uppercase tracking-[0.2em] text-[#8A8177]"
+                        >
+                            {{ t('taskDetails.bulkSource') }}
+                        </span>
+                        <div class="relative">
+                            <select
+                                v-model="batchCommandKey"
+                                data-test="task-batch-command"
+                                class="h-8 w-full appearance-none border border-[#D6CEC2] bg-white px-2.5 pr-7 text-xs text-[#2B221B] outline-none transition-colors focus:border-[#B86134] disabled:cursor-not-allowed disabled:opacity-60"
+                                :disabled="batchRunning"
+                            >
+                                <option
+                                    v-for="command in batchCommands"
+                                    :key="command.key"
+                                    :value="command.key"
+                                >
+                                    {{ command.sourceLabel }}
+                                </option>
+                            </select>
+                            <ChevronDown
+                                class="pointer-events-none absolute top-1/2 right-2 h-3 w-3 -translate-y-1/2 text-[#8A8177]"
+                            />
+                        </div>
+                    </label>
+
+                    <ArrowRight class="mb-2 h-3.5 w-3.5 text-[#B29A84]" />
+
+                    <div class="min-w-0">
+                        <span
+                            class="mb-1.5 block text-[10px] uppercase tracking-[0.2em] text-[#8A8177]"
+                        >
+                            {{ t('taskDetails.bulkTarget') }}
+                        </span>
+                        <div
+                            class="flex h-8 items-center border border-[#D6CEC2] bg-[#F8F5EE] px-2.5 text-xs text-[#2B221B]"
+                        >
+                            {{ statusLabelMap[activeBatchCommand.targetStatus] }}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-between gap-3">
+                    <div class="min-w-0 text-[11px] leading-relaxed text-[#6B635B]">
+                        <span v-if="batchFeedback" class="flex items-start gap-1.5">
+                            <CheckCircle2 class="mt-0.5 h-3 w-3 shrink-0 text-emerald-600" />
+                            <span>{{ batchFeedback }}</span>
+                        </span>
+                        <span v-else class="truncate">{{ activeOption?.taskName }}</span>
+                    </div>
+                    <button
+                        data-test="task-batch-execute"
+                        type="button"
+                        class="inline-flex h-8 shrink-0 items-center gap-1.5 border px-3 text-[11px] transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                        :class="
+                            activeBatchCommand.targetStatus === 'CANCELLED'
+                                ? 'border-rose-300 text-rose-600 hover:bg-rose-50'
+                                : 'border-[#C67C4E] text-[#B86134] hover:bg-[#C67C4E] hover:text-white'
+                        "
+                        :disabled="batchRunning || patchingId !== null"
+                        @click="executeBatchCommand"
+                    >
+                        <Loader2 v-if="batchRunning" class="h-3 w-3 animate-spin" />
+                        <RotateCcw
+                            v-else-if="activeBatchCommand.targetStatus === 'PENDING'"
+                            class="h-3 w-3"
+                        />
+                        <XCircle v-else class="h-3 w-3" />
+                        <span>{{ activeBatchCommand.label }}</span>
+                    </button>
+                </div>
             </div>
         </div>
 
@@ -375,7 +619,7 @@ const cancelTask = async (row: TaskRow) => {
                                     v-if="canResetRow(row)"
                                     type="button"
                                     class="inline-flex h-7 items-center gap-1 border border-[#C67C4E] px-2 text-[11px] uppercase tracking-[0.18em] text-[#C67C4E] transition-colors hover:bg-[#C67C4E] hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
-                                    :disabled="patchingId !== null"
+                                    :disabled="patchingId !== null || batchRunning"
                                     @click="resetTask(row)"
                                 >
                                     <Loader2
@@ -390,7 +634,7 @@ const cancelTask = async (row: TaskRow) => {
                                 v-if="canCancelRow(row)"
                                 type="button"
                                 class="inline-flex items-center gap-1 border border-[#B8AFA3] px-3 py-1.5 text-[11px] uppercase tracking-[0.18em] text-[#8A8177] transition-colors hover:border-rose-400 hover:text-rose-500 disabled:cursor-not-allowed disabled:opacity-60"
-                                :disabled="patchingId !== null"
+                                :disabled="patchingId !== null || batchRunning"
                                 @click="cancelTask(row)"
                             >
                                 <Loader2
