@@ -1,19 +1,15 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import {
-    ChevronLeft,
-    ChevronRight,
-    LayoutGrid,
-    List as ListIcon,
-    Pause,
-    Play,
-} from 'lucide-vue-next'
+import { Pause, Play } from 'lucide-vue-next'
 import ArtistLibrarySection from '@/components/artist/ArtistLibrarySection.vue'
 import DashboardTopBar from '@/components/dashboard/DashboardTopBar.vue'
 import LibraryEmptyHint from '@/components/dashboard/LibraryEmptyHint.vue'
 import AlbumGridCard from '@/components/media/AlbumGridCard.vue'
+import MediaGrid from '@/components/media/MediaGrid.vue'
+import ViewModeToggle from '@/components/media/ViewModeToggle.vue'
 import WorkGridCard from '@/components/media/WorkGridCard.vue'
+import PaginationControls from '@/components/common/PaginationControls.vue'
 import { useI18n } from 'vue-i18n'
 import { api } from '@/ApiInstance'
 import { resolveErrorMessage } from '@/i18n/errors'
@@ -263,30 +259,7 @@ const playItem = async (item: DisplayItem) => {
                     v-if="activeTab !== 'Artists'"
                     class="flex items-center justify-between gap-4 sm:justify-start"
                 >
-                    <div class="flex bg-[#EFEAE2] p-1 rounded-md">
-                        <button
-                            class="p-2 rounded-sm transition-all"
-                            :class="
-                                viewMode === 'grid'
-                                    ? 'bg-white shadow-sm text-[#2C2420]'
-                                    : 'text-[#8C857B] hover:text-[#5E5950]'
-                            "
-                            @click="viewMode = 'grid'"
-                        >
-                            <LayoutGrid :size="18" />
-                        </button>
-                        <button
-                            class="p-2 rounded-sm transition-all"
-                            :class="
-                                viewMode === 'list'
-                                    ? 'bg-white shadow-sm text-[#2C2420]'
-                                    : 'text-[#8C857B] hover:text-[#5E5950]'
-                            "
-                            @click="viewMode = 'list'"
-                        >
-                            <ListIcon :size="18" />
-                        </button>
-                    </div>
+                    <ViewModeToggle v-model="viewMode" />
                 </div>
             </div>
 
@@ -357,10 +330,7 @@ const playItem = async (item: DisplayItem) => {
                     "
                 />
 
-                <div
-                    v-else-if="viewMode === 'grid'"
-                    class="grid grid-cols-2 gap-x-5 gap-y-10 sm:gap-x-8 sm:gap-y-12 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 xl:gap-x-12 xl:gap-y-16"
-                >
+                <MediaGrid v-else-if="viewMode === 'grid'">
                     <template v-if="activeTab === 'Albums'">
                         <AlbumGridCard
                             v-for="item in displayItems"
@@ -390,7 +360,7 @@ const playItem = async (item: DisplayItem) => {
                             @play="playItem(item)"
                         />
                     </template>
-                </div>
+                </MediaGrid>
 
                 <div v-else class="space-y-2">
                     <div
@@ -462,28 +432,12 @@ const playItem = async (item: DisplayItem) => {
                 </div>
             </div>
 
-            <div
-                v-if="totalPageCount > 1"
-                class="mt-10 flex items-center justify-center gap-4 sm:mt-12 sm:gap-6"
-            >
-                <button
-                    :disabled="pageIndex === 0 || isLoading"
-                    class="p-2 text-[#8C857B] hover:text-[#C27E46] disabled:opacity-30 disabled:hover:text-[#8C857B] transition-colors"
-                    @click="handlePageChange(pageIndex - 1)"
-                >
-                    <ChevronLeft :size="20" />
-                </button>
-                <span class="font-serif text-sm text-[#5E5950]">
-                    {{ t('albumList.pageInfo', { current: pageIndex + 1, total: totalPageCount }) }}
-                </span>
-                <button
-                    :disabled="pageIndex >= totalPageCount - 1 || isLoading"
-                    class="p-2 text-[#8C857B] hover:text-[#C27E46] disabled:opacity-30 disabled:hover:text-[#8C857B] transition-colors"
-                    @click="handlePageChange(pageIndex + 1)"
-                >
-                    <ChevronRight :size="20" />
-                </button>
-            </div>
+            <PaginationControls
+                :page-index="pageIndex"
+                :total-page-count="totalPageCount"
+                :disabled="isLoading"
+                @change="handlePageChange"
+            />
         </div>
     </div>
 </template>

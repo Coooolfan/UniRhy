@@ -15,6 +15,7 @@ export default {
         saving: '保存中...',
         loading: '加载中...',
         retry: '重试',
+        pageInfo: '第 {current} / {total} 页',
         close: '关闭',
         edit: '编辑',
         delete: '删除',
@@ -176,6 +177,8 @@ export default {
         removing: '移除中',
         trackCount: '{count} 首曲目',
         tracks: '曲目',
+        gridView: '网格视图',
+        listView: '列表视图',
         playNow: '立即播放',
         pausePlayback: '暂停播放',
     },
@@ -373,8 +376,6 @@ export default {
         artistLabel: '艺术家',
         editArtist: '编辑艺术家',
         emptyTracks: '暂无相关曲目',
-        gridView: '网格视图',
-        listView: '列表视图',
     },
     account: {
         admin: '管理员',
@@ -570,7 +571,6 @@ export default {
         librarySubtitle: '所有旋律归于此处',
         loading: '加载中...',
         retry: '重试',
-        pageInfo: '第 {current} / {total} 页',
     },
     tasksView: {
         submitFailed: '提交任务失败',

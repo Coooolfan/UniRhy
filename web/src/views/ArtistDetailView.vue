@@ -2,10 +2,12 @@
 import { onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { ChevronLeft, ChevronRight, LayoutGrid, List as ListIcon } from 'lucide-vue-next'
 import { api } from '@/ApiInstance'
 import { resolveErrorMessage } from '@/i18n/errors'
 import DashboardTopBar from '@/components/dashboard/DashboardTopBar.vue'
+import MediaGrid from '@/components/media/MediaGrid.vue'
+import ViewModeToggle from '@/components/media/ViewModeToggle.vue'
+import PaginationControls from '@/components/common/PaginationControls.vue'
 import MediaListPanel from '@/components/MediaListPanel.vue'
 import MediaListItem from '@/components/MediaListItem.vue'
 import { useModal } from '@/composables/useModal'
@@ -329,21 +331,7 @@ watch(
                     @item-keydown="onRecordingKeydown"
                 >
                     <template #actions>
-                        <div class="flex bg-[#EFEAE2] p-1 rounded-md">
-                            <button
-                                class="p-2 rounded-sm transition-all text-[#8C857B] hover:text-[#5E5950]"
-                                :title="t('artistDetail.gridView')"
-                                @click="viewMode = 'grid'"
-                            >
-                                <LayoutGrid :size="18" />
-                            </button>
-                            <button
-                                class="p-2 rounded-sm transition-all bg-white shadow-sm text-[#2C2420]"
-                                :title="t('artistDetail.listView')"
-                            >
-                                <ListIcon :size="18" />
-                            </button>
-                        </div>
+                        <ViewModeToggle v-model="viewMode" />
                     </template>
                     <template #empty>
                         {{ t('artistDetail.emptyTracks') }}
@@ -378,21 +366,7 @@ watch(
                             {{ t('media.trackCount', { count: totalRowCount }) }}
                         </div>
                     </div>
-                    <div class="flex bg-[#EFEAE2] p-1 rounded-md self-start sm:self-auto">
-                        <button
-                            class="p-2 rounded-sm transition-all bg-white shadow-sm text-[#2C2420]"
-                            :title="t('artistDetail.gridView')"
-                        >
-                            <LayoutGrid :size="18" />
-                        </button>
-                        <button
-                            class="p-2 rounded-sm transition-all text-[#8C857B] hover:text-[#5E5950]"
-                            :title="t('artistDetail.listView')"
-                            @click="viewMode = 'list'"
-                        >
-                            <ListIcon :size="18" />
-                        </button>
-                    </div>
+                    <ViewModeToggle v-model="viewMode" class="self-start sm:self-auto" />
                 </div>
 
                 <div
@@ -402,9 +376,8 @@ watch(
                     {{ t('artistDetail.emptyTracks') }}
                 </div>
 
-                <div
+                <MediaGrid
                     v-else
-                    class="grid grid-cols-2 gap-x-5 gap-y-10 sm:gap-x-8 sm:gap-y-12 md:grid-cols-3 lg:grid-cols-4"
                     :class="{ 'pointer-events-none opacity-50': isRecordingsLoading }"
                 >
                     <RecordingGridCard
@@ -419,7 +392,7 @@ watch(
                         "
                         @play="handlePlay(item)"
                     />
-                </div>
+                </MediaGrid>
             </div>
 
             <p v-if="recordingsError" class="mt-4 text-sm text-[#B75D5D]">
@@ -433,28 +406,12 @@ watch(
                 </button>
             </p>
 
-            <div
-                v-if="totalPageCount > 1"
-                class="mt-10 flex items-center justify-center gap-4 sm:mt-12 sm:gap-6"
-            >
-                <button
-                    :disabled="pageIndex === 0 || isRecordingsLoading"
-                    class="p-2 text-[#8C857B] hover:text-[#C27E46] disabled:opacity-30 disabled:hover:text-[#8C857B] transition-colors"
-                    @click="handlePageChange(pageIndex - 1)"
-                >
-                    <ChevronLeft :size="20" />
-                </button>
-                <span class="font-serif text-sm text-[#5E5950]">
-                    {{ t('albumList.pageInfo', { current: pageIndex + 1, total: totalPageCount }) }}
-                </span>
-                <button
-                    :disabled="pageIndex >= totalPageCount - 1 || isRecordingsLoading"
-                    class="p-2 text-[#8C857B] hover:text-[#C27E46] disabled:opacity-30 disabled:hover:text-[#8C857B] transition-colors"
-                    @click="handlePageChange(pageIndex + 1)"
-                >
-                    <ChevronRight :size="20" />
-                </button>
-            </div>
+            <PaginationControls
+                :page-index="pageIndex"
+                :total-page-count="totalPageCount"
+                :disabled="isRecordingsLoading"
+                @change="handlePageChange"
+            />
         </div>
     </div>
 </template>
