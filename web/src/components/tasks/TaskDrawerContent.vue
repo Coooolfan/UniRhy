@@ -352,7 +352,7 @@ const cancelTask = async (row: TaskRow) => {
                                 <button
                                     v-if="selectable"
                                     type="button"
-                                    class="inline-flex items-center gap-1 border border-[#8A7F6D] px-3 py-1.5 text-[11px] uppercase tracking-[0.18em] text-[#8A7F6D] transition-colors hover:border-[#B86134] hover:text-[#B86134]"
+                                    class="inline-flex h-7 items-center gap-1 border border-[#8A7F6D] px-2 text-[11px] uppercase tracking-[0.18em] text-[#8A7F6D] transition-colors hover:border-[#B86134] hover:text-[#B86134]"
                                     :title="t('taskDetails.viewTree')"
                                     @click.stop="emit('select', row)"
                                 >
@@ -360,7 +360,7 @@ const cancelTask = async (row: TaskRow) => {
                                 </button>
                                 <button
                                     type="button"
-                                    class="inline-flex items-center gap-1 border border-[#8A7F6D] px-3 py-1.5 text-[11px] uppercase tracking-[0.18em] text-[#8A7F6D] transition-colors hover:border-[#B86134] hover:text-[#B86134]"
+                                    class="inline-flex h-7 items-center gap-1 border border-[#8A7F6D] px-2 text-[11px] uppercase tracking-[0.18em] text-[#8A7F6D] transition-colors hover:border-[#B86134] hover:text-[#B86134]"
                                     :title="
                                         expandedIds.has(row.id)
                                             ? t('taskDetails.hideParams')
@@ -374,7 +374,7 @@ const cancelTask = async (row: TaskRow) => {
                                 <button
                                     v-if="canResetRow(row)"
                                     type="button"
-                                    class="inline-flex items-center gap-1 border border-[#C67C4E] px-3 py-1.5 text-[11px] uppercase tracking-[0.18em] text-[#C67C4E] transition-colors hover:bg-[#C67C4E] hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+                                    class="inline-flex h-7 items-center gap-1 border border-[#C67C4E] px-2 text-[11px] uppercase tracking-[0.18em] text-[#C67C4E] transition-colors hover:bg-[#C67C4E] hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
                                     :disabled="patchingId !== null"
                                     @click="resetTask(row)"
                                 >
