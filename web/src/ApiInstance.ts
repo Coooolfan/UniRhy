@@ -1,4 +1,4 @@
-import { Api, type ApiErrors, type Executor } from './__generated'
+import { Api, type ApiErrors } from './__generated'
 import { buildApiUrl } from '@/runtime/platform'
 import { runtimeFetch } from '@/runtime/http'
 import { i18n } from '@/i18n'
@@ -76,7 +76,8 @@ export function normalizeApiError(
     return { message: i18n.global.t('common.unknownError') }
 }
 
-export const executeApiRequest: Executor = async ({ uri, method, headers, body }) => {
+// 导出全局变量`api`
+export const api = new Api(async ({ uri, method, headers, body }) => {
     const tenant = Reflect.get(window, '__tenant')
     const isFormData = body instanceof FormData
     const fetchHeaders: HeadersInit = {
@@ -120,7 +121,4 @@ export const executeApiRequest: Executor = async ({ uri, method, headers, body }
         return null
     }
     return JSON.parse(text)
-}
-
-// 导出全局变量`api`
-export const api = new Api(executeApiRequest)
+})

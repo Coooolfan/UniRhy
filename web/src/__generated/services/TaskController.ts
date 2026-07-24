@@ -1,13 +1,15 @@
 import type {Executor} from '../';
 import type {AsyncTaskDto} from '../model/dto/';
-import type {TaskAction, TaskStatus} from '../model/enums/';
+import type {TaskStatus} from '../model/enums/';
 import type {
     Page, 
     TaskCreateRequest, 
     TaskCreatedResponse, 
     TaskDetailResponse, 
     TaskStatusBatchPatchRequest, 
-    TaskStatusPatchRequest
+    TaskStatusPatchRequest, 
+    TaskStatusTransitionRequest, 
+    TaskStatusTransitionResponse
 } from '../model/static/';
 
 /**
@@ -18,7 +20,7 @@ export class TaskController {
     constructor(private executor: Executor) {}
     
     /**
-     * 创建一个 PLAN 根任务。
+     * 创建一个根任务。
      */
     readonly createTask: (options: TaskControllerOptions['createTask']) => Promise<
         TaskCreatedResponse
@@ -78,15 +80,6 @@ export class TaskController {
             _uri += encodeURIComponent(_value);
             _separator = '&';
         }
-        _value = options.actions;
-        if (_value !== undefined && _value !== null) {
-            for (const _item of _value) {
-                _uri += _separator
-                _uri += 'actions='
-                _uri += encodeURIComponent(_item);
-                _separator = '&';
-            }
-        }
         _value = options.statuses;
         if (_value !== undefined && _value !== null) {
             for (const _item of _value) {
@@ -127,6 +120,13 @@ export class TaskController {
         let _uri = '/api/tasks';
         return (await this.executor({uri: _uri, method: 'PATCH', body: options.body})) as Promise<number>;
     }
+    
+    readonly transitionTaskStatuses: (options: TaskControllerOptions['transitionTaskStatuses']) => Promise<
+        TaskStatusTransitionResponse
+    > = async(options) => {
+        let _uri = '/api/tasks/status-transitions';
+        return (await this.executor({uri: _uri, method: 'POST', body: options.body})) as Promise<TaskStatusTransitionResponse>;
+    }
 }
 
 export type TaskControllerOptions = {
@@ -138,7 +138,6 @@ export type TaskControllerOptions = {
         readonly rootsOnly?: boolean | undefined, 
         readonly namespace?: string | undefined, 
         readonly taskType?: string | undefined, 
-        readonly actions?: ReadonlyArray<TaskAction> | undefined, 
         readonly statuses?: ReadonlyArray<TaskStatus> | undefined, 
         readonly pageIndex?: number | undefined, 
         readonly pageSize?: number | undefined
@@ -148,6 +147,9 @@ export type TaskControllerOptions = {
     }, 
     'getTaskTree': {
         readonly id: number
+    }, 
+    'transitionTaskStatuses': {
+        readonly body: TaskStatusTransitionRequest
     }, 
     'patchTask': {
         readonly id: number, 

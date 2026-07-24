@@ -4,7 +4,5 @@ export type {PlaybackStrategy} from './PlaybackStrategy';
 export {PlaybackStrategy_CONSTANTS} from './PlaybackStrategy';
 export type {StopStrategy} from './StopStrategy';
 export {StopStrategy_CONSTANTS} from './StopStrategy';
-export type {TaskAction} from './TaskAction';
-export {TaskAction_CONSTANTS} from './TaskAction';
 export type {TaskStatus} from './TaskStatus';
 export {TaskStatus_CONSTANTS} from './TaskStatus';
