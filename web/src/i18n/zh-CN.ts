@@ -67,6 +67,7 @@ export default {
             workUpdate: '更新作品失败',
             albumUpdate: '更新专辑失败',
             artistLoad: '艺术家加载失败',
+            artistRecordingLoad: '艺术家曲目加载失败',
             artistUpdate: '更新艺术家失败',
             taskDetailsLoad: '加载任务列表失败',
             taskStatusPatch: '更新任务状态失败',
@@ -367,6 +368,13 @@ export default {
         editTitle: '编辑艺术家',
         emptyTitle: '艺术家库空空如也',
         emptyDescription: '尚未录入任何艺术家。',
+    },
+    artistDetail: {
+        artistLabel: '艺术家',
+        editArtist: '编辑艺术家',
+        emptyTracks: '暂无相关曲目',
+        gridView: '网格视图',
+        listView: '列表视图',
     },
     account: {
         admin: '管理员',

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
+import { Pencil } from 'lucide-vue-next'
 
 const { t } = useI18n()
 
@@ -11,17 +12,20 @@ const props = withDefaults(
         selectable?: boolean
         selected?: boolean
         openable?: boolean
+        editable?: boolean
     }>(),
     {
         selectable: false,
         selected: false,
         openable: true,
+        editable: false,
     },
 )
 
 const emit = defineEmits<{
     (e: 'open'): void
     (e: 'toggle-select'): void
+    (e: 'edit'): void
 }>()
 </script>
 
@@ -110,6 +114,16 @@ const emit = defineEmits<{
                 class="absolute left-0 top-0 z-30 h-1/2 w-1/2 cursor-pointer rounded-tl-full"
                 @click.stop="emit('toggle-select')"
             ></button>
+
+            <button
+                v-if="editable"
+                type="button"
+                :title="t('artistLibrary.editTitle')"
+                class="absolute bottom-1 right-1 z-30 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-white/90 text-[#8C857B] opacity-100 shadow-md transition-all hover:text-[#C17D46] sm:opacity-0 sm:group-hover:opacity-100"
+                @click.stop="emit('edit')"
+            >
+                <Pencil :size="14" />
+            </button>
         </div>
 
         <h3

@@ -136,8 +136,8 @@ export const useTaskManagement = () => {
         isSubmitting.value = true
         submitError.value = ''
         try {
-            await api.taskSubmissionController.createSubmission({
-                body: { namespace, taskType, params },
+            await api.taskController.createTask({
+                body: { namespace, taskType, payload: params },
             })
             refreshSubmittedTaskData()
             return true

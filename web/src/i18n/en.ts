@@ -69,6 +69,7 @@ export default {
             workUpdate: 'Failed to update work',
             albumUpdate: 'Failed to update album',
             artistLoad: 'Failed to load artists',
+            artistRecordingLoad: 'Failed to load artist tracks',
             artistUpdate: 'Failed to update artist',
             taskDetailsLoad: 'Failed to load tasks',
             taskStatusPatch: 'Failed to update task status',
@@ -377,6 +378,13 @@ export default {
         editTitle: 'Edit Artist',
         emptyTitle: 'The artist library is empty',
         emptyDescription: 'No artists have been added yet.',
+    },
+    artistDetail: {
+        artistLabel: 'Artist',
+        editArtist: 'Edit Artist',
+        emptyTracks: 'No tracks for this artist yet',
+        gridView: 'Grid view',
+        listView: 'List view',
     },
     account: {
         admin: 'Admin',

@@ -18,8 +18,8 @@ vi.mock('@/ApiInstance', async (importOriginal) => {
             taskDefinitionController: {
                 listTaskDefinitions: vi.fn(),
             },
-            taskSubmissionController: {
-                createSubmission: vi.fn(),
+            taskController: {
+                createTask: vi.fn(),
             },
             fileSystemStorageController: {
                 list: vi.fn(),
@@ -39,7 +39,7 @@ import TasksView from '@/views/TasksView.vue'
 
 const getTaskStatisticsMock = vi.mocked(api.taskStatisticsController.getTaskStatistics)
 const listTaskDefinitionsMock = vi.mocked(api.taskDefinitionController.listTaskDefinitions)
-const createSubmissionMock = vi.mocked(api.taskSubmissionController.createSubmission)
+const createSubmissionMock = vi.mocked(api.taskController.createTask)
 const listFileSystemStorageMock = vi.mocked(api.fileSystemStorageController.list)
 const listOssStorageMock = vi.mocked(api.ossStorageController.list)
 const getSystemConfigMock = vi.mocked(api.systemConfigController.get)
@@ -61,7 +61,6 @@ const statsRow = (
 ): TaskStatisticsResponse => ({
     namespace,
     taskType,
-    submissions: counts(),
     tasks: counts(tasks),
 })
 
@@ -208,7 +207,7 @@ describe('TasksView', () => {
     it('shows submit feedback on the action button for two seconds after a successful submission', async () => {
         vi.useFakeTimers()
         getTaskStatisticsMock.mockResolvedValue(emptyBuiltInStats())
-        createSubmissionMock.mockResolvedValue({ submissionId: 1 })
+        createSubmissionMock.mockResolvedValue({ taskId: 1 })
         listFileSystemStorageMock.mockResolvedValue([
             {
                 id: 1,
@@ -250,7 +249,7 @@ describe('TasksView', () => {
             body: {
                 namespace: BUILT_IN_NAMESPACE,
                 taskType: 'METADATA_PARSE',
-                params: { providerType: 'FILE_SYSTEM', providerId: 1 },
+                payload: { providerType: 'FILE_SYSTEM', providerId: 1 },
             },
         })
         expect(actionButton.text()).toContain('任务已提交')

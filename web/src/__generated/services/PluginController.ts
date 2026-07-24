@@ -5,7 +5,7 @@ import type {PluginConfigurationResponse, PluginConfigurationUpdateRequest, Plug
  * 插件管理接口
  * 
  * 提供插件的上传、启停、并发调整、删除与导出能力；
- * 任务提交经由统一的 `/api/task-submissions`
+ * 任务提交经由统一的 `/api/tasks`
  */
 export class PluginController {
     
@@ -14,7 +14,7 @@ export class PluginController {
     /**
      * 删除插件
      * 
-     * 只允许删除已禁用的插件；存在活动 submission / task 时返回 409
+     * 只允许删除已禁用的插件；存在活动任务时返回 409
      * 需要管理员角色才能访问
      * 
      * @parameter {PluginControllerOptions['delete']} options

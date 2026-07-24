@@ -17,6 +17,9 @@ export type AllErrors = {
         family: 'ALBUM', 
         code: 'RECORDING_IDS_MISMATCH'
     } | {
+        family: 'COMMON', 
+        code: 'NOT_FOUND'
+    } | {
         family: 'ARTIST', 
         code: 'TARGET_NOT_FOUND'
     } | {
@@ -117,33 +120,11 @@ export type AllErrors = {
         code: 'SYSTEM_STORAGE_PROVIDER_CANNOT_BE_READONLY'
     } | {
         family: 'TASK', 
-        code: 'TASK_NOT_FOUND'
-    } | {
-        family: 'TASK', 
-        code: 'STATUS_CONFLICT'
-    } | {
-        family: 'TASK', 
-        code: 'PLUGIN_UNAVAILABLE'
-    } | {
-        family: 'TASK', 
         code: 'DEFINITION_NOT_FOUND'
     } | {
         family: 'TASK', 
         code: 'INVALID_TASK_KEY', 
         reason: string
-    } | {
-        family: 'TASK', 
-        code: 'INVALID_PARAMS', 
-        reason: string
-    } | {
-        family: 'TASK', 
-        code: 'SUBMISSION_NOT_FOUND'
-    } | {
-        family: 'TASK', 
-        code: 'DELETE_CONFLICT'
-    } | {
-        family: 'COMMON', 
-        code: 'NOT_FOUND'
     } | {
         family: 'WORK', 
         code: 'INVALID_RANDOM_LENGTH'
@@ -212,6 +193,16 @@ export type ApiErrors = {
             })
     }, 
     'artistController': {
+        'getArtistById': AllErrors & ({
+                family: 'COMMON', 
+                code: 'NOT_FOUND', 
+                readonly [key:string]: any
+            }), 
+        'listArtistRecordings': AllErrors & ({
+                family: 'COMMON', 
+                code: 'NOT_FOUND', 
+                readonly [key:string]: any
+            }), 
         'createArtist': AllErrors & ({
                 family: 'COMMON', 
                 code: 'FORBIDDEN', 
@@ -553,37 +544,6 @@ export type ApiErrors = {
             })
     }, 
     'taskController': {
-        'getTask': AllErrors & ({
-                family: 'TASK', 
-                code: 'TASK_NOT_FOUND', 
-                readonly [key:string]: any
-            }), 
-        'patchTask': AllErrors & ({
-                family: 'COMMON', 
-                code: 'FORBIDDEN', 
-                readonly [key:string]: any
-            } | {
-                family: 'TASK', 
-                code: 'TASK_NOT_FOUND', 
-                readonly [key:string]: any
-            } | {
-                family: 'TASK', 
-                code: 'STATUS_CONFLICT', 
-                readonly [key:string]: any
-            } | {
-                family: 'TASK', 
-                code: 'PLUGIN_UNAVAILABLE', 
-                readonly [key:string]: any
-            }), 
-        'patchTasks': AllErrors & ({
-                family: 'COMMON', 
-                code: 'FORBIDDEN', 
-                readonly [key:string]: any
-            } | {
-                family: 'TASK', 
-                code: 'STATUS_CONFLICT', 
-                readonly [key:string]: any
-            })
     }, 
     'taskDefinitionController': {
         'getTaskDefinition': AllErrors & ({
@@ -600,78 +560,6 @@ export type ApiErrors = {
         'getTaskStatistics': AllErrors & ({
                 family: 'TASK', 
                 code: 'INVALID_TASK_KEY', 
-                readonly [key:string]: any
-            })
-    }, 
-    'taskSubmissionController': {
-        'createSubmission': AllErrors & ({
-                family: 'COMMON', 
-                code: 'FORBIDDEN', 
-                readonly [key:string]: any
-            } | {
-                family: 'TASK', 
-                code: 'INVALID_TASK_KEY', 
-                readonly [key:string]: any
-            } | {
-                family: 'TASK', 
-                code: 'INVALID_PARAMS', 
-                readonly [key:string]: any
-            } | {
-                family: 'TASK', 
-                code: 'DEFINITION_NOT_FOUND', 
-                readonly [key:string]: any
-            } | {
-                family: 'TASK', 
-                code: 'PLUGIN_UNAVAILABLE', 
-                readonly [key:string]: any
-            }), 
-        'getSubmission': AllErrors & ({
-                family: 'TASK', 
-                code: 'SUBMISSION_NOT_FOUND', 
-                readonly [key:string]: any
-            }), 
-        'listSubmissionTasks': AllErrors & ({
-                family: 'TASK', 
-                code: 'SUBMISSION_NOT_FOUND', 
-                readonly [key:string]: any
-            }), 
-        'patchSubmission': AllErrors & ({
-                family: 'COMMON', 
-                code: 'FORBIDDEN', 
-                readonly [key:string]: any
-            } | {
-                family: 'TASK', 
-                code: 'SUBMISSION_NOT_FOUND', 
-                readonly [key:string]: any
-            } | {
-                family: 'TASK', 
-                code: 'STATUS_CONFLICT', 
-                readonly [key:string]: any
-            } | {
-                family: 'TASK', 
-                code: 'PLUGIN_UNAVAILABLE', 
-                readonly [key:string]: any
-            }), 
-        'patchSubmissions': AllErrors & ({
-                family: 'COMMON', 
-                code: 'FORBIDDEN', 
-                readonly [key:string]: any
-            } | {
-                family: 'TASK', 
-                code: 'STATUS_CONFLICT', 
-                readonly [key:string]: any
-            }), 
-        'deleteSubmission': AllErrors & ({
-                family: 'COMMON', 
-                code: 'FORBIDDEN', 
-                readonly [key:string]: any
-            } | {
-                family: 'TASK', 
-                code: 'SUBMISSION_NOT_FOUND', 
-                readonly [key:string]: any
-            } | {
-                family: 'TASK', 
-                code: 'DELETE_CONFLICT', 
                 readonly [key:string]: any
             })
     }, 
