@@ -2,7 +2,6 @@
 import { computed, ref, watch } from 'vue'
 import { api } from '@/ApiInstance'
 import { resolveErrorMessage } from '@/i18n/errors'
-import { transitionTaskStatuses } from '@/services/taskStatusTransitions'
 import type { AsyncTaskDto } from '@/__generated/model/dto'
 import type { TaskStatus } from '@/__generated/model/enums/TaskStatus'
 import { useI18n } from 'vue-i18n'
@@ -344,11 +343,13 @@ const executeBatchCommand = async () => {
     batchFeedback.value = ''
     error.value = ''
     try {
-        const result = await transitionTaskStatuses({
-            namespace: option.namespace,
-            taskType: option.taskType,
-            sourceStatuses: [...command.sourceStatuses],
-            targetStatus: command.targetStatus,
+        const result = await api.taskController.transitionTaskStatuses({
+            body: {
+                namespace: option.namespace,
+                taskType: option.taskType,
+                sourceStatuses: [...command.sourceStatuses],
+                targetStatus: command.targetStatus,
+            },
         })
         if (result.transitioned === 0) {
             batchFeedback.value = t('taskDetails.bulkNoChanges')

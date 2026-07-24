@@ -39,6 +39,8 @@ export type {TaskStatisticsResponse} from './TaskStatisticsResponse';
 export type {TaskStatusBatchPatchRequest} from './TaskStatusBatchPatchRequest';
 export type {TaskStatusCounts} from './TaskStatusCounts';
 export type {TaskStatusPatchRequest} from './TaskStatusPatchRequest';
+export type {TaskStatusTransitionRequest} from './TaskStatusTransitionRequest';
+export type {TaskStatusTransitionResponse} from './TaskStatusTransitionResponse';
 export type {TokenLoginRequest} from './TokenLoginRequest';
 export type {TokenLoginResponse} from './TokenLoginResponse';
 export type {WorkMergeReq} from './WorkMergeReq';
