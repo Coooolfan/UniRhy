@@ -115,7 +115,6 @@ const buildFlow = (rootNode: TreeNode) => {
             position: { x: depth * (NODE_WIDTH + GAP_X), y: centerY },
             data: {
                 taskId: node.id,
-                action: node.action,
                 status: node.status,
                 startedAt: node.startedAt,
                 completedAt: node.completedAt,
@@ -213,16 +212,6 @@ defineExpose({ refresh: fetchTree })
                     <span class="text-xs text-[#8A8177]">{{ t('taskTree.rootTask') }}</span>
                     <span class="font-mono text-sm font-semibold text-[#2B221B]">
                         #{{ root.id }}
-                    </span>
-                    <span
-                        class="inline-flex items-center border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em]"
-                        :class="
-                            root.action === 'PLAN'
-                                ? 'border-[#8A7F6D]/50 text-[#8A7F6D]'
-                                : 'border-[#B29A84]/50 text-[#B29A84]'
-                        "
-                    >
-                        {{ root.action === 'PLAN' ? t('taskTree.plan') : t('taskTree.run') }}
                     </span>
                 </div>
                 <span class="hidden text-[#E0D5C4] sm:inline">|</span>

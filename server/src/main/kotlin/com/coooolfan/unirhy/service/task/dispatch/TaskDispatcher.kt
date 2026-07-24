@@ -2,7 +2,6 @@ package com.coooolfan.unirhy.service.task.dispatch
 
 import com.coooolfan.unirhy.service.task.PluginTaskService
 import com.coooolfan.unirhy.service.task.common.AsyncTaskStore
-import com.coooolfan.unirhy.service.task.common.TaskAction
 import com.coooolfan.unirhy.service.task.spi.TaskPlannerRegistry
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Qualifier
@@ -10,7 +9,7 @@ import org.springframework.stereotype.Component
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.RejectedExecutionException
 
-/** 统一发现并调度 PLAN / RUN 任务。 */
+/** 统一发现并调度根任务与子任务。 */
 @Component
 class TaskDispatcher(
     private val pluginTaskService: PluginTaskService,
@@ -29,19 +28,16 @@ class TaskDispatcher(
 
     private fun dispatchTasks() {
         val pendingCounts = taskStore.discoverPendingCounts()
-        for ((key, actionCounts) in pendingCounts) {
-            val executableActions = buildList {
-                if (actionCounts.containsKey(TaskAction.PLAN) && plannerRegistry.find(key) != null) add(TaskAction.PLAN)
-                if (actionCounts.containsKey(TaskAction.RUN)) add(TaskAction.RUN)
-            }
-            val executableCount = executableActions.sumOf { actionCounts[it] ?: 0L }
+        for ((key, counts) in pendingCounts) {
+            val includeRoots = plannerRegistry.find(key) != null
+            val executableCount = counts.childCount + if (includeRoots) counts.rootCount else 0L
             val slots = minOf(executableCount, capacityManager.availableHandlerSlots(key).toLong())
             for (i in 0 until slots) {
                 if (!capacityManager.tryAcquireHandlerSlot(key)) break
                 val submitted = runCatching {
                     workerExecutor.execute {
                         try {
-                            executionEngine.executeOne(key, executableActions)
+                            executionEngine.executeOne(key, includeRoots)
                         } catch (ex: Throwable) {
                             logger.error("Task worker crashed for {}", key, ex)
                         } finally {

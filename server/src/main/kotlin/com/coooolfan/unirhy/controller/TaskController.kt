@@ -9,7 +9,6 @@ import com.coooolfan.unirhy.model.AsyncTask
 import com.coooolfan.unirhy.model.by
 import com.coooolfan.unirhy.service.task.AsyncTaskService
 import com.coooolfan.unirhy.service.task.TaskStatusCounts
-import com.coooolfan.unirhy.service.task.common.TaskAction
 import com.coooolfan.unirhy.service.task.common.TaskStatus
 import jakarta.servlet.http.HttpServletResponse
 import org.babyfish.jimmer.Page
@@ -43,7 +42,7 @@ data class TaskDetailResponse(
 class TaskController(
     private val taskService: AsyncTaskService,
 ) {
-    /** 创建一个 PLAN 根任务。 */
+    /** 创建一个根任务。 */
     @PostMapping
     @SaCheckRole(ROLE_ADMIN)
     @ResponseStatus(HttpStatus.ACCEPTED)
@@ -62,7 +61,6 @@ class TaskController(
         @RequestParam(required = false, defaultValue = "false") rootsOnly: Boolean,
         @RequestParam(required = false) namespace: String?,
         @RequestParam(required = false) taskType: String?,
-        @RequestParam(required = false) actions: List<TaskAction>?,
         @RequestParam(required = false) statuses: List<TaskStatus>?,
         @RequestParam(required = false) pageIndex: Int?,
         @RequestParam(required = false) pageSize: Int?,
@@ -72,7 +70,6 @@ class TaskController(
             rootsOnly = rootsOnly,
             namespace = namespace,
             taskType = taskType,
-            actions = actions ?: emptyList(),
             statuses = statuses ?: emptyList(),
             pageIndex = pageIndex ?: 0,
             pageSize = pageSize ?: 20,

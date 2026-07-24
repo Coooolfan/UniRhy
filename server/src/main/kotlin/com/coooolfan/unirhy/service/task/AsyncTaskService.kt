@@ -5,7 +5,6 @@ import com.coooolfan.unirhy.model.AsyncTask
 import com.coooolfan.unirhy.model.by
 import com.coooolfan.unirhy.service.plugin.PluginStore
 import com.coooolfan.unirhy.service.task.common.AsyncTaskStore
-import com.coooolfan.unirhy.service.task.common.TaskAction
 import com.coooolfan.unirhy.service.task.common.TaskFormSchema
 import com.coooolfan.unirhy.service.task.common.TaskKey
 import com.coooolfan.unirhy.service.task.common.TaskStatus
@@ -27,7 +26,7 @@ class AsyncTaskService(
     private val transactionTemplate: TransactionTemplate,
 ) {
 
-    /** 校验公开任务表单并创建一个 PLAN 根任务。 */
+    /** 校验公开任务表单并创建一个根任务。 */
     fun create(namespace: String, taskType: String, payload: JsonNode): Long {
         val key = TaskKey.ofOrNull(namespace, taskType)
             ?: throw TaskException.invalidTaskKey(reason = "invalid task key: $namespace:$taskType")
@@ -59,13 +58,12 @@ class AsyncTaskService(
         rootsOnly: Boolean,
         namespace: String?,
         taskType: String?,
-        actions: List<TaskAction>,
         statuses: List<TaskStatus>,
         pageIndex: Int,
         pageSize: Int,
         fetcher: Fetcher<AsyncTask>,
     ): Page<AsyncTask> = taskStore.list(
-        parentId, rootsOnly, namespace, taskType, actions, statuses, pageIndex, pageSize, fetcher,
+        parentId, rootsOnly, namespace, taskType, statuses, pageIndex, pageSize, fetcher,
     )
 
     fun get(id: Long, fetcher: Fetcher<AsyncTask>): AsyncTask =

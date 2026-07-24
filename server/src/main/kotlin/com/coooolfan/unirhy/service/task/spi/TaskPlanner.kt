@@ -4,7 +4,7 @@ import com.coooolfan.unirhy.service.task.common.TaskKey
 import tools.jackson.databind.JsonNode
 
 /**
- * 规划 SPI：根据 PLAN 根任务参数生成 RUN 子任务 payload 序列。
+ * 规划 SPI：根据根任务参数生成子任务 payload 序列。
  *
  * 在 Planner worker 的事务内调用；使用当前数据库连接的写入参与该事务。
  * 该 SPI 属于服务端内部，不属于 WASM ABI，也不开放 JVM 插件装载。

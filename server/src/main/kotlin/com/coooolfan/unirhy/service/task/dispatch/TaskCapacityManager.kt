@@ -9,7 +9,7 @@ import java.util.concurrent.atomic.AtomicInteger
  * 每节点的 TaskKey 本地并发容量。
  *
  * - Handler 容量：Dispatcher 在提交 Worker 前预留，Worker 在 `finally` 中释放；
- *   PLAN 与 RUN 共用 TaskKey 容量，不限制集群总并发。
+ *   根任务与子任务共用 TaskKey 容量，不限制集群总并发。
  */
 @Component
 class TaskCapacityManager {

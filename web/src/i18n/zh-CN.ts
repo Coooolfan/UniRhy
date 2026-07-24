@@ -643,8 +643,6 @@ export default {
         emptyChildren: '无子任务',
         childCount: '{count} 个子任务',
         nodeCount: '共 {count} 个节点',
-        plan: '规划',
-        run: '执行',
         refreshTree: '刷新任务树',
         resetView: '重置视图',
         loadFailed: '加载任务树失败',

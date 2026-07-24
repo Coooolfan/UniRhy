@@ -2,13 +2,11 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Handle, Position } from '@vue-flow/core'
-import type { TaskAction } from '@/__generated/model/enums/TaskAction'
 import type { TaskStatus } from '@/__generated/model/enums/TaskStatus'
 
 /** Vue Flow 自定义任务节点的 data 载荷 */
 export type TaskFlowNodeData = {
     taskId: number
-    action: TaskAction
     status: TaskStatus
     startedAt?: string
     completedAt?: string
@@ -70,18 +68,8 @@ const durationText = computed(() => {
         <Handle type="target" :position="Position.Left" class="!opacity-0" />
         <Handle type="source" :position="Position.Right" class="!opacity-0" />
 
-        <div class="flex items-center justify-between gap-2">
+        <div class="flex items-center">
             <span class="font-mono text-xs font-semibold text-[#2B221B]">#{{ data.taskId }}</span>
-            <span
-                class="inline-flex shrink-0 items-center border px-1 py-0.5 text-[9px] font-semibold uppercase tracking-[0.16em]"
-                :class="
-                    data.action === 'PLAN'
-                        ? 'border-[#8A7F6D]/50 text-[#8A7F6D]'
-                        : 'border-[#B29A84]/50 text-[#B29A84]'
-                "
-            >
-                {{ data.action === 'PLAN' ? t('taskTree.plan') : t('taskTree.run') }}
-            </span>
         </div>
         <div class="mt-1.5 flex items-center gap-1.5">
             <span
