@@ -67,7 +67,7 @@ class TaskContentReadE2eTest {
 
     @Test
     @Order(3)
-    fun `scan submission should report metadata parse stats and accept incremental duplicate submission`() {
+    fun `scan task should report metadata parse stats and accept incremental duplicate creation`() {
         val state = bootstrapAdminSession(baseUrl())
         preparedData = executeScanAndPrepareData(state)
     }
@@ -245,8 +245,8 @@ class TaskContentReadE2eTest {
         val baselineFailed = taskCount(baselineStats, "METADATA_PARSE", "failed")
 
         val submitResponse = state.api.post(
-            path = "/api/task-submissions",
-            json = submissionBody("METADATA_PARSE", scanRequestBody),
+            path = "/api/tasks",
+            json = taskBody("METADATA_PARSE", scanRequestBody),
         )
         E2eAssert.status(submitResponse, 202, "[scan] submit scan task should return accepted")
 
@@ -361,8 +361,8 @@ class TaskContentReadE2eTest {
         baselineFailed: Long,
     ) {
         val duplicateSubmitResponse = state.api.post(
-            path = "/api/task-submissions",
-            json = submissionBody("METADATA_PARSE", scanRequestBody),
+            path = "/api/tasks",
+            json = taskBody("METADATA_PARSE", scanRequestBody),
         )
         E2eAssert.status(
             duplicateSubmitResponse,
@@ -412,7 +412,7 @@ class TaskContentReadE2eTest {
         val completed = taskCount(finalStats, "METADATA_PARSE", "completed")
         val failed = taskCount(finalStats, "METADATA_PARSE", "failed")
         val terminalDelta = (completed - baselineCompleted) + (failed - baselineFailed)
-        // 重复 submission 在首批任务完成后规划时会补投相同 payload（活动去重只覆盖 PENDING/RUNNING），
+        // 重复根任务在首批任务完成后规划时会补投相同 payload（活动去重只覆盖 PENDING/RUNNING），
         // 补投的任务按“已扫描”跳过，因此终态总量 >= 文件数且不产生失败。
         assertTrue(
             terminalDelta >= expectedTaskCount.toLong(),
@@ -435,8 +435,8 @@ class TaskContentReadE2eTest {
         val baselineFailed = taskCount(baselineStats, "TRANSCODE", "failed")
 
         val submitResponse = state.api.post(
-            path = "/api/task-submissions",
-            json = submissionBody("TRANSCODE", transcodeRequestBody(state)),
+            path = "/api/tasks",
+            json = taskBody("TRANSCODE", transcodeRequestBody(state)),
         )
         E2eAssert.status(submitResponse, 202, "[transcode] submit transcode task should return accepted")
 
@@ -513,11 +513,11 @@ class TaskContentReadE2eTest {
         return taskStatRows(response.body(), step)
     }
 
-    private fun submissionBody(taskType: String, params: Map<String, Any>): Map<String, Any> {
+    private fun taskBody(taskType: String, payload: Map<String, Any>): Map<String, Any> {
         return linkedMapOf(
             "namespace" to "app.unirhy.built-in",
             "taskType" to taskType,
-            "params" to params,
+            "payload" to payload,
         )
     }
 

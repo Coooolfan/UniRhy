@@ -1312,11 +1312,11 @@ class AccountPlaylistContentE2eTest {
         val baselineFailed = taskCount(baselineStats, "METADATA_PARSE", "failed")
 
         val submitResponse = state.api.post(
-            path = "/api/task-submissions",
+            path = "/api/tasks",
             json = mapOf(
                 "namespace" to "app.unirhy.built-in",
                 "taskType" to "METADATA_PARSE",
-                "params" to requestBody,
+                "payload" to requestBody,
             ),
         )
         E2eAssert.status(submitResponse, 202, "[prepare] submit scan task should return accepted")
@@ -1488,11 +1488,11 @@ class AccountPlaylistContentE2eTest {
         val baselineFailed = taskCount(baselineStats, "METADATA_PARSE", "failed")
 
         val submitResponse = state.api.post(
-            path = "/api/task-submissions",
+            path = "/api/tasks",
             json = mapOf(
                 "namespace" to "app.unirhy.built-in",
                 "taskType" to "METADATA_PARSE",
-                "params" to scanRequestBody(state),
+                "payload" to scanRequestBody(state),
             ),
         )
         E2eAssert.status(submitResponse, 202, "[scan-helper] submit scan task should return accepted")

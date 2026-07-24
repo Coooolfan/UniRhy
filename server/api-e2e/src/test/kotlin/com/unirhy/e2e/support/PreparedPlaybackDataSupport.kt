@@ -70,11 +70,11 @@ private fun executeScanAndPreparePlaybackData(
     )
 
     val submitResponse = state.api.post(
-        path = "/api/task-submissions",
+        path = "/api/tasks",
         json = mapOf(
             "namespace" to "app.unirhy.built-in",
             "taskType" to "METADATA_PARSE",
-            "params" to mapOf(
+            "payload" to mapOf(
                 "providerType" to "FILE_SYSTEM",
                 "providerId" to resolveSystemFsProviderId(state),
             ),

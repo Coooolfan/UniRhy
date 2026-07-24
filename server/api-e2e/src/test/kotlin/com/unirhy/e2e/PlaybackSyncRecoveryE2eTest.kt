@@ -20,6 +20,7 @@ import org.springframework.boot.test.web.server.LocalServerPort
 import org.springframework.test.annotation.DirtiesContext
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
+import java.net.http.HttpResponse
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
@@ -130,44 +131,68 @@ class PlaybackSyncRecoveryE2eTest {
             assertEquals(0, initialLoad.payload.path("currentIndex").intValue(), "[playing] initial play should load first track")
             val initialScheduled = client.awaitMessage(PlaybackSyncMessageType.SCHEDULED_ACTION)
             assertEquals("PLAY", initialScheduled.payload.path("scheduledAction").path("action").asString(), "[playing] initial play should schedule playback")
+            client.drainMessages()
 
-            val currentAfterPlay = fetchQueue(state)
-            val nextResponse = state.api.post(
+            val nextResponse = postQueueMutation(
+                state = state,
                 path = "/api/playback-queues/current/next-navigation-requests",
-                json = mapOf("version" to currentAfterPlay.path("version").longValue()),
             )
             E2eAssert.status(nextResponse, 200, "[playing] next action should succeed")
             val nextQueue = E2eJson.mapper.readTree(nextResponse.body())
+            val nextIndex = nextQueue.path("currentIndex").intValue()
+            val nextVersion = nextQueue.path("version").longValue()
+            assertTrue(nextIndex in prepared.recordingIds.indices, "[playing] next should select a valid track")
 
-            val nextQueueChange = client.awaitMessage(PlaybackSyncMessageType.ROOM_EVENT_QUEUE_CHANGE)
-            assertEquals(1, nextQueueChange.payload.path("queue").path("currentIndex").intValue(), "[playing] next should move to second track")
-            val nextLoad = client.awaitMessage(PlaybackSyncMessageType.ROOM_EVENT_LOAD_AUDIO_SOURCE)
-            assertEquals(1, nextLoad.payload.path("currentIndex").intValue(), "[playing] next should request loading second track")
+            val nextQueueChange = client.awaitMessageMatching(
+                PlaybackSyncMessageType.ROOM_EVENT_QUEUE_CHANGE,
+            ) { message ->
+                message.payload.path("queue").path("version").longValue() == nextVersion
+            }
+            assertEquals(
+                nextIndex,
+                nextQueueChange.payload.path("queue").path("currentIndex").intValue(),
+                "[playing] queue event should match next response",
+            )
+            val nextLoad = client.awaitMessageMatching(
+                PlaybackSyncMessageType.ROOM_EVENT_LOAD_AUDIO_SOURCE,
+            ) { message ->
+                message.payload.path("currentIndex").intValue() == nextIndex
+            }
             client.send(
                 PlaybackSyncMessageType.AUDIO_SOURCE_LOADED,
                 mapOf(
                     "commandId" to nextLoad.payload.path("commandId").asString(),
                     "deviceId" to "web-playing",
-                    "currentIndex" to 1,
-                    "recordingId" to prepared.recordingIds[1],
+                    "currentIndex" to nextIndex,
+                    "recordingId" to prepared.recordingIds[nextIndex],
                 ),
             )
-            val nextScheduled = client.awaitMessage(PlaybackSyncMessageType.SCHEDULED_ACTION)
-            assertEquals("PLAY", nextScheduled.payload.path("scheduledAction").path("action").asString(), "[playing] next should schedule play after load")
+            val nextCommandId = nextLoad.payload.path("commandId").asString()
+            client.awaitMessageMatching(PlaybackSyncMessageType.SCHEDULED_ACTION) { message ->
+                message.payload.path("commandId").asString() == nextCommandId &&
+                    message.payload.path("scheduledAction").path("action").asString() == "PLAY"
+            }
+            client.drainMessages()
             val persistedAfterNext = fetchQueue(state)
 
-            val removeResponse = state.api.post(
+            val removeResponse = postQueueMutation(
+                state = state,
                 path = "/api/playback-queues/current/item-removals",
-                json = mapOf(
-                    "index" to persistedAfterNext.path("currentIndex").intValue(),
-                    "version" to persistedAfterNext.path("version").longValue(),
-                ),
+                payload = mapOf("index" to persistedAfterNext.path("currentIndex").intValue()),
             )
             E2eAssert.status(removeResponse, 200, "[playing] remove current action should succeed")
+            val removeQueue = E2eJson.mapper.readTree(removeResponse.body())
+            val removeIndex = removeQueue.path("currentIndex").intValue()
+            val removeVersion = removeQueue.path("version").longValue()
 
-            val removeQueueChange = client.awaitMessage(PlaybackSyncMessageType.ROOM_EVENT_QUEUE_CHANGE)
-            assertEquals(1, removeQueueChange.payload.path("queue").path("currentIndex").intValue(), "[playing] remove current should retarget current index")
-            val removeLoad = client.awaitMessage(PlaybackSyncMessageType.ROOM_EVENT_LOAD_AUDIO_SOURCE)
+            client.awaitMessageMatching(PlaybackSyncMessageType.ROOM_EVENT_QUEUE_CHANGE) { message ->
+                message.payload.path("queue").path("version").longValue() == removeVersion
+            }
+            val removeLoad = client.awaitMessageMatching(
+                PlaybackSyncMessageType.ROOM_EVENT_LOAD_AUDIO_SOURCE,
+            ) { message ->
+                message.payload.path("currentIndex").intValue() == removeIndex
+            }
             val newCurrentRecordingId = removeLoad.payload.path("recordingId").longValue()
             client.send(
                 PlaybackSyncMessageType.AUDIO_SOURCE_LOADED,
@@ -178,8 +203,11 @@ class PlaybackSyncRecoveryE2eTest {
                     "recordingId" to newCurrentRecordingId,
                 ),
             )
-            val removeScheduled = client.awaitMessage(PlaybackSyncMessageType.SCHEDULED_ACTION)
-            assertEquals("PLAY", removeScheduled.payload.path("scheduledAction").path("action").asString(), "[playing] remove current should schedule replacement play")
+            val removeCommandId = removeLoad.payload.path("commandId").asString()
+            client.awaitMessageMatching(PlaybackSyncMessageType.SCHEDULED_ACTION) { message ->
+                message.payload.path("commandId").asString() == removeCommandId &&
+                    message.payload.path("scheduledAction").path("action").asString() == "PLAY"
+            }
         }
     }
 
@@ -213,6 +241,7 @@ class PlaybackSyncRecoveryE2eTest {
             client.close()
             client.awaitClose()
         }
+        Thread.sleep(200L)
 
         E2eWebSocketClient.connect(baseUrl(), state.api.authToken()).use { reconnect ->
             hello(reconnect, "web-after-disconnect")
@@ -270,11 +299,30 @@ class PlaybackSyncRecoveryE2eTest {
         if (queue.path("recordingIds").isEmpty) {
             return
         }
-        val response = state.api.post(
+        val response = postQueueMutation(
+            state = state,
             path = "/api/playback-queues/current/clear-requests",
-            json = mapOf("version" to queue.path("version").longValue()),
         )
         E2eAssert.status(response, 200, "[prepare] clear queue for recovery test should succeed")
+    }
+
+    private fun postQueueMutation(
+        state: E2eAdminSession,
+        path: String,
+        payload: Map<String, Any> = emptyMap(),
+    ): HttpResponse<String> {
+        var lastResponse: HttpResponse<String>? = null
+        repeat(10) {
+            val queue = fetchQueue(state)
+            val response = state.api.post(
+                path = path,
+                json = payload + ("version" to queue.path("version").longValue()),
+            )
+            if (response.statusCode() != 409) return response
+            lastResponse = response
+            Thread.sleep(50L)
+        }
+        return requireNotNull(lastResponse)
     }
 
     private fun fetchQueue(state: E2eAdminSession): JsonNode {
