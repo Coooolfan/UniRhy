@@ -665,8 +665,6 @@ export default {
         emptyChildren: 'No child tasks',
         childCount: '{count} children',
         nodeCount: '{count} nodes',
-        plan: 'Plan',
-        run: 'Run',
         refreshTree: 'Refresh task tree',
         resetView: 'Reset view',
         loadFailed: 'Failed to load task tree',

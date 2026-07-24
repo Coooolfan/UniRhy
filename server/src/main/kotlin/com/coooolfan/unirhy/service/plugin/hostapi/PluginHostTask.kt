@@ -7,7 +7,6 @@ import com.coooolfan.unirhy.service.task.AsyncTaskService
 import com.coooolfan.unirhy.service.task.TaskDefinitionService
 import com.coooolfan.unirhy.service.task.TaskStatisticsService
 import com.coooolfan.unirhy.service.task.common.AsyncTaskStore
-import com.coooolfan.unirhy.service.task.common.TaskAction
 import com.coooolfan.unirhy.service.task.common.TaskKey
 import com.coooolfan.unirhy.service.task.common.TaskStatus
 import org.babyfish.jimmer.Page
@@ -78,7 +77,6 @@ internal fun buildTaskHostFunctions(
                 rootsOnly = request.optionalBoolean("rootsOnly") ?: false,
                 namespace = request.optionalText("namespace"),
                 taskType = request.optionalText("taskType"),
-                actions = request.actionFilter(),
                 statuses = request.statusFilter(),
                 pageIndex = page.pageIndex,
                 pageSize = page.pageSize,
@@ -113,7 +111,6 @@ private fun ObjectNode.requiredObjectList(name: String): List<ObjectNode> {
 }
 
 private fun ObjectNode.statusFilter(): List<TaskStatus> = optionalEnumFilter("status", TaskStatus.entries)
-private fun ObjectNode.actionFilter(): List<TaskAction> = optionalEnumFilter("action", TaskAction.entries)
 
 private fun <T : Enum<T>> ObjectNode.optionalEnumFilter(name: String, entries: List<T>): List<T> {
     val value = get(name) ?: return emptyList()

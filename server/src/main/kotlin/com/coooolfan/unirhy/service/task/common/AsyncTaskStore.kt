@@ -1,7 +1,6 @@
 package com.coooolfan.unirhy.service.task.common
 
 import com.coooolfan.unirhy.model.AsyncTask
-import com.coooolfan.unirhy.model.action
 import com.coooolfan.unirhy.model.completedAt
 import com.coooolfan.unirhy.model.completedReason
 import com.coooolfan.unirhy.model.createdAt
@@ -27,8 +26,12 @@ data class ClaimedTask(
     val id: Long,
     val parentId: Long?,
     val key: TaskKey,
-    val action: TaskAction,
     val payloadJson: String,
+)
+
+data class PendingTaskCounts(
+    val rootCount: Long,
+    val childCount: Long,
 )
 
 @Component
@@ -37,12 +40,12 @@ class AsyncTaskStore(
     private val jdbc: NamedParameterJdbcTemplate,
 ) {
 
-    /** 创建一个无父节点的入口规划任务。 */
+    /** 创建一个交由 Planner 处理的根任务。 */
     fun enqueueRoot(key: TaskKey, payloadJson: String): Long =
         jdbc.queryForObject(
             """
-            INSERT INTO public.async_task (parent_task_id, namespace, task_type, action, payload, status)
-            VALUES (NULL, :namespace, :taskType, 'PLAN', CAST(:payload AS jsonb), 'PENDING')
+            INSERT INTO public.async_task (parent_task_id, namespace, task_type, payload, status)
+            VALUES (NULL, :namespace, :taskType, CAST(:payload AS jsonb), 'PENDING')
             RETURNING id
             """.trimIndent(),
             MapSqlParameterSource()
@@ -53,14 +56,14 @@ class AsyncTaskStore(
         )!!
 
     /**
-     * 批量创建父任务的 RUN 子任务。活动子任务去重由
+     * 批量创建交由 Handler 处理的子任务。活动子任务去重由
      * `uq_async_task_active_child` 提供，冲突记录被忽略。
      */
     fun enqueueChildrenIgnoringConflicts(parentId: Long, key: TaskKey, payloadJsonList: List<String>): Int {
         if (payloadJsonList.isEmpty()) return 0
         val insertSql = """
-            INSERT INTO public.async_task (parent_task_id, namespace, task_type, action, payload, status)
-            VALUES (:parentId, :namespace, :taskType, 'RUN', CAST(:payload AS jsonb), 'PENDING')
+            INSERT INTO public.async_task (parent_task_id, namespace, task_type, payload, status)
+            VALUES (:parentId, :namespace, :taskType, CAST(:payload AS jsonb), 'PENDING')
             ON CONFLICT DO NOTHING
         """.trimIndent()
         val batchParams = payloadJsonList.map { payloadJson ->
@@ -73,31 +76,36 @@ class AsyncTaskStore(
         return jdbc.batchUpdate(insertSql, batchParams).sum()
     }
 
-    fun discoverPendingCounts(): Map<TaskKey, Map<TaskAction, Long>> {
+    fun discoverPendingCounts(): Map<TaskKey, PendingTaskCounts> {
         val querySql = """
-            SELECT namespace, task_type, action, count(*)
+            SELECT namespace,
+                   task_type,
+                   count(*) FILTER (WHERE parent_task_id IS NULL),
+                   count(*) FILTER (WHERE parent_task_id IS NOT NULL)
             FROM public.async_task
             WHERE status = 'PENDING'
-            GROUP BY namespace, task_type, action
+            GROUP BY namespace, task_type
         """.trimIndent()
-        val result = mutableMapOf<TaskKey, MutableMap<TaskAction, Long>>()
+        val result = mutableMapOf<TaskKey, PendingTaskCounts>()
         jdbc.query(querySql) { rs ->
             val key = TaskKey.ofOrNull(rs.getString(1), rs.getString(2)) ?: return@query
-            result.getOrPut(key) { mutableMapOf() }[TaskAction.valueOf(rs.getString(3))] = rs.getLong(4)
+            result[key] = PendingTaskCounts(
+                rootCount = rs.getLong(3),
+                childCount = rs.getLong(4),
+            )
         }
         return result
     }
 
-    /** claim 一条指定 action 的任务并标记为 RUNNING；行锁保持到执行事务结束。 */
-    fun claimOne(key: TaskKey, actions: Collection<TaskAction>): ClaimedTask? {
-        if (actions.isEmpty()) return null
+    /** claim 一条当前节点可执行的任务并标记为 RUNNING；行锁保持到执行事务结束。 */
+    fun claimOne(key: TaskKey, includeRoots: Boolean): ClaimedTask? {
         val claimSql = """
             WITH grabbed AS (
                 SELECT id
                 FROM public.async_task
                 WHERE namespace = :namespace
                   AND task_type = :taskType
-                  AND action IN (:actions)
+                  AND (:includeRoots OR parent_task_id IS NOT NULL)
                   AND status = 'PENDING'
                 ORDER BY created_at, id
                 LIMIT 1
@@ -106,19 +114,18 @@ class AsyncTaskStore(
             UPDATE public.async_task t
             SET status = 'RUNNING', started_at = now()
             WHERE t.id IN (SELECT id FROM grabbed)
-            RETURNING t.id, t.parent_task_id, t.action, t.payload
+            RETURNING t.id, t.parent_task_id, t.payload
         """.trimIndent()
         val params = MapSqlParameterSource()
             .addValue("namespace", key.namespace)
             .addValue("taskType", key.taskType)
-            .addValue("actions", actions.map { it.name })
+            .addValue("includeRoots", includeRoots)
         return jdbc.query(claimSql, params) { rs, _ ->
             ClaimedTask(
                 id = rs.getLong(1),
                 parentId = rs.getLong(2).let { if (rs.wasNull()) null else it },
                 key = key,
-                action = TaskAction.valueOf(rs.getString(3)),
-                payloadJson = rs.getString(4),
+                payloadJson = rs.getString(3),
             )
         }.firstOrNull()
     }
@@ -143,7 +150,6 @@ class AsyncTaskStore(
         rootsOnly: Boolean,
         namespace: String?,
         taskType: String?,
-        actions: List<TaskAction>,
         statuses: List<TaskStatus>,
         pageIndex: Int,
         pageSize: Int,
@@ -154,7 +160,6 @@ class AsyncTaskStore(
             if (rootsOnly) where(table.parentId.isNull())
             namespace?.let { where(table.namespace eq it) }
             taskType?.let { where(table.taskType eq it) }
-            if (actions.isNotEmpty()) where(table.action valueIn actions)
             if (statuses.isNotEmpty()) where(table.status valueIn statuses)
             orderBy(table.createdAt.desc(), table.id.desc())
             select(table.fetch(fetcher))

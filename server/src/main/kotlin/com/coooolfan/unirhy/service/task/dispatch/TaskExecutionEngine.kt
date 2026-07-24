@@ -2,7 +2,6 @@ package com.coooolfan.unirhy.service.task.dispatch
 
 import com.coooolfan.unirhy.service.plugin.PluginStore
 import com.coooolfan.unirhy.service.task.common.AsyncTaskStore
-import com.coooolfan.unirhy.service.task.common.TaskAction
 import com.coooolfan.unirhy.service.task.common.TaskKey
 import com.coooolfan.unirhy.service.task.common.TaskStatus
 import com.coooolfan.unirhy.service.task.common.failureReason
@@ -15,8 +14,8 @@ import org.springframework.transaction.support.TransactionTemplate
 import tools.jackson.databind.ObjectMapper
 
 /**
- * 统一任务执行引擎。PLAN 与 RUN 都从同一任务表 claim，并在同一执行事务中
- * 创建子任务和完成当前节点。
+ * 统一任务执行引擎。根任务交由 Planner 生成子任务，非根任务交由 Handler 执行，
+ * 两者都在同一执行事务中完成当前节点。
  */
 @Component
 class TaskExecutionEngine(
@@ -30,9 +29,9 @@ class TaskExecutionEngine(
     private val logger = LoggerFactory.getLogger(TaskExecutionEngine::class.java)
     private val transactionTemplate = TransactionTemplate(transactionManager)
 
-    fun executeOne(key: TaskKey, actions: Collection<TaskAction>) {
+    fun executeOne(key: TaskKey, includeRoots: Boolean) {
         transactionTemplate.executeWithoutResult { status ->
-            val claimed = taskStore.claimOne(key, actions) ?: return@executeWithoutResult
+            val claimed = taskStore.claimOne(key, includeRoots) ?: return@executeWithoutResult
             if (!isKeyClaimable(key)) {
                 status.setRollbackOnly()
                 return@executeWithoutResult
@@ -42,38 +41,35 @@ class TaskExecutionEngine(
             val savepoint = status.createSavepoint()
             try {
                 val payload = objectMapper.readTree(claimed.payloadJson)
-                val enqueued = when (claimed.action) {
-                    TaskAction.PLAN -> {
-                        val planner = plannerRegistry.find(key)
-                        if (planner == null) {
-                            status.setRollbackOnly()
-                            return@executeWithoutResult
-                        }
-                        enqueuePlannedChildren(claimed.id, key, planner.plan(payload))
+                val enqueued = if (claimed.parentId == null) {
+                    val planner = plannerRegistry.find(key)
+                    if (planner == null) {
+                        status.setRollbackOnly()
+                        return@executeWithoutResult
                     }
-                    TaskAction.RUN -> {
-                        val handler = handlerRegistry.find(key)
-                        if (handler == null) {
-                            status.setRollbackOnly()
-                            return@executeWithoutResult
-                        }
-                        handler.run(claimed.id, payload)
-                        0
+                    enqueuePlannedChildren(claimed.id, key, planner.plan(payload))
+                } else {
+                    val handler = handlerRegistry.find(key)
+                    if (handler == null) {
+                        status.setRollbackOnly()
+                        return@executeWithoutResult
                     }
+                    handler.run(claimed.id, payload)
+                    0
                 }
                 status.releaseSavepoint(savepoint)
                 taskStore.complete(claimed.id, TaskStatus.COMPLETED, "SUCCESS")
                 logger.info(
-                    "Task completed: taskId={}, taskKey={}, action={}, enqueued={}, durationMs={}",
-                    claimed.id, key, claimed.action, enqueued, System.currentTimeMillis() - startedAt,
+                    "Task completed: taskId={}, taskKey={}, parentTaskId={}, enqueued={}, durationMs={}",
+                    claimed.id, key, claimed.parentId, enqueued, System.currentTimeMillis() - startedAt,
                 )
             } catch (ex: Exception) {
                 status.rollbackToSavepoint(savepoint)
                 val reason = failureReason(ex)
                 taskStore.complete(claimed.id, TaskStatus.FAILED, reason)
                 logger.error(
-                    "Task failed: taskId={}, taskKey={}, action={}, durationMs={}, reason={}",
-                    claimed.id, key, claimed.action, System.currentTimeMillis() - startedAt, reason, ex,
+                    "Task failed: taskId={}, taskKey={}, parentTaskId={}, durationMs={}, reason={}",
+                    claimed.id, key, claimed.parentId, System.currentTimeMillis() - startedAt, reason, ex,
                 )
             }
         }
