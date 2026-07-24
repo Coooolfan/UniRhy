@@ -273,7 +273,7 @@ const cancelTask = async (row: TaskRow) => {
             </div>
         </div>
 
-        <div class="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6">
+        <div class="task-list-scroll min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6">
             <div
                 v-if="error"
                 class="mb-4 border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700"
@@ -446,3 +446,27 @@ const cancelTask = async (row: TaskRow) => {
         </footer>
     </div>
 </template>
+
+<style scoped>
+.task-list-scroll {
+    scrollbar-color: #d6d1c4 transparent;
+    scrollbar-gutter: stable;
+}
+
+.task-list-scroll::-webkit-scrollbar {
+    width: 6px;
+}
+
+.task-list-scroll::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.task-list-scroll::-webkit-scrollbar-thumb {
+    border-radius: 3px;
+    background-color: #d6d1c4;
+}
+
+.task-list-scroll::-webkit-scrollbar-thumb:hover {
+    background-color: #c0bab0;
+}
+</style>
