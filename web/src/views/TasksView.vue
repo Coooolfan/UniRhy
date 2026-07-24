@@ -7,6 +7,8 @@ import { useModal } from '@/composables/useModal'
 import TaskSubmissionModal from '@/components/tasks/TaskSubmissionModal.vue'
 import SideDrawer from '@/components/SideDrawer.vue'
 import TaskDrawerContent from '@/components/tasks/TaskDrawerContent.vue'
+import TaskTreePanel from '@/components/tasks/TaskTreePanel.vue'
+import type { AsyncTaskDto } from '@/__generated/model/dto'
 import type { TaskStatus } from '@/__generated/model/enums/TaskStatus'
 import { taskKeyOf, useTaskManagement } from '@/composables/useTaskManagement'
 import {
@@ -15,6 +17,7 @@ import {
     BarChart3,
     CheckCircle2,
     FileMusic,
+    ListCollapse,
     Loader2,
     RefreshCw,
     ServerCog,
@@ -22,6 +25,8 @@ import {
 import { useUserStore } from '@/stores/user'
 
 const { t } = useI18n()
+
+type TaskRow = AsyncTaskDto['TaskController/DEFAULT_TASK_FETCHER']
 
 type SubmitFeedbackStatus = 'idle' | 'success'
 type SummaryTone = 'idle' | 'working' | 'failed' | 'done'
@@ -289,6 +294,11 @@ const isTaskDrawerOpen = ref(false)
 const drawerTaskKey = ref<string>(taskKeyOf('app.unirhy.built-in', 'METADATA_PARSE'))
 const drawerStatuses = ref<TaskStatus[]>(['PENDING'])
 
+// 任务树扩展视图：选中任务后侧边栏拓宽，右侧画布展示其所属整棵树
+const isTreeExpanded = ref(false)
+const selectedTask = ref<TaskRow | null>(null)
+const treePanel = ref<InstanceType<typeof TaskTreePanel> | null>(null)
+
 const drawerTaskOptions = computed(() =>
     taskSummaryRows.value.map((row) => ({
         taskKey: row.taskKey,
@@ -307,10 +317,34 @@ const drawerTaskName = computed(
 const openTaskDrawer = (taskKey: string, statuses: TaskStatus[]) => {
     drawerTaskKey.value = taskKey
     drawerStatuses.value = [...statuses]
+    selectedTask.value = null
+    isTreeExpanded.value = false
     isTaskDrawerOpen.value = true
 }
 
 const drawerTitle = computed(() => drawerTaskName.value)
+
+const onSelectTask = (row: TaskRow) => {
+    selectedTask.value = row
+    isTreeExpanded.value = true
+}
+
+const collapseTree = () => {
+    isTreeExpanded.value = false
+}
+
+const onDrawerOpenChange = (open: boolean) => {
+    isTaskDrawerOpen.value = open
+    if (!open) {
+        selectedTask.value = null
+        isTreeExpanded.value = false
+    }
+}
+
+const onTaskActionSuccess = () => {
+    refreshTaskStatistics()
+    treePanel.value?.refresh()
+}
 </script>
 
 <template>
@@ -621,18 +655,53 @@ const drawerTitle = computed(() => drawerTaskName.value)
         </div>
 
         <SideDrawer
-            v-model:open="isTaskDrawerOpen"
+            :open="isTaskDrawerOpen"
+            :expanded="isTreeExpanded"
             :title="drawerTitle"
             width="34rem"
             max-width="calc(100vw - 2rem)"
+            @update:open="onDrawerOpenChange"
+            @update:expanded="isTreeExpanded = $event"
         >
-            <TaskDrawerContent
-                v-if="isTaskDrawerOpen"
-                v-model:task-key="drawerTaskKey"
-                v-model:statuses="drawerStatuses"
-                :tasks="drawerTaskOptions"
-                @reset-success="refreshTaskStatistics"
-            />
+            <template #header-actions>
+                <button
+                    v-if="isTreeExpanded"
+                    type="button"
+                    class="p-1.5 text-[#8A8A8A] transition-colors hover:text-[#B86134]"
+                    :title="t('taskDetails.collapseTree')"
+                    :aria-label="t('taskDetails.collapseTree')"
+                    @click="collapseTree"
+                >
+                    <ListCollapse class="h-4 w-4" />
+                </button>
+            </template>
+
+            <div v-if="isTaskDrawerOpen" class="flex h-full min-h-0 w-full min-w-0 flex-1">
+                <!-- 左侧：任务列表 -->
+                <div
+                    class="min-h-0 shrink-0"
+                    :class="isTreeExpanded ? 'w-[24rem] border-r border-[#EAE6DE]' : 'w-full'"
+                >
+                    <TaskDrawerContent
+                        v-model:task-key="drawerTaskKey"
+                        v-model:statuses="drawerStatuses"
+                        :tasks="drawerTaskOptions"
+                        selectable
+                        :selected-id="selectedTask?.id ?? null"
+                        @select="onSelectTask"
+                        @reset-success="onTaskActionSuccess"
+                    />
+                </div>
+
+                <!-- 右侧：自由画布 + 树信息 -->
+                <TaskTreePanel
+                    v-if="isTreeExpanded"
+                    ref="treePanel"
+                    :task-id="selectedTask?.id ?? null"
+                    :selected-id="selectedTask?.id ?? null"
+                    class="min-w-0 flex-1"
+                />
+            </div>
         </SideDrawer>
     </div>
 </template>

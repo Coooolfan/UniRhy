@@ -7,7 +7,16 @@ import type { TaskStatus } from '@/__generated/model/enums/TaskStatus'
 import { useI18n } from 'vue-i18n'
 import { useUserStore } from '@/stores/user'
 import { useModal } from '@/composables/useModal'
-import { ChevronLeft, ChevronRight, Loader2, RotateCcw, XCircle } from 'lucide-vue-next'
+import {
+    ChevronDown,
+    ChevronLeft,
+    ChevronRight,
+    ChevronUp,
+    ListTree,
+    Loader2,
+    RotateCcw,
+    XCircle,
+} from 'lucide-vue-next'
 
 const { t } = useI18n()
 
@@ -25,12 +34,15 @@ const props = defineProps<{
     statuses: ReadonlyArray<TaskStatus>
     tasks: ReadonlyArray<TaskOption>
     pageSize?: number
+    selectable?: boolean
+    selectedId?: number | null
 }>()
 
 const emit = defineEmits<{
     resetSuccess: []
     'update:taskKey': [value: string]
     'update:statuses': [value: TaskStatus[]]
+    select: [row: TaskRow]
 }>()
 
 const STATUS_ORDER: readonly TaskStatus[] = [
@@ -288,7 +300,14 @@ const cancelTask = async (row: TaskRow) => {
                 <li
                     v-for="row in rows"
                     :key="row.id"
-                    class="border border-[#EAE6DE] bg-white/60 p-3 sm:p-4"
+                    class="border bg-white/60 p-3 transition-colors sm:p-4"
+                    :class="[
+                        selectable ? 'cursor-pointer hover:border-[#C67C4E]/60' : '',
+                        selectable && selectedId === row.id
+                            ? 'border-[#C67C4E] ring-1 ring-[#C67C4E]/40'
+                            : 'border-[#EAE6DE]',
+                    ]"
+                    @click="selectable && emit('select', row)"
                 >
                     <div class="flex items-start justify-between gap-2 sm:gap-3">
                         <div class="min-w-0 flex-1">
@@ -311,40 +330,62 @@ const cancelTask = async (row: TaskRow) => {
                                     }}
                                 </span>
                             </div>
-                            <div
-                                class="mt-1 grid grid-cols-1 gap-x-3 text-[11px] text-[#8A8177] sm:grid-cols-2"
-                            >
-                                <span>{{
-                                    t('taskDetails.startedAt', { time: formatTime(row.startedAt) })
+                            <div class="mt-1 text-[11px] text-[#8A8177]">
+                                <span class="whitespace-nowrap">{{
+                                    formatTime(row.startedAt)
                                 }}</span>
-                                <span>{{
-                                    t('taskDetails.completedAt', {
-                                        time: formatTime(row.completedAt),
-                                    })
+                                <span class="px-1 text-[#C9BCA9]">→</span>
+                                <span class="whitespace-nowrap">{{
+                                    formatTime(row.completedAt)
                                 }}</span>
                             </div>
                             <div
                                 v-if="row.completedReason"
-                                class="mt-2 text-xs leading-relaxed text-[#5A524A]"
+                                class="mt-2 line-clamp-2 text-xs leading-relaxed text-[#5A524A]"
+                                :title="row.completedReason"
                             >
                                 {{ row.completedReason }}
                             </div>
                         </div>
                         <div class="flex shrink-0 flex-col items-end gap-2">
-                            <button
-                                v-if="canResetRow(row)"
-                                type="button"
-                                class="inline-flex items-center gap-1 border border-[#C67C4E] px-3 py-1.5 text-[11px] uppercase tracking-[0.18em] text-[#C67C4E] transition-colors hover:bg-[#C67C4E] hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
-                                :disabled="patchingId !== null"
-                                @click="resetTask(row)"
-                            >
-                                <Loader2
-                                    v-if="patchingId === row.id"
-                                    class="h-3 w-3 animate-spin"
-                                />
-                                <RotateCcw v-else class="h-3 w-3" />
-                                <span>{{ t('taskDetails.reset') }}</span>
-                            </button>
+                            <div class="flex items-center gap-2">
+                                <button
+                                    v-if="selectable"
+                                    type="button"
+                                    class="inline-flex items-center gap-1 border border-[#8A7F6D] px-3 py-1.5 text-[11px] uppercase tracking-[0.18em] text-[#8A7F6D] transition-colors hover:border-[#B86134] hover:text-[#B86134]"
+                                    :title="t('taskDetails.viewTree')"
+                                    @click.stop="emit('select', row)"
+                                >
+                                    <ListTree class="h-3 w-3" />
+                                </button>
+                                <button
+                                    type="button"
+                                    class="inline-flex items-center gap-1 border border-[#8A7F6D] px-3 py-1.5 text-[11px] uppercase tracking-[0.18em] text-[#8A7F6D] transition-colors hover:border-[#B86134] hover:text-[#B86134]"
+                                    :title="
+                                        expandedIds.has(row.id)
+                                            ? t('taskDetails.hideParams')
+                                            : t('taskDetails.viewParams')
+                                    "
+                                    @click.stop="toggleExpand(row.id)"
+                                >
+                                    <ChevronUp v-if="expandedIds.has(row.id)" class="h-3 w-3" />
+                                    <ChevronDown v-else class="h-3 w-3" />
+                                </button>
+                                <button
+                                    v-if="canResetRow(row)"
+                                    type="button"
+                                    class="inline-flex items-center gap-1 border border-[#C67C4E] px-3 py-1.5 text-[11px] uppercase tracking-[0.18em] text-[#C67C4E] transition-colors hover:bg-[#C67C4E] hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+                                    :disabled="patchingId !== null"
+                                    @click="resetTask(row)"
+                                >
+                                    <Loader2
+                                        v-if="patchingId === row.id"
+                                        class="h-3 w-3 animate-spin"
+                                    />
+                                    <RotateCcw v-else class="h-3 w-3" />
+                                    <span>{{ t('taskDetails.reset') }}</span>
+                                </button>
+                            </div>
                             <button
                                 v-if="canCancelRow(row)"
                                 type="button"
@@ -362,17 +403,6 @@ const cancelTask = async (row: TaskRow) => {
                         </div>
                     </div>
 
-                    <button
-                        type="button"
-                        class="mt-3 text-[11px] uppercase tracking-[0.22em] text-[#8A8177] transition-colors hover:text-[#B86134]"
-                        @click="toggleExpand(row.id)"
-                    >
-                        {{
-                            expandedIds.has(row.id)
-                                ? t('taskDetails.hideParams')
-                                : t('taskDetails.viewParams')
-                        }}
-                    </button>
                     <pre
                         v-if="expandedIds.has(row.id)"
                         class="mt-2 max-h-64 overflow-auto border border-[#EAE6DE] bg-[#F8F5EE] p-3 font-mono text-[11px] leading-relaxed text-[#2B221B]"

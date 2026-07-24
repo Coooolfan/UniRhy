@@ -8,6 +8,10 @@
 | --------------------------------------------- | -------- | ----------------- | -------------------------- |
 | @tailwindcss/vite                             | ^4.1.18  | MIT               | Tailwind CSS Vite 插件     |
 | @tauri-apps/plugin-notification               | 2.3.3    | MIT OR Apache-2.0 | 系统通知与通知权限         |
+| @vue-flow/background                          | ^1.3.2   | MIT               | Vue Flow 画布背景组件      |
+| @vue-flow/controls                            | ^1.1.3   | MIT               | Vue Flow 缩放控制组件      |
+| @vue-flow/core                                | ^1.48.2  | MIT               | Vue 流程图/节点画布库      |
+| @vue-flow/minimap                             | ^1.5.4   | MIT               | Vue Flow 小地图组件        |
 | lucide-vue-next                               | ^0.562.0 | ISC               | 图标库 Vue 组件            |
 | pinia                                         | ^3.0.4   | MIT               | Vue 状态管理库             |
 | tailwindcss                                   | ^4.1.18  | MIT               | 原子化 CSS 框架            |
