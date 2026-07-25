@@ -25,6 +25,7 @@ export type {PlaylistUpdate} from './PlaylistUpdate';
 export type {PluginConfigurationResponse} from './PluginConfigurationResponse';
 export type {PluginConfigurationUpdateRequest} from './PluginConfigurationUpdateRequest';
 export type {PluginInfoResponse} from './PluginInfoResponse';
+export type {PluginTaskResponse} from './PluginTaskResponse';
 export type {RecordingMergeReq} from './RecordingMergeReq';
 export type {RecordingReorderReq} from './RecordingReorderReq';
 export type {RecordingUpdate} from './RecordingUpdate';

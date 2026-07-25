@@ -10,25 +10,44 @@ const plugin: PluginInfoResponse = {
     id: 'com.example.importer',
     name: 'Example Importer',
     version: '1.0.0',
-    taskType: 'IMPORT',
-    concurrency: 1,
     isAvailable: false,
     enabled: false,
-    formDefinition: {
-        schema: {
-            type: 'object',
-            properties: {
-                sourceUrl: {
-                    type: 'string',
-                    title: 'Source URL',
-                    description: 'Media source address',
+    tasks: [
+        {
+            taskType: 'IMPORT',
+            concurrency: 1,
+            userSubmittable: true,
+            formDefinition: {
+                schema: {
+                    type: 'object',
+                    properties: {
+                        sourceUrl: {
+                            type: 'string',
+                            title: 'Source URL',
+                            description: 'Media source address',
+                        },
+                    },
+                    required: ['sourceUrl'],
+                    additionalProperties: false,
                 },
+                order: ['sourceUrl'],
             },
-            required: ['sourceUrl'],
-            additionalProperties: false,
         },
-        order: ['sourceUrl'],
-    },
+        {
+            taskType: 'IMPORT_ITEM',
+            concurrency: 4,
+            userSubmittable: false,
+            formDefinition: {
+                schema: {
+                    type: 'object',
+                    properties: { itemId: { type: 'integer', title: 'Item ID' } },
+                    required: ['itemId'],
+                    additionalProperties: false,
+                },
+                order: ['itemId'],
+            },
+        },
+    ],
     configDefinition: {
         schema: {
             type: 'object',
@@ -123,10 +142,12 @@ describe('PluginsSection', () => {
         )
         expect(wrapper.text()).not.toContain('Source URL')
         expect(
-            wrapper.get('[data-testid="plugin-form-params-toggle"]').attributes('aria-expanded'),
+            wrapper
+                .get('[data-testid="plugin-form-params-toggle-IMPORT"]')
+                .attributes('aria-expanded'),
         ).toBe('false')
 
-        await wrapper.get('[data-testid="plugin-form-params-toggle"]').trigger('click')
+        await wrapper.get('[data-testid="plugin-form-params-toggle-IMPORT"]').trigger('click')
         expect(wrapper.text()).toContain('Source URL')
         expect(wrapper.text()).toContain('Media source address')
 
@@ -134,10 +155,28 @@ describe('PluginsSection', () => {
         await flushPromises()
         expect(setEnabled).toHaveBeenCalledWith(plugin.id, true)
 
-        await wrapper.get('[data-testid="plugin-concurrency-input"]').setValue('3')
-        await wrapper.get('[data-testid="plugin-concurrency-save"]').trigger('click')
+        await wrapper.get('[data-testid="plugin-concurrency-input-IMPORT"]').setValue('3')
+        await wrapper.get('[data-testid="plugin-concurrency-save-IMPORT"]').trigger('click')
         await flushPromises()
-        expect(updateConcurrency).toHaveBeenCalledWith(plugin.id, 3)
+        expect(updateConcurrency).toHaveBeenCalledWith(plugin.id, 'IMPORT', 3)
+    })
+
+    it('exposes an independent concurrency control per declared task', async () => {
+        const { wrapper, updateConcurrency } = mountSection()
+
+        await wrapper.get('button[title="插件详情"]').trigger('click')
+        await flushPromises()
+
+        expect(wrapper.text()).toContain('IMPORT_ITEM')
+        expect(
+            wrapper.get<HTMLInputElement>('[data-testid="plugin-concurrency-input-IMPORT_ITEM"]')
+                .element.value,
+        ).toBe('4')
+
+        await wrapper.get('[data-testid="plugin-concurrency-input-IMPORT_ITEM"]').setValue('8')
+        await wrapper.get('[data-testid="plugin-concurrency-save-IMPORT_ITEM"]').trigger('click')
+        await flushPromises()
+        expect(updateConcurrency).toHaveBeenCalledWith(plugin.id, 'IMPORT_ITEM', 8)
     })
 
     it('requires confirmation before deleting a plugin', async () => {

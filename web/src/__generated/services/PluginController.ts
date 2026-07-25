@@ -103,13 +103,15 @@ export class PluginController {
     }
     
     /**
-     * 修改插件任务执行并发值
+     * 修改插件某个任务的执行并发值
      * 
+     * 并发是"每任务一份"的属性：入口任务与工作任务各自独立
      * 修改后无需重启服务，各节点在下一轮对账时生效
      * 需要管理员角色才能访问
      * 
      * @parameter {PluginControllerOptions['updateConcurrency']} options
      * - id 插件 ID
+     * - taskType 任务名段
      * - concurrency 正整数并发值
      * 
      */
@@ -118,6 +120,8 @@ export class PluginController {
     > = async(options) => {
         let _uri = '/api/plugins/';
         _uri += encodeURIComponent(options.id);
+        _uri += '/tasks/';
+        _uri += encodeURIComponent(options.taskType);
         _uri += '/concurrency';
         let _separator = _uri.indexOf('?') === -1 ? '?' : '&';
         let _value: any = undefined;
@@ -189,6 +193,10 @@ export type PluginControllerOptions = {
          * 插件 ID
          */
         readonly id: string, 
+        /**
+         * 任务名段
+         */
+        readonly taskType: string, 
         /**
          * 正整数并发值
          * 

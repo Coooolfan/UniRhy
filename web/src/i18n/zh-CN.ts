@@ -500,6 +500,9 @@ export default {
         enabled: '已启用',
         disabled: '已禁用',
         formParams: '表单参数',
+        tasks: '任务',
+        entryTask: '可投递',
+        workerTask: '仅由上游产出',
         configuration: '插件配置',
         resetConfiguration: '恢复已保存配置',
         clearSecret: '清除敏感值',
@@ -665,6 +668,8 @@ export default {
     taskSubmission: {
         metadataParse: '元数据解析',
         metadataParseDesc: '遍历存储节点，发现媒体文件并补充缺失的元数据解析',
+        metadataParseItem: '元数据解析（单个资产）',
+        transcodeItem: '媒体转码（单个资产）',
         transcode: '媒体转码',
         transcodeDesc: '遍历源存储节点中的所有已导入文件，转码为指定格式并保存到目标存储节点',
         opusHint: '现代音频编码。转码目标为128Kbps可变码率。',

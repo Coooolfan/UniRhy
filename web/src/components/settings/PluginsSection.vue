@@ -15,7 +15,7 @@ const props = defineProps<{
     error: string
     onUpload: (file: File) => Promise<void>
     onSetEnabled: (id: string, enabled: boolean) => Promise<void>
-    onUpdateConcurrency: (id: string, concurrency: number) => Promise<void>
+    onUpdateConcurrency: (id: string, taskType: string, concurrency: number) => Promise<void>
     onLoadConfiguration: (id: string) => Promise<PluginConfigurationResponse>
     onSaveConfiguration: (
         id: string,
@@ -145,7 +145,7 @@ const handleDownload = async (plugin: PluginInfoResponse) => {
         <div v-else class="space-y-4">
             <div
                 v-for="plugin in plugins"
-                :key="`${plugin.id}-${plugin.taskType}`"
+                :key="plugin.id"
                 class="border border-[#E8E4D9] bg-[#FDFAF5] p-5 shadow-sm"
             >
                 <div class="flex items-start justify-between gap-4">
@@ -164,10 +164,12 @@ const handleDownload = async (plugin: PluginInfoResponse) => {
                                 class="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 font-mono text-[11px] text-[#9C968B]"
                             >
                                 <span class="break-all">{{ plugin.id }}</span>
-                                <span aria-hidden="true" class="text-[#D6D1C4]">/</span>
-                                <span class="text-[#8A8177]">
-                                    {{ plugin.taskType }}
-                                </span>
+                                <template v-for="task in plugin.tasks" :key="task.taskType">
+                                    <span aria-hidden="true" class="text-[#D6D1C4]">/</span>
+                                    <span class="text-[#8A8177]">
+                                        {{ task.taskType }}
+                                    </span>
+                                </template>
                             </div>
 
                             <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">

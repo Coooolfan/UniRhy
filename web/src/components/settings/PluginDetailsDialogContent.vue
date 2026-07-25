@@ -12,7 +12,7 @@ const props = defineProps<{
     plugin: PluginInfoResponse
     canManage: boolean
     setEnabled: (id: string, enabled: boolean) => Promise<void>
-    updateConcurrency: (id: string, concurrency: number) => Promise<void>
+    updateConcurrency: (id: string, taskType: string, concurrency: number) => Promise<void>
     loadConfiguration: (id: string) => Promise<PluginConfigurationResponse>
     saveConfiguration: (
         id: string,
@@ -23,28 +23,43 @@ const props = defineProps<{
 
 const { t } = useI18n()
 const enabled = ref(props.plugin.enabled)
-const concurrency = ref(String(props.plugin.concurrency))
-const savedConcurrency = ref(props.plugin.concurrency)
 const isToggling = ref(false)
-const isSavingConcurrency = ref(false)
-const isFormParamsExpanded = ref(false)
 const error = ref('')
 
-const formFields = computed(() => parseFormDefinition(props.plugin.formDefinition))
+/** 并发与表单定义都是「每任务一份」，按 taskType 索引 */
+const concurrencyDrafts = ref<Record<string, string>>(
+    Object.fromEntries(props.plugin.tasks.map((task) => [task.taskType, String(task.concurrency)])),
+)
+const savedConcurrency = ref<Record<string, number>>(
+    Object.fromEntries(props.plugin.tasks.map((task) => [task.taskType, task.concurrency])),
+)
+const savingTaskType = ref<string | null>(null)
+const expandedFormTaskType = ref<string | null>(null)
+
 const hasConfiguration = computed(
     () => parseFormDefinition(props.plugin.configDefinition).length > 0,
 )
-const parsedConcurrency = computed(() => Number(concurrency.value))
-const isConcurrencyValid = computed(
-    () => Number.isInteger(parsedConcurrency.value) && parsedConcurrency.value > 0,
-)
-const canSaveConcurrency = computed(
+const taskFormFields = computed(
     () =>
-        props.canManage &&
-        isConcurrencyValid.value &&
-        parsedConcurrency.value !== savedConcurrency.value &&
-        !isSavingConcurrency.value,
+        new Map(
+            props.plugin.tasks.map((task) => [
+                task.taskType,
+                parseFormDefinition(task.formDefinition),
+            ]),
+        ),
 )
+
+const formFieldsOf = (taskType: string) => taskFormFields.value.get(taskType) ?? []
+const parsedConcurrency = (taskType: string) => Number(concurrencyDrafts.value[taskType])
+const isConcurrencyValid = (taskType: string) => {
+    const value = parsedConcurrency(taskType)
+    return Number.isInteger(value) && value > 0
+}
+const canSaveConcurrency = (taskType: string) =>
+    props.canManage &&
+    isConcurrencyValid(taskType) &&
+    parsedConcurrency(taskType) !== savedConcurrency.value[taskType] &&
+    savingTaskType.value === null
 
 const fieldTypeLabel = (field: SchemaField) =>
     field.type === 'array' ? `${field.items?.type ?? 'unknown'}[]` : field.type
@@ -64,17 +79,18 @@ const handleEnabledChange = async (event: Event) => {
     }
 }
 
-const handleConcurrencySave = async () => {
-    if (!canSaveConcurrency.value) return
-    isSavingConcurrency.value = true
+const handleConcurrencySave = async (taskType: string) => {
+    if (!canSaveConcurrency(taskType)) return
+    const next = parsedConcurrency(taskType)
+    savingTaskType.value = taskType
     error.value = ''
     try {
-        await props.updateConcurrency(props.plugin.id, parsedConcurrency.value)
-        savedConcurrency.value = parsedConcurrency.value
+        await props.updateConcurrency(props.plugin.id, taskType, next)
+        savedConcurrency.value = { ...savedConcurrency.value, [taskType]: next }
     } catch (e) {
         error.value = resolveErrorMessage(e)
     } finally {
-        isSavingConcurrency.value = false
+        savingTaskType.value = null
     }
 }
 </script>
@@ -102,7 +118,13 @@ const handleConcurrencySave = async () => {
                     </p>
                     <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
                         <span class="font-mono text-[#9C968B]">v{{ plugin.version }}</span>
-                        <span class="font-mono text-[#8A8177]">{{ plugin.taskType }}</span>
+                        <span
+                            v-for="task in plugin.tasks"
+                            :key="task.taskType"
+                            class="font-mono text-[#8A8177]"
+                        >
+                            {{ task.taskType }}
+                        </span>
                     </div>
                 </div>
 
@@ -146,35 +168,65 @@ const handleConcurrencySave = async () => {
                     </section>
 
                     <section class="border-b border-[#E8E4D9] pb-5">
-                        <label for="plugin-concurrency" class="mb-3 block text-xs text-[#8A8A8A]">
-                            {{ t('plugins.concurrency') }}
-                        </label>
-                        <div class="flex items-center gap-2">
-                            <input
-                                id="plugin-concurrency"
-                                v-model="concurrency"
-                                data-testid="plugin-concurrency-input"
-                                type="number"
-                                min="1"
-                                step="1"
-                                class="min-w-0 flex-1 border-b border-[#D6D1C4] bg-[#F7F5F0] p-2.5 text-sm text-[#2C2A28] outline-none focus:border-[#C27E46] disabled:opacity-60"
-                                :disabled="!canManage || isSavingConcurrency"
-                            />
-                            <button
-                                v-if="canManage"
-                                data-testid="plugin-concurrency-save"
-                                type="button"
-                                class="inline-flex min-h-9 shrink-0 items-center gap-1.5 border border-[#C27E46] px-3 py-2 text-xs text-[#C27E46] transition-colors hover:bg-[#C27E46] hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
-                                :disabled="!canSaveConcurrency"
-                                @click="handleConcurrencySave"
-                            >
-                                <Loader2
-                                    v-if="isSavingConcurrency"
-                                    class="h-3.5 w-3.5 animate-spin"
-                                />
-                                <Save v-else class="h-3.5 w-3.5" />
-                                <span>{{ t('common.save') }}</span>
-                            </button>
+                        <span class="mb-3 block text-xs text-[#8A8A8A]">
+                            {{ t('plugins.tasks') }}
+                        </span>
+                        <div class="space-y-4">
+                            <div v-for="task in plugin.tasks" :key="task.taskType" class="min-w-0">
+                                <div
+                                    class="mb-2 flex flex-wrap items-baseline gap-x-2 gap-y-1 text-xs"
+                                >
+                                    <span class="font-mono break-all text-[#2C2A28]">
+                                        {{ task.taskType }}
+                                    </span>
+                                    <span
+                                        :class="
+                                            task.userSubmittable
+                                                ? 'text-[#5F7350]'
+                                                : 'text-[#9C968B]'
+                                        "
+                                    >
+                                        {{
+                                            task.userSubmittable
+                                                ? t('plugins.entryTask')
+                                                : t('plugins.workerTask')
+                                        }}
+                                    </span>
+                                </div>
+                                <label
+                                    :for="`plugin-concurrency-${task.taskType}`"
+                                    class="mb-2 block text-xs text-[#8A8A8A]"
+                                >
+                                    {{ t('plugins.concurrency') }}
+                                </label>
+                                <div class="flex items-center gap-2">
+                                    <input
+                                        :id="`plugin-concurrency-${task.taskType}`"
+                                        v-model="concurrencyDrafts[task.taskType]"
+                                        :data-testid="`plugin-concurrency-input-${task.taskType}`"
+                                        type="number"
+                                        min="1"
+                                        step="1"
+                                        class="min-w-0 flex-1 border-b border-[#D6D1C4] bg-[#F7F5F0] p-2.5 text-sm text-[#2C2A28] outline-none focus:border-[#C27E46] disabled:opacity-60"
+                                        :disabled="!canManage || savingTaskType !== null"
+                                    />
+                                    <button
+                                        v-if="canManage"
+                                        :data-testid="`plugin-concurrency-save-${task.taskType}`"
+                                        type="button"
+                                        class="inline-flex min-h-9 shrink-0 items-center gap-1.5 border border-[#C27E46] px-3 py-2 text-xs text-[#C27E46] transition-colors hover:bg-[#C27E46] hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+                                        :disabled="!canSaveConcurrency(task.taskType)"
+                                        @click="handleConcurrencySave(task.taskType)"
+                                    >
+                                        <Loader2
+                                            v-if="savingTaskType === task.taskType"
+                                            class="h-3.5 w-3.5 animate-spin"
+                                        />
+                                        <Save v-else class="h-3.5 w-3.5" />
+                                        <span>{{ t('common.save') }}</span>
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     </section>
                 </div>
@@ -191,39 +243,62 @@ const handleConcurrencySave = async () => {
             </div>
         </div>
 
-        <section v-if="formFields.length > 0" class="mt-8 border-t border-[#E8E4D9] pt-1">
-            <button
-                data-testid="plugin-form-params-toggle"
-                type="button"
-                class="flex w-full items-center justify-between gap-3 py-3 text-left text-sm font-medium text-[#2C2A28] transition-colors hover:text-[#C27E46]"
-                :aria-expanded="isFormParamsExpanded"
-                @click="isFormParamsExpanded = !isFormParamsExpanded"
+        <template v-for="task in plugin.tasks" :key="task.taskType">
+            <section
+                v-if="formFieldsOf(task.taskType).length > 0"
+                class="mt-8 border-t border-[#E8E4D9] pt-1"
             >
-                <span>{{ t('plugins.formParams') }}</span>
-                <ChevronDown
-                    class="h-4 w-4 shrink-0 transition-transform"
-                    :class="isFormParamsExpanded ? 'rotate-180' : ''"
-                />
-            </button>
-            <div v-if="isFormParamsExpanded" class="grid gap-x-6 gap-y-4 pt-2 sm:grid-cols-2">
-                <div v-for="field in formFields" :key="field.name" class="min-w-0">
-                    <div class="flex flex-wrap items-baseline gap-2 text-sm">
-                        <span class="font-mono text-xs text-[#C27E46]">
-                            {{ fieldTypeLabel(field) }}
+                <button
+                    :data-testid="`plugin-form-params-toggle-${task.taskType}`"
+                    type="button"
+                    class="flex w-full items-center justify-between gap-3 py-3 text-left text-sm font-medium text-[#2C2A28] transition-colors hover:text-[#C27E46]"
+                    :aria-expanded="expandedFormTaskType === task.taskType"
+                    @click="
+                        expandedFormTaskType =
+                            expandedFormTaskType === task.taskType ? null : task.taskType
+                    "
+                >
+                    <span>
+                        {{ t('plugins.formParams') }}
+                        <span class="ml-2 font-mono text-xs text-[#9C968B]">
+                            {{ task.taskType }}
                         </span>
-                        <span class="text-[#2C2A28]">
-                            {{ field.title }}
-                            <span v-if="field.required" class="text-[#C27E46]">*</span>
-                        </span>
-                        <span v-if="field.default !== undefined" class="text-xs text-[#9C968B]">
-                            {{ t('plugins.default', { value: field.default }) }}
-                        </span>
+                    </span>
+                    <ChevronDown
+                        class="h-4 w-4 shrink-0 transition-transform"
+                        :class="expandedFormTaskType === task.taskType ? 'rotate-180' : ''"
+                    />
+                </button>
+                <div
+                    v-if="expandedFormTaskType === task.taskType"
+                    class="grid gap-x-6 gap-y-4 pt-2 sm:grid-cols-2"
+                >
+                    <div
+                        v-for="field in formFieldsOf(task.taskType)"
+                        :key="field.name"
+                        class="min-w-0"
+                    >
+                        <div class="flex flex-wrap items-baseline gap-2 text-sm">
+                            <span class="font-mono text-xs text-[#C27E46]">
+                                {{ fieldTypeLabel(field) }}
+                            </span>
+                            <span class="text-[#2C2A28]">
+                                {{ field.title }}
+                                <span v-if="field.required" class="text-[#C27E46]">*</span>
+                            </span>
+                            <span v-if="field.default !== undefined" class="text-xs text-[#9C968B]">
+                                {{ t('plugins.default', { value: field.default }) }}
+                            </span>
+                        </div>
+                        <p
+                            v-if="field.description"
+                            class="mt-1 text-xs leading-relaxed text-[#9C968B]"
+                        >
+                            {{ field.description }}
+                        </p>
                     </div>
-                    <p v-if="field.description" class="mt-1 text-xs leading-relaxed text-[#9C968B]">
-                        {{ field.description }}
-                    </p>
                 </div>
-            </div>
-        </section>
+            </section>
+        </template>
     </div>
 </template>

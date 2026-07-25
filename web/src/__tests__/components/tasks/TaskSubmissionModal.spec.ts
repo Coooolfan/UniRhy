@@ -26,6 +26,7 @@ const builtInDefinitions: TaskDefinitionView[] = [
         namespace: BUILT_IN_NAMESPACE,
         taskType: 'METADATA_PARSE',
         name: '元数据解析',
+        userSubmittable: true,
         formDefinition: {
             schema: {
                 type: 'object',
@@ -40,6 +41,7 @@ const builtInDefinitions: TaskDefinitionView[] = [
         namespace: BUILT_IN_NAMESPACE,
         taskType: 'TRANSCODE',
         name: '音频转码',
+        userSubmittable: true,
         formDefinition: {
             schema: {
                 type: 'object',
@@ -56,6 +58,7 @@ const pluginDefinition: TaskDefinitionView = {
     namespace: 'com.example.cover',
     taskType: 'FETCH_COVER',
     name: '封面抓取',
+    userSubmittable: true,
     formDefinition: {
         schema: {
             type: 'object',
@@ -88,6 +91,7 @@ const arrayPluginDefinition: TaskDefinitionView = {
     namespace: 'com.example.batch',
     taskType: 'BATCH_IMPORT',
     name: '批量导入',
+    userSubmittable: true,
     formDefinition: {
         schema: {
             type: 'object',

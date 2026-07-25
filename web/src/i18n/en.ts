@@ -520,6 +520,9 @@ export default {
         enabled: 'Enabled',
         disabled: 'Disabled',
         formParams: 'Form Parameters',
+        tasks: 'Tasks',
+        entryTask: 'Submittable',
+        workerTask: 'Produced upstream',
         configuration: 'Plugin Configuration',
         resetConfiguration: 'Restore saved configuration',
         clearSecret: 'Clear sensitive value',
@@ -689,6 +692,8 @@ export default {
         metadataParse: 'Metadata Parse',
         metadataParseDesc:
             'Traverse storage nodes, discover media files and supplement missing metadata parsing',
+        metadataParseItem: 'Metadata Parsing (single asset)',
+        transcodeItem: 'Media Transcode (single asset)',
         transcode: 'Media Transcode',
         transcodeDesc:
             'Traverse all imported files in the source storage node, transcode to the specified format and save to the target storage node',
