@@ -25,7 +25,7 @@ const builtInDefinitions: TaskDefinitionView[] = [
     {
         namespace: BUILT_IN_NAMESPACE,
         taskType: 'METADATA_PARSE',
-        name: '元数据解析',
+        name: '资产扫描',
         userSubmittable: true,
         formDefinition: {
             schema: {
@@ -39,9 +39,39 @@ const builtInDefinitions: TaskDefinitionView[] = [
     },
     {
         namespace: BUILT_IN_NAMESPACE,
+        taskType: 'METADATA_PARSE_ITEM',
+        name: '元数据解析',
+        userSubmittable: false,
+        formDefinition: {
+            schema: {
+                type: 'object',
+                properties: {},
+                required: [],
+                additionalProperties: false,
+            },
+            order: [],
+        },
+    },
+    {
+        namespace: BUILT_IN_NAMESPACE,
         taskType: 'TRANSCODE',
-        name: '音频转码',
+        name: '音频转码扫描',
         userSubmittable: true,
+        formDefinition: {
+            schema: {
+                type: 'object',
+                properties: {},
+                required: [],
+                additionalProperties: false,
+            },
+            order: [],
+        },
+    },
+    {
+        namespace: BUILT_IN_NAMESPACE,
+        taskType: 'TRANSCODE_ITEM',
+        name: '音频转码',
+        userSubmittable: false,
         formDefinition: {
             schema: {
                 type: 'object',
@@ -186,7 +216,9 @@ describe('TaskSubmissionModal', () => {
     it('submits a metadata parse payload with the selected provider', async () => {
         const wrapper = await mountModal()
 
-        expect(wrapper.text()).toContain('元数据解析')
+        expect(wrapper.text()).toContain('资产扫描')
+        expect(wrapper.find('[data-test="task-type-metadata_parse_item"]').exists()).toBe(false)
+        expect(wrapper.find('[data-test="task-type-transcode_item"]').exists()).toBe(false)
         await wrapper.get('[data-test="task-submit-button"]').trigger('click')
 
         expect(submitTaskMock).toHaveBeenCalledWith(BUILT_IN_NAMESPACE, 'METADATA_PARSE', {

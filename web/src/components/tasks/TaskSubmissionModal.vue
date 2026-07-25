@@ -100,40 +100,42 @@ const isSubmitting = ref(false)
 const submitError = ref('')
 
 const allTaskOptions = computed<TaskOption[]>(() =>
-    props.definitions.map((definition) => {
-        const key = taskKeyOf(definition.namespace, definition.taskType)
-        if (key === METADATA_PARSE_KEY) {
+    props.definitions
+        .filter((definition) => definition.userSubmittable)
+        .map((definition) => {
+            const key = taskKeyOf(definition.namespace, definition.taskType)
+            if (key === METADATA_PARSE_KEY) {
+                return {
+                    key,
+                    namespace: definition.namespace,
+                    taskType: definition.taskType,
+                    name: definition.name ?? key,
+                    desc: t('taskSubmission.metadataParseDesc'),
+                    icon: FolderSearch,
+                    isPlugin: false,
+                }
+            }
+            if (key === TRANSCODE_KEY) {
+                return {
+                    key,
+                    namespace: definition.namespace,
+                    taskType: definition.taskType,
+                    name: definition.name ?? key,
+                    desc: t('taskSubmission.transcodeDesc'),
+                    icon: FileAudio,
+                    isPlugin: false,
+                }
+            }
             return {
                 key,
                 namespace: definition.namespace,
                 taskType: definition.taskType,
-                name: t('taskSubmission.metadataParse'),
-                desc: t('taskSubmission.metadataParseDesc'),
-                icon: FolderSearch,
-                isPlugin: false,
+                name: definition.name ?? key,
+                desc: t('taskSubmission.pluginDesc', { id: definition.namespace }),
+                icon: Puzzle,
+                isPlugin: true,
             }
-        }
-        if (key === TRANSCODE_KEY) {
-            return {
-                key,
-                namespace: definition.namespace,
-                taskType: definition.taskType,
-                name: t('taskSubmission.transcode'),
-                desc: t('taskSubmission.transcodeDesc'),
-                icon: FileAudio,
-                isPlugin: false,
-            }
-        }
-        return {
-            key,
-            namespace: definition.namespace,
-            taskType: definition.taskType,
-            name: definition.name ?? key,
-            desc: t('taskSubmission.pluginDesc', { id: definition.namespace }),
-            icon: Puzzle,
-            isPlugin: true,
-        }
-    }),
+        }),
 )
 
 const activeTaskOption = computed<TaskOption | undefined>(() =>
@@ -230,12 +232,9 @@ const canSubmit = computed(() => {
     )
 })
 
-const submitButtonLabel = computed(() => {
-    if (isPluginTask.value)
-        return t('taskSubmission.submitPluginTask', { name: activeTaskOption.value?.name ?? '' })
-    if (activeTaskKey.value === METADATA_PARSE_KEY) return t('taskSubmission.submitMetadataTask')
-    return t('taskSubmission.submitTranscodeTask')
-})
+const submitButtonLabel = computed(() =>
+    t('taskSubmission.submitTask', { name: activeTaskOption.value?.name ?? '' }),
+)
 
 const activeTaskAvailability = computed<TaskAvailability | null>(() => {
     if (isPluginTask.value) return null
