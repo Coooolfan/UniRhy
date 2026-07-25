@@ -64,9 +64,9 @@ export const usePluginSettings = () => {
         }
     }
 
-    const updateConcurrency = async (id: string, concurrency: number) => {
+    const updateConcurrency = async (id: string, taskType: string, concurrency: number) => {
         try {
-            await api.pluginController.updateConcurrency({ id, concurrency })
+            await api.pluginController.updateConcurrency({ id, taskType, concurrency })
             await fetch()
         } catch (e) {
             error.value = resolveErrorMessage(e)

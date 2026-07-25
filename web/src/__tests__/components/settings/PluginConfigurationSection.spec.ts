@@ -7,14 +7,24 @@ const plugin = (required: boolean): PluginInfoResponse => ({
     id: 'com.example.configured',
     name: 'Configured Plugin',
     version: '1.0.0',
-    taskType: 'IMPORT',
-    concurrency: 1,
     isAvailable: false,
     enabled: false,
-    formDefinition: {
-        schema: { type: 'object', properties: {}, required: [], additionalProperties: false },
-        order: [],
-    },
+    tasks: [
+        {
+            taskType: 'IMPORT',
+            concurrency: 1,
+            userSubmittable: true,
+            formDefinition: {
+                schema: {
+                    type: 'object',
+                    properties: {},
+                    required: [],
+                    additionalProperties: false,
+                },
+                order: [],
+            },
+        },
+    ],
     configDefinition: {
         schema: {
             type: 'object',

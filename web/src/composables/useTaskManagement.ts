@@ -21,7 +21,9 @@ export const taskKeyOf = (namespace: string, taskType: string) => `${namespace}:
 const builtinTaskTypeLabel = (namespace: string, taskType: string): string | undefined => {
     if (namespace !== BUILT_IN_NAMESPACE) return undefined
     if (taskType === 'METADATA_PARSE') return i18n.global.t('taskSubmission.metadataParse')
+    if (taskType === 'METADATA_PARSE_ITEM') return i18n.global.t('taskSubmission.metadataParseItem')
     if (taskType === 'TRANSCODE') return i18n.global.t('taskSubmission.transcode')
+    if (taskType === 'TRANSCODE_ITEM') return i18n.global.t('taskSubmission.transcodeItem')
     return undefined
 }
 

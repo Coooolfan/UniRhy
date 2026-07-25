@@ -74,6 +74,7 @@ const builtInDefinitions = [
         namespace: BUILT_IN_NAMESPACE,
         taskType: 'METADATA_PARSE',
         name: '元数据解析',
+        userSubmittable: true,
         formDefinition: {
             schema: {
                 type: 'object',
@@ -88,6 +89,7 @@ const builtInDefinitions = [
         namespace: BUILT_IN_NAMESPACE,
         taskType: 'TRANSCODE',
         name: '音频转码',
+        userSubmittable: true,
         formDefinition: {
             schema: {
                 type: 'object',
