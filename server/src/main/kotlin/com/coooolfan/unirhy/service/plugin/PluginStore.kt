@@ -6,9 +6,7 @@ import org.springframework.stereotype.Component
 
 data class PluginAvailabilityRow(
     val id: String,
-    val taskType: String,
     val enabled: Boolean,
-    val formDefinitionJson: String,
 )
 
 /**
@@ -29,7 +27,7 @@ class PluginStore(
     fun lockForShare(pluginId: String): PluginAvailabilityRow? =
         jdbc.query(
             """
-            SELECT id, task_type, enabled, form_definition::text
+            SELECT id, enabled
             FROM public.plugin
             WHERE id = :id
             FOR SHARE
@@ -38,9 +36,7 @@ class PluginStore(
         ) { rs, _ ->
             PluginAvailabilityRow(
                 id = rs.getString(1),
-                taskType = rs.getString(2),
-                enabled = rs.getBoolean(3),
-                formDefinitionJson = rs.getString(4),
+                enabled = rs.getBoolean(2),
             )
         }.firstOrNull()
 

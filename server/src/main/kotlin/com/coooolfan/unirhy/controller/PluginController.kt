@@ -10,6 +10,7 @@ import com.coooolfan.unirhy.service.plugin.hostapi.PluginDataService
 import com.coooolfan.unirhy.service.task.PluginTaskService
 import jakarta.servlet.http.HttpServletResponse
 import tools.jackson.databind.JsonNode
+import tools.jackson.databind.ObjectMapper
 import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
@@ -23,15 +24,22 @@ import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.multipart.MultipartFile
 
+/** 插件声明的单个任务 */
+data class PluginTaskResponse(
+    val taskType: String,
+    val concurrency: Int,
+    /** 能否被用户直接从表单投递 */
+    val userSubmittable: Boolean,
+    val formDefinition: JsonNode,
+)
+
 data class PluginInfoResponse(
     val id: String,
     val name: String?,
     val version: String,
-    val taskType: String,
-    val concurrency: Int,
     val isAvailable: Boolean,
     val enabled: Boolean,
-    val formDefinition: JsonNode,
+    val tasks: List<PluginTaskResponse>,
     val configDefinition: JsonNode,
 )
 
@@ -58,6 +66,7 @@ class PluginController(
     private val pluginService: PluginService,
     private val pluginTaskService: PluginTaskService,
     private val pluginDataService: PluginDataService,
+    private val objectMapper: ObjectMapper,
 ) {
     /**
      * 获取插件列表
@@ -78,11 +87,16 @@ class PluginController(
                 id = plugin.id,
                 name = plugin.name,
                 version = plugin.version,
-                taskType = plugin.taskType,
-                concurrency = plugin.concurrency,
                 isAvailable = pluginTaskService.isLoaded(plugin.id),
                 enabled = plugin.enabled,
-                formDefinition = plugin.formDefinition,
+                tasks = pluginService.listPluginTasks(plugin.id).map { task ->
+                    PluginTaskResponse(
+                        taskType = task.taskType,
+                        concurrency = task.concurrency,
+                        userSubmittable = task.userSubmittable,
+                        formDefinition = objectMapper.readTree(task.formDefinitionJson),
+                    )
+                },
                 configDefinition = plugin.configDefinition,
             )
         }
@@ -167,19 +181,21 @@ class PluginController(
     }
 
     /**
-     * 修改插件任务执行并发值
+     * 修改插件某个任务的执行并发值
      *
+     * 并发是"每任务一份"的属性：入口任务与工作任务各自独立
      * 修改后无需重启服务，各节点在下一轮对账时生效
      * 需要管理员角色才能访问
      *
      * @param id 插件 ID
+     * @param taskType 任务名段
      * @param concurrency 正整数并发值
      *
-     * @api PUT /api/plugins/{id}/concurrency
+     * @api PUT /api/plugins/{id}/tasks/{taskType}/concurrency
      * @permission 需要管理员权限
      * @description 调用PluginService.updateConcurrency()方法修改并发值
      */
-    @PutMapping("/plugins/{id}/concurrency")
+    @PutMapping("/plugins/{id}/tasks/{taskType}/concurrency")
     @SaCheckRole(ROLE_ADMIN)
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @Throws(
@@ -187,8 +203,12 @@ class PluginController(
         PluginException.NotFound::class,
         PluginException.InvalidConcurrency::class,
     )
-    fun updateConcurrency(@PathVariable id: String, @RequestParam concurrency: Int) {
-        pluginService.updateConcurrency(id, concurrency)
+    fun updateConcurrency(
+        @PathVariable id: String,
+        @PathVariable taskType: String,
+        @RequestParam concurrency: Int,
+    ) {
+        pluginService.updateConcurrency(id, taskType, concurrency)
     }
 
     /**

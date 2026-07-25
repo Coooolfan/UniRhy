@@ -277,7 +277,7 @@ object ApiCoverageRegistry {
         ),
         full(
             "PUT",
-            "/api/plugins/{id}/concurrency",
+            "/api/plugins/{id}/tasks/{taskType}/concurrency",
             testRef = PLUGIN_LIFECYCLE_CASE,
             note = "validation: non-positive concurrency returns 400",
         ),

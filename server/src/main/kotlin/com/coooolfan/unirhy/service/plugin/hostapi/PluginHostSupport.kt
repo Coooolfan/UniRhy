@@ -75,7 +75,6 @@ internal val PLUGIN_HOST_FUNCTION_NAMES: Set<String> = setOf(
     "host_task_definition_list",
     "host_task_definition_get",
     "host_task_create",
-    "host_task_enqueue",
     "host_task_list",
     "host_task_get",
     "host_task_patch",

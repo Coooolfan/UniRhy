@@ -2,6 +2,7 @@ package com.coooolfan.unirhy.service.task
 
 import com.coooolfan.unirhy.error.TaskException
 import com.coooolfan.unirhy.service.plugin.PluginStore
+import com.coooolfan.unirhy.service.plugin.PluginTaskStore
 import com.coooolfan.unirhy.service.task.common.AsyncTaskStore
 import com.coooolfan.unirhy.service.task.common.TaskStatus
 import org.mockito.Mockito.mock
@@ -23,7 +24,13 @@ class AsyncTaskServiceTest {
         val definitionService = mock(TaskDefinitionService::class.java)
         val sourceStatuses = setOf(TaskStatus.FAILED, TaskStatus.CANCELLED)
         `when`(definitionService.find(key)).thenReturn(
-            TaskDefinitionView(key.namespace, key.taskType, null, jacksonObjectMapper().createObjectNode()),
+            TaskDefinitionView(
+                namespace = key.namespace,
+                taskType = key.taskType,
+                name = null,
+                userSubmittable = true,
+                formDefinition = jacksonObjectMapper().createObjectNode(),
+            ),
         )
         `when`(taskStore.requeueByKey(key, sourceStatuses)).thenReturn(7)
 
@@ -76,6 +83,7 @@ class AsyncTaskServiceTest {
         objectMapper = jacksonObjectMapper(),
         taskStore = taskStore,
         pluginStore = mock(PluginStore::class.java),
+        pluginTaskStore = mock(PluginTaskStore::class.java),
         definitionService = definitionService,
         transactionTemplate = mock(TransactionTemplate::class.java),
     )

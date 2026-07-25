@@ -16,8 +16,9 @@ import tools.jackson.databind.JsonNode
 import java.time.Instant
 
 /**
- * 统一任务资源。根任务承载用户表单参数并通过 Planner 生成子任务，非根任务执行具体载荷。
- * [parent] 既表示产生关系，也决定节点交由 Planner 还是 Handler 处理。
+ * 统一任务资源。所有任务节点同构：由 `(namespace, taskType)` 对应的 Executor 执行，
+ * Executor 返回的后继被入队为子任务，返回空序列即叶子。
+ * [parent] 只表示产生关系，不参与执行角色判定。
  */
 @Entity
 interface AsyncTask {
@@ -40,7 +41,7 @@ interface AsyncTask {
 
     val taskType: String
 
-    /** 根任务使用入口表单参数，非根任务使用 Planner 或父任务生成的执行载荷。 */
+    /** 入口任务使用用户表单参数，其余任务使用上游 Executor 生成的执行载荷。 */
     @Serialized
     val payload: JsonNode
 

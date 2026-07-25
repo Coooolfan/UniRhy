@@ -240,9 +240,6 @@ class TaskContentReadE2eTest {
         val fixture = prepareScanFixture(state.runtime.scanWorkspace)
         val expectedTaskCount = countFilesWithExtensions(fixture.fixtureRoot, ACCEPT_EXTENSIONS)
         val baselineStats = fetchTaskStats(state, "[scan] baseline task stats before submit")
-        val baselineActive = taskCount(baselineStats, "METADATA_PARSE", "active")
-        val baselineCompleted = taskCount(baselineStats, "METADATA_PARSE", "completed")
-        val baselineFailed = taskCount(baselineStats, "METADATA_PARSE", "failed")
 
         val submitResponse = state.api.post(
             path = "/api/tasks",
@@ -254,9 +251,7 @@ class TaskContentReadE2eTest {
             state = state,
             scanRequestBody = scanRequestBody,
             expectedTaskCount = expectedTaskCount,
-            baselineActive = baselineActive,
-            baselineCompleted = baselineCompleted,
-            baselineFailed = baselineFailed,
+            baselineStats = baselineStats,
         )
 
         val worksResponse = state.api.get(
@@ -352,14 +347,20 @@ class TaskContentReadE2eTest {
         )
     }
 
+    /**
+     * 入口任务 `METADATA_PARSE` 只负责展开，逐个资产的解析记在
+     * `METADATA_PARSE_ITEM` 名下，因此工作量断言针对工作任务的终态计数。
+     */
     private fun awaitScanTaskLifecycle(
         state: E2eAdminSession,
         scanRequestBody: Map<String, Any>,
         expectedTaskCount: Int,
-        baselineActive: Long,
-        baselineCompleted: Long,
-        baselineFailed: Long,
+        baselineStats: List<JsonNode>,
     ) {
+        val baselineEntryActive = taskCount(baselineStats, "METADATA_PARSE", "active")
+        val baselineItemCompleted = taskCount(baselineStats, "METADATA_PARSE_ITEM", "completed")
+        val baselineItemFailed = taskCount(baselineStats, "METADATA_PARSE_ITEM", "failed")
+
         val duplicateSubmitResponse = state.api.post(
             path = "/api/tasks",
             json = taskBody("METADATA_PARSE", scanRequestBody),
@@ -380,20 +381,21 @@ class TaskContentReadE2eTest {
         while (System.currentTimeMillis() <= deadline) {
             pollCount += 1
             val statsRows = fetchTaskStats(state, "[scan] task stats")
-            val active = taskCount(statsRows, "METADATA_PARSE", "active")
-            val completed = taskCount(statsRows, "METADATA_PARSE", "completed")
-            val failed = taskCount(statsRows, "METADATA_PARSE", "failed")
+            val entryActive = taskCount(statsRows, "METADATA_PARSE", "active")
+            val itemActive = taskCount(statsRows, "METADATA_PARSE_ITEM", "active")
+            val itemCompleted = taskCount(statsRows, "METADATA_PARSE_ITEM", "completed")
+            val itemFailed = taskCount(statsRows, "METADATA_PARSE_ITEM", "failed")
             lastStatsBody = taskStatsBody(statsRows)
 
-            if (active > baselineActive) {
+            if (entryActive > baselineEntryActive || itemActive > 0) {
                 observedActive = true
             }
-            val terminalDelta = (completed - baselineCompleted) + (failed - baselineFailed)
+            val terminalDelta = (itemCompleted - baselineItemCompleted) + (itemFailed - baselineItemFailed)
             if (terminalDelta > 0) {
                 observedCompletion = true
             }
 
-            if (active <= baselineActive && terminalDelta >= expectedTaskCount) {
+            if (entryActive <= baselineEntryActive && itemActive <= 0 && terminalDelta >= expectedTaskCount) {
                 break
             }
 
@@ -402,25 +404,25 @@ class TaskContentReadE2eTest {
 
         assertTrue(
             observedActive || observedCompletion,
-            "[scan] expected METADATA_PARSE stats to change after submit, last=$lastStatsBody",
+            "[scan] expected scan task stats to change after submit, last=$lastStatsBody",
         )
         assertTrue(
             observedCompletion,
-            "[scan] METADATA_PARSE task stats never reached terminal state before timeout ${timeoutMillis}ms, last=$lastStatsBody",
+            "[scan] METADATA_PARSE_ITEM stats never reached terminal state before timeout ${timeoutMillis}ms, last=$lastStatsBody",
         )
         val finalStats = fetchTaskStats(state, "[scan] final task stats")
-        val completed = taskCount(finalStats, "METADATA_PARSE", "completed")
-        val failed = taskCount(finalStats, "METADATA_PARSE", "failed")
-        val terminalDelta = (completed - baselineCompleted) + (failed - baselineFailed)
-        // 重复根任务在首批任务完成后规划时会补投相同 payload（活动去重只覆盖 PENDING/RUNNING），
+        val itemCompleted = taskCount(finalStats, "METADATA_PARSE_ITEM", "completed")
+        val itemFailed = taskCount(finalStats, "METADATA_PARSE_ITEM", "failed")
+        val terminalDelta = (itemCompleted - baselineItemCompleted) + (itemFailed - baselineItemFailed)
+        // 重复入口任务在首批工作任务完成后展开时会补投相同 payload（活动去重只覆盖 PENDING/RUNNING），
         // 补投的任务按“已扫描”跳过，因此终态总量 >= 文件数且不产生失败。
         assertTrue(
             terminalDelta >= expectedTaskCount.toLong(),
             "[scan] final stats should cover unique fixture file count, last=${taskStatsBody(finalStats)}",
         )
         assertEquals(
-            baselineFailed,
-            failed,
+            baselineItemFailed,
+            itemFailed,
             "[scan] scan tasks should not fail, last=${taskStatsBody(finalStats)}",
         )
     }
@@ -430,9 +432,9 @@ class TaskContentReadE2eTest {
         assertTrue(expectedOpusCount > 0, "[transcode] fixture should contain audio files: ${fixture.fixtureRoot}")
         val existingOpusCount = countFilesWithExtensions(state.runtime.scanWorkspace, setOf("opus"))
         val baselineStats = fetchTaskStats(state, "[transcode] baseline task stats")
-        val baselineActive = taskCount(baselineStats, "TRANSCODE", "active")
-        val baselineCompleted = taskCount(baselineStats, "TRANSCODE", "completed")
-        val baselineFailed = taskCount(baselineStats, "TRANSCODE", "failed")
+        val baselineEntryActive = taskCount(baselineStats, "TRANSCODE", "active")
+        val baselineCompleted = taskCount(baselineStats, "TRANSCODE_ITEM", "completed")
+        val baselineFailed = taskCount(baselineStats, "TRANSCODE_ITEM", "failed")
 
         val submitResponse = state.api.post(
             path = "/api/tasks",
@@ -447,17 +449,18 @@ class TaskContentReadE2eTest {
 
         while (System.currentTimeMillis() <= deadline) {
             val statsRows = fetchTaskStats(state, "[transcode] task stats")
-            val active = taskCount(statsRows, "TRANSCODE", "active")
-            val completed = taskCount(statsRows, "TRANSCODE", "completed")
-            val failed = taskCount(statsRows, "TRANSCODE", "failed")
+            val entryActive = taskCount(statsRows, "TRANSCODE", "active")
+            val active = taskCount(statsRows, "TRANSCODE_ITEM", "active")
+            val completed = taskCount(statsRows, "TRANSCODE_ITEM", "completed")
+            val failed = taskCount(statsRows, "TRANSCODE_ITEM", "failed")
             lastStatsBody = taskStatsBody(statsRows)
 
-            if (active > baselineActive) {
+            if (entryActive > baselineEntryActive || active > 0) {
                 observedActive = true
             }
 
             val terminalDelta = (completed - baselineCompleted) + (failed - baselineFailed)
-            if (active <= baselineActive && terminalDelta >= expectedOpusCount) {
+            if (entryActive <= baselineEntryActive && active <= 0 && terminalDelta >= expectedOpusCount) {
                 val actualOpusCount = countFilesWithExtensions(state.runtime.scanWorkspace, setOf("opus")) - existingOpusCount
                 assertEquals(
                     expectedOpusCount,

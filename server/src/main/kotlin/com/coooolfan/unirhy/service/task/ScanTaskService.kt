@@ -7,8 +7,8 @@ import com.coooolfan.unirhy.service.storage.StorageNode
 import com.coooolfan.unirhy.service.storage.StorageNodeObjectService
 import com.coooolfan.unirhy.service.storage.bindProvider
 import com.coooolfan.unirhy.service.storage.resolveWriteableStorageNode
-import com.coooolfan.unirhy.service.task.spi.AsyncTaskHandler
-import com.coooolfan.unirhy.service.task.spi.TaskPlanner
+import com.coooolfan.unirhy.service.task.spi.TaskExecutor
+import com.coooolfan.unirhy.service.task.spi.TaskSpec
 import com.coooolfan.unirhy.service.task.common.TaskKey
 import tools.jackson.databind.JsonNode
 import tools.jackson.databind.ObjectMapper
@@ -34,45 +34,49 @@ import java.nio.file.Files
 import java.time.LocalDate
 
 /**
- * 内建元数据扫描的规划器：解析根任务参数、遍历存储节点并产出扫描 payload。
+ * 内建元数据扫描的入口任务：解析用户表单参数、遍历存储节点并展开出待解析资产。
+ * 只依赖存储节点元数据，可在任意节点执行。
  */
 @Component
-class ScanTaskPlanner(
+class ScanPlanExecutor(
     private val objectMapper: ObjectMapper,
     private val storageObjects: StorageNodeObjectService,
-) : TaskPlanner {
+) : TaskExecutor {
 
     override val key: TaskKey = BuiltInTasks.METADATA_PARSE
 
-    override fun plan(params: JsonNode): Sequence<JsonNode> {
-        val request = objectMapper.treeToValue(params, ScanTaskRequest::class.java)
+    override fun execute(taskId: Long, payload: JsonNode): Sequence<TaskSpec> {
+        val request = objectMapper.treeToValue(payload, ScanTaskRequest::class.java)
         val provider = storageObjects.resolve(request.providerType, request.providerId)
-        return discoverScanFileTaskPayloads(provider).map { objectMapper.valueToTree(it) }
+        return discoverScanFileTaskPayloads(provider).map {
+            TaskSpec(BuiltInTasks.METADATA_PARSE_ITEM, objectMapper.valueToTree(it))
+        }
     }
 }
 
 /**
- * 内建元数据扫描的执行器：下载源文件、解析音频元数据并保存 Recording。
+ * 内建元数据扫描的工作任务：下载单个源文件、解析音频元数据并保存 Recording。
+ * 叶子任务，不产出后继。
  */
 @Component
-class ScanTaskHandler(
+class ScanItemExecutor(
     private val sql: KSqlClient,
     private val objectMapper: ObjectMapper,
     private val storageObjects: StorageNodeObjectService,
     private val jdbc: NamedParameterJdbcTemplate,
     transactionManager: PlatformTransactionManager,
-) : AsyncTaskHandler {
+) : TaskExecutor {
 
-    private val logger = LoggerFactory.getLogger(ScanTaskHandler::class.java)
+    private val logger = LoggerFactory.getLogger(ScanItemExecutor::class.java)
 
     /** 嵌套事务（savepoint）用于保存重试：唯一键冲突后回滚到 savepoint 再重试 */
     private val nestedTransaction = TransactionTemplate(transactionManager).apply {
         propagationBehavior = TransactionDefinition.PROPAGATION_NESTED
     }
 
-    override val key: TaskKey = BuiltInTasks.METADATA_PARSE
+    override val key: TaskKey = BuiltInTasks.METADATA_PARSE_ITEM
 
-    override fun run(taskId: Long, payload: JsonNode) {
+    override fun execute(taskId: Long, payload: JsonNode): Sequence<TaskSpec> {
         val scanPayload = objectMapper.treeToValue(payload, ScanFileTaskPayload::class.java)
         val provider = storageObjects.resolve(scanPayload.providerType, scanPayload.providerId)
         val writeableProvider = sql.findOneById(SYSTEM_CONFIG_FETCHER, SYSTEM_CONFIG_ID)
@@ -85,7 +89,7 @@ class ScanTaskHandler(
                 provider.providerId,
                 scanPayload.objectKey,
             )
-            return
+            return emptySequence()
         }
 
         if (audioMediaFileExists(provider.providerType, provider.providerId, scanPayload.objectKey)) {
@@ -94,7 +98,7 @@ class ScanTaskHandler(
                 provider.providerId,
                 scanPayload.objectKey,
             )
-            return
+            return emptySequence()
         }
 
         val scannedRecording = storageObjects.materializeTempFile(provider, scanPayload.objectKey).use { tempFile ->
@@ -108,6 +112,7 @@ class ScanTaskHandler(
             )
         }
         saveScannedRecordingWithRetry(scannedRecording, scanPayload.objectKey)
+        return emptySequence()
     }
 
     /**
