@@ -2,12 +2,9 @@ package com.coooolfan.unirhy.service.plugin.hostapi
 
 import com.coooolfan.unirhy.model.AsyncTask
 import com.coooolfan.unirhy.model.by
-import com.coooolfan.unirhy.service.plugin.WasmExecutionContext
 import com.coooolfan.unirhy.service.task.AsyncTaskService
 import com.coooolfan.unirhy.service.task.TaskDefinitionService
 import com.coooolfan.unirhy.service.task.TaskStatisticsService
-import com.coooolfan.unirhy.service.task.common.AsyncTaskStore
-import com.coooolfan.unirhy.service.task.common.TaskKey
 import com.coooolfan.unirhy.service.task.common.TaskStatus
 import org.babyfish.jimmer.Page
 import org.babyfish.jimmer.sql.fetcher.Fetcher
@@ -19,7 +16,6 @@ import tools.jackson.databind.node.ObjectNode
 
 private data class HostPage<T>(val rows: List<T>, val totalRowCount: Long)
 private data class HostTaskCreated(val taskId: Long)
-private data class HostTasksEnqueued(val enqueued: Int)
 
 private val HOST_TASK_FETCHER: Fetcher<AsyncTask> = newFetcher(AsyncTask::class).by {
     allScalarFields()
@@ -30,9 +26,6 @@ internal fun buildTaskHostFunctions(
     taskDefinitionService: TaskDefinitionService,
     asyncTaskService: AsyncTaskService,
     taskStatisticsService: TaskStatisticsService,
-    asyncTaskStore: AsyncTaskStore,
-    pluginId: String,
-    executionContext: WasmExecutionContext?,
     objectMapper: ObjectMapper,
     instanceRef: () -> Instance,
     callExecutor: PluginHostCallExecutor = DIRECT_PLUGIN_HOST_CALL_EXECUTOR,
@@ -50,23 +43,6 @@ internal fun buildTaskHostFunctions(
                     namespace = request.requiredText("namespace"),
                     taskType = request.requiredText("taskType"),
                     payload = request.requiredObject("payload"),
-                ),
-            )
-        },
-        support.jsonFunction("host_task_enqueue") { request ->
-            val context = executionContext
-                ?: conflict("Tasks can only be enqueued while a plugin task is running")
-            val namespace = request.optionalText("namespace") ?: pluginId
-            val taskType = request.optionalText("taskType") ?: context.taskType
-            val key = TaskKey.ofOrNull(namespace, taskType)
-                ?: invalidArgument("Invalid task key: $namespace:$taskType")
-            taskDefinitionService.find(key) ?: notFound("Task definition not found: $key")
-            val payloads = request.requiredObjectList("payloads")
-            HostTasksEnqueued(
-                asyncTaskStore.enqueueChildrenIgnoringConflicts(
-                    parentId = context.taskId,
-                    key = key,
-                    payloadJsonList = payloads.map { it.toString() },
                 ),
             )
         },
@@ -98,18 +74,6 @@ internal fun buildTaskHostFunctions(
     )
 }
 
-private fun ObjectNode.requiredObjectList(name: String): List<ObjectNode> {
-    val value = requiredNode(name)
-    if (!value.isArray) invalidArgument("Field '$name' must be an array")
-    if (value.isEmpty) invalidArgument("Field '$name' must contain at least one item")
-    if (value.size() > HOST_MAX_ENQUEUE_BATCH_SIZE) {
-        invalidArgument("Field '$name' must contain at most $HOST_MAX_ENQUEUE_BATCH_SIZE items")
-    }
-    return value.mapIndexed { index, item ->
-        item as? ObjectNode ?: invalidArgument("Field '$name[$index]' must be an object")
-    }
-}
-
 private fun ObjectNode.statusFilter(): List<TaskStatus> = optionalEnumFilter("status", TaskStatus.entries)
 
 private fun <T : Enum<T>> ObjectNode.optionalEnumFilter(name: String, entries: List<T>): List<T> {
@@ -125,5 +89,3 @@ private fun ObjectNode.requiredTaskStatus(): TaskStatus =
         ?: invalidArgument("Unknown task status")
 
 private fun <T> Page<T>.toHostPage(): HostPage<T> = HostPage(rows, totalRowCount)
-
-private const val HOST_MAX_ENQUEUE_BATCH_SIZE = 1000

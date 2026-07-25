@@ -5,8 +5,8 @@ import com.coooolfan.unirhy.service.task.common.AsyncTaskStore
 import com.coooolfan.unirhy.service.task.common.TaskKey
 import com.coooolfan.unirhy.service.task.common.TaskStatus
 import com.coooolfan.unirhy.service.task.common.failureReason
-import com.coooolfan.unirhy.service.task.spi.AsyncTaskHandlerRegistry
-import com.coooolfan.unirhy.service.task.spi.TaskPlannerRegistry
+import com.coooolfan.unirhy.service.task.spi.TaskExecutorRegistry
+import com.coooolfan.unirhy.service.task.spi.TaskSpec
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 import org.springframework.transaction.PlatformTransactionManager
@@ -14,25 +14,29 @@ import org.springframework.transaction.support.TransactionTemplate
 import tools.jackson.databind.ObjectMapper
 
 /**
- * 统一任务执行引擎。根任务交由 Planner 生成子任务，非根任务交由 Handler 执行，
- * 两者都在同一执行事务中完成当前节点。
+ * 统一任务执行引擎。所有任务走同一条路径：交由 `(namespace, taskType)` 对应的
+ * Executor 执行，其返回的后继在同一执行事务中入队；返回空序列即叶子。
  */
 @Component
 class TaskExecutionEngine(
     transactionManager: PlatformTransactionManager,
     private val taskStore: AsyncTaskStore,
-    private val plannerRegistry: TaskPlannerRegistry,
-    private val handlerRegistry: AsyncTaskHandlerRegistry,
+    private val executorRegistry: TaskExecutorRegistry,
     private val pluginStore: PluginStore,
     private val objectMapper: ObjectMapper,
 ) {
     private val logger = LoggerFactory.getLogger(TaskExecutionEngine::class.java)
     private val transactionTemplate = TransactionTemplate(transactionManager)
 
-    fun executeOne(key: TaskKey, includeRoots: Boolean) {
+    fun executeOne(key: TaskKey) {
         transactionTemplate.executeWithoutResult { status ->
-            val claimed = taskStore.claimOne(key, includeRoots) ?: return@executeWithoutResult
+            val claimed = taskStore.claimOne(key) ?: return@executeWithoutResult
             if (!isKeyClaimable(key)) {
+                status.setRollbackOnly()
+                return@executeWithoutResult
+            }
+            val executor = executorRegistry.find(key)
+            if (executor == null) {
                 status.setRollbackOnly()
                 return@executeWithoutResult
             }
@@ -41,22 +45,7 @@ class TaskExecutionEngine(
             val savepoint = status.createSavepoint()
             try {
                 val payload = objectMapper.readTree(claimed.payloadJson)
-                val enqueued = if (claimed.parentId == null) {
-                    val planner = plannerRegistry.find(key)
-                    if (planner == null) {
-                        status.setRollbackOnly()
-                        return@executeWithoutResult
-                    }
-                    enqueuePlannedChildren(claimed.id, key, planner.plan(payload))
-                } else {
-                    val handler = handlerRegistry.find(key)
-                    if (handler == null) {
-                        status.setRollbackOnly()
-                        return@executeWithoutResult
-                    }
-                    handler.run(claimed.id, payload)
-                    0
-                }
+                val enqueued = enqueueSuccessors(claimed.id, executor.execute(claimed.id, payload))
                 status.releaseSavepoint(savepoint)
                 taskStore.complete(claimed.id, TaskStatus.COMPLETED, "SUCCESS")
                 logger.info(
@@ -75,17 +64,25 @@ class TaskExecutionEngine(
         }
     }
 
-    private fun enqueuePlannedChildren(parentId: Long, key: TaskKey, payloads: Sequence<tools.jackson.databind.JsonNode>): Int {
+    /**
+     * 惰性消费后继序列并按目标 TaskKey 分批入队。后继可跨 key、跨 namespace，
+     * 因此按 key 分桶累积，任一桶满即刷写。
+     */
+    private fun enqueueSuccessors(parentId: Long, specs: Sequence<TaskSpec>): Int {
         var enqueued = 0
-        val batch = ArrayList<String>(ENQUEUE_BATCH_SIZE)
-        for (payload in payloads) {
-            batch += payload.toString()
+        val batches = LinkedHashMap<TaskKey, ArrayList<String>>()
+        for (spec in specs) {
+            val batch = batches.getOrPut(spec.key) { ArrayList(ENQUEUE_BATCH_SIZE) }
+            batch += spec.payload.toString()
             if (batch.size >= ENQUEUE_BATCH_SIZE) {
-                enqueued += taskStore.enqueueChildrenIgnoringConflicts(parentId, key, batch)
+                enqueued += taskStore.enqueueChildrenIgnoringConflicts(parentId, spec.key, batch)
                 batch.clear()
             }
         }
-        return enqueued + taskStore.enqueueChildrenIgnoringConflicts(parentId, key, batch)
+        for ((specKey, batch) in batches) {
+            enqueued += taskStore.enqueueChildrenIgnoringConflicts(parentId, specKey, batch)
+        }
+        return enqueued
     }
 
     private fun isKeyClaimable(key: TaskKey): Boolean =

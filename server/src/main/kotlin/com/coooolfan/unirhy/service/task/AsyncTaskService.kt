@@ -4,6 +4,7 @@ import com.coooolfan.unirhy.error.TaskException
 import com.coooolfan.unirhy.model.AsyncTask
 import com.coooolfan.unirhy.model.by
 import com.coooolfan.unirhy.service.plugin.PluginStore
+import com.coooolfan.unirhy.service.plugin.PluginTaskStore
 import com.coooolfan.unirhy.service.task.common.AsyncTaskStore
 import com.coooolfan.unirhy.service.task.common.TaskFormSchema
 import com.coooolfan.unirhy.service.task.common.TaskKey
@@ -22,11 +23,15 @@ class AsyncTaskService(
     private val objectMapper: ObjectMapper,
     private val taskStore: AsyncTaskStore,
     private val pluginStore: PluginStore,
+    private val pluginTaskStore: PluginTaskStore,
     private val definitionService: TaskDefinitionService,
     private val transactionTemplate: TransactionTemplate,
 ) {
 
-    /** 校验公开任务表单并创建一个根任务。 */
+    /**
+     * 校验入口任务表单并创建一个入口任务。
+     * 只有 `userSubmittable` 的任务可被投递；工作任务只能由上游 Executor 产出。
+     */
     fun create(namespace: String, taskType: String, payload: JsonNode): Long {
         val key = TaskKey.ofOrNull(namespace, taskType)
             ?: throw TaskException.invalidTaskKey(reason = "invalid task key: $namespace:$taskType")
@@ -48,9 +53,10 @@ class AsyncTaskService(
             }
         }
         val plugin = pluginStore.lockForShare(key.namespace) ?: throw TaskException.definitionNotFound()
-        if (plugin.taskType != key.taskType) throw TaskException.definitionNotFound()
+        val task = pluginTaskStore.find(key) ?: throw TaskException.definitionNotFound()
+        if (!task.userSubmittable) throw TaskException.definitionNotFound()
         if (!plugin.enabled) throw TaskException.pluginUnavailable()
-        return objectMapper.readTree(plugin.formDefinitionJson)
+        return objectMapper.readTree(task.formDefinitionJson)
     }
 
     fun list(

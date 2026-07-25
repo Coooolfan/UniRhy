@@ -6,6 +6,10 @@ import org.babyfish.jimmer.sql.Serialized
 import tools.jackson.databind.JsonNode
 import java.time.Instant
 
+/**
+ * 已安装插件。任务身份、并发与表单定义都是"每任务一份"的属性，
+ * 保存在 `plugin_task`（由 `PluginTaskStore` 直接访问，不建实体）。
+ */
 @Entity
 interface Plugin {
     /** 插件 ID，即任务命名空间（反向域名） */
@@ -18,16 +22,6 @@ interface Plugin {
     val version: String
 
     val abi: String
-
-    /** 插件自有任务名段（全大写标识符），`(id, taskType)` 即任务身份二元组 */
-    val taskType: String
-
-    /** 当前使用的任务执行并发值；首次安装由 manifest 初始化，之后由管理员直接修改 */
-    val concurrency: Int
-
-    /** 完整表单定义 `{schema, order}` */
-    @Serialized
-    val formDefinition: JsonNode
 
     /** 插件级配置声明 `{schema, order}`；实际配置值保存在 `plugin_data` */
     @Serialized

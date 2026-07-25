@@ -4,11 +4,14 @@ import com.coooolfan.unirhy.error.PluginException
 import com.coooolfan.unirhy.model.Plugin
 import com.coooolfan.unirhy.model.id
 import com.coooolfan.unirhy.service.plugin.PluginManifest
+import com.coooolfan.unirhy.service.plugin.PluginTaskRow
+import com.coooolfan.unirhy.service.plugin.PluginTaskStore
 import com.coooolfan.unirhy.service.plugin.UNIRHY_WASM_ABI_V1
 import com.coooolfan.unirhy.service.plugin.WasmPlugin
 import com.coooolfan.unirhy.service.plugin.WasmPluginException
 import com.coooolfan.unirhy.service.plugin.hostapi.PluginDataService
 import com.coooolfan.unirhy.service.task.PluginTaskService
+import com.coooolfan.unirhy.service.task.common.TaskKey
 import tools.jackson.databind.ObjectMapper
 import tools.jackson.dataformat.yaml.YAMLMapper
 import tools.jackson.module.kotlin.kotlinModule
@@ -38,6 +41,7 @@ class PluginService(
     private val jdbc: NamedParameterJdbcTemplate,
     private val pluginTaskService: PluginTaskService,
     private val pluginDataService: PluginDataService,
+    private val pluginTaskStore: PluginTaskStore,
     private val transactionTemplate: TransactionTemplate,
 ) {
     private val logger = LoggerFactory.getLogger(PluginService::class.java)
@@ -52,6 +56,9 @@ class PluginService(
     fun getPlugin(id: String): Plugin =
         sql.findById(Plugin::class, id)
             ?: throw PluginException.notFound()
+
+    /** 某插件声明的全部任务定义 */
+    fun listPluginTasks(id: String): List<PluginTaskRow> = pluginTaskStore.findByPlugin(id)
 
     /**
      * 上传插件包。同 id 上传即覆盖升级：保留已有的 `concurrency` 与 `created_at`，
@@ -108,35 +115,54 @@ class PluginService(
         }
 
         val existing = sql.findById(Plugin::class, manifest.id)
-        if (existing != null && existing.taskType != manifest.task.type) {
-            throw PluginException.invalidManifest(
-                reason = "task type must stay ${existing.taskType} for plugin ${manifest.id}; " +
-                    "incompatible task protocol changes require a new plugin id"
-            )
+        if (existing != null) {
+            val declared = manifest.tasks.map { it.type }.toSet()
+            val removed = pluginTaskStore.findByPlugin(manifest.id).map { it.taskType }.filterNot { it in declared }
+            if (removed.isNotEmpty()) {
+                throw PluginException.invalidManifest(
+                    reason = "task types ${removed.sorted()} must stay declared for plugin ${manifest.id}; " +
+                        "incompatible task protocol changes require a new plugin id"
+                )
+            }
         }
 
         val now = Instant.now()
         val configDefinition = manifest.configDefinition()
+        // 覆盖升级保留管理员已调整过的并发值
+        val existingConcurrency = pluginTaskStore.findByPlugin(manifest.id)
+            .associate { it.taskType to it.concurrency }
         transactionTemplate.executeWithoutResult {
             sql.saveCommand(Plugin {
                 id = manifest.id
                 name = manifest.name
                 version = manifest.version
                 abi = manifest.runtime.abi
-                taskType = manifest.task.type
-                concurrency = existing?.concurrency ?: manifest.task.concurrency
-                formDefinition = manifest.formDefinition()
                 this.configDefinition = configDefinition
                 this.wasm = wasm
                 enabled = false
                 createdAt = existing?.createdAt ?: now
                 updatedAt = now
             }).execute()
+            pluginTaskStore.replaceAll(
+                manifest.id,
+                manifest.tasks.map { task ->
+                    PluginTaskRow(
+                        pluginId = manifest.id,
+                        taskType = task.type,
+                        concurrency = existingConcurrency[task.type] ?: task.concurrency,
+                        userSubmittable = task.userSubmittable,
+                        formDefinitionJson = manifest.formDefinition(task).toString(),
+                    )
+                },
+            )
             pluginDataService.reconcileConfigEncryption(manifest.id, configDefinition)
         }
 
         pluginTaskService.uninstall(manifest.id)
-        logger.info("Plugin uploaded: id={}, version={}, taskType={}", manifest.id, manifest.version, manifest.task.type)
+        logger.info(
+            "Plugin uploaded: id={}, version={}, taskTypes={}",
+            manifest.id, manifest.version, manifest.tasks.map { it.type },
+        )
     }
 
     /**
@@ -165,17 +191,25 @@ class PluginService(
         }
     }
 
-    /** 管理员直接读写当前并发值，修改后无需重启，各节点由 reconcile 生效 */
-    fun updateConcurrency(id: String, concurrency: Int) {
+    /**
+     * 管理员直接读写某个任务的当前并发值，修改后无需重启，各节点由 reconcile 生效。
+     * 并发是"每任务一份"的属性：入口任务与工作任务各自独立。
+     */
+    fun updateConcurrency(id: String, taskType: String, concurrency: Int) {
         if (concurrency <= 0) {
             throw PluginException.invalidConcurrency()
         }
         getPlugin(id)
-        sql.saveCommand(Plugin {
-            this.id = id
-            this.concurrency = concurrency
-            this.updatedAt = Instant.now()
-        }, SaveMode.UPDATE_ONLY).execute()
+        val key = TaskKey.ofOrNull(id, taskType) ?: throw PluginException.notFound()
+        transactionTemplate.executeWithoutResult {
+            if (!pluginTaskStore.updateConcurrency(key, concurrency)) {
+                throw PluginException.notFound()
+            }
+            sql.saveCommand(Plugin {
+                this.id = id
+                this.updatedAt = Instant.now()
+            }, SaveMode.UPDATE_ONLY).execute()
+        }
     }
 
     /**
@@ -209,13 +243,14 @@ class PluginService(
         pluginTaskService.uninstall(id)
     }
 
-    /** 导出插件包；manifest 的 `task.concurrency` 写入当前并发值 */
+    /** 导出插件包；manifest 的 `tasks[].concurrency` 写入当前并发值 */
     fun export(id: String): ByteArray {
         val plugin = getPlugin(id)
+        val tasks = pluginTaskStore.findByPlugin(id)
         val baos = ByteArrayOutputStream()
         ZipOutputStream(baos).use { zos ->
             zos.putNextEntry(ZipEntry("plugin.yml"))
-            zos.write(reconstructManifestYaml(plugin).toByteArray(Charsets.UTF_8))
+            zos.write(reconstructManifestYaml(plugin, tasks).toByteArray(Charsets.UTF_8))
             zos.closeEntry()
             zos.putNextEntry(ZipEntry("plugin.wasm"))
             zos.write(plugin.wasm)
@@ -224,7 +259,7 @@ class PluginService(
         return baos.toByteArray()
     }
 
-    private fun reconstructManifestYaml(plugin: Plugin): String {
+    private fun reconstructManifestYaml(plugin: Plugin, tasks: List<PluginTaskRow>): String {
         val data = mapOf(
             "id" to plugin.id,
             "name" to plugin.name,
@@ -233,14 +268,18 @@ class PluginService(
                 "type" to "wasm",
                 "abi" to plugin.abi,
             ),
-            "task" to mapOf(
-                "type" to plugin.taskType,
-                "concurrency" to plugin.concurrency,
-            ),
-            "form" to mapOf(
-                "schema" to plugin.formDefinition.get("schema"),
-                "order" to plugin.formDefinition.get("order"),
-            ),
+            "tasks" to tasks.map { task ->
+                val formDefinition = objectMapper.readTree(task.formDefinitionJson)
+                mapOf(
+                    "type" to task.taskType,
+                    "concurrency" to task.concurrency,
+                    "userSubmittable" to task.userSubmittable,
+                    "form" to mapOf(
+                        "schema" to formDefinition.get("schema"),
+                        "order" to formDefinition.get("order"),
+                    ),
+                )
+            },
             "config" to mapOf(
                 "schema" to plugin.configDefinition.get("schema"),
                 "order" to plugin.configDefinition.get("order"),

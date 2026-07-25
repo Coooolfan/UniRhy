@@ -4,6 +4,7 @@ import com.coooolfan.unirhy.model.Account
 import com.coooolfan.unirhy.model.Plugin
 import com.coooolfan.unirhy.model.by
 import com.coooolfan.unirhy.model.id
+import com.coooolfan.unirhy.service.plugin.PluginTaskStore
 import org.babyfish.jimmer.sql.fetcher.Fetcher
 import org.babyfish.jimmer.sql.kt.KSqlClient
 import org.babyfish.jimmer.sql.kt.fetcher.newFetcher
@@ -12,15 +13,20 @@ import run.endive.runtime.Instance
 import tools.jackson.databind.JsonNode
 import tools.jackson.databind.ObjectMapper
 
+private data class HostPluginTaskMetadata(
+    val taskType: String,
+    val concurrency: Int,
+    val userSubmittable: Boolean,
+    val formDefinition: JsonNode,
+)
+
 private data class HostPluginMetadata(
     val id: String,
     val name: String?,
     val version: String,
-    val taskType: String,
-    val concurrency: Int,
     val isAvailable: Boolean,
     val enabled: Boolean,
-    val formDefinition: JsonNode,
+    val tasks: List<HostPluginTaskMetadata>,
     val configDefinition: JsonNode,
 )
 
@@ -34,10 +40,7 @@ private data class HostAccountMetadata(
 private val HOST_PLUGIN_METADATA_FETCHER: Fetcher<Plugin> = newFetcher(Plugin::class).by {
     name()
     version()
-    taskType()
-    concurrency()
     enabled()
-    formDefinition()
     configDefinition()
 }
 
@@ -49,6 +52,7 @@ private val HOST_ACCOUNT_METADATA_FETCHER: Fetcher<Account> = newFetcher(Account
 
 internal fun buildMetadataHostFunctions(
     sql: KSqlClient,
+    pluginTaskStore: PluginTaskStore,
     isPluginLoaded: (String) -> Boolean,
     objectMapper: ObjectMapper,
     instanceRef: () -> Instance,
@@ -56,17 +60,27 @@ internal fun buildMetadataHostFunctions(
 ): List<HostFunction> {
     val support = PluginHostSupport(objectMapper, callExecutor, instanceRef)
 
+    fun tasksOf(pluginId: String): List<HostPluginTaskMetadata> =
+        pluginTaskStore.findByPlugin(pluginId).map { task ->
+            HostPluginTaskMetadata(
+                taskType = task.taskType,
+                concurrency = task.concurrency,
+                userSubmittable = task.userSubmittable,
+                formDefinition = objectMapper.readTree(task.formDefinitionJson),
+            )
+        }
+
     return listOf(
         support.jsonFunction("host_plugin_list") {
             sql.createQuery(Plugin::class) {
                 orderBy(table.id)
                 select(table.fetch(HOST_PLUGIN_METADATA_FETCHER))
-            }.execute().map { it.toHostMetadata(isPluginLoaded) }
+            }.execute().map { it.toHostMetadata(isPluginLoaded, tasksOf(it.id)) }
         },
         support.jsonFunction("host_plugin_get") { request ->
             val plugin = sql.findById(HOST_PLUGIN_METADATA_FETCHER, request.requiredText("id"))
                 ?: notFound("Plugin not found")
-            plugin.toHostMetadata(isPluginLoaded)
+            plugin.toHostMetadata(isPluginLoaded, tasksOf(plugin.id))
         },
         support.jsonFunction("host_account_list") {
             sql.createQuery(Account::class) {
@@ -82,15 +96,16 @@ internal fun buildMetadataHostFunctions(
     )
 }
 
-private fun Plugin.toHostMetadata(isPluginLoaded: (String) -> Boolean): HostPluginMetadata = HostPluginMetadata(
+private fun Plugin.toHostMetadata(
+    isPluginLoaded: (String) -> Boolean,
+    tasks: List<HostPluginTaskMetadata>,
+): HostPluginMetadata = HostPluginMetadata(
     id = id,
     name = name,
     version = version,
-    taskType = taskType,
-    concurrency = concurrency,
     isAvailable = isPluginLoaded(id),
     enabled = enabled,
-    formDefinition = formDefinition,
+    tasks = tasks,
     configDefinition = configDefinition,
 )
 

@@ -27,9 +27,10 @@ class PluginHostSupportTest {
 
     @Test
     fun `catalog contains exactly the documented imports`() {
-        assertEquals(67, PLUGIN_HOST_FUNCTION_NAMES.size)
+        assertEquals(66, PLUGIN_HOST_FUNCTION_NAMES.size)
         assertTrue("host_task_create" in PLUGIN_HOST_FUNCTION_NAMES)
-        assertTrue("host_task_enqueue" in PLUGIN_HOST_FUNCTION_NAMES)
+        // 后继任务统一由 execute() 的返回值声明，不再提供 host 侧入队函数
+        assertFalse("host_task_enqueue" in PLUGIN_HOST_FUNCTION_NAMES)
         assertFalse("host_task_submission_create" in PLUGIN_HOST_FUNCTION_NAMES)
         assertTrue("host_plugin_config_get" in PLUGIN_HOST_FUNCTION_NAMES)
         assertTrue("host_plugin_data_get" in PLUGIN_HOST_FUNCTION_NAMES)

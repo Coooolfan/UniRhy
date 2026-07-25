@@ -1,7 +1,6 @@
 package com.coooolfan.unirhy.service.task
 
 import com.coooolfan.unirhy.model.Plugin
-import com.coooolfan.unirhy.model.concurrency
 import com.coooolfan.unirhy.model.enabled
 import com.coooolfan.unirhy.model.id
 import com.coooolfan.unirhy.model.taskType
@@ -12,8 +11,8 @@ import com.coooolfan.unirhy.service.PlaylistService
 import com.coooolfan.unirhy.service.RecordingService
 import com.coooolfan.unirhy.service.SystemConfigService
 import com.coooolfan.unirhy.service.WorkService
+import com.coooolfan.unirhy.service.plugin.PluginTaskStore
 import com.coooolfan.unirhy.service.plugin.WasmPlugin
-import com.coooolfan.unirhy.service.plugin.WasmExecutionContext
 import com.coooolfan.unirhy.service.plugin.hostapi.NestedPluginHostCallExecutor
 import com.coooolfan.unirhy.service.plugin.hostapi.PluginMediaService
 import com.coooolfan.unirhy.service.plugin.hostapi.PluginDataService
@@ -35,10 +34,9 @@ import com.coooolfan.unirhy.service.storage.StorageNodeObjectService
 import com.coooolfan.unirhy.service.task.common.AsyncTaskStore
 import com.coooolfan.unirhy.service.task.common.TaskKey
 import com.coooolfan.unirhy.service.task.dispatch.TaskCapacityManager
-import com.coooolfan.unirhy.service.task.spi.AsyncTaskHandler
-import com.coooolfan.unirhy.service.task.spi.AsyncTaskHandlerRegistry
-import com.coooolfan.unirhy.service.task.spi.TaskPlanner
-import com.coooolfan.unirhy.service.task.spi.TaskPlannerRegistry
+import com.coooolfan.unirhy.service.task.spi.TaskExecutor
+import com.coooolfan.unirhy.service.task.spi.TaskExecutorRegistry
+import com.coooolfan.unirhy.service.task.spi.TaskSpec
 import tools.jackson.databind.JsonNode
 import tools.jackson.databind.ObjectMapper
 import org.babyfish.jimmer.sql.kt.KSqlClient
@@ -48,11 +46,11 @@ import org.springframework.transaction.PlatformTransactionManager
 import java.time.Instant
 
 /**
- * WASM 插件运行时：按插件 id 维护本地已加载状态，将 `plan()` / `run()`
- * 适配为 [TaskPlanner] / [AsyncTaskHandler] 并成对注册。
+ * WASM 插件运行时：按插件 id 维护本地已加载状态，把插件声明的每个任务
+ * 适配为一个 [TaskExecutor] 注册。所有任务共用插件的 `execute` 导出函数。
  *
  * 各节点通过固定轮询 tick 调用 [reconcile]，根据
- * `plugin.id/enabled/task_type/concurrency/updated_at` 与本地快照对齐，
+ * `plugin.id/enabled/updated_at` 与本地快照对齐，
  * 不依赖处理管理请求的节点推送状态。
  */
 @Service
@@ -75,15 +73,15 @@ class PluginTaskService(
     private val taskStatisticsService: TaskStatisticsService,
     private val asyncTaskStore: AsyncTaskStore,
     transactionManager: PlatformTransactionManager,
-    private val plannerRegistry: TaskPlannerRegistry,
-    private val handlerRegistry: AsyncTaskHandlerRegistry,
+    private val pluginTaskStore: PluginTaskStore,
+    private val executorRegistry: TaskExecutorRegistry,
     private val capacityManager: TaskCapacityManager,
 ) {
     private val logger = LoggerFactory.getLogger(PluginTaskService::class.java)
     private val hostCallExecutor = NestedPluginHostCallExecutor(transactionManager)
 
     private data class LoadedSnapshot(
-        val key: TaskKey,
+        val keys: Set<TaskKey>,
         val updatedAt: Instant,
     )
 
@@ -93,33 +91,38 @@ class PluginTaskService(
 
     fun isLoaded(pluginId: String): Boolean = synchronized(lock) { pluginId in loaded }
 
-    /** 装载插件并成对注册 Planner / Handler；失败抛出异常且不产生半注册状态 */
+    /** 装载插件并为其每个已声明任务注册 Executor；失败抛出异常且不产生半注册状态 */
     fun install(plugin: Plugin) {
-        val key = TaskKey(plugin.id, plugin.taskType)
-        val wasmPlugin = loadWasmPlugin(plugin.id, plugin.wasm)
-        synchronized(lock) {
-            loaded[plugin.id]?.let { previous ->
-                if (previous.key != key) {
-                    plannerRegistry.unregister(previous.key)
-                    handlerRegistry.unregister(previous.key)
-                    capacityManager.removeHandler(previous.key)
-                }
-            }
-            plannerRegistry.replace(WasmTaskPlanner(key, wasmPlugin, objectMapper))
-            handlerRegistry.replace(WasmTaskHandler(key, wasmPlugin))
-            capacityManager.setHandlerLimit(key, plugin.concurrency)
-            loaded[plugin.id] = LoadedSnapshot(key = key, updatedAt = plugin.updatedAt)
+        val tasks = pluginTaskStore.findByPlugin(plugin.id)
+        if (tasks.isEmpty()) {
+            logger.warn("Plugin declares no task, runtime not installed: id={}", plugin.id)
+            return
         }
-        logger.info("Plugin runtime installed: id={}, key={}, concurrency={}", plugin.id, key, plugin.concurrency)
+        val wasmPlugin = loadWasmPlugin(plugin.id, plugin.wasm)
+        val keys = tasks.map { it.key }.toSet()
+        synchronized(lock) {
+            // 覆盖升级可能删掉了某些任务，先摘除不再声明的 key
+            loaded[plugin.id]?.keys?.minus(keys)?.forEach { stale ->
+                executorRegistry.unregister(stale)
+                capacityManager.remove(stale)
+            }
+            for (task in tasks) {
+                executorRegistry.replace(WasmTaskExecutor(task.key, wasmPlugin, objectMapper))
+                capacityManager.setLimit(task.key, task.concurrency)
+            }
+            loaded[plugin.id] = LoadedSnapshot(keys = keys, updatedAt = plugin.updatedAt)
+        }
+        logger.info("Plugin runtime installed: id={}, keys={}", plugin.id, keys)
     }
 
-    /** 成对移除 Planner / Handler 与本地容量 */
+    /** 移除该插件全部 Executor 与本地容量 */
     fun uninstall(pluginId: String) {
         synchronized(lock) {
             val snapshot = loaded.remove(pluginId) ?: return
-            plannerRegistry.unregister(snapshot.key)
-            handlerRegistry.unregister(snapshot.key)
-            capacityManager.removeHandler(snapshot.key)
+            for (key in snapshot.keys) {
+                executorRegistry.unregister(key)
+                capacityManager.remove(key)
+            }
         }
         logger.info("Plugin runtime uninstalled: id={}", pluginId)
     }
@@ -127,7 +130,7 @@ class PluginTaskService(
     /** 每轮 tick 根据数据库插件元数据对齐本地 Registry */
     fun reconcile() {
         val rows = sql.createQuery(Plugin::class) {
-            select(table.id, table.enabled, table.taskType, table.concurrency, table.updatedAt)
+            select(table.id, table.enabled, table.updatedAt)
         }.execute()
 
         val enabledRows = rows.filter { it._2 }.associateBy { it._1 }
@@ -139,7 +142,7 @@ class PluginTaskService(
 
         for ((pluginId, row) in enabledRows) {
             val snapshot = synchronized(lock) { loaded[pluginId] }
-            if (snapshot != null && snapshot.updatedAt == row._5) {
+            if (snapshot != null && snapshot.updatedAt == row._3) {
                 continue
             }
             val plugin = sql.findById(Plugin::class, pluginId) ?: continue
@@ -155,7 +158,7 @@ class PluginTaskService(
     }
 
     private fun loadWasmPlugin(pluginId: String, wasmBytes: ByteArray): WasmPlugin =
-        WasmPlugin.load(pluginId, wasmBytes) { instanceRef, executionContext ->
+        WasmPlugin.load(pluginId, wasmBytes) { instanceRef ->
             val functions = buildDefaultHostFunctions(storageObjects, objectMapper, instanceRef, hostCallExecutor) +
                 buildArtistHostFunctions(artistService, objectMapper, instanceRef, hostCallExecutor) +
                 buildWorkHostFunctions(workService, objectMapper, instanceRef, hostCallExecutor) +
@@ -176,9 +179,6 @@ class PluginTaskService(
                     taskDefinitionService,
                     asyncTaskService,
                     taskStatisticsService,
-                    asyncTaskStore,
-                    pluginId,
-                    executionContext,
                     objectMapper,
                     instanceRef,
                     hostCallExecutor,
@@ -190,7 +190,14 @@ class PluginTaskService(
                     instanceRef,
                     hostCallExecutor,
                 ) +
-                buildMetadataHostFunctions(sql, { id -> isLoaded(id) }, objectMapper, instanceRef, hostCallExecutor)
+                buildMetadataHostFunctions(
+                    sql,
+                    pluginTaskStore,
+                    { id -> isLoaded(id) },
+                    objectMapper,
+                    instanceRef,
+                    hostCallExecutor,
+                )
             validatePluginHostFunctions(functions)
             functions
         }
@@ -201,22 +208,26 @@ class PluginTaskService(
     }
 }
 
-private class WasmTaskPlanner(
+/**
+ * 把插件的 `execute` 导出函数适配为单个 TaskKey 的 Executor。
+ * 后继的 namespace 缺省为插件自身，显式给出时允许跨 namespace 派活。
+ */
+private class WasmTaskExecutor(
     override val key: TaskKey,
     private val wasmPlugin: WasmPlugin,
     private val objectMapper: ObjectMapper,
-) : TaskPlanner {
-    override fun plan(params: JsonNode): Sequence<JsonNode> {
-        val payloads = wasmPlugin.plan(params.toString().toByteArray(Charsets.UTF_8))
-        return payloads.asSequence().map { objectMapper.readTree(it) }
-    }
-}
-
-private class WasmTaskHandler(
-    override val key: TaskKey,
-    private val wasmPlugin: WasmPlugin,
-) : AsyncTaskHandler {
-    override fun run(taskId: Long, payload: JsonNode) {
-        wasmPlugin.run(taskId, key.taskType, payload.toString().toByteArray(Charsets.UTF_8))
+) : TaskExecutor {
+    override fun execute(taskId: Long, payload: JsonNode): Sequence<TaskSpec> {
+        val successors = wasmPlugin.execute(
+            taskId = taskId,
+            taskType = key.taskType,
+            payloadJson = payload.toString().toByteArray(Charsets.UTF_8),
+        )
+        return successors.asSequence().map { successor ->
+            TaskSpec(
+                key = TaskKey(successor.namespace ?: key.namespace, successor.taskType),
+                payload = successor.payload,
+            )
+        }
     }
 }

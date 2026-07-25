@@ -8,37 +8,38 @@ import java.util.concurrent.atomic.AtomicInteger
 /**
  * 每节点的 TaskKey 本地并发容量。
  *
- * - Handler 容量：Dispatcher 在提交 Worker 前预留，Worker 在 `finally` 中释放；
- *   根任务与子任务共用 TaskKey 容量，不限制集群总并发。
+ * Dispatcher 在提交 Worker 前预留，Worker 在 `finally` 中释放；
+ * 配额只表示"本节点能同时执行几个该 key 的任务"，不限制集群总并发。
+ * 阶段已编码进 TaskKey，入口任务与工作任务是不同的 key，各自独立配额。
  */
 @Component
 class TaskCapacityManager {
 
-    private class HandlerCapacity(limit: Int) {
+    private class Capacity(limit: Int) {
         val limit = AtomicInteger(limit)
         val inUse = AtomicInteger(0)
     }
 
-    private val handlerCapacities = ConcurrentHashMap<TaskKey, HandlerCapacity>()
+    private val capacities = ConcurrentHashMap<TaskKey, Capacity>()
 
-    fun setHandlerLimit(key: TaskKey, limit: Int) {
-        handlerCapacities.compute(key) { _, existing ->
-            existing?.also { it.limit.set(limit) } ?: HandlerCapacity(limit)
+    fun setLimit(key: TaskKey, limit: Int) {
+        capacities.compute(key) { _, existing ->
+            existing?.also { it.limit.set(limit) } ?: Capacity(limit)
         }
     }
 
-    fun removeHandler(key: TaskKey) {
-        handlerCapacities.remove(key)
+    fun remove(key: TaskKey) {
+        capacities.remove(key)
     }
 
     /** 当前可再预留的 Worker 数 */
-    fun availableHandlerSlots(key: TaskKey): Int {
-        val capacity = handlerCapacities[key] ?: return 0
+    fun availableSlots(key: TaskKey): Int {
+        val capacity = capacities[key] ?: return 0
         return (capacity.limit.get() - capacity.inUse.get()).coerceAtLeast(0)
     }
 
-    fun tryAcquireHandlerSlot(key: TaskKey): Boolean {
-        val capacity = handlerCapacities[key] ?: return false
+    fun tryAcquireSlot(key: TaskKey): Boolean {
+        val capacity = capacities[key] ?: return false
         while (true) {
             val current = capacity.inUse.get()
             if (current >= capacity.limit.get()) {
@@ -50,7 +51,7 @@ class TaskCapacityManager {
         }
     }
 
-    fun releaseHandlerSlot(key: TaskKey) {
-        handlerCapacities[key]?.inUse?.decrementAndGet()
+    fun releaseSlot(key: TaskKey) {
+        capacities[key]?.inUse?.decrementAndGet()
     }
 }

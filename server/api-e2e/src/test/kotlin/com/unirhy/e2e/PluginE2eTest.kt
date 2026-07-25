@@ -75,8 +75,13 @@ class PluginE2eTest {
         val uploaded = pluginNode(listAfterUploadResponse.body(), pluginId)
         assertEquals(pluginId, uploaded.path("id").asString(), "[plugins] list should contain uploaded plugin")
         assertEquals("0.0.1", uploaded.path("version").asString(), "[plugins] version should match manifest")
-        assertEquals(TASK_TYPE, uploaded.path("taskType").asString(), "[plugins] task type should match manifest")
-        assertEquals(1, uploaded.path("concurrency").intValue(), "[plugins] concurrency should match manifest")
+        val uploadedTask = uploaded.path("tasks").single()
+        assertEquals(TASK_TYPE, uploadedTask.path("taskType").asString(), "[plugins] task type should match manifest")
+        assertEquals(1, uploadedTask.path("concurrency").intValue(), "[plugins] concurrency should match manifest")
+        assertTrue(
+            uploadedTask.path("userSubmittable").asBoolean(),
+            "[plugins] entry task should be user-submittable",
+        )
         assertFalse(uploaded.path("enabled").asBoolean(), "[plugins] uploaded plugin should start disabled")
         assertFalse(uploaded.path("isAvailable").asBoolean(), "[plugins] disabled plugin should not be loaded")
         assertEquals(
@@ -97,13 +102,13 @@ class PluginE2eTest {
         )
 
         val invalidConcurrencyResponse = state.api.put(
-            path = "/api/plugins/$pluginId/concurrency",
+            path = "/api/plugins/$pluginId/tasks/$TASK_TYPE/concurrency",
             query = mapOf("concurrency" to 0),
         )
         E2eAssert.status(invalidConcurrencyResponse, 400, "[plugins] non-positive concurrency should fail")
 
         val concurrencyResponse = state.api.put(
-            path = "/api/plugins/$pluginId/concurrency",
+            path = "/api/plugins/$pluginId/tasks/$TASK_TYPE/concurrency",
             query = mapOf("concurrency" to 5),
         )
         E2eAssert.status(concurrencyResponse, 204, "[plugins] concurrency update should succeed")
@@ -119,7 +124,11 @@ class PluginE2eTest {
         val enabled = pluginNode(listAfterEnableResponse.body(), pluginId)
         assertTrue(enabled.path("enabled").asBoolean(), "[plugins] enabled flag should be true")
         assertTrue(enabled.path("isAvailable").asBoolean(), "[plugins] enabled wasm should be loaded")
-        assertEquals(5, enabled.path("concurrency").intValue(), "[plugins] concurrency update should persist")
+        assertEquals(
+            5,
+            enabled.path("tasks").single().path("concurrency").intValue(),
+            "[plugins] concurrency update should persist",
+        )
 
         E2eAssert.status(
             state.api.delete("/api/plugins/$pluginId"),
@@ -588,26 +597,27 @@ class PluginE2eTest {
             runtime:
               type: wasm
               abi: unirhy-wasm-abi-v1
-            task:
-              type: $TASK_TYPE
-              concurrency: 1
-            form:
-              schema:
-                type: object
-                properties:
-                  dryRun:
-                    type: boolean
-                    title: Dry run
-                  tags:
-                    type: array
-                    title: Tags
-                    items:
-                      type: string
-                required: []
-                additionalProperties: false
-              order:
-                - dryRun
-                - tags
+            tasks:
+              - type: $TASK_TYPE
+                concurrency: 1
+                userSubmittable: true
+                form:
+                  schema:
+                    type: object
+                    properties:
+                      dryRun:
+                        type: boolean
+                        title: Dry run
+                      tags:
+                        type: array
+                        title: Tags
+                        items:
+                          type: string
+                    required: []
+                    additionalProperties: false
+                  order:
+                    - dryRun
+                    - tags
         """.trimIndent() + if (config.isEmpty()) "" else "\n$config"
         return zip(
             "plugin.yml" to manifest.toByteArray(),
@@ -696,9 +706,10 @@ class PluginE2eTest {
                 runtime:
                   type: wasm
                   abi: unirhy-wasm-abi-v1
-                task:
-                  type: $TASK_TYPE
-                  concurrency: 1
+                tasks:
+                  - type: $TASK_TYPE
+                    concurrency: 1
+                    userSubmittable: true
             """.trimIndent().toByteArray(),
         )
     }

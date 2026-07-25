@@ -25,22 +25,23 @@ class PluginManifestTest {
                 runtime:
                   type: wasm
                   abi: unirhy-wasm-abi-v1
-                task:
-                  type: FETCH_COVER
-                  concurrency: 4
-                form:
-                  schema:
-                    type: object
-                    properties:
-                      keyword:
-                        type: string
-                        title: 搜索关键字
-                        minLength: 1
-                    required:
-                      - keyword
-                    additionalProperties: false
-                  order:
-                    - keyword
+                tasks:
+                  - type: FETCH_COVER
+                    concurrency: 4
+                    userSubmittable: true
+                    form:
+                      schema:
+                        type: object
+                        properties:
+                          keyword:
+                            type: string
+                            title: 搜索关键字
+                            minLength: 1
+                        required:
+                          - keyword
+                        additionalProperties: false
+                      order:
+                        - keyword
             """.trimIndent()
         )
 
@@ -48,10 +49,67 @@ class PluginManifestTest {
         assertEquals("1.0.0", manifest.version)
         assertEquals("wasm", manifest.runtime.type)
         assertEquals(UNIRHY_WASM_ABI_V1, manifest.runtime.abi)
-        assertEquals("FETCH_COVER", manifest.task.type)
-        assertEquals(4, manifest.task.concurrency)
-        assertEquals(TaskKey("com.example.task-plugin", "FETCH_COVER"), manifest.taskKey)
+        assertEquals("FETCH_COVER", manifest.tasks.single().type)
+        assertEquals(4, manifest.tasks.single().concurrency)
+        assertEquals(listOf(TaskKey("com.example.task-plugin", "FETCH_COVER")), manifest.taskKeys())
         assertNull(manifest.validate())
+    }
+
+    @Test
+    fun `loads entry task and worker task with independent forms`() {
+        val manifest = parse(
+            """
+                id: com.example.two-stage
+                version: 1.0.0
+                runtime:
+                  type: wasm
+                  abi: unirhy-wasm-abi-v1
+                tasks:
+                  - type: IMPORT
+                    concurrency: 2
+                    userSubmittable: true
+                    form:
+                      schema:
+                        type: object
+                        properties:
+                          url:
+                            type: string
+                            title: URL
+                        required:
+                          - url
+                        additionalProperties: false
+                      order:
+                        - url
+                  - type: IMPORT_ITEM
+                    concurrency: 8
+                    form:
+                      schema:
+                        type: object
+                        properties:
+                          itemId:
+                            type: integer
+                            title: 条目 ID
+                        required:
+                          - itemId
+                        additionalProperties: false
+                      order:
+                        - itemId
+            """.trimIndent()
+        )
+
+        assertNull(manifest.validate())
+        val entry = manifest.tasks.first { it.userSubmittable }
+        val worker = manifest.tasks.first { !it.userSubmittable }
+        assertEquals("IMPORT", entry.type)
+        assertEquals("IMPORT_ITEM", worker.type)
+        assertEquals(
+            setOf("url"),
+            manifest.formDefinition(entry).path("schema").path("properties").propertyNames().toSet(),
+        )
+        assertEquals(
+            setOf("itemId"),
+            manifest.formDefinition(worker).path("schema").path("properties").propertyNames().toSet(),
+        )
     }
 
     @Test
@@ -63,21 +121,22 @@ class PluginManifestTest {
                 runtime:
                   type: wasm
                   abi: unirhy-wasm-abi-v1
-                task:
-                  type: IMPORT
-                  concurrency: 1
-                form:
-                  schema:
-                    type: object
-                    properties:
-                      url:
-                        type: string
-                        title: URL
-                    required:
-                      - url
-                    additionalProperties: false
-                  order:
-                    - url
+                tasks:
+                  - type: IMPORT
+                    concurrency: 1
+                    userSubmittable: true
+                    form:
+                      schema:
+                        type: object
+                        properties:
+                          url:
+                            type: string
+                            title: URL
+                        required:
+                          - url
+                        additionalProperties: false
+                      order:
+                        - url
                 config:
                   schema:
                     type: object
@@ -95,7 +154,10 @@ class PluginManifestTest {
         )
 
         assertNull(manifest.validate())
-        assertEquals(setOf("url"), manifest.formDefinition().path("schema").path("properties").propertyNames().toSet())
+        assertEquals(
+            setOf("url"),
+            manifest.formDefinition(manifest.tasks.single()).path("schema").path("properties").propertyNames().toSet(),
+        )
         assertEquals(
             setOf("apiKey"),
             manifest.configDefinition().path("schema").path("properties").propertyNames().toSet(),
@@ -111,21 +173,22 @@ class PluginManifestTest {
                 runtime:
                   type: wasm
                   abi: unirhy-wasm-abi-v1
-                task:
-                  type: IMPORT
-                  concurrency: 1
-                form:
-                  schema:
-                    type: object
-                    properties:
-                      apiKey:
-                        type: string
-                        title: API Key
-                        writeOnly: true
-                    required: []
-                    additionalProperties: false
-                  order:
-                    - apiKey
+                tasks:
+                  - type: IMPORT
+                    concurrency: 1
+                    userSubmittable: true
+                    form:
+                      schema:
+                        type: object
+                        properties:
+                          apiKey:
+                            type: string
+                            title: API Key
+                            writeOnly: true
+                        required: []
+                        additionalProperties: false
+                      order:
+                        - apiKey
             """.trimIndent()
         )
 
@@ -141,9 +204,10 @@ class PluginManifestTest {
                 runtime:
                   type: wasm
                   abi: unirhy-wasm-abi-v1
-                task:
-                  type: IMPORT
-                  concurrency: 1
+                tasks:
+                  - type: IMPORT
+                    concurrency: 1
+                    userSubmittable: true
                 config:
                   schema:
                     type: object
@@ -163,7 +227,7 @@ class PluginManifestTest {
     }
 
     @Test
-    fun `manifest without form uses empty form definition`() {
+    fun `task without form uses empty form definition`() {
         val manifest = parse(
             """
                 id: com.example.simple
@@ -171,14 +235,15 @@ class PluginManifestTest {
                 runtime:
                   type: wasm
                   abi: unirhy-wasm-abi-v1
-                task:
-                  type: SIMPLE
-                  concurrency: 1
+                tasks:
+                  - type: SIMPLE
+                    concurrency: 1
+                    userSubmittable: true
             """.trimIndent()
         )
 
         assertNull(manifest.validate())
-        val formDefinition = manifest.formDefinition()
+        val formDefinition = manifest.formDefinition(manifest.tasks.single())
         assertEquals("object", formDefinition.get("schema").get("type").stringValue())
         assertEquals(0, formDefinition.get("schema").get("properties").size())
         assertEquals(0, formDefinition.get("order").size())
@@ -193,9 +258,10 @@ class PluginManifestTest {
                 runtime:
                   type: wasm
                   abi: unirhy-wasm-abi-v1
-                task:
-                  type: EVIL
-                  concurrency: 1
+                tasks:
+                  - type: EVIL
+                    concurrency: 1
+                    userSubmittable: true
             """.trimIndent()
         )
         assertNotNull(manifest.validate())
@@ -210,9 +276,10 @@ class PluginManifestTest {
                 runtime:
                   type: wasm
                   abi: unirhy-wasm-abi-v1
-                task:
-                  type: lower_case
-                  concurrency: 1
+                tasks:
+                  - type: lower_case
+                    concurrency: 1
+                    userSubmittable: true
             """.trimIndent()
         )
         assertNotNull(manifest.validate())
@@ -227,9 +294,62 @@ class PluginManifestTest {
                 runtime:
                   type: wasm
                   abi: unirhy-wasm-abi-v1
-                task:
-                  type: SIMPLE
-                  concurrency: 0
+                tasks:
+                  - type: SIMPLE
+                    concurrency: 0
+                    userSubmittable: true
+            """.trimIndent()
+        )
+        assertNotNull(manifest.validate())
+    }
+
+    @Test
+    fun `rejects manifest without task`() {
+        val manifest = parse(
+            """
+                id: com.example.empty
+                version: 1.0.0
+                runtime:
+                  type: wasm
+                  abi: unirhy-wasm-abi-v1
+                tasks: []
+            """.trimIndent()
+        )
+        assertNotNull(manifest.validate())
+    }
+
+    @Test
+    fun `rejects manifest without user-submittable task`() {
+        val manifest = parse(
+            """
+                id: com.example.no-entry
+                version: 1.0.0
+                runtime:
+                  type: wasm
+                  abi: unirhy-wasm-abi-v1
+                tasks:
+                  - type: WORKER_ONLY
+                    concurrency: 1
+            """.trimIndent()
+        )
+        assertNotNull(manifest.validate())
+    }
+
+    @Test
+    fun `rejects duplicate task type`() {
+        val manifest = parse(
+            """
+                id: com.example.duplicate
+                version: 1.0.0
+                runtime:
+                  type: wasm
+                  abi: unirhy-wasm-abi-v1
+                tasks:
+                  - type: IMPORT
+                    concurrency: 1
+                    userSubmittable: true
+                  - type: IMPORT
+                    concurrency: 2
             """.trimIndent()
         )
         assertNotNull(manifest.validate())
@@ -244,21 +364,22 @@ class PluginManifestTest {
                 runtime:
                   type: wasm
                   abi: unirhy-wasm-abi-v1
-                task:
-                  type: SIMPLE
-                  concurrency: 1
-                form:
-                  schema:
-                    type: object
-                    properties:
-                      keyword:
-                        type: string
-                        title: 关键字
-                        pattern: ".*"
-                    required: []
-                    additionalProperties: false
-                  order:
-                    - keyword
+                tasks:
+                  - type: SIMPLE
+                    concurrency: 1
+                    userSubmittable: true
+                    form:
+                      schema:
+                        type: object
+                        properties:
+                          keyword:
+                            type: string
+                            title: 关键字
+                            pattern: ".*"
+                        required: []
+                        additionalProperties: false
+                      order:
+                        - keyword
             """.trimIndent()
         )
         assertNotNull(manifest.validate())
@@ -273,19 +394,20 @@ class PluginManifestTest {
                 runtime:
                   type: wasm
                   abi: unirhy-wasm-abi-v1
-                task:
-                  type: SIMPLE
-                  concurrency: 1
-                form:
-                  schema:
-                    type: object
-                    properties:
-                      keyword:
-                        type: string
-                        title: 关键字
-                    required: []
-                    additionalProperties: false
-                  order: []
+                tasks:
+                  - type: SIMPLE
+                    concurrency: 1
+                    userSubmittable: true
+                    form:
+                      schema:
+                        type: object
+                        properties:
+                          keyword:
+                            type: string
+                            title: 关键字
+                        required: []
+                        additionalProperties: false
+                      order: []
             """.trimIndent()
         )
         assertNotNull(manifest.validate())

@@ -29,18 +29,13 @@ data class ClaimedTask(
     val payloadJson: String,
 )
 
-data class PendingTaskCounts(
-    val rootCount: Long,
-    val childCount: Long,
-)
-
 @Component
 class AsyncTaskStore(
     private val sql: KSqlClient,
     private val jdbc: NamedParameterJdbcTemplate,
 ) {
 
-    /** 创建一个交由 Planner 处理的根任务。 */
+    /** 创建一个用户投递的入口任务（无父任务）。 */
     fun enqueueRoot(key: TaskKey, payloadJson: String): Long =
         jdbc.queryForObject(
             """
@@ -56,8 +51,8 @@ class AsyncTaskStore(
         )!!
 
     /**
-     * 批量创建交由 Handler 处理的子任务。活动子任务去重由
-     * `uq_async_task_active_child` 提供，冲突记录被忽略。
+     * 批量创建后继任务。[key] 是后继自己的 TaskKey，可与父任务不同、可跨 namespace。
+     * 同父同 key 的活动任务去重由 `uq_async_task_active_sibling` 提供，冲突记录被忽略。
      */
     fun enqueueChildrenIgnoringConflicts(parentId: Long, key: TaskKey, payloadJsonList: List<String>): Int {
         if (payloadJsonList.isEmpty()) return 0
@@ -76,36 +71,30 @@ class AsyncTaskStore(
         return jdbc.batchUpdate(insertSql, batchParams).sum()
     }
 
-    fun discoverPendingCounts(): Map<TaskKey, PendingTaskCounts> {
+    /** 按 TaskKey 统计待执行任务数；入口任务与工作任务是不同的 key，无需分列。 */
+    fun discoverPendingCounts(): Map<TaskKey, Long> {
         val querySql = """
-            SELECT namespace,
-                   task_type,
-                   count(*) FILTER (WHERE parent_task_id IS NULL),
-                   count(*) FILTER (WHERE parent_task_id IS NOT NULL)
+            SELECT namespace, task_type, count(*)
             FROM public.async_task
             WHERE status = 'PENDING'
             GROUP BY namespace, task_type
         """.trimIndent()
-        val result = mutableMapOf<TaskKey, PendingTaskCounts>()
+        val result = mutableMapOf<TaskKey, Long>()
         jdbc.query(querySql) { rs ->
             val key = TaskKey.ofOrNull(rs.getString(1), rs.getString(2)) ?: return@query
-            result[key] = PendingTaskCounts(
-                rootCount = rs.getLong(3),
-                childCount = rs.getLong(4),
-            )
+            result[key] = rs.getLong(3)
         }
         return result
     }
 
     /** claim 一条当前节点可执行的任务并标记为 RUNNING；行锁保持到执行事务结束。 */
-    fun claimOne(key: TaskKey, includeRoots: Boolean): ClaimedTask? {
+    fun claimOne(key: TaskKey): ClaimedTask? {
         val claimSql = """
             WITH grabbed AS (
                 SELECT id
                 FROM public.async_task
                 WHERE namespace = :namespace
                   AND task_type = :taskType
-                  AND (:includeRoots OR parent_task_id IS NOT NULL)
                   AND status = 'PENDING'
                 ORDER BY created_at, id
                 LIMIT 1
@@ -119,7 +108,6 @@ class AsyncTaskStore(
         val params = MapSqlParameterSource()
             .addValue("namespace", key.namespace)
             .addValue("taskType", key.taskType)
-            .addValue("includeRoots", includeRoots)
         return jdbc.query(claimSql, params) { rs, _ ->
             ClaimedTask(
                 id = rs.getLong(1),

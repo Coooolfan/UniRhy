@@ -6,8 +6,8 @@ import com.coooolfan.unirhy.service.storage.StorageNode
 import com.coooolfan.unirhy.service.storage.StorageNodeObjectService
 import com.coooolfan.unirhy.service.storage.bindProvider
 import com.coooolfan.unirhy.service.task.common.TaskKey
-import com.coooolfan.unirhy.service.task.spi.AsyncTaskHandler
-import com.coooolfan.unirhy.service.task.spi.TaskPlanner
+import com.coooolfan.unirhy.service.task.spi.TaskExecutor
+import com.coooolfan.unirhy.service.task.spi.TaskSpec
 import tools.jackson.databind.JsonNode
 import tools.jackson.databind.ObjectMapper
 import org.babyfish.jimmer.sql.ast.mutation.AssociatedSaveMode
@@ -21,19 +21,20 @@ import java.io.IOException
 import java.util.*
 
 /**
- * 内建转码任务的规划器：按源存储节点上的音频 Asset 产出转码 payload。
+ * 内建转码任务的入口任务：按源存储节点上的音频 Asset 展开出待转码单元。
+ * 只查询存储节点元数据与 Asset 表，不需要 ffmpeg，可在任意节点执行。
  */
 @Component
-class TranscodeTaskPlanner(
+class TranscodePlanExecutor(
     private val sql: KSqlClient,
     private val objectMapper: ObjectMapper,
     private val storageObjects: StorageNodeObjectService,
-) : TaskPlanner {
+) : TaskExecutor {
 
     override val key: TaskKey = BuiltInTasks.TRANSCODE
 
-    override fun plan(params: JsonNode): Sequence<JsonNode> {
-        val request = objectMapper.treeToValue(params, TranscodeTaskRequest::class.java)
+    override fun execute(taskId: Long, payload: JsonNode): Sequence<TaskSpec> {
+        val request = objectMapper.treeToValue(payload, TranscodeTaskRequest::class.java)
         if (request.targetCodec != CodecType.OPUS) {
             error("Unsupported target codec: ${request.targetCodec}")
         }
@@ -58,43 +59,49 @@ class TranscodeTaskPlanner(
         }
 
         return recordingAssetMap.entries.asSequence().map { entry ->
-            objectMapper.valueToTree(
-                TranscodeTaskPayload(
-                    recordingId = entry.key,
-                    srcObjectKey = entry.value,
-                    srcProviderType = srcProvider.providerType,
-                    srcProviderId = srcProvider.providerId,
-                    dstProviderType = dstProvider.providerType,
-                    dstProviderId = request.dstProviderId,
-                    targetCodec = request.targetCodec,
-                )
+            TaskSpec(
+                BuiltInTasks.TRANSCODE_ITEM,
+                objectMapper.valueToTree(
+                    TranscodeTaskPayload(
+                        recordingId = entry.key,
+                        srcObjectKey = entry.value,
+                        srcProviderType = srcProvider.providerType,
+                        srcProviderId = srcProvider.providerId,
+                        dstProviderType = dstProvider.providerType,
+                        dstProviderId = request.dstProviderId,
+                        targetCodec = request.targetCodec,
+                    )
+                ),
             )
         }
     }
 }
 
 /**
- * 内建转码任务的执行器：下载源文件、调用 ffmpeg 转码并保存新 Asset。
+ * 内建转码任务的工作任务：下载单个源文件、调用 ffmpeg 转码并保存新 Asset。
+ * 叶子任务，不产出后继。
  *
- * ffmpeg 不可用的节点不注册该 Handler，对应任务保持 PENDING 由其他节点消费。
+ * ffmpeg 不可用的节点不注册该 Executor，对应任务保持 PENDING 由其他节点消费；
+ * 入口任务 [TranscodePlanExecutor] 不受影响，任意节点都能规划。
  */
 @Component
-class TranscodeTaskHandler(
+class TranscodeItemExecutor(
     private val sql: KSqlClient,
     private val objectMapper: ObjectMapper,
     private val storageObjects: StorageNodeObjectService,
-) : AsyncTaskHandler {
+) : TaskExecutor {
 
-    private val logger = LoggerFactory.getLogger(TranscodeTaskHandler::class.java)
+    private val logger = LoggerFactory.getLogger(TranscodeItemExecutor::class.java)
 
     val ffmpegAvailable: Boolean = detectFfmpegAvailability()
 
-    override val key: TaskKey = BuiltInTasks.TRANSCODE
+    override val key: TaskKey = BuiltInTasks.TRANSCODE_ITEM
 
-    override fun run(taskId: Long, payload: JsonNode) {
+    override fun execute(taskId: Long, payload: JsonNode): Sequence<TaskSpec> {
         val transcodePayload = objectMapper.treeToValue(payload, TranscodeTaskPayload::class.java)
         val transcodedAsset = prepareTranscodedAsset(transcodePayload)
         saveTranscodedAsset(transcodedAsset)
+        return emptySequence()
     }
 
     private fun detectFfmpegAvailability(): Boolean {

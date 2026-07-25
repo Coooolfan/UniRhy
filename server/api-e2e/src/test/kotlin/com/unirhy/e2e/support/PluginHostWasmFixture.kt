@@ -10,7 +10,6 @@ object PluginHostWasmFixture {
     private const val ALLOC_TYPE = 3
     private const val VOID_BINARY_TYPE = 4
 
-    private const val PLAN_PTR = 1024
     private const val ARTIST_REQUEST_PTR = 2048
     private const val WORK_REQUEST_PTR = 3072
     private const val RECORDING_REQUEST_PTR = 4096
@@ -27,7 +26,7 @@ object PluginHostWasmFixture {
     private const val DATA_GET_REQUEST_PTR = 15360
     private const val DATA_LIST_REQUEST_PTR = 16384
     private const val STORAGE_DATA_PTR = 17408
-    private const val RUN_RESULT_PTR = 19456
+    private const val EXECUTE_RESULT_PTR = 19456
     private const val ALLOC_PTR = 20480
     private const val RESPONSE_OK_VALUE_OFFSET = 6
     private const val RESPONSE_DATA_ARRAY_ITEM_OFFSET = 19
@@ -87,7 +86,6 @@ object PluginHostWasmFixture {
         "host_task_definition_list",
         "host_task_definition_get",
         "host_task_create",
-        "host_task_enqueue",
         "host_task_list",
         "host_task_get",
         "host_task_patch",
@@ -117,10 +115,9 @@ object PluginHostWasmFixture {
         pluginDataKey: String,
         pluginDataValue: String,
     ): ByteArray {
-        check(hostFunctionNames.size == 67 && hostFunctionNames.distinct().size == 67)
+        check(hostFunctionNames.size == 66 && hostFunctionNames.distinct().size == 66)
 
-        val plan = "[{}]".toByteArray()
-        val runResult = "{\"ok\":true}".toByteArray()
+        val executeResult = "{\"ok\":true}".toByteArray()
         val artistRequest = E2eJson.mapper.writeValueAsBytes(mapOf("displayName" to artistName))
         val workRequest = E2eJson.mapper.writeValueAsBytes(mapOf("title" to workTitle))
         val recordingRequest = E2eJson.mapper.writeValueAsBytes(
@@ -186,7 +183,6 @@ object PluginHostWasmFixture {
         val dataListRequest = E2eJson.mapper.writeValueAsBytes(
             mapOf("prefix" to pluginDataKey, "pageIndex" to 0, "pageSize" to 10),
         )
-        requireFits(PLAN_PTR, ARTIST_REQUEST_PTR, plan)
         requireFits(ARTIST_REQUEST_PTR, WORK_REQUEST_PTR, artistRequest)
         requireFits(WORK_REQUEST_PTR, RECORDING_REQUEST_PTR, workRequest)
         requireFits(RECORDING_REQUEST_PTR, DEFAULT_NODE_REQUEST_PTR, recordingRequest)
@@ -202,8 +198,8 @@ object PluginHostWasmFixture {
         requireFits(DATA_PUT_REQUEST_PTR, DATA_GET_REQUEST_PTR, dataPutRequest)
         requireFits(DATA_GET_REQUEST_PTR, DATA_LIST_REQUEST_PTR, dataGetRequest)
         requireFits(DATA_LIST_REQUEST_PTR, STORAGE_DATA_PTR, dataListRequest)
-        requireFits(STORAGE_DATA_PTR, RUN_RESULT_PTR, objectBytes)
-        requireFits(RUN_RESULT_PTR, ALLOC_PTR, runResult)
+        requireFits(STORAGE_DATA_PTR, EXECUTE_RESULT_PTR, objectBytes)
+        requireFits(EXECUTE_RESULT_PTR, ALLOC_PTR, executeResult)
 
         val artistCreateIndex = hostFunctionNames.indexOf("host_artist_create")
         val workCreateIndex = hostFunctionNames.indexOf("host_work_create")
@@ -251,7 +247,6 @@ object PluginHostWasmFixture {
                     unsignedLeb128(ALLOC_TYPE),
                     unsignedLeb128(VOID_BINARY_TYPE),
                     unsignedLeb128(JSON_TYPE),
-                    unsignedLeb128(JSON_TYPE),
                 ),
             )
             writeSection(5, vector(bytes(byteArrayOf(0x00), unsignedLeb128(1))))
@@ -260,8 +255,7 @@ object PluginHostWasmFixture {
                 vector(
                     export("alloc", FUNCTION_EXPORT, firstDefinedFunctionIndex),
                     export("dealloc", FUNCTION_EXPORT, firstDefinedFunctionIndex + 1),
-                    export("plan", FUNCTION_EXPORT, firstDefinedFunctionIndex + 2),
-                    export("run", FUNCTION_EXPORT, firstDefinedFunctionIndex + 3),
+                    export("execute", FUNCTION_EXPORT, firstDefinedFunctionIndex + 2),
                     export("memory", MEMORY_EXPORT, 0),
                 ),
             )
@@ -270,7 +264,6 @@ object PluginHostWasmFixture {
                 vector(
                     functionBody(i32Const(ALLOC_PTR), END),
                     functionBody(END),
-                    functionBody(i64Const(pack(PLAN_PTR, plan.size)), END),
                     functionBody(
                         callJsonAndAssertSuccess(ARTIST_REQUEST_PTR, artistRequest, artistCreateIndex),
                         callJsonAndAssertSuccess(WORK_REQUEST_PTR, workRequest, workCreateIndex),
@@ -332,7 +325,7 @@ object PluginHostWasmFixture {
                         objectBytes.mapIndexed { index, byte ->
                             assertMemoryByte(ALLOC_PTR + index, byte.toInt() and 0xFF)
                         }.let(::bytes),
-                        i64Const(pack(RUN_RESULT_PTR, runResult.size)),
+                        i64Const(pack(EXECUTE_RESULT_PTR, executeResult.size)),
                         END,
                     ),
                 ),
@@ -340,7 +333,6 @@ object PluginHostWasmFixture {
             writeSection(
                 11,
                 vector(
-                    dataSegment(PLAN_PTR, plan),
                     dataSegment(ARTIST_REQUEST_PTR, artistRequest),
                     dataSegment(WORK_REQUEST_PTR, workRequest),
                     dataSegment(RECORDING_REQUEST_PTR, recordingRequest),
@@ -357,7 +349,7 @@ object PluginHostWasmFixture {
                     dataSegment(DATA_GET_REQUEST_PTR, dataGetRequest),
                     dataSegment(DATA_LIST_REQUEST_PTR, dataListRequest),
                     dataSegment(STORAGE_DATA_PTR, objectBytes),
-                    dataSegment(RUN_RESULT_PTR, runResult),
+                    dataSegment(EXECUTE_RESULT_PTR, executeResult),
                 ),
             )
         }.toByteArray()
