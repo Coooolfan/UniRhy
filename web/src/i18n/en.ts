@@ -689,12 +689,8 @@ export default {
         loadFailed: 'Failed to load task tree',
     },
     taskSubmission: {
-        metadataParse: 'Metadata Parse',
         metadataParseDesc:
             'Traverse storage nodes, discover media files and supplement missing metadata parsing',
-        metadataParseItem: 'Metadata Parsing (single asset)',
-        transcodeItem: 'Media Transcode (single asset)',
-        transcode: 'Media Transcode',
         transcodeDesc:
             'Traverse all imported files in the source storage node, transcode to the specified format and save to the target storage node',
         opusHint: 'Modern audio codec. Transcode target is 128Kbps variable bitrate.',
@@ -703,9 +699,7 @@ export default {
         pluginDesc: 'Plugin {id}',
         fsProviderLabel: '[FS] {name}',
         ossProviderLabel: '[OSS] {name}',
-        submitPluginTask: 'Submit {name} task',
-        submitMetadataTask: 'Submit metadata parse task',
-        submitTranscodeTask: 'Submit transcode task',
+        submitTask: 'Submit {name} task',
         noStorageTitle: 'No available storage nodes',
         noStorageDesc:
             'Please configure a storage node in system settings first, then come back to start a metadata parse or transcode task.',

@@ -66,14 +66,16 @@ const statsRow = (
 
 const emptyBuiltInStats = () => [
     statsRow(BUILT_IN_NAMESPACE, 'METADATA_PARSE'),
+    statsRow(BUILT_IN_NAMESPACE, 'METADATA_PARSE_ITEM'),
     statsRow(BUILT_IN_NAMESPACE, 'TRANSCODE'),
+    statsRow(BUILT_IN_NAMESPACE, 'TRANSCODE_ITEM'),
 ]
 
 const builtInDefinitions = [
     {
         namespace: BUILT_IN_NAMESPACE,
         taskType: 'METADATA_PARSE',
-        name: '元数据解析',
+        name: '资产扫描',
         userSubmittable: true,
         formDefinition: {
             schema: {
@@ -87,9 +89,39 @@ const builtInDefinitions = [
     },
     {
         namespace: BUILT_IN_NAMESPACE,
+        taskType: 'METADATA_PARSE_ITEM',
+        name: '元数据解析',
+        userSubmittable: false,
+        formDefinition: {
+            schema: {
+                type: 'object',
+                properties: {},
+                required: [],
+                additionalProperties: false,
+            },
+            order: [],
+        },
+    },
+    {
+        namespace: BUILT_IN_NAMESPACE,
         taskType: 'TRANSCODE',
-        name: '音频转码',
+        name: '音频转码扫描',
         userSubmittable: true,
+        formDefinition: {
+            schema: {
+                type: 'object',
+                properties: {},
+                required: [],
+                additionalProperties: false,
+            },
+            order: [],
+        },
+    },
+    {
+        namespace: BUILT_IN_NAMESPACE,
+        taskType: 'TRANSCODE_ITEM',
+        name: '音频转码',
+        userSubmittable: false,
         formDefinition: {
             schema: {
                 type: 'object',
@@ -169,10 +201,12 @@ describe('TasksView', () => {
                 completed: 5,
                 failed: 1,
             }),
+            statsRow(BUILT_IN_NAMESPACE, 'METADATA_PARSE_ITEM', { completed: 2 }),
             statsRow(BUILT_IN_NAMESPACE, 'TRANSCODE', {
                 active: 3,
                 completed: 7,
             }),
+            statsRow(BUILT_IN_NAMESPACE, 'TRANSCODE_ITEM', { completed: 4 }),
         ])
         const wrapper = mountWithModalHost()
 
@@ -183,8 +217,10 @@ describe('TasksView', () => {
         expect(listOssStorageMock).not.toHaveBeenCalled()
         expect(getSystemConfigMock).not.toHaveBeenCalled()
         expect(wrapper.text()).toContain('6 个任务待处理或执行中')
+        expect(wrapper.text()).toContain('资产扫描')
         expect(wrapper.text()).toContain('元数据解析')
-        expect(wrapper.text()).toContain('媒体转码')
+        expect(wrapper.text()).toContain('音频转码扫描')
+        expect(wrapper.text()).toContain('音频转码')
         expect(wrapper.text()).toContain('状态概览')
         expect(wrapper.text()).toContain('任务类型分布')
         expect(wrapper.text()).toMatch(/1\s*Failed\s*失败/u)

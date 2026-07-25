@@ -26,10 +26,10 @@ object BuiltInTasks {
     const val METADATA_PARSE_ITEM_CONCURRENCY = 10
     const val TRANSCODE_ITEM_CONCURRENCY = 1
 
-    const val METADATA_PARSE_NAME = "元数据解析"
-    const val METADATA_PARSE_ITEM_NAME = "元数据解析（单个资产）"
-    const val TRANSCODE_NAME = "音频转码"
-    const val TRANSCODE_ITEM_NAME = "音频转码（单个资产）"
+    const val METADATA_PARSE_NAME = "资产扫描"
+    const val METADATA_PARSE_ITEM_NAME = "元数据解析"
+    const val TRANSCODE_NAME = "音频转码扫描"
+    const val TRANSCODE_ITEM_NAME = "音频转码"
 
     /** 可被用户从表单投递的入口任务 */
     val ENTRY_KEYS = listOf(METADATA_PARSE, TRANSCODE)

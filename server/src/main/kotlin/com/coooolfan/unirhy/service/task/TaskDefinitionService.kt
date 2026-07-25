@@ -28,8 +28,8 @@ class TaskDefinitionService(
     private val pluginTaskStore: PluginTaskStore,
 ) {
 
-    /** 可被用户投递的任务定义 */
-    fun list(): List<TaskDefinitionView> = allDefinitions().filter { it.userSubmittable }
+    /** 当前完整任务定义，包含不可直接提交的工作任务 */
+    fun list(): List<TaskDefinitionView> = allDefinitions()
 
     fun get(namespace: String, taskType: String): TaskDefinitionView {
         val key = TaskKey.ofOrNull(namespace, taskType)
