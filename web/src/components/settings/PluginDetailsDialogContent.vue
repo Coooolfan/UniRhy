@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { ChevronDown, Loader2, Save, XCircle } from 'lucide-vue-next'
+import { Loader2, Save } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 import type { PluginInfoResponse } from '@/__generated/model/static/PluginInfoResponse'
 import type { PluginConfigurationResponse } from '@/__generated/model/static/PluginConfigurationResponse'
 import PluginConfigurationSection from '@/components/settings/PluginConfigurationSection.vue'
-import { parseFormDefinition, type SchemaField } from '@/components/tasks/schemaForm'
+import { parseFormDefinition } from '@/components/tasks/schemaForm'
 import { resolveErrorMessage } from '@/i18n/errors'
 
 const props = defineProps<{
@@ -26,7 +26,7 @@ const enabled = ref(props.plugin.enabled)
 const isToggling = ref(false)
 const error = ref('')
 
-/** 并发与表单定义都是「每任务一份」，按 taskType 索引 */
+/** 并发配置按 taskType 索引 */
 const concurrencyDrafts = ref<Record<string, string>>(
     Object.fromEntries(props.plugin.tasks.map((task) => [task.taskType, String(task.concurrency)])),
 )
@@ -34,22 +34,11 @@ const savedConcurrency = ref<Record<string, number>>(
     Object.fromEntries(props.plugin.tasks.map((task) => [task.taskType, task.concurrency])),
 )
 const savingTaskType = ref<string | null>(null)
-const expandedFormTaskType = ref<string | null>(null)
 
 const hasConfiguration = computed(
     () => parseFormDefinition(props.plugin.configDefinition).length > 0,
 )
-const taskFormFields = computed(
-    () =>
-        new Map(
-            props.plugin.tasks.map((task) => [
-                task.taskType,
-                parseFormDefinition(task.formDefinition),
-            ]),
-        ),
-)
 
-const formFieldsOf = (taskType: string) => taskFormFields.value.get(taskType) ?? []
 const parsedConcurrency = (taskType: string) => Number(concurrencyDrafts.value[taskType])
 const isConcurrencyValid = (taskType: string) => {
     const value = parsedConcurrency(taskType)
@@ -61,18 +50,19 @@ const canSaveConcurrency = (taskType: string) =>
     parsedConcurrency(taskType) !== savedConcurrency.value[taskType] &&
     savingTaskType.value === null
 
-const fieldTypeLabel = (field: SchemaField) =>
-    field.type === 'array' ? `${field.items?.type ?? 'unknown'}[]` : field.type
-
 const handleEnabledChange = async (event: Event) => {
     if (!props.canManage || isToggling.value) return
-    const nextEnabled = (event.target as HTMLInputElement).checked
+    const input = event.target as HTMLInputElement
+    const previousEnabled = enabled.value
+    const nextEnabled = input.checked
     isToggling.value = true
     error.value = ''
     try {
         await props.setEnabled(props.plugin.id, nextEnabled)
         enabled.value = nextEnabled
     } catch (e) {
+        enabled.value = previousEnabled
+        input.checked = previousEnabled
         error.value = resolveErrorMessage(e)
     } finally {
         isToggling.value = false
@@ -116,15 +106,8 @@ const handleConcurrencySave = async (taskType: string) => {
                     <p class="break-all font-mono text-xs text-[#8A8177]">
                         {{ plugin.id }}
                     </p>
-                    <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                    <div class="mt-2 text-xs">
                         <span class="font-mono text-[#9C968B]">v{{ plugin.version }}</span>
-                        <span
-                            v-for="task in plugin.tasks"
-                            :key="task.taskType"
-                            class="font-mono text-[#8A8177]"
-                        >
-                            {{ task.taskType }}
-                        </span>
                     </div>
                 </div>
 
@@ -158,13 +141,6 @@ const handleConcurrencySave = async (taskType: string) => {
                                 {{ enabled ? t('plugins.enabled') : t('plugins.disabled') }}
                             </span>
                         </label>
-                        <p
-                            v-if="enabled && !plugin.isAvailable"
-                            class="mt-3 flex items-center gap-1.5 text-xs text-[#B95D5D]"
-                        >
-                            <XCircle class="h-3.5 w-3.5 shrink-0" />
-                            {{ t('plugins.notLoaded') }}
-                        </p>
                     </section>
 
                     <section class="border-b border-[#E8E4D9] pb-5">
@@ -242,63 +218,5 @@ const handleConcurrencySave = async (taskType: string) => {
                 />
             </div>
         </div>
-
-        <template v-for="task in plugin.tasks" :key="task.taskType">
-            <section
-                v-if="formFieldsOf(task.taskType).length > 0"
-                class="mt-8 border-t border-[#E8E4D9] pt-1"
-            >
-                <button
-                    :data-testid="`plugin-form-params-toggle-${task.taskType}`"
-                    type="button"
-                    class="flex w-full items-center justify-between gap-3 py-3 text-left text-sm font-medium text-[#2C2A28] transition-colors hover:text-[#C27E46]"
-                    :aria-expanded="expandedFormTaskType === task.taskType"
-                    @click="
-                        expandedFormTaskType =
-                            expandedFormTaskType === task.taskType ? null : task.taskType
-                    "
-                >
-                    <span>
-                        {{ t('plugins.formParams') }}
-                        <span class="ml-2 font-mono text-xs text-[#9C968B]">
-                            {{ task.taskType }}
-                        </span>
-                    </span>
-                    <ChevronDown
-                        class="h-4 w-4 shrink-0 transition-transform"
-                        :class="expandedFormTaskType === task.taskType ? 'rotate-180' : ''"
-                    />
-                </button>
-                <div
-                    v-if="expandedFormTaskType === task.taskType"
-                    class="grid gap-x-6 gap-y-4 pt-2 sm:grid-cols-2"
-                >
-                    <div
-                        v-for="field in formFieldsOf(task.taskType)"
-                        :key="field.name"
-                        class="min-w-0"
-                    >
-                        <div class="flex flex-wrap items-baseline gap-2 text-sm">
-                            <span class="font-mono text-xs text-[#C27E46]">
-                                {{ fieldTypeLabel(field) }}
-                            </span>
-                            <span class="text-[#2C2A28]">
-                                {{ field.title }}
-                                <span v-if="field.required" class="text-[#C27E46]">*</span>
-                            </span>
-                            <span v-if="field.default !== undefined" class="text-xs text-[#9C968B]">
-                                {{ t('plugins.default', { value: field.default }) }}
-                            </span>
-                        </div>
-                        <p
-                            v-if="field.description"
-                            class="mt-1 text-xs leading-relaxed text-[#9C968B]"
-                        >
-                            {{ field.description }}
-                        </p>
-                    </div>
-                </div>
-            </section>
-        </template>
     </div>
 </template>

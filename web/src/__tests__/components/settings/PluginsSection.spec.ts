@@ -141,15 +141,9 @@ describe('PluginsSection', () => {
             'https://api.example.test',
         )
         expect(wrapper.text()).not.toContain('Source URL')
-        expect(
-            wrapper
-                .get('[data-testid="plugin-form-params-toggle-IMPORT"]')
-                .attributes('aria-expanded'),
-        ).toBe('false')
-
-        await wrapper.get('[data-testid="plugin-form-params-toggle-IMPORT"]').trigger('click')
-        expect(wrapper.text()).toContain('Source URL')
-        expect(wrapper.text()).toContain('Media source address')
+        expect(wrapper.find('[data-testid="plugin-form-params-toggle-IMPORT"]').exists()).toBe(
+            false,
+        )
 
         await wrapper.get('[data-testid="plugin-enabled-toggle"]').setValue(true)
         await flushPromises()
@@ -159,6 +153,23 @@ describe('PluginsSection', () => {
         await wrapper.get('[data-testid="plugin-concurrency-save-IMPORT"]').trigger('click')
         await flushPromises()
         expect(updateConcurrency).toHaveBeenCalledWith(plugin.id, 'IMPORT', 3)
+    })
+
+    it('restores the enabled toggle when enabling fails', async () => {
+        const { wrapper, setEnabled } = mountSection()
+        setEnabled.mockRejectedValueOnce(new Error('Enable failed'))
+
+        await wrapper.get('button[title="插件详情"]').trigger('click')
+        await flushPromises()
+
+        const toggle = wrapper.get<HTMLInputElement>('[data-testid="plugin-enabled-toggle"]')
+        await toggle.setValue(true)
+        await flushPromises()
+
+        expect(setEnabled).toHaveBeenCalledWith(plugin.id, true)
+        expect(toggle.element.checked).toBe(false)
+        expect(wrapper.text()).toContain('Enable failed')
+        expect(wrapper.text()).toContain('已禁用')
     })
 
     it('exposes an independent concurrency control per declared task', async () => {
