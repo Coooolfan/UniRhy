@@ -1,15 +1,15 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Download, Loader2, Puzzle, Settings2, Trash2, Upload, XCircle } from 'lucide-vue-next'
-import type { PluginInfoResponse } from '@/__generated/model/static/PluginInfoResponse'
+import { Download, Loader2, Puzzle, Settings2, Trash2, Upload } from 'lucide-vue-next'
+import type { PluginInfoView } from '@/__generated/model/static/PluginInfoView'
 import type { PluginConfigurationResponse } from '@/__generated/model/static/PluginConfigurationResponse'
 import PluginDetailsDialogContent from '@/components/settings/PluginDetailsDialogContent.vue'
 import { parseFormDefinition } from '@/components/tasks/schemaForm'
 import { useModal } from '@/composables/useModal'
 
 const props = defineProps<{
-    plugins: ReadonlyArray<PluginInfoResponse>
+    plugins: ReadonlyArray<PluginInfoView>
     isLoading: boolean
     isUploading: boolean
     error: string
@@ -23,7 +23,7 @@ const props = defineProps<{
         clearedSecretFields: ReadonlyArray<string>,
     ) => Promise<PluginConfigurationResponse>
     onDelete: (id: string) => Promise<void>
-    onDownload: (plugin: PluginInfoResponse) => Promise<void>
+    onDownload: (plugin: PluginInfoView) => Promise<void>
     canManage?: boolean
 }>()
 
@@ -44,7 +44,7 @@ const handleFileChange = async (event: Event) => {
     }
 }
 
-const openPluginDetails = (plugin: PluginInfoResponse) => {
+const openPluginDetails = (plugin: PluginInfoView) => {
     const hasConfiguration = parseFormDefinition(plugin.configDefinition).length > 0
     void modal.open(PluginDetailsDialogContent, {
         title: plugin.name ?? plugin.id,
@@ -61,7 +61,7 @@ const openPluginDetails = (plugin: PluginInfoResponse) => {
     })
 }
 
-const handleDelete = async (plugin: PluginInfoResponse) => {
+const handleDelete = async (plugin: PluginInfoView) => {
     const confirmed = await modal.confirm({
         title: t('plugins.deleteTitle', { name: plugin.name ?? plugin.id }),
         content: t('plugins.deleteConfirm'),
@@ -79,7 +79,7 @@ const handleDelete = async (plugin: PluginInfoResponse) => {
     }
 }
 
-const handleDownload = async (plugin: PluginInfoResponse) => {
+const handleDownload = async (plugin: PluginInfoView) => {
     if (!props.canManage) return
     downloadingId.value = plugin.id
     try {
@@ -179,13 +179,6 @@ const handleDownload = async (plugin: PluginInfoResponse) => {
                                             ? t('plugins.enabled')
                                             : t('plugins.disabled')
                                     }}
-                                </span>
-                                <span
-                                    v-if="plugin.enabled && !plugin.isAvailable"
-                                    class="flex items-center gap-1 text-[#B95D5D]"
-                                >
-                                    <XCircle class="h-3.5 w-3.5" />
-                                    {{ t('plugins.notLoaded') }}
                                 </span>
                             </div>
                         </div>
