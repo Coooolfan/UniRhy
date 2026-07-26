@@ -14,16 +14,6 @@ internal data class StoredPluginData(
 internal class PluginDataStore(
     private val jdbc: NamedParameterJdbcTemplate,
 ) {
-    fun configDefinition(pluginId: String): String? = jdbc.query(
-        "SELECT config_definition::text FROM public.plugin WHERE id = :pluginId",
-        MapSqlParameterSource("pluginId", pluginId),
-    ) { rs, _ -> rs.getString(1) }.firstOrNull()
-
-    fun exists(pluginId: String): Boolean = jdbc.query(
-        "SELECT 1 FROM public.plugin WHERE id = :pluginId",
-        MapSqlParameterSource("pluginId", pluginId),
-    ) { _, _ -> true }.isNotEmpty()
-
     fun find(pluginId: String, key: String): StoredPluginData? = jdbc.query(
         """
         SELECT key, value::text, encrypted_value
