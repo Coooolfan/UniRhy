@@ -35,7 +35,7 @@ export type SchemaField = {
 const FIELD_TYPES: readonly SchemaFieldType[] = ['string', 'integer', 'number', 'boolean', 'array']
 const ARRAY_ITEM_TYPES: readonly SchemaArrayItemType[] = ['string', 'integer', 'number']
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
+export const isRecord = (value: unknown): value is Record<string, unknown> =>
     typeof value === 'object' && value !== null && !Array.isArray(value)
 
 const isFieldType = (value: unknown): value is SchemaFieldType =>

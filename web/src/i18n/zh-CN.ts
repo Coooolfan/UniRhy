@@ -658,12 +658,9 @@ export default {
         title: '任务树',
         rootTask: '根任务',
         selectHint: '点击左侧任务查看其任务树',
-        emptyChildren: '无子任务',
         childCount: '{count} 个子任务',
         nodeCount: '共 {count} 个节点',
         refreshTree: '刷新任务树',
-        resetView: '重置视图',
-        loadFailed: '加载任务树失败',
     },
     taskSubmission: {
         metadataParseDesc: '遍历存储节点，发现媒体文件并补充缺失的元数据解析',

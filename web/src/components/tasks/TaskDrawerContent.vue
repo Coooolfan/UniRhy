@@ -7,6 +7,7 @@ import type { TaskStatus } from '@/__generated/model/enums/TaskStatus'
 import { useI18n } from 'vue-i18n'
 import { useUserStore } from '@/stores/user'
 import { useModal } from '@/composables/useModal'
+import { STATUS_ORDER, formatTaskTime, useTaskStatusLabels } from './taskStatus'
 import {
     ArrowRight,
     CheckCircle2,
@@ -23,6 +24,7 @@ import {
 } from 'lucide-vue-next'
 
 const { t } = useI18n()
+const statusLabelMap = useTaskStatusLabels()
 
 type TaskRow = AsyncTaskDto['TaskController/DEFAULT_TASK_FETCHER']
 
@@ -63,14 +65,6 @@ const emit = defineEmits<{
     select: [row: TaskRow]
 }>()
 
-const STATUS_ORDER: readonly TaskStatus[] = [
-    'PENDING',
-    'RUNNING',
-    'COMPLETED',
-    'FAILED',
-    'CANCELLED',
-]
-
 const activeOption = computed<TaskOption | undefined>(() =>
     props.tasks.find((option) => option.taskKey === props.taskKey),
 )
@@ -88,14 +82,6 @@ const toggleStatus = (target: TaskStatus) => {
         : [...props.statuses, target]
     emit('update:statuses', next)
 }
-
-const statusLabelMap = computed<Record<TaskStatus, string>>(() => ({
-    PENDING: t('taskDetails.pending'),
-    RUNNING: t('taskDetails.running'),
-    COMPLETED: t('taskDetails.completed'),
-    FAILED: t('taskDetails.failed'),
-    CANCELLED: t('taskDetails.cancelled'),
-}))
 
 const STATUS_BADGE_CLASS = 'border-[#DFD6C4] bg-[#F1EBDD] text-[#5A524A]'
 
@@ -168,13 +154,6 @@ const inferredBatchCommand = (): BatchCommandKey => {
     if (props.statuses.length === 1 && props.statuses[0] === 'FAILED') return 'REQUEUE_FAILED'
     if (props.statuses.length === 1 && props.statuses[0] === 'CANCELLED') {
         return 'REQUEUE_CANCELLED'
-    }
-    if (
-        props.statuses.includes('FAILED') &&
-        props.statuses.includes('CANCELLED') &&
-        props.statuses.every((status) => status === 'FAILED' || status === 'CANCELLED')
-    ) {
-        return 'REQUEUE_RECOVERABLE'
     }
     return 'REQUEUE_RECOVERABLE'
 }
@@ -258,13 +237,6 @@ const toggleExpand = (id: number) => {
         next.add(id)
     }
     expandedIds.value = next
-}
-
-const formatTime = (value: string | undefined | null) => {
-    if (!value) return '—'
-    const date = new Date(value)
-    if (Number.isNaN(date.getTime())) return value
-    return date.toLocaleString('zh-CN', { hour12: false })
 }
 
 const formatPayload = (payload: unknown) => {
@@ -570,18 +542,18 @@ const executeBatchCommand = async () => {
                                 <span class="basis-full sm:basis-auto">
                                     {{
                                         t('taskDetails.createdAt', {
-                                            time: formatTime(row.createdAt),
+                                            time: formatTaskTime(row.createdAt),
                                         })
                                     }}
                                 </span>
                             </div>
                             <div class="mt-1 text-[11px] text-[#8A8177]">
                                 <span class="whitespace-nowrap">{{
-                                    formatTime(row.startedAt)
+                                    formatTaskTime(row.startedAt)
                                 }}</span>
                                 <span class="px-1 text-[#C9BCA9]">→</span>
                                 <span class="whitespace-nowrap">{{
-                                    formatTime(row.completedAt)
+                                    formatTaskTime(row.completedAt)
                                 }}</span>
                             </div>
                             <div

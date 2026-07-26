@@ -681,12 +681,9 @@ export default {
         title: 'Task Tree',
         rootTask: 'Root Task',
         selectHint: 'Click a task on the left to view its task tree',
-        emptyChildren: 'No child tasks',
         childCount: '{count} children',
         nodeCount: '{count} nodes',
         refreshTree: 'Refresh task tree',
-        resetView: 'Reset view',
-        loadFailed: 'Failed to load task tree',
     },
     taskSubmission: {
         metadataParseDesc:

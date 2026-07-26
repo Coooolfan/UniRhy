@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Handle, Position } from '@vue-flow/core'
+import { STATUS_DOT_CLASS, useTaskStatusLabels } from './taskStatus'
 import type { TaskStatus } from '@/__generated/model/enums/TaskStatus'
 
 /** Vue Flow 自定义任务节点的 data 载荷 */
@@ -19,22 +20,7 @@ const props = defineProps<{
 }>()
 
 const { t } = useI18n()
-
-const statusLabelMap = computed<Record<TaskStatus, string>>(() => ({
-    PENDING: t('taskDetails.pending'),
-    RUNNING: t('taskDetails.running'),
-    COMPLETED: t('taskDetails.completed'),
-    FAILED: t('taskDetails.failed'),
-    CANCELLED: t('taskDetails.cancelled'),
-}))
-
-const STATUS_DOT_CLASS: Record<TaskStatus, string> = {
-    PENDING: 'bg-[#B8AFA3]',
-    RUNNING: 'bg-[#B86134]',
-    COMPLETED: 'bg-emerald-600',
-    FAILED: 'bg-rose-500',
-    CANCELLED: 'bg-[#D8CFC2]',
-}
+const statusLabelMap = useTaskStatusLabels()
 
 const STATUS_CARD_CLASS: Record<TaskStatus, string> = {
     PENDING: 'border-[#DFD6C4] bg-[#FFFCF5]',
