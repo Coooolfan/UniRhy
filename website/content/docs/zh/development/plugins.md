@@ -3,7 +3,7 @@ title: 插件开发指南
 description: 从 manifest、WASM ABI 与任务生命周期开始，构建、打包并验证一个 UniRhy 插件。
 ---
 
-UniRhy 插件是运行在服务端的 WebAssembly 模块。一个插件提供一个异步任务，可以查询或修改音乐库、访问存储节点、发起 HTTP 请求，也可以提交其他任务。本指南以 Rust 为例完成最小插件，UniRhy 不绑定插件的编程语言，任何能生成兼容的 WebAssembly 模块的语言都可以使用。
+UniRhy 插件是运行在服务端的 WebAssembly 模块。一个插件声明一个或多个异步任务，可以查询或修改音乐库、访问存储节点、发起 HTTP 请求，也可以继续创建任务。本指南以 Rust 为例完成最小插件，UniRhy 不绑定插件的编程语言，任何能生成兼容的 WebAssembly 模块的语言都可以使用。
 
 > 插件拥有接近管理员的能力，并且与服务端运行在同一信任边界内。当前版本下，UniRhy 不为插件配置单独的网络白名单、调用超时或内存上限。只安装你信任且与当前 UniRhy 版本匹配的插件。
 
@@ -11,11 +11,11 @@ UniRhy 插件是运行在服务端的 WebAssembly 模块。一个插件提供一
 
 ## 先理解执行模型
 
-一次插件任务分为规划与执行两个阶段：
+所有任务都是同一种记录，并通过同一个导出函数执行。一条任务接收自己的 payload，完成工作，再返回它希望入队的后继任务；不返回后继即为叶子任务：
 
 <figure class="diagram-figure plugin-flow-figure" role="img" aria-labelledby="plugin-flow-title-zh" aria-describedby="plugin-flow-desc-zh">
 <span id="plugin-flow-title-zh" class="sr-only">插件任务从表单提交到异步执行的流程图</span>
-<span id="plugin-flow-desc-zh" class="sr-only">表单参数以 JSON 传入 plan 函数；plan 返回包含多个 payload 的列表。每个 payload 分别生成一条异步任务，每条任务再独立调用一次 run 函数。</span>
+<span id="plugin-flow-desc-zh" class="sr-only">表单参数成为根任务的 payload。服务端对该任务调用一次 execute，调用返回一组后继。每个后继成为一条独立调度的子任务并再次调用 execute，子任务同样可以继续返回后继。</span>
 <svg class="plugin-flow-diagram" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 430" role="presentation" aria-hidden="true" focusable="false">
   <defs>
     <marker id="plugin-flow-arrow-zh" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
@@ -31,61 +31,50 @@ UniRhy 插件是运行在服务端的 WebAssembly 模块。一个插件提供一
     </style>
   </defs>
 
-  <rect class="pf-node" x="20" y="180" width="120" height="70" rx="3"/>
-  <text class="pf-label" x="80" y="210" text-anchor="middle">表单参数</text>
-  <text class="pf-sub" x="80" y="232" text-anchor="middle">params JSON</text>
+  <rect class="pf-node" x="16" y="180" width="118" height="70" rx="3"/>
+  <text class="pf-label" x="75" y="207" text-anchor="middle">表单参数</text>
+  <text class="pf-sub" x="75" y="229" text-anchor="middle">根任务 payload</text>
 
-  <rect class="pf-node" x="180" y="180" width="120" height="70" rx="3"/>
-  <text class="pf-code" x="240" y="211" text-anchor="middle">plan(params)</text>
-  <text class="pf-sub" x="240" y="232" text-anchor="middle">规划一次</text>
+  <rect class="pf-node" x="174" y="180" width="140" height="70" rx="3"/>
+  <text class="pf-code" x="244" y="207" text-anchor="middle">execute()</text>
+  <text class="pf-sub" x="244" y="229" text-anchor="middle">入口任务</text>
 
-  <rect class="pf-node" x="340" y="125" width="135" height="180" rx="3"/>
-  <text class="pf-label" x="407.5" y="151" text-anchor="middle">payload 列表</text>
-  <rect class="pf-item" x="357" y="164" width="101" height="34" rx="3"/>
-  <text class="pf-code" x="407.5" y="186" text-anchor="middle">payload 1</text>
-  <rect class="pf-item" x="357" y="208" width="101" height="34" rx="3"/>
-  <text class="pf-code" x="407.5" y="230" text-anchor="middle">payload 2</text>
-  <rect class="pf-item" x="357" y="252" width="101" height="34" rx="3"/>
-  <text class="pf-code" x="407.5" y="274" text-anchor="middle">payload n</text>
+  <rect class="pf-node" x="354" y="120" width="140" height="190" rx="3"/>
+  <text class="pf-label" x="424" y="146" text-anchor="middle">后继列表</text>
+  <rect class="pf-item" x="371" y="160" width="106" height="36" rx="3"/>
+  <text class="pf-code" x="424" y="183" text-anchor="middle">successor 1</text>
+  <rect class="pf-item" x="371" y="204" width="106" height="36" rx="3"/>
+  <text class="pf-code" x="424" y="227" text-anchor="middle">successor 2</text>
+  <rect class="pf-item" x="371" y="248" width="106" height="36" rx="3"/>
+  <text class="pf-code" x="424" y="271" text-anchor="middle">successor n</text>
 
-  <rect class="pf-node" x="535" y="40" width="115" height="70" rx="3"/>
-  <text class="pf-label" x="592.5" y="70" text-anchor="middle">异步任务 1</text>
-  <text class="pf-sub" x="592.5" y="91" text-anchor="middle">独立调度</text>
-  <rect class="pf-node" x="535" y="180" width="115" height="70" rx="3"/>
-  <text class="pf-label" x="592.5" y="210" text-anchor="middle">异步任务 2</text>
-  <text class="pf-sub" x="592.5" y="231" text-anchor="middle">独立调度</text>
-  <rect class="pf-node" x="535" y="320" width="115" height="70" rx="3"/>
-  <text class="pf-label" x="592.5" y="350" text-anchor="middle">异步任务 n</text>
-  <text class="pf-sub" x="592.5" y="371" text-anchor="middle">独立调度</text>
+  <rect class="pf-node" x="534" y="36" width="180" height="70" rx="3"/>
+  <text class="pf-code" x="624" y="63" text-anchor="middle">execute()</text>
+  <text class="pf-sub" x="624" y="85" text-anchor="middle">子任务，可继续返回后继</text>
+  <rect class="pf-node" x="534" y="180" width="180" height="70" rx="3"/>
+  <text class="pf-code" x="624" y="207" text-anchor="middle">execute()</text>
+  <text class="pf-sub" x="624" y="229" text-anchor="middle">子任务，可继续返回后继</text>
+  <rect class="pf-node" x="534" y="324" width="180" height="70" rx="3"/>
+  <text class="pf-code" x="624" y="351" text-anchor="middle">execute()</text>
+  <text class="pf-sub" x="624" y="373" text-anchor="middle">子任务，可继续返回后继</text>
 
-  <rect class="pf-node" x="670" y="40" width="110" height="70" rx="3"/>
-  <text class="pf-code" x="725" y="70" text-anchor="middle">run</text>
-  <text class="pf-code" x="725" y="89" text-anchor="middle">(payload 1)</text>
-  <rect class="pf-node" x="670" y="180" width="110" height="70" rx="3"/>
-  <text class="pf-code" x="725" y="210" text-anchor="middle">run</text>
-  <text class="pf-code" x="725" y="229" text-anchor="middle">(payload 2)</text>
-  <rect class="pf-node" x="670" y="320" width="110" height="70" rx="3"/>
-  <text class="pf-code" x="725" y="350" text-anchor="middle">run</text>
-  <text class="pf-code" x="725" y="369" text-anchor="middle">(payload n)</text>
-
-  <path class="pf-line" d="M140,215 L180,215" marker-end="url(#plugin-flow-arrow-zh)"/>
-  <path class="pf-line" d="M300,215 L340,215" marker-end="url(#plugin-flow-arrow-zh)"/>
-  <path class="pf-line" d="M475,181 C 500,181 500,75 515,75 L535,75" marker-end="url(#plugin-flow-arrow-zh)"/>
-  <path class="pf-line" d="M475,215 L535,215" marker-end="url(#plugin-flow-arrow-zh)"/>
-  <path class="pf-line" d="M475,269 C 500,269 500,355 515,355 L535,355" marker-end="url(#plugin-flow-arrow-zh)"/>
-  <path class="pf-line" d="M650,75 L670,75" marker-end="url(#plugin-flow-arrow-zh)"/>
-  <path class="pf-line" d="M650,215 L670,215" marker-end="url(#plugin-flow-arrow-zh)"/>
-  <path class="pf-line" d="M650,355 L670,355" marker-end="url(#plugin-flow-arrow-zh)"/>
+  <path class="pf-line" d="M134,215 L174,215" marker-end="url(#plugin-flow-arrow-zh)"/>
+  <path class="pf-line" d="M314,215 L354,215" marker-end="url(#plugin-flow-arrow-zh)"/>
+  <path class="pf-line" d="M494,178 C 514,178 514,71 524,71 L534,71" marker-end="url(#plugin-flow-arrow-zh)"/>
+  <path class="pf-line" d="M494,215 L534,215" marker-end="url(#plugin-flow-arrow-zh)"/>
+  <path class="pf-line" d="M494,265 C 514,265 514,359 524,359 L534,359" marker-end="url(#plugin-flow-arrow-zh)"/>
 </svg>
 </figure>
 
-- `plan()` 接收用户提交的表单参数，返回 JSON 数组。数组中的每一项都会成为一条独立任务；返回空数组也属于规划成功。
-- `run()` 每次接收一项 payload，完成真正的业务处理。
-- 同一插件的 `plan()` 在单个节点上串行规划；`run()` 可以按插件并发值并行执行。
-- 每次调用都会创建新的 WASM Instance。不要依赖 `plan()` 与 `run()` 之间的线性内存或全局变量；需要传递的数据必须进入 payload 或外部持久化存储。
-- submission 的 `COMPLETED` 只表示规划与任务投递完成，不代表所有子任务都已执行成功。
+- 服务端对每条任务调用一次 `execute()`，传入 `{taskId, taskType, payload}`。一个插件只导出一个 `execute()`，由插件自己按 `taskType` 分发。
+- 返回的后继会作为当前任务的子任务入队，与当前任务被标记为 `COMPLETED` 处于同一个事务；随后每个子任务各自独立调度。
+- 后继可以指向同一插件的另一种任务类型，也可以显式给出 `namespace`，把工作派给其他插件。
+- 并发是「每种任务类型一份」的属性。负责展开工作的入口任务通常配置为并发 `1`，它产出的工作任务则使用更高的并发。
+- 每次调用都会得到全新的 WASM Instance。线性内存与全局变量不在任务之间共享，需要传递的数据请放进 payload、插件数据或外部持久化存储。
+- 后继在活动兄弟之间去重：若某个后继的父任务、命名空间、任务类型与 payload 都与一条 `PENDING` 或 `RUNNING` 的兄弟任务相同，则被静默丢弃。根任务不参与这项去重。
+- 任务处于 `COMPLETED` 只表示这一次调用成功且其后继已入队，并不代表它下方的子树已经结束。
 
-通常应让 `plan()` 只负责发现工作并生成稳定、较小的 payload，把网络下载和数据写入放在 `run()` 中。Host API 在两个阶段都可用，但规划阶段产生的外部副作用同样可能被重复执行。
+一般来说，入口任务应专注于发现工作并产出小而稳定的 payload，把网络下载与数据写入放在工作任务中。Host API 对所有任务都可用，但在展开阶段产生的外部副作用同样可能被重复执行。
 
 ## 准备 Rust 工程
 
@@ -93,15 +82,15 @@ UniRhy 插件是运行在服务端的 WebAssembly 模块。一个插件提供一
 
 ```sh
 rustup target add wasm32-unknown-unknown
-cargo new --lib metadata-enricher
-cd metadata-enricher
+cargo new --lib artist-enricher
+cd artist-enricher
 ```
 
-将 crate 构建为动态库，并为发行构建启用体积优化：
+将 crate 构建为动态库，并让 release 构建以体积为优化目标：
 
 ```toml
 [package]
-name = "metadata_enricher"
+name = "artist_enricher"
 version = "0.1.0"
 edition = "2021"
 
@@ -120,83 +109,150 @@ panic = "abort"
 codegen-units = 1
 ```
 
-UniRhy 不提供 WASI。插件不能直接使用 guest 文件系统、socket 或线程；这些能力必须通过 `env` 模块下的 Host API 获得。
+UniRhy 不提供 WASI。插件无法直接使用宿主文件系统、套接字或线程，这些能力都要通过 `env` 模块中的 Host API 获得。
 
 ## 编写 plugin.yml
 
-插件包根目录必须包含 `plugin.yml` 与 `plugin.wasm`。下面的 manifest 声明了一个带两个表单字段的元数据补全任务：
+包根目录必须包含 `plugin.yml` 与 `plugin.wasm`。下面的 manifest 声明了一个供用户投递的入口任务、一个只能由插件自己产出的工作任务，以及一项插件级配置：
 
 ```yaml
-id: com.example.unirhy.metadata-enricher
-name: Metadata Enricher
+id: com.example.unirhy.artist-enricher
+name: Artist Enricher
 version: 0.1.0
 
 runtime:
   type: wasm
   abi: unirhy-wasm-abi-v1
 
-task:
-  type: ENRICH_METADATA
-  concurrency: 4
+tasks:
+  - type: SCAN_ARTISTS
+    concurrency: 1
+    userSubmittable: true
+    form:
+      schema:
+        $schema: https://json-schema.org/draft/2020-12/schema
+        type: object
+        title: 扫描艺术家
+        description: 将艺术家库切分为若干补全批次
+        properties:
+          batchSize:
+            type: integer
+            title: 每批数量
+            minimum: 1
+            default: 50
+        required:
+          - batchSize
+        additionalProperties: false
+      order:
+        - batchSize
 
-form:
+  - type: ENRICH_ARTIST
+    concurrency: 4
+    form:
+      schema:
+        $schema: https://json-schema.org/draft/2020-12/schema
+        type: object
+        title: 补全单个批次
+        properties:
+          offset:
+            type: integer
+            title: 偏移量
+            minimum: 0
+          limit:
+            type: integer
+            title: 数量
+            minimum: 1
+        required:
+          - offset
+          - limit
+        additionalProperties: false
+      order:
+        - offset
+        - limit
+
+config:
   schema:
     $schema: https://json-schema.org/draft/2020-12/schema
     type: object
-    title: 补全元数据
-    description: 从外部来源补全曲目信息
+    title: 元数据来源
     properties:
-      query:
+      endpoint:
         type: string
-        title: 搜索词
+        title: API 地址
         minLength: 1
-      dryRun:
-        type: boolean
-        title: 仅预览
-        default: true
+      apiKey:
+        type: string
+        title: API 密钥
+        writeOnly: true
+        minLength: 1
     required:
-      - query
-      - dryRun
+      - endpoint
+      - apiKey
     additionalProperties: false
   order:
-    - query
-    - dryRun
+    - endpoint
+    - apiKey
 ```
 
-关键约束如下：
+其中的关键约束是：
 
-- `id` 同时是任务 namespace，使用至少两段的小写反向域名格式；`app.unirhy` 前缀由内建任务保留。
-- `task.type` 必须是大写标识符。`id` 与 `task.type` 一起构成稳定的任务身份。
-- `task.concurrency` 是首次安装时的 `run()` 并发初始值。管理员之后可以修改它；同 id 升级不会覆盖当前值。
-- `version` 只用于展示，服务端不比较版本号，也不解析依赖。
-- `form.schema` 使用 JSON Schema Draft 2020-12 的白名单子集。字段仅支持 `string`、`integer`、`number` 与 `boolean` 标量。
-- 根 schema 必须声明 `type: object`、`properties`、`required` 和 `additionalProperties: false`；`form.order` 必须恰好包含全部字段。
-- `default` 只负责初始化前端表单。服务端不会补默认值，因此必填字段仍必须出现在提交参数中。
+- `id` 同时是任务命名空间，须为至少两段的小写反向域名；`app.unirhy` 前缀保留给内置任务。
+- `tasks[].type` 必须是大写标识符，且在插件内唯一。`id` 与 `tasks[].type` 共同构成稳定的任务身份。
+- 至少要有一个任务声明 `userSubmittable: true`。只有这类任务能从界面或 `host_task_create` 投递，其余任务只能作为后继出现。
+- `tasks[].concurrency` 是该任务类型首次安装时的并发初始值。管理员之后可以调整，同 id 覆盖升级会保留当前值。
+- `version` 仅用于展示，服务端不比较版本，也不做依赖解析。
+- `form.schema` 使用 JSON Schema Draft 2020-12 的受支持子集。字段可以是 `string`、`integer`、`number`、`boolean` 标量，也可以是元素类型同质的 `string` / `integer` / `number` 数组。
+- 根 Schema 必须声明 `type: object`、`properties`、`required` 与 `additionalProperties: false`，`form.order` 必须不重不漏地列出全部字段。
+- 对可投递任务，`form` 会用于校验提交的参数；对其余任务，它只是声明 payload 契约，服务端不会再校验后继携带的 payload。
+- `default` 只用于初始化前端表单。服务端不会注入默认值，required 字段仍须出现在提交的参数中。
+- `config` 声明的是插件级配置，由管理员在插件页面填写，与具体任务无关。它沿用同一套 Schema 子集，但不允许数组，且 `string` 字段可以声明 `writeOnly: true`。
+- `writeOnly` 字段会加密存储，且永远不会回传给管理界面，管理端只能看到该字段是否已配置。插件自身通过 `host_plugin_config_get` 读取完整值。
+- 若 `config` 中的 required 字段尚未配置齐全，插件无法被启用。
 
-如果任务不需要参数，可以完全省略 `form`；UniRhy 会使用不接受任何字段的空表单。
+如果某个任务不需要参数，省略它的 `form`，UniRhy 会提供一个不接受任何字段的空表单。插件不需要配置时，整段 `config` 可以省略。
 
 ## 实现 WASM ABI
 
-ABI v1 要求模块提供线性内存，并导出以下函数：
+ABI v1 要求提供线性内存与以下导出：
 
-| 导出      | 签名                         | 作用                                    |
-| --------- | ---------------------------- | --------------------------------------- |
-| `alloc`   | `(i32 size) -> i32`          | 为 host 写入数据分配 guest 内存         |
-| `dealloc` | `(i32 ptr, i32 len)`         | 释放跨边界传输使用的 guest 内存         |
-| `plan`    | `(i32 ptr, i32 len) -> i64`  | 接收 UTF-8 参数 JSON，返回 payload 数组 |
-| `run`     | `(i32 ptr, i32 len) -> void` | 接收一项 UTF-8 payload JSON并执行任务   |
+| 导出      | 签名                        | 用途                       |
+| --------- | --------------------------- | -------------------------- |
+| `alloc`   | `(i32 size) -> i32`         | 为宿主写入的数据分配内存   |
+| `dealloc` | `(i32 ptr, i32 len)`        | 释放跨边界传输占用的内存   |
+| `execute` | `(i32 ptr, i32 len) -> i64` | 执行一条任务并返回结果信封 |
 
-`plan()` 的 `i64` 返回值把输出指针放在高 32 位、字节长度放在低 32 位：
+`execute()` 接收一个 UTF-8 JSON 对象：
+
+```json
+{ "taskId": 42, "taskType": "SCAN_ARTISTS", "payload": { "batchSize": 50 } }
+```
+
+并返回一个信封。成功时 `successors` 可以省略或为空，表示叶子任务；`namespace` 缺省即插件自身：
+
+```json
+{
+  "ok": true,
+  "successors": [{ "taskType": "ENRICH_ARTIST", "payload": { "offset": 0, "limit": 50 } }]
+}
+```
+
+失败时 `error` 必须是非空字符串，任务会以该信息记为 `FAILED`：
+
+```json
+{ "ok": false, "error": "metadata source returned 503" }
+```
+
+返回的 `i64` 高 32 位是输出指针，低 32 位是字节长度：
 
 ```text
 (ptr << 32) | len
 ```
 
-下面是可编译的最小实现。它把表单参数包装成一条 payload，并在执行阶段写入服务端日志：
+下面的最小实现把音乐库切分成若干批次，并在处理每个批次时写一条服务端日志：
 
 ```rust
-use serde::de::DeserializeOwned;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
+use serde_json::{json, Value};
 use std::{mem, ptr, slice};
 
 #[link(wasm_import_module = "env")]
@@ -204,11 +260,12 @@ extern "C" {
     fn host_log(level: i32, ptr: i32, len: i32);
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct Payload {
-    query: String,
-    dry_run: bool,
+struct Invocation {
+    task_id: i64,
+    task_type: String,
+    payload: Value,
 }
 
 #[no_mangle]
@@ -226,12 +283,7 @@ pub unsafe extern "C" fn dealloc(pointer: u32, size: u32) {
     }
 }
 
-unsafe fn read_json<T: DeserializeOwned>(pointer: u32, size: u32) -> T {
-    let bytes = slice::from_raw_parts(pointer as *const u8, size as usize);
-    serde_json::from_slice(bytes).expect("invalid JSON input")
-}
-
-fn return_json<T: Serialize>(value: &T) -> u64 {
+fn return_json(value: &Value) -> u64 {
     let bytes = serde_json::to_vec(value).expect("failed to serialize JSON output");
     if bytes.is_empty() {
         return 0;
@@ -245,41 +297,74 @@ fn return_json<T: Serialize>(value: &T) -> u64 {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn plan(pointer: u32, size: u32) -> u64 {
-    let params: Payload = read_json(pointer, size);
-    return_json(&vec![params])
+pub unsafe extern "C" fn execute(pointer: u32, size: u32) -> u64 {
+    let bytes = slice::from_raw_parts(pointer as *const u8, size as usize);
+    let outcome = match serde_json::from_slice::<Invocation>(bytes) {
+        Ok(call) => dispatch(&call),
+        Err(err) => Err(format!("invalid invocation: {err}")),
+    };
+    let envelope = match outcome {
+        Ok(successors) => json!({ "ok": true, "successors": successors }),
+        Err(message) => json!({ "ok": false, "error": message }),
+    };
+    return_json(&envelope)
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn run(pointer: u32, size: u32) {
-    let payload: Payload = read_json(pointer, size);
-    let message = format!(
-        "metadata-enricher: query={}, dryRun={}",
-        payload.query, payload.dry_run
-    );
-    host_log(1, message.as_ptr() as i32, message.len() as i32);
+fn dispatch(call: &Invocation) -> Result<Vec<Value>, String> {
+    match call.task_type.as_str() {
+        "SCAN_ARTISTS" => plan_batches(&call.payload),
+        "ENRICH_ARTIST" => enrich(call.task_id, &call.payload).map(|()| Vec::new()),
+        other => Err(format!("unknown task type: {other}")),
+    }
+}
+
+fn plan_batches(payload: &Value) -> Result<Vec<Value>, String> {
+    let batch_size = payload
+        .get("batchSize")
+        .and_then(Value::as_i64)
+        .ok_or("batchSize is required")?;
+    if batch_size <= 0 {
+        return Err("batchSize must be positive".to_string());
+    }
+    let successors = (0..4)
+        .map(|index| {
+            json!({
+                "taskType": "ENRICH_ARTIST",
+                "payload": { "offset": index * batch_size, "limit": batch_size }
+            })
+        })
+        .collect();
+    Ok(successors)
+}
+
+fn enrich(task_id: i64, payload: &Value) -> Result<(), String> {
+    let message = format!("artist-enricher: taskId={task_id}, payload={payload}");
+    unsafe { host_log(1, message.as_ptr() as i32, message.len() as i32) };
+    Ok(())
 }
 ```
 
-`host_log` 的日志级别为 `0 = debug`、`1 = info`、`2 = warn`，其他值按 error 记录。
+`host_log` 的级别为 `0 = debug`、`1 = info`、`2 = warn`，其余取值按 error 记录。
+
+`execute()` 内部发生 panic 或 trap 同样会让任务失败，但显式返回 `{"ok": false, "error": ...}` 能给出有用得多的失败原因。
 
 ## 调用 Host API
 
-Host imports 位于 `env` 模块。除日志和二进制存储函数外，它们统一使用以下签名：
+Host imports 位于 `env` 模块。除日志与二进制存储操作外，它们共用同一签名：
 
 ```text
 (i32 requestPtr, i32 requestLen) -> i64
 ```
 
-guest 将 UTF-8 JSON Object 写入自己的线性内存，调用 Host 函数，再按 `plan()` 相同的方式解包响应指针与长度。读取响应后必须调用自己的 `dealloc()`。
+插件把 UTF-8 的 JSON Object 写入自己的线性内存，调用 Host 函数，再按与自身 `execute()` 返回值完全相同的方式解包响应指针与长度。读取完响应后请调用自己的 `dealloc()` 释放内存。
 
-例如，调用 `host_artist_search` 时请求可以是：
+例如一次 `host_artist_search` 的请求可以是：
 
 ```json
 { "name": "Miles Davis" }
 ```
 
-JSON Host API 始终返回信封：
+JSON 类 Host API 始终返回信封：
 
 ```json
 { "ok": true, "data": [{ "id": 42, "displayName": "Miles Davis" }] }
@@ -292,77 +377,86 @@ JSON Host API 始终返回信封：
 }
 ```
 
-插件必须先检查 `ok`，再读取 `data`。当前通用错误码为 `INVALID_ARGUMENT`、`NOT_FOUND`、`CONFLICT`、`RESPONSE_TOO_LARGE` 与 `INTERNAL`。无效指针、越界内存或无法解析的请求 JSON 属于 ABI 错误，会直接使本次 WASM 调用失败。
+读取 `data` 前先检查 `ok`。常见错误码为 `INVALID_ARGUMENT`、`NOT_FOUND`、`CONFLICT`、`RESPONSE_TOO_LARGE` 与 `INTERNAL`。非法指针、越界内存或无法解析的请求 JSON 属于 ABI 失败，会直接中止当前 WASM 调用。
 
 当前 Host API 覆盖以下领域：
 
 | 领域       | 能力                                               |
 | ---------- | -------------------------------------------------- |
-| 基础       | 分级日志、HTTP 请求、将 HTTP 响应流式下载到存储    |
-| 音乐元数据 | Artist、Work、Recording、Album 的查询与变更        |
-| 媒体       | MediaFile 与 Asset 的查询、创建和删除              |
-| 存储       | FS/OSS 节点查询，对象列举、stat、读、写与删除      |
-| 歌单       | 查询、创建、修改、删除和曲目顺序管理               |
-| 任务       | 查询任务定义、提交与管理 submission/task、读取统计 |
-| 只读元数据 | 插件与账号查询                                     |
+| 基础设施   | 分级日志、HTTP 请求，以及把 HTTP 响应流式写入存储  |
+| 音乐元数据 | 查询与修改 Artist、Work、Recording、Album          |
+| 媒体       | 查询、创建与删除 MediaFile 与 Asset                |
+| 存储       | 查询 FS/OSS 节点；列举、stat、读取、写入与删除对象 |
+| 播放列表   | 查询、创建、更新、删除与调整曲目顺序               |
+| 任务       | 查询任务定义、创建与管理任务、读取统计             |
+| 配置与数据 | 读取插件自身配置，读写与列举插件数据               |
+| 只读元数据 | 查询插件与账号                                     |
 
-分页接口默认每页 100 条，`pageIndex` 从 0 开始，`pageSize` 最大为 1000。完整的函数名称、请求与响应结构见 [Host API 参考](https://github.com/Coooolfan/UniRhy/blob/main/docs/PLUGIN_HOST_API.md)。Host 函数目录不属于长期稳定性承诺；升级 UniRhy 时，应使用目标版本重新构建并验证插件。
+分页调用默认返回 100 行，`pageIndex` 从 0 开始，`pageSize` 上限 1000。完整的函数名与请求/响应结构见 [Host API 参考](https://github.com/Coooolfan/UniRhy/blob/main/docs/PLUGIN_HOST_API.md)。Host 函数目录不构成长期兼容承诺，升级时请针对目标 UniRhy 版本重新构建并验证插件。
 
-### 二进制与大文件
+### 配置与插件数据
 
-三个接口采用特殊约定：
+`host_plugin_config_get` 返回插件自身的配置，其中包含明文的 `writeOnly` 字段。其他插件无法读取它，每个插件的数据都以自身 id 为界。
 
-- `host_storage_object_read(requestPtr, requestLen) -> i64` 直接返回原始字节；对象不存在时返回 `0`。读取前先调用 stat 并确保 guest 内存足够。
-- `host_storage_object_write(metaPtr, metaLen, dataPtr, dataLen) -> i64` 将原始字节写入指定对象，返回 JSON 信封。
-- `host_http_download_to_storage` 仍使用 JSON 请求，但由服务端直接把响应流写入 FS/OSS，不经过 guest 内存，适合音频等大文件。
+`host_plugin_data_put`、`host_plugin_data_get` 与 `host_plugin_data_list` 提供一个键值存储，用于保存需要跨任务存活的状态，例如同步游标。若某个键同时也在 `config` 中声明，写入时会按该字段的 Schema 校验，并在字段为 `writeOnly` 时加密存储；其余键则原样保存任意 JSON 值。
 
-普通 `host_http_request` 的响应体会经过 Base64 和 guest 内存，硬上限为 256 MiB。大文件始终优先使用流式下载接口。
+### 二进制数据与大文件
+
+有三个操作使用特殊约定：
+
+- `host_storage_object_read(requestPtr, requestLen) -> i64` 返回原始字节，对象不存在时返回 `0`。调用前先 stat，并确认插件侧内存足够。
+- `host_storage_object_write(metaPtr, metaLen, dataPtr, dataLen) -> i64` 把原始字节写入对象，返回 JSON 信封。
+- `host_http_download_to_storage` 仍然接收 JSON，但服务端会把响应直接流式写入 FS/OSS，不经过插件内存。音频等大文件请使用它。
+
+普通 `host_http_request` 的响应要经过 Base64 与插件内存，硬上限为 256 MiB。内容较大时优先使用流式下载。
 
 ## 事务、失败与幂等
 
-数据库 Host API 写入参与当前 `plan()` 或 `run()` 的事务。每次 JSON Host 调用还会建立嵌套 savepoint：一次调用返回失败信封时，其数据库写入被回滚，但插件仍可处理错误并继续调用其他 API。随后如果整个 `plan()` 或 `run()` 失败，本次调用产生的数据库写入也会一并回滚。
+通过 Host API 产生的数据库写入参与当前任务的事务。每次 JSON Host 调用还会建立一个嵌套保存点：若某次调用返回错误信封，它的数据库改动会被回滚，而插件仍可检查错误并继续执行。如果 `execute()` 随后失败，本次调用产生的全部数据库改动都会回滚，包括它本应入队的后继。
 
-HTTP、文件系统与 OSS 副作用不在 PostgreSQL 事务内。节点退出、连接中断或管理员手动重置失败任务时，`plan()` 或 `run()` 可能再次执行，而此前的外部写入可能已经完成。因此：
+HTTP、文件系统与 OSS 的副作用不在 PostgreSQL 事务内。节点关闭、连接中断，或管理员重置失败任务，都可能让一条任务在外部写入已经完成之后再次执行。因此：
 
-- 使用确定性的 object key，并在写入前检查目标状态；
-- 用 `overwrite` 明确表达覆盖意图；
-- 让重复执行得到相同结果，或能够识别已经完成的步骤；
-- 不要把 submission 或 task 的状态当作外部副作用恰好执行一次的证明。
+- 使用确定性的对象键，并在写入前检查目标；
+- 用 `overwrite` 显式表达覆盖意图；
+- 让后继 payload 保持确定，使重跑落入活动兄弟去重，而不是让子树翻倍；
+- 让重复执行得到相同结果，或能够识别已完成的步骤；
+- 不要把任务状态当作某个外部副作用恰好发生一次的证据。
 
-普通执行异常不会自动重试，失败记录需要管理员手动重置为 `PENDING`。如果 HTTP 请求需要重试，应在单次调用内设置有限次数并自行处理退避。
+普通执行错误不会自动重试，需要管理员把失败或已取消的任务重新置为 `PENDING`。若某次 HTTP 调用需要重试，请在单次调用内做有限次重试并自行实现退避。
 
 ## 构建与打包
 
-编译 WASM：
+编译模块：
 
 ```sh
 cargo build --release --target wasm32-unknown-unknown
 ```
 
-创建包目录，并确保两个文件位于 ZIP 根目录：
+创建打包目录，并保证两个文件都位于 ZIP 根目录：
 
 ```sh
 mkdir -p dist/plugin
 cp plugin.yml dist/plugin/plugin.yml
-cp target/wasm32-unknown-unknown/release/metadata_enricher.wasm dist/plugin/plugin.wasm
-(cd dist/plugin && zip -r ../metadata-enricher-0.1.0.up plugin.yml plugin.wasm)
-unzip -l dist/metadata-enricher-0.1.0.up
+cp target/wasm32-unknown-unknown/release/artist_enricher.wasm dist/plugin/plugin.wasm
+(cd dist/plugin && zip -r ../artist-enricher-0.1.0.up plugin.yml plugin.wasm)
+unzip -l dist/artist-enricher-0.1.0.up
 ```
 
-`.up` 本质是 ZIP 文件。压缩包上限为 10 MiB，`plugin.wasm` 条目上限为 20 MiB。
+`.up` 包就是 ZIP 文件。压缩包上限为 10 MiB，其中 `plugin.wasm` 条目上限为 20 MiB。
 
 ## 安装与验证
 
-1. 使用管理员账号打开“设置 → 插件”，上传 `.up` 文件。
-2. 上传后的插件保持禁用。启用时，服务端会实例化 WASM，并校验 Host imports 与 `alloc`、`dealloc`、`plan`、`run` 导出。
-3. 打开“任务管理”，选择插件任务，填写 schema 生成的表单并提交。
-4. 先确认 submission 规划成功，再检查其子任务是否全部完成；失败原因会记录在对应资源上。
-5. 使用 `host_log` 输出可定位的任务标识与关键阶段，但不要记录凭据、Cookie 或完整媒体内容。
+1. 以管理员身份登录，打开 _设置 → 插件_，上传 `.up` 文件。
+2. 若 manifest 声明了 `config`，先填写插件配置；required 字段必须配置完整才能启用插件。
+3. 上传后的插件保持禁用。启用时服务端会实例化 WASM，并校验 Host imports 与 `alloc`、`dealloc`、`execute` 导出，其中 `execute` 的签名必须是 `(i32, i32) -> i64`。
+4. 打开 _任务管理_，选择插件中可投递的任务，填写由 Schema 生成的表单并提交。
+5. 确认根任务已完成，再展开任务树查看它产出的后继。失败原因记录在各条任务上。
+6. 使用 `host_log` 时带上有用的任务标识与任务类型，但绝不要记录凭据、Cookie 或完整媒体内容。
 
-常见启用失败通常来自导入名称或签名不匹配、缺少必需导出、使用 WASI、ABI 值错误，或打包后文件不在 ZIP 根目录。上传能证明 manifest 与 WASM 格式可解析；只有启用成功才证明模块能够与当前 Host API 完整链接。
+启用失败的常见原因包括：import 名称或签名不匹配、缺少必需导出、使用了 WASI、ABI 取值不正确、配置不完整，以及包内文件不在 ZIP 根目录。上传成功只能说明 manifest 与模块可以被解析，启用成功才能说明模块与当前 Host API 链接一致。
 
 ## 升级插件
 
-上传相同 `id` 的包表示覆盖升级，上传后插件会回到禁用状态。升级必须保持 `task.type` 不变，并能处理旧版本已经产生但尚未执行的 payload。服务端不会把插件版本写入任务，也不会为待执行任务保留旧 WASM。
+上传同 `id` 的包即为就地升级，插件会重新变为禁用状态。新 manifest 必须继续声明旧版本已声明的全部任务类型（服务端会拒绝丢弃任务类型的上传），且每种任务都要能处理旧版本创建的 payload。已有的并发值会被保留，已存储的配置会按新声明调整加密表示。服务端不会在任务上记录插件版本，也不会为待执行的任务保留旧的 WASM。
 
-如果 payload 协议无法向后兼容，请使用新的插件 `id`。发布前至少验证：旧 payload 可由新 `run()` 处理、重复执行不会破坏外部数据、目标 UniRhy 版本提供全部所需 Host imports。
+如果 payload 协议无法保持兼容，请以新的插件 `id` 发布。发布前至少要验证：新的 `execute()` 能接受旧 payload、重复执行不会破坏外部数据、目标 UniRhy 版本提供了所需的全部 Host import。
