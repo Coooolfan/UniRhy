@@ -286,59 +286,39 @@ const openTaskModal = async () => {
     if (submitted) showSubmitFeedback()
 }
 
-const refreshAll = () => {
-    refreshTaskStatistics()
-}
-
 const isTaskDrawerOpen = ref(false)
 const drawerTaskKey = ref<string>(taskKeyOf('app.unirhy.built-in', 'METADATA_PARSE'))
 const drawerStatuses = ref<TaskStatus[]>(['PENDING'])
 
 // 任务树扩展视图：选中任务后侧边栏拓宽，右侧画布展示其所属整棵树
-const isTreeExpanded = ref(false)
 const selectedTask = ref<TaskRow | null>(null)
+const isTreeExpanded = computed(() => selectedTask.value !== null)
 const treePanel = ref<InstanceType<typeof TaskTreePanel> | null>(null)
-
-const drawerTaskOptions = computed(() =>
-    taskSummaryRows.value.map((row) => ({
-        taskKey: row.taskKey,
-        namespace: row.namespace,
-        taskType: row.taskType,
-        taskName: row.taskName,
-    })),
-)
 
 const drawerTaskName = computed(
     () =>
-        drawerTaskOptions.value.find((option) => option.taskKey === drawerTaskKey.value)
-            ?.taskName ?? drawerTaskKey.value,
+        taskSummaryRows.value.find((row) => row.taskKey === drawerTaskKey.value)?.taskName ??
+        drawerTaskKey.value,
 )
 
 const openTaskDrawer = (taskKey: string, statuses: TaskStatus[]) => {
     drawerTaskKey.value = taskKey
     drawerStatuses.value = [...statuses]
     selectedTask.value = null
-    isTreeExpanded.value = false
     isTaskDrawerOpen.value = true
 }
 
-const drawerTitle = computed(() => drawerTaskName.value)
-
 const onSelectTask = (row: TaskRow) => {
     selectedTask.value = row
-    isTreeExpanded.value = true
 }
 
 const collapseTree = () => {
-    isTreeExpanded.value = false
+    selectedTask.value = null
 }
 
 const onDrawerOpenChange = (open: boolean) => {
     isTaskDrawerOpen.value = open
-    if (!open) {
-        selectedTask.value = null
-        isTreeExpanded.value = false
-    }
+    if (!open) selectedTask.value = null
 }
 
 const onTaskActionSuccess = () => {
@@ -367,7 +347,7 @@ const onTaskActionSuccess = () => {
                     class="text-[#8A8A8A] transition-colors hover:text-[#C67C4E] disabled:opacity-50"
                     :disabled="isLoadingTaskStatistics"
                     :title="t('tasksView.refreshStatus')"
-                    @click="refreshAll"
+                    @click="refreshTaskStatistics"
                 >
                     <RefreshCw
                         class="h-5 w-5"
@@ -657,11 +637,11 @@ const onTaskActionSuccess = () => {
         <SideDrawer
             :open="isTaskDrawerOpen"
             :expanded="isTreeExpanded"
-            :title="drawerTitle"
+            :title="drawerTaskName"
             width="34rem"
             max-width="calc(100vw - 2rem)"
             @update:open="onDrawerOpenChange"
-            @update:expanded="isTreeExpanded = $event"
+            @update:expanded="(value: boolean) => !value && collapseTree()"
         >
             <template #header-actions>
                 <button
@@ -685,7 +665,7 @@ const onTaskActionSuccess = () => {
                     <TaskDrawerContent
                         v-model:task-key="drawerTaskKey"
                         v-model:statuses="drawerStatuses"
-                        :tasks="drawerTaskOptions"
+                        :tasks="taskSummaryRows"
                         selectable
                         :selected-id="selectedTask?.id ?? null"
                         @select="onSelectTask"

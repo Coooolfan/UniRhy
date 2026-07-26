@@ -11,6 +11,7 @@ import type { AsyncTaskDto } from '@/__generated/model/dto'
 import type { TaskStatus } from '@/__generated/model/enums/TaskStatus'
 import { ListTree, Loader2, RefreshCw } from 'lucide-vue-next'
 import TaskTreeNode, { type TaskFlowNodeData } from './TaskTreeNode.vue'
+import { STATUS_DOT_CLASS, STATUS_ORDER, formatTaskTime, useTaskStatusLabels } from './taskStatus'
 
 import '@vue-flow/core/dist/style.css'
 import '@vue-flow/core/dist/theme-default.css'
@@ -26,36 +27,13 @@ const props = defineProps<{
 }>()
 
 const { t } = useI18n()
+const statusLabelMap = useTaskStatusLabels()
 
 const root = ref<TreeNode | null>(null)
 const loading = ref(false)
 const error = ref('')
 
 // ── 数据 ─────────────────────────────────────────────
-const STATUS_ORDER: readonly TaskStatus[] = [
-    'PENDING',
-    'RUNNING',
-    'COMPLETED',
-    'FAILED',
-    'CANCELLED',
-]
-
-const statusLabelMap = computed<Record<TaskStatus, string>>(() => ({
-    PENDING: t('taskDetails.pending'),
-    RUNNING: t('taskDetails.running'),
-    COMPLETED: t('taskDetails.completed'),
-    FAILED: t('taskDetails.failed'),
-    CANCELLED: t('taskDetails.cancelled'),
-}))
-
-const STATUS_DOT_CLASS: Record<TaskStatus, string> = {
-    PENDING: 'bg-[#B8AFA3]',
-    RUNNING: 'bg-[#B86134]',
-    COMPLETED: 'bg-emerald-600',
-    FAILED: 'bg-rose-500',
-    CANCELLED: 'bg-[#D8CFC2]',
-}
-
 /** 递归统计整棵树的节点数与各状态数量 */
 const treeStats = computed(() => {
     const counts: Record<TaskStatus, number> = {
@@ -75,23 +53,13 @@ const treeStats = computed(() => {
     return { total, counts }
 })
 
-const formatTime = (value: string | undefined | null) => {
-    if (!value) return '—'
-    const date = new Date(value)
-    if (Number.isNaN(date.getTime())) return value
-    return date.toLocaleString('zh-CN', { hour12: false })
-}
-
 // ── 布局：经典 tidy 树（叶子递增 y，父节点取子节点 y 中心）──
 const NODE_WIDTH = 208 // w-52
 const NODE_HEIGHT = 84
 const GAP_X = 64
 const GAP_Y = 16
 
-const flowNodes = ref<Node<TaskFlowNodeData>[]>([])
-const flowEdges = ref<Edge[]>([])
-
-const buildFlow = (rootNode: TreeNode) => {
+const buildFlow = (rootNode: TreeNode): { nodes: Node<TaskFlowNodeData>[]; edges: Edge[] } => {
     const nodes: Node<TaskFlowNodeData>[] = []
     const edges: Edge[] = []
     let nextLeafY = 0
@@ -103,9 +71,13 @@ const buildFlow = (rootNode: TreeNode) => {
             centerY = nextLeafY
             nextLeafY += NODE_HEIGHT + GAP_Y
         } else {
-            const childYs = children.map((child) => layout(child, depth + 1))
-            const firstY = childYs[0]
-            const lastY = childYs.length > 1 ? (childYs.pop() as number) : firstY
+            // 子节点按序布局，父节点取首末子节点的 y 中点
+            let firstY = 0
+            let lastY = 0
+            children.forEach((child, index) => {
+                lastY = layout(child, depth + 1)
+                if (index === 0) firstY = lastY
+            })
             centerY = (firstY + lastY) / 2
         }
 
@@ -134,9 +106,12 @@ const buildFlow = (rootNode: TreeNode) => {
     }
 
     layout(rootNode, 0)
-    flowNodes.value = nodes
-    flowEdges.value = edges
+    return { nodes, edges }
 }
+
+const flow = computed(() => (root.value ? buildFlow(root.value) : { nodes: [], edges: [] }))
+const flowNodes = computed(() => flow.value.nodes)
+const flowEdges = computed(() => flow.value.edges)
 
 // ── Vue Flow 实例与视图控制 ──────────────────────────
 const flowStore = ref<VueFlowStore | null>(null)
@@ -160,8 +135,6 @@ const nodeClass = (node: GraphNode<TaskFlowNodeData>) =>
 const fetchTree = async () => {
     if (props.taskId === null) {
         root.value = null
-        flowNodes.value = []
-        flowEdges.value = []
         error.value = ''
         return
     }
@@ -178,13 +151,10 @@ const fetchTree = async () => {
         }
         const tree = await api.taskController.getTaskTree({ id: cursor })
         root.value = tree
-        buildFlow(tree)
         await nextTick()
         flowStore.value?.fitView({ padding: 0.15, maxZoom: 1 })
     } catch (err) {
         root.value = null
-        flowNodes.value = []
-        flowEdges.value = []
         error.value = resolveErrorMessage(err, 'errors.fallback.taskTreeLoad')
     } finally {
         loading.value = false
@@ -220,7 +190,7 @@ defineExpose({ refresh: fetchTree })
                 >
                 <span class="hidden text-[#E0D5C4] sm:inline">|</span>
                 <span class="text-xs text-[#8A8177]">
-                    {{ t('taskDetails.createdAt', { time: formatTime(root.createdAt) }) }}
+                    {{ t('taskDetails.createdAt', { time: formatTaskTime(root.createdAt) }) }}
                 </span>
                 <span class="hidden text-[#E0D5C4] sm:inline">|</span>
                 <span class="text-xs text-[#8A8177]">

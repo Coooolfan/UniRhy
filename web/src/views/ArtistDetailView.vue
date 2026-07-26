@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { api } from '@/ApiInstance'
@@ -56,7 +56,6 @@ const currentRecordingId = ref<number | null>(null)
 
 type Recording = RecordingPreview &
     RecordingPlaybackCandidate & {
-        label: string
         labels: string[]
         comment: string
         isDefault: boolean
@@ -67,17 +66,27 @@ type ArtistRecordingDto = Awaited<
     ReturnType<typeof api.artistController.listArtistRecordings>
 >['rows'][number]
 
-const artistData = ref<ArtistHeroData>({
-    name: '',
-    aliases: '',
-    comment: '',
-    avatar: '',
-})
+type ArtistDetailDto = Awaited<ReturnType<typeof api.artistController.getArtistById>>
 
-const artistEditInitial = ref<ArtistEditForm>({
-    displayName: '',
-    alias: [],
-    comment: '',
+const artist = ref<ArtistDetailDto | null>(null)
+
+const artistData = computed<ArtistHeroData>(() => ({
+    name: artist.value?.displayName ?? '',
+    aliases: artist.value?.alias.join(' / ') ?? '',
+    comment: artist.value?.comment ?? '',
+    avatar: resolveCover(artist.value?.avatar),
+}))
+
+const artistEditInitial = computed<ArtistEditForm>(() => ({
+    displayName: artist.value?.displayName ?? '',
+    alias: [...(artist.value?.alias ?? [])],
+    comment: artist.value?.comment ?? '',
+}))
+
+/** 路由参数中的艺术家 id；非法值统一表示为 null */
+const artistId = computed<number | null>(() => {
+    const id = Number(route.params.id)
+    return Number.isNaN(id) ? null : id
 })
 
 const recordings = ref<Recording[]>([])
@@ -101,20 +110,7 @@ const {
 const fetchArtist = async (id: number) => {
     try {
         artistError.value = ''
-        const data = await api.artistController.getArtistById({ id })
-
-        artistData.value = {
-            name: data.displayName,
-            aliases: data.alias.join(' / '),
-            comment: data.comment || '',
-            avatar: resolveCover(data.avatar),
-        }
-
-        artistEditInitial.value = {
-            displayName: data.displayName,
-            alias: [...data.alias],
-            comment: data.comment ?? '',
-        }
+        artist.value = await api.artistController.getArtistById({ id })
     } catch (error) {
         artistError.value = resolveErrorMessage(error, 'errors.fallback.artistLoad')
     }
@@ -138,7 +134,6 @@ const fetchRecordings = async (id: number) => {
             fallbackArtist: artistData.value.name,
             transform: (recording: ArtistRecordingDto, base: NormalizedRecordingBase) => ({
                 ...base,
-                label: formatLabels(recording.label),
                 labels: normalizeLabels(recording.label),
                 comment: recording.comment,
                 durationMs: recording.durationMs,
@@ -174,21 +169,15 @@ const handlePageChange = (nextPageIndex: number) => {
         return
     }
     pageIndex.value = nextPageIndex
-    const id = Number(route.params.id)
-    if (!Number.isNaN(id)) {
-        void fetchRecordings(id)
-    }
+    if (artistId.value !== null) void fetchRecordings(artistId.value)
 }
 
 const buildRecordingLabel = (recording: Recording) => {
+    const label = formatLabels(recording.labels)
     const duration = formatDurationMs(recording.durationMs)
-    if (!recording.label) {
-        return duration
-    }
-    if (!duration) {
-        return recording.label
-    }
-    return `${recording.label} · ${duration}`
+    if (!label) return duration
+    if (!duration) return label
+    return `${label} · ${duration}`
 }
 
 const openAddToPlaylistModal = (recording: Recording) => {
@@ -202,8 +191,8 @@ const openAddToPlaylistModal = (recording: Recording) => {
 }
 
 const openEditArtistModal = async () => {
-    const artistId = Number(route.params.id)
-    if (Number.isNaN(artistId)) {
+    const id = artistId.value
+    if (id === null) {
         return
     }
 
@@ -216,14 +205,14 @@ const openEditArtistModal = async () => {
             submittingText: t('common.saving'),
             onSubmit: async (form: ArtistEditForm) => {
                 await api.artistController.updateArtist({
-                    id: artistId,
+                    id,
                     body: {
                         displayName: form.displayName,
                         alias: form.alias,
                         comment: form.comment,
                     },
                 })
-                await fetchArtist(artistId)
+                await fetchArtist(id)
             },
         },
     })
@@ -259,7 +248,6 @@ const openEditRecordingModal = async (recording: Recording) => {
                         recordings.value[index] = {
                             ...current,
                             title,
-                            label: formatLabels(label),
                             labels: label,
                             comment,
                         }
@@ -270,22 +258,14 @@ const openEditRecordingModal = async (recording: Recording) => {
     })
 }
 
-onMounted(() => {
-    const id = Number(route.params.id)
-    if (!Number.isNaN(id)) {
-        void fetchPage(id)
-    }
-})
-
 watch(
-    () => route.params.id,
-    (newId) => {
-        const id = Number(newId)
-        if (!Number.isNaN(id)) {
-            pageIndex.value = 0
-            void fetchPage(id)
-        }
+    artistId,
+    (id) => {
+        if (id === null) return
+        pageIndex.value = 0
+        void fetchPage(id)
     },
+    { immediate: true },
 )
 </script>
 
@@ -305,7 +285,7 @@ watch(
             <button
                 class="ml-4 text-[#C27E46]"
                 type="button"
-                @click="fetchPage(Number(route.params.id))"
+                @click="artistId !== null && fetchPage(artistId)"
             >
                 {{ t('common.retry') }}
             </button>
@@ -400,7 +380,7 @@ watch(
                 <button
                     class="ml-4 text-[#C27E46]"
                     type="button"
-                    @click="fetchRecordings(Number(route.params.id))"
+                    @click="artistId !== null && fetchRecordings(artistId)"
                 >
                     {{ t('common.retry') }}
                 </button>

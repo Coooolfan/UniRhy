@@ -7,6 +7,7 @@ import DeclarativeFormFields from '@/components/tasks/DeclarativeFormFields.vue'
 import {
     initialFormValues,
     isFormValid,
+    isRecord,
     parseFormDefinition,
     toSubmissionParams,
     type SchemaFormValues,
@@ -38,9 +39,8 @@ const isLoading = ref(false)
 const isSaving = ref(false)
 const hasSnapshot = ref(false)
 const error = ref('')
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-    typeof value === 'object' && value !== null && !Array.isArray(value)
+/** 声明了默认值但服务端尚未存过的字段：视作待保存，使表单初始即为脏 */
+const hasUnsavedDefaults = ref(false)
 
 const visibleConfiguredSecrets = computed(
     () => new Set([...configuredSecrets.value].filter((name) => !clearedSecrets.value.has(name))),
@@ -53,7 +53,7 @@ const serializedState = computed(() =>
         clearedSecretFields: [...clearedSecrets.value].sort(),
     }),
 )
-const isDirty = computed(() => serializedState.value !== baseline.value)
+const isDirty = computed(() => hasUnsavedDefaults.value || serializedState.value !== baseline.value)
 const isValid = computed(() =>
     isFormValid(fields.value, values.value, visibleConfiguredSecrets.value),
 )
@@ -77,9 +77,9 @@ const applySnapshot = (snapshot: PluginConfigurationResponse) => {
         values: toSubmissionParams(fields.value, values.value),
         clearedSecretFields: [],
     })
-    if (fields.value.some((field) => field.default !== undefined && !(field.name in source))) {
-        baseline.value = '__unsaved_defaults__'
-    }
+    hasUnsavedDefaults.value = fields.value.some(
+        (field) => field.default !== undefined && !(field.name in source),
+    )
 }
 
 const load = async () => {
