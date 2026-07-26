@@ -27,7 +27,7 @@ class AsyncTaskServiceTest {
             TaskDefinitionView(
                 namespace = key.namespace,
                 taskType = key.taskType,
-                name = null,
+                name = key.taskType,
                 userSubmittable = true,
                 formDefinition = jacksonObjectMapper().createObjectNode(),
             ),

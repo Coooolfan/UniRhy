@@ -41,6 +41,9 @@ interface PluginTask {
     @Key
     val taskType: String
 
+    /** 任务显示名；插件未声明时为 null，由服务端回退到 [taskType] */
+    val name: String?
+
     /** 单节点并发上限；管理员可调整，覆盖升级时保留 */
     val concurrency: Int
 
