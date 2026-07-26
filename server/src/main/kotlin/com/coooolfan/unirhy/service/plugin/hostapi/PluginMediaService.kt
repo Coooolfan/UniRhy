@@ -11,8 +11,6 @@ import org.babyfish.jimmer.sql.fetcher.Fetcher
 import org.babyfish.jimmer.sql.kt.KSqlClient
 import org.babyfish.jimmer.sql.kt.ast.expression.eq
 import org.babyfish.jimmer.sql.kt.fetcher.newFetcher
-import org.springframework.jdbc.core.namedparam.MapSqlParameterSource
-import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -41,7 +39,6 @@ internal data class HostAssetView(
 @Service
 class PluginMediaService(
     private val sql: KSqlClient,
-    private val jdbc: NamedParameterJdbcTemplate,
     private val storageObjects: StorageNodeObjectService,
 ) {
     internal fun getMediaFile(id: Long): HostMediaFileView = findMediaFile(id)?.toHostView()
@@ -84,20 +81,32 @@ class PluginMediaService(
     @Transactional
     internal fun deleteMediaFile(id: Long) {
         if (findMediaFile(id) == null) notFound("Media file $id was not found")
-        val referenced = jdbc.queryForObject(
-            """
-            SELECT EXISTS (SELECT 1 FROM public.asset WHERE media_file_id = :id)
-                OR EXISTS (SELECT 1 FROM public.recording WHERE cover_id = :id)
-                OR EXISTS (SELECT 1 FROM public.album WHERE cover_id = :id)
-                OR EXISTS (SELECT 1 FROM public.artist WHERE avatar_id = :id)
-                OR EXISTS (SELECT 1 FROM public.account WHERE avatar_id = :id)
-            """.trimIndent(),
-            MapSqlParameterSource("id", id),
-            Boolean::class.java,
-        ) == true
-        if (referenced) conflict("Media file $id is still referenced")
+        if (isReferenced(id)) conflict("Media file $id is still referenced")
         sql.deleteById(MediaFile::class, id)
     }
+
+    /** 媒体文件的全部引用位置；任一存在即禁止删除。逐项短路，命中即返回 */
+    private fun isReferenced(id: Long): Boolean =
+        sql.createQuery(Asset::class) {
+            where(table.mediaFile.id eq id)
+            select(table.id)
+        }.exists() ||
+            sql.createQuery(Recording::class) {
+                where(table.cover.id eq id)
+                select(table.id)
+            }.exists() ||
+            sql.createQuery(Album::class) {
+                where(table.cover.id eq id)
+                select(table.id)
+            }.exists() ||
+            sql.createQuery(Artist::class) {
+                where(table.avatar.id eq id)
+                select(table.id)
+            }.exists() ||
+            sql.createQuery(Account::class) {
+                where(table.avatar.id eq id)
+                select(table.id)
+            }.exists()
 
     internal fun listAssets(recordingId: Long?, mediaFileId: Long?): List<HostAssetView> {
         if (recordingId == null && mediaFileId == null) {

@@ -1,7 +1,12 @@
 package com.coooolfan.unirhy.service.plugin
 
-import org.springframework.jdbc.core.namedparam.MapSqlParameterSource
-import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate
+import com.coooolfan.unirhy.model.Plugin
+import com.coooolfan.unirhy.model.enabled
+import com.coooolfan.unirhy.model.id
+import org.babyfish.jimmer.sql.ast.query.LockMode
+import org.babyfish.jimmer.sql.ast.query.LockWait
+import org.babyfish.jimmer.sql.kt.KSqlClient
+import org.babyfish.jimmer.sql.kt.ast.expression.eq
 import org.springframework.stereotype.Component
 
 data class PluginAvailabilityRow(
@@ -17,7 +22,7 @@ data class PluginAvailabilityRow(
  */
 @Component
 class PluginStore(
-    private val jdbc: NamedParameterJdbcTemplate,
+    private val sql: KSqlClient,
 ) {
 
     /**
@@ -25,25 +30,17 @@ class PluginStore(
      * 根任务创建事务持有该共享锁直到插入完成，防止并发删除遗漏新任务。
      */
     fun lockForShare(pluginId: String): PluginAvailabilityRow? =
-        jdbc.query(
-            """
-            SELECT id, enabled
-            FROM public.plugin
-            WHERE id = :id
-            FOR SHARE
-            """.trimIndent(),
-            MapSqlParameterSource("id", pluginId),
-        ) { rs, _ ->
-            PluginAvailabilityRow(
-                id = rs.getString(1),
-                enabled = rs.getBoolean(2),
-            )
-        }.firstOrNull()
+        sql.createQuery(Plugin::class) {
+            where(table.id eq pluginId)
+            select(table.id, table.enabled)
+        }.forUpdate(LockMode.SHARE, LockWait.DEFAULT).execute().firstOrNull()?.let {
+            PluginAvailabilityRow(id = it._1, enabled = it._2)
+        }
 
     /** Worker claim 的插件启用谓词：插件记录存在且 enabled = true */
     fun isEnabled(pluginId: String): Boolean =
-        jdbc.query(
-            "SELECT enabled FROM public.plugin WHERE id = :id",
-            MapSqlParameterSource("id", pluginId),
-        ) { rs, _ -> rs.getBoolean(1) }.firstOrNull() == true
+        sql.createQuery(Plugin::class) {
+            where(table.id eq pluginId)
+            select(table.enabled)
+        }.execute().firstOrNull() == true
 }

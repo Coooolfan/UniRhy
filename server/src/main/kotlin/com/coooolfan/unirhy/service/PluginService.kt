@@ -4,6 +4,7 @@ import com.coooolfan.unirhy.error.PluginException
 import com.coooolfan.unirhy.model.Plugin
 import com.coooolfan.unirhy.model.PluginTask
 import com.coooolfan.unirhy.model.by
+import com.coooolfan.unirhy.model.enabled
 import com.coooolfan.unirhy.model.id
 import com.coooolfan.unirhy.service.plugin.PluginManifest
 import com.coooolfan.unirhy.service.plugin.PluginTaskStore
@@ -12,6 +13,7 @@ import com.coooolfan.unirhy.service.plugin.WasmPlugin
 import com.coooolfan.unirhy.service.plugin.WasmPluginException
 import com.coooolfan.unirhy.service.plugin.hostapi.PluginDataService
 import com.coooolfan.unirhy.service.task.PluginTaskService
+import com.coooolfan.unirhy.service.task.common.AsyncTaskStore
 import com.coooolfan.unirhy.service.task.common.TaskKey
 import tools.jackson.databind.ObjectMapper
 import tools.jackson.dataformat.yaml.YAMLMapper
@@ -19,10 +21,9 @@ import tools.jackson.module.kotlin.kotlinModule
 import org.babyfish.jimmer.sql.ast.mutation.SaveMode
 import org.babyfish.jimmer.sql.fetcher.Fetcher
 import org.babyfish.jimmer.sql.kt.KSqlClient
+import org.babyfish.jimmer.sql.kt.ast.expression.eq
 import org.babyfish.jimmer.sql.kt.fetcher.newFetcher
 import org.slf4j.LoggerFactory
-import org.springframework.jdbc.core.namedparam.MapSqlParameterSource
-import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate
 import org.springframework.stereotype.Service
 import org.springframework.transaction.support.TransactionTemplate
 import org.springframework.web.multipart.MultipartFile
@@ -45,7 +46,7 @@ private val PLUGIN_SUMMARY_FETCHER: Fetcher<Plugin> = newFetcher(Plugin::class).
 @Service
 class PluginService(
     private val sql: KSqlClient,
-    private val jdbc: NamedParameterJdbcTemplate,
+    private val asyncTaskStore: AsyncTaskStore,
     private val pluginTaskService: PluginTaskService,
     private val pluginDataService: PluginDataService,
     private val pluginTaskStore: PluginTaskStore,
@@ -227,24 +228,14 @@ class PluginService(
      */
     fun delete(id: String) {
         transactionTemplate.executeWithoutResult {
-            val enabled = jdbc.query(
-                "SELECT enabled FROM public.plugin WHERE id = :id FOR UPDATE",
-                MapSqlParameterSource("id", id),
-            ) { rs, _ -> rs.getBoolean(1) }.firstOrNull() ?: throw PluginException.notFound()
+            val enabled = sql.createQuery(Plugin::class) {
+                where(table.id eq id)
+                select(table.enabled)
+            }.forUpdate().execute().firstOrNull() ?: throw PluginException.notFound()
             if (enabled) {
                 throw PluginException.deleteConflict()
             }
-            val hasActive = jdbc.queryForObject(
-                """
-                SELECT EXISTS (
-                    SELECT 1 FROM public.async_task
-                    WHERE namespace = :id AND status IN ('PENDING', 'RUNNING')
-                )
-                """.trimIndent(),
-                MapSqlParameterSource("id", id),
-                Boolean::class.java,
-            ) == true
-            if (hasActive) {
+            if (asyncTaskStore.hasActiveByNamespace(id)) {
                 throw PluginException.deleteConflict()
             }
             sql.deleteById(Plugin::class, id)
