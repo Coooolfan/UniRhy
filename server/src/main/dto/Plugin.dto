@@ -1,0 +1,28 @@
+export com.coooolfan.unirhy.model.Plugin
+    -> package com.coooolfan.unirhy.model.dto
+
+/**
+ * 插件列表视图，含插件声明的全部任务。
+ * 不含 WASM 字节码（每个插件最大 20MB）
+ */
+PluginInfoView {
+    id
+
+    name
+
+    version
+
+    enabled
+
+    configDefinition
+
+    tasks {
+        taskType
+
+        concurrency
+
+        userSubmittable
+
+        formDefinition
+    }
+}

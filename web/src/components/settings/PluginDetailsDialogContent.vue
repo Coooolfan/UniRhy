@@ -2,14 +2,14 @@
 import { computed, ref } from 'vue'
 import { Loader2, Save } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
-import type { PluginInfoResponse } from '@/__generated/model/static/PluginInfoResponse'
+import type { PluginInfoView } from '@/__generated/model/static/PluginInfoView'
 import type { PluginConfigurationResponse } from '@/__generated/model/static/PluginConfigurationResponse'
 import PluginConfigurationSection from '@/components/settings/PluginConfigurationSection.vue'
 import { parseFormDefinition } from '@/components/tasks/schemaForm'
 import { resolveErrorMessage } from '@/i18n/errors'
 
 const props = defineProps<{
-    plugin: PluginInfoResponse
+    plugin: PluginInfoView
     canManage: boolean
     setEnabled: (id: string, enabled: boolean) => Promise<void>
     updateConcurrency: (id: string, taskType: string, concurrency: number) => Promise<void>

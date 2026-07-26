@@ -3,14 +3,13 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import AppModalHost from '@/components/modals/AppModalHost.vue'
 import PluginsSection from '@/components/settings/PluginsSection.vue'
-import type { PluginInfoResponse } from '@/__generated/model/static'
+import type { PluginInfoView } from '@/__generated/model/static'
 import { useModalStore } from '@/stores/modal'
 
-const plugin: PluginInfoResponse = {
+const plugin: PluginInfoView = {
     id: 'com.example.importer',
     name: 'Example Importer',
     version: '1.0.0',
-    isAvailable: false,
     enabled: false,
     tasks: [
         {

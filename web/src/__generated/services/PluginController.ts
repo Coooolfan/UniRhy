@@ -1,5 +1,5 @@
 import type {Executor} from '../';
-import type {PluginConfigurationResponse, PluginConfigurationUpdateRequest, PluginInfoResponse} from '../model/static/';
+import type {PluginConfigurationResponse, PluginConfigurationUpdateRequest, PluginInfoView} from '../model/static/';
 
 /**
  * 插件管理接口
@@ -62,17 +62,17 @@ export class PluginController {
     /**
      * 获取插件列表
      * 
-     * 此接口用于获取系统中已安装的全部插件信息，并标记插件在本节点是否已加载可用
+     * 此接口用于获取系统中已安装的全部插件信息及其声明的任务
      * 需要用户登录认证才能访问
      * 
-     * @return List<PluginInfoResponse> 返回插件信息列表
+     * @return List<PluginInfoView> 返回插件信息列表
      * 
      */
     readonly listPlugins: () => Promise<
-        ReadonlyArray<PluginInfoResponse>
+        ReadonlyArray<PluginInfoView>
     > = async() => {
         let _uri = '/api/plugins';
-        return (await this.executor({uri: _uri, method: 'GET'})) as Promise<ReadonlyArray<PluginInfoResponse>>;
+        return (await this.executor({uri: _uri, method: 'GET'})) as Promise<ReadonlyArray<PluginInfoView>>;
     }
     
     /**

@@ -506,7 +506,6 @@ export default {
         empty: 'No installed plugins',
         emptyHint: 'Upload a .up file to manage it here',
         running: 'Running',
-        notLoaded: 'Not loaded',
         disable: 'Disable',
         enable: 'Enable',
         exportFile: 'Export .up file',

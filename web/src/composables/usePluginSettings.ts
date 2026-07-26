@@ -4,7 +4,7 @@ import { i18n } from '@/i18n'
 import { resolveErrorMessage } from '@/i18n/errors'
 import { buildApiUrl } from '@/runtime/platform'
 import { runtimeFetch } from '@/runtime/http'
-import type { PluginInfoResponse } from '@/__generated/model/static/PluginInfoResponse'
+import type { PluginInfoView } from '@/__generated/model/static/PluginInfoView'
 import type { PluginConfigurationResponse } from '@/__generated/model/static/PluginConfigurationResponse'
 
 const TOKEN_HEADER_NAME = 'unirhy-token'
@@ -23,7 +23,7 @@ const saveConfiguration = (
     })
 
 export const usePluginSettings = () => {
-    const plugins = ref<ReadonlyArray<PluginInfoResponse>>([])
+    const plugins = ref<ReadonlyArray<PluginInfoView>>([])
     const isLoading = ref(false)
     const isUploading = ref(false)
     const error = ref('')
@@ -84,7 +84,7 @@ export const usePluginSettings = () => {
         }
     }
 
-    const downloadPlugin = async (plugin: PluginInfoResponse) => {
+    const downloadPlugin = async (plugin: PluginInfoView) => {
         const token = getAuthToken()
         const headers: Record<string, string> = {}
         if (token) headers[TOKEN_HEADER_NAME] = token

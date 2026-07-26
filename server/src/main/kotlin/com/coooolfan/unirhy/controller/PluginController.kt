@@ -5,9 +5,9 @@ import cn.dev33.satoken.annotation.SaCheckRole
 import com.coooolfan.unirhy.config.ROLE_ADMIN
 import com.coooolfan.unirhy.error.CommonException
 import com.coooolfan.unirhy.error.PluginException
+import com.coooolfan.unirhy.model.dto.PluginInfoView
 import com.coooolfan.unirhy.service.PluginService
 import com.coooolfan.unirhy.service.plugin.hostapi.PluginDataService
-import com.coooolfan.unirhy.service.task.PluginTaskService
 import jakarta.servlet.http.HttpServletResponse
 import tools.jackson.databind.JsonNode
 import org.springframework.http.HttpStatus
@@ -24,24 +24,6 @@ import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.multipart.MultipartFile
 
 /** 插件声明的单个任务 */
-data class PluginTaskResponse(
-    val taskType: String,
-    val concurrency: Int,
-    /** 能否被用户直接从表单投递 */
-    val userSubmittable: Boolean,
-    val formDefinition: JsonNode,
-)
-
-data class PluginInfoResponse(
-    val id: String,
-    val name: String?,
-    val version: String,
-    val isAvailable: Boolean,
-    val enabled: Boolean,
-    val tasks: List<PluginTaskResponse>,
-    val configDefinition: JsonNode,
-)
-
 data class PluginConfigurationResponse(
     val values: JsonNode,
     val configuredSecretFields: List<String>,
@@ -63,43 +45,22 @@ data class PluginConfigurationUpdateRequest(
 @SaCheckLogin
 class PluginController(
     private val pluginService: PluginService,
-    private val pluginTaskService: PluginTaskService,
     private val pluginDataService: PluginDataService,
 ) {
     /**
      * 获取插件列表
      *
-     * 此接口用于获取系统中已安装的全部插件信息，并标记插件在本节点是否已加载可用
+     * 此接口用于获取系统中已安装的全部插件信息及其声明的任务
      * 需要用户登录认证才能访问
      *
-     * @return List<PluginInfoResponse> 返回插件信息列表
+     * @return List<PluginInfoView> 返回插件信息列表
      *
      * @api GET /api/plugins
      * @permission 需要登录认证
      * @description 调用PluginService.listPlugins()方法获取插件列表
      */
     @GetMapping("/plugins")
-    fun listPlugins(): List<PluginInfoResponse> {
-        val tasksByPlugin = pluginService.listPluginTasksByPlugin()
-        return pluginService.listPlugins().map { plugin ->
-            PluginInfoResponse(
-                id = plugin.id,
-                name = plugin.name,
-                version = plugin.version,
-                isAvailable = pluginTaskService.isLoaded(plugin.id),
-                enabled = plugin.enabled,
-                tasks = tasksByPlugin[plugin.id].orEmpty().map { task ->
-                    PluginTaskResponse(
-                        taskType = task.taskType,
-                        concurrency = task.concurrency,
-                        userSubmittable = task.userSubmittable,
-                        formDefinition = task.formDefinition,
-                    )
-                },
-                configDefinition = plugin.configDefinition,
-            )
-        }
-    }
+    fun listPlugins(): List<PluginInfoView> = pluginService.listPlugins()
 
     /**
      * 上传插件

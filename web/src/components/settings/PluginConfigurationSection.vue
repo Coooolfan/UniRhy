@@ -2,7 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { Loader2, RotateCcw, Save } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
-import type { PluginConfigurationResponse, PluginInfoResponse } from '@/__generated/model/static'
+import type { PluginConfigurationResponse, PluginInfoView } from '@/__generated/model/static'
 import DeclarativeFormFields from '@/components/tasks/DeclarativeFormFields.vue'
 import {
     initialFormValues,
@@ -16,7 +16,7 @@ import { resolveErrorMessage } from '@/i18n/errors'
 
 const props = withDefaults(
     defineProps<{
-        plugin: PluginInfoResponse
+        plugin: PluginInfoView
         canManage: boolean
         embedded?: boolean
         loadConfiguration: (id: string) => Promise<PluginConfigurationResponse>

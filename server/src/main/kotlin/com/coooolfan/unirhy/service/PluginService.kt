@@ -4,6 +4,7 @@ import com.coooolfan.unirhy.error.PluginException
 import com.coooolfan.unirhy.model.Plugin
 import com.coooolfan.unirhy.model.PluginTask
 import com.coooolfan.unirhy.model.by
+import com.coooolfan.unirhy.model.dto.PluginInfoView
 import com.coooolfan.unirhy.model.enabled
 import com.coooolfan.unirhy.model.id
 import com.coooolfan.unirhy.service.plugin.PluginManifest
@@ -56,19 +57,15 @@ class PluginService(
     private val yamlMapper: ObjectMapper = YAMLMapper.builder().addModule(kotlinModule()).build()
 
     /** 列表视图不需要 WASM 字节码（每个插件最大 20MB），显式排除避免整库读入堆内存 */
-    fun listPlugins(): List<Plugin> =
+    fun listPlugins(): List<PluginInfoView> =
         sql.createQuery(Plugin::class) {
             orderBy(table.id)
-            select(table.fetch(PLUGIN_SUMMARY_FETCHER))
+            select(table.fetch(PluginInfoView::class))
         }.execute()
 
     fun getPlugin(id: String): Plugin =
         sql.findById(Plugin::class, id)
             ?: throw PluginException.notFound()
-
-    /** 全部插件的任务定义，按插件 ID 分组。列表视图用，避免逐插件查询 */
-    fun listPluginTasksByPlugin(): Map<String, List<PluginTask>> =
-        pluginTaskStore.findAll().groupBy { it.pluginId }
 
     /**
      * 上传插件包。同 id 上传即覆盖升级：保留已有的 `concurrency` 与 `created_at`，

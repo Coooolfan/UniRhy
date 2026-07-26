@@ -487,7 +487,6 @@ export default {
         empty: '暂无已安装的插件',
         emptyHint: '上传 .up 文件后即可在此管理',
         running: '运行中',
-        notLoaded: '未加载',
         disable: '禁用',
         enable: '启用',
         exportFile: '导出 .up 文件',

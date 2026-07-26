@@ -2,6 +2,8 @@ package com.coooolfan.unirhy.model
 
 import org.babyfish.jimmer.sql.Entity
 import org.babyfish.jimmer.sql.Id
+import org.babyfish.jimmer.sql.OneToMany
+import org.babyfish.jimmer.sql.OrderedProp
 import org.babyfish.jimmer.sql.Serialized
 import tools.jackson.databind.JsonNode
 import java.time.Instant
@@ -35,4 +37,8 @@ interface Plugin {
 
     /** 多节点本地 Registry 的缓存失效标记；安装、覆盖上传、启禁用及并发修改时更新 */
     val updatedAt: Instant
+
+    /** 该插件声明的全部任务 */
+    @OneToMany(mappedBy = "plugin", orderedProps = [OrderedProp("taskType")])
+    val tasks: List<PluginTask>
 }

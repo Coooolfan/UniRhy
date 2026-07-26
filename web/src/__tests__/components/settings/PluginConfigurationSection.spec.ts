@@ -1,13 +1,12 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
 import PluginConfigurationSection from '@/components/settings/PluginConfigurationSection.vue'
-import type { PluginInfoResponse } from '@/__generated/model/static'
+import type { PluginInfoView } from '@/__generated/model/static'
 
-const plugin = (required: boolean): PluginInfoResponse => ({
+const plugin = (required: boolean): PluginInfoView => ({
     id: 'com.example.configured',
     name: 'Configured Plugin',
     version: '1.0.0',
-    isAvailable: false,
     enabled: false,
     tasks: [
         {

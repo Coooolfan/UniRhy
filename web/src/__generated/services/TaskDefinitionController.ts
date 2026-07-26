@@ -4,7 +4,8 @@ import type {TaskDefinitionView} from '../model/static/';
 /**
  * 任务定义查询接口
  * 
- * 内建任务与已启用插件任务的统一定义视图，供前端渲染提交表单
+ * 内建任务与已启用插件任务的统一定义视图，供前端展示任务名称、
+ * 过滤可提交任务并渲染对应表单
  */
 export class TaskDefinitionController {
     
@@ -29,9 +30,11 @@ export class TaskDefinitionController {
     }
     
     /**
-     * 获取当前可提交的任务定义列表
+     * 获取当前完整任务定义列表
      * 
-     * @return 每项包含 namespace、taskType、名称以及 form.schema / form.order
+     * 返回入口任务和工作任务；调用方根据 `userSubmittable` 判断任务能否由用户直接提交
+     * 
+     * @return 每项包含 namespace、taskType、名称、提交能力以及 form.schema / form.order
      * 
      */
     readonly listTaskDefinitions: () => Promise<
