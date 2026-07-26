@@ -4,13 +4,15 @@ import com.coooolfan.unirhy.model.Work
 import com.coooolfan.unirhy.model.by
 import com.coooolfan.unirhy.model.dto.WorkMergeReq
 import com.coooolfan.unirhy.service.WorkService
-import org.babyfish.jimmer.Page
 import org.babyfish.jimmer.sql.exception.EmptyResultException
 import org.babyfish.jimmer.sql.fetcher.Fetcher
 import org.babyfish.jimmer.sql.kt.fetcher.newFetcher
 import run.endive.runtime.HostFunction
 import run.endive.runtime.Instance
 import tools.jackson.databind.ObjectMapper
+
+/** Id-only fetcher for existence checks that discard the loaded entity. */
+private val HOST_WORK_ID_FETCHER: Fetcher<Work> = newFetcher(Work::class).by { }
 
 private val HOST_WORK_LIST_FETCHER: Fetcher<Work> = newFetcher(Work::class).by {
     allScalarFields()
@@ -44,11 +46,6 @@ private val HOST_WORK_DETAIL_FETCHER: Fetcher<Work> = newFetcher(Work::class).by
     }
 }
 
-private data class WorkPageData(
-    val rows: List<Work>,
-    val totalRowCount: Long,
-)
-
 internal fun buildWorkHostFunctions(
     workService: WorkService,
     objectMapper: ObjectMapper,
@@ -59,7 +56,7 @@ internal fun buildWorkHostFunctions(
 
     val hostWorkList = support.jsonFunction("host_work_list") { request ->
         val pageRequest = support.page(request)
-        workService.listWork(pageRequest.pageIndex, pageRequest.pageSize, HOST_WORK_LIST_FETCHER).toHostData()
+        workService.listWork(pageRequest.pageIndex, pageRequest.pageSize, HOST_WORK_LIST_FETCHER).toHostPage()
     }
 
     val hostWorkGet = support.jsonFunction("host_work_get") { request ->
@@ -104,7 +101,7 @@ internal fun buildWorkHostFunctions(
 
     val hostWorkDelete = support.jsonFunction("host_work_delete") { request ->
         val id = request.requiredLong("id")
-        findWork(workService, id, HOST_WORK_LIST_FETCHER)
+        findWork(workService, id, HOST_WORK_ID_FETCHER)
         workService.deleteWork(id)
         null
     }
@@ -115,7 +112,7 @@ internal fun buildWorkHostFunctions(
             needMergeIds = request.requiredLongList("needMergeIds").toSet(),
         )
         for (id in merge.needMergeIds + merge.targetId) {
-            findWork(workService, id, HOST_WORK_LIST_FETCHER)
+            findWork(workService, id, HOST_WORK_ID_FETCHER)
         }
         workService.mergeWork(merge)
         null
@@ -132,11 +129,6 @@ internal fun buildWorkHostFunctions(
         hostWorkMerge,
     )
 }
-
-private fun Page<Work>.toHostData(): WorkPageData = WorkPageData(
-    rows = rows,
-    totalRowCount = totalRowCount,
-)
 
 private fun findWork(workService: WorkService, id: Long, fetcher: Fetcher<Work>): Work =
     try {

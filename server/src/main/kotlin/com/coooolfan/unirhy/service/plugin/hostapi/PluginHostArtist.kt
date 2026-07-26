@@ -4,7 +4,6 @@ import com.coooolfan.unirhy.model.Artist
 import com.coooolfan.unirhy.model.by
 import com.coooolfan.unirhy.model.dto.ArtistMergeReq
 import com.coooolfan.unirhy.service.ArtistService
-import org.babyfish.jimmer.Page
 import org.babyfish.jimmer.sql.fetcher.Fetcher
 import org.babyfish.jimmer.sql.kt.fetcher.newFetcher
 import run.endive.runtime.HostFunction
@@ -14,11 +13,6 @@ import tools.jackson.databind.ObjectMapper
 private val HOST_ARTIST_FETCHER: Fetcher<Artist> = newFetcher(Artist::class).by {
     allScalarFields()
 }
-
-private data class ArtistPageData(
-    val rows: List<Artist>,
-    val totalRowCount: Long,
-)
 
 internal fun buildArtistHostFunctions(
     artistService: ArtistService,
@@ -30,7 +24,7 @@ internal fun buildArtistHostFunctions(
 
     val hostArtistList = support.jsonFunction("host_artist_list") { request ->
         val pageRequest = support.page(request)
-        artistService.listArtist(pageRequest.pageIndex, pageRequest.pageSize, HOST_ARTIST_FETCHER).toHostData()
+        artistService.listArtist(pageRequest.pageIndex, pageRequest.pageSize, HOST_ARTIST_FETCHER).toHostPage()
     }
 
     val hostArtistGetByIds = support.jsonFunction("host_artist_get_by_ids") { request ->
@@ -79,30 +73,10 @@ internal fun buildArtistHostFunctions(
     }
 
     val hostArtistSplit = support.jsonFunction("host_artist_split") { request ->
-        val sourceArtistId = request.requiredLong("sourceArtistId")
-        val names = request.requiredTextList("names")
-        if (names.size < 2) invalidArgument("names must contain at least two entries")
-        findArtist(artistService, sourceArtistId)
-
-        artistService.updateArtist(
-            Artist {
-                id = sourceArtistId
-                displayName = names.first()
-                alias = emptyList()
-            },
-            HOST_ARTIST_FETCHER,
+        artistService.splitArtist(
+            sourceArtistId = request.requiredLong("sourceArtistId"),
+            names = request.requiredTextList("names"),
         )
-        for (name in names.drop(1)) {
-            artistService.createArtist(
-                Artist {
-                    displayName = name
-                    alias = emptyList()
-                    comment = ""
-                },
-                HOST_ARTIST_FETCHER,
-                sourceArtistId,
-            )
-        }
         null
     }
 
@@ -116,11 +90,6 @@ internal fun buildArtistHostFunctions(
         hostArtistSplit,
     )
 }
-
-private fun Page<Artist>.toHostData(): ArtistPageData = ArtistPageData(
-    rows = rows,
-    totalRowCount = totalRowCount,
-)
 
 private fun findArtist(artistService: ArtistService, id: Long): Artist =
     artistService.getArtistsByIds(listOf(id), HOST_ARTIST_FETCHER).firstOrNull()

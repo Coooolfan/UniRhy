@@ -3,7 +3,6 @@ package com.coooolfan.unirhy.service.plugin.hostapi
 import com.coooolfan.unirhy.model.Album
 import com.coooolfan.unirhy.model.by
 import com.coooolfan.unirhy.service.AlbumService
-import org.babyfish.jimmer.Page
 import org.babyfish.jimmer.sql.exception.EmptyResultException
 import org.babyfish.jimmer.sql.fetcher.Fetcher
 import org.babyfish.jimmer.sql.kt.fetcher.newFetcher
@@ -12,6 +11,9 @@ import run.endive.runtime.Instance
 import tools.jackson.databind.ObjectMapper
 import java.time.LocalDate
 import java.time.format.DateTimeParseException
+
+/** Id-only fetcher for existence checks that discard the loaded entity. */
+private val HOST_ALBUM_ID_FETCHER: Fetcher<Album> = newFetcher(Album::class).by { }
 
 private val HOST_ALBUM_LIST_FETCHER: Fetcher<Album> = newFetcher(Album::class).by {
     allScalarFields()
@@ -51,11 +53,6 @@ private val HOST_ALBUM_DETAIL_FETCHER: Fetcher<Album> = newFetcher(Album::class)
     }
 }
 
-private data class AlbumPageData(
-    val rows: List<Album>,
-    val totalRowCount: Long,
-)
-
 internal fun buildAlbumHostFunctions(
     albumService: AlbumService,
     objectMapper: ObjectMapper,
@@ -71,7 +68,7 @@ internal fun buildAlbumHostFunctions(
             pageRequest.pageSize,
             HOST_ALBUM_LIST_FETCHER,
             filterSingle = true,
-        ).toHostData()
+        ).toHostPage()
     }
 
     val hostAlbumGet = support.jsonFunction("host_album_get") { request ->
@@ -84,7 +81,7 @@ internal fun buildAlbumHostFunctions(
 
     val hostAlbumUpdate = support.jsonFunction("host_album_update") { request ->
         val id = request.requiredLong("id")
-        findAlbum(albumService, id, HOST_ALBUM_LIST_FETCHER)
+        findAlbum(albumService, id, HOST_ALBUM_ID_FETCHER)
         albumService.updateAlbum(
             Album {
                 this.id = id
@@ -112,11 +109,6 @@ internal fun buildAlbumHostFunctions(
         hostAlbumReorderRecordings,
     )
 }
-
-private fun Page<Album>.toHostData(): AlbumPageData = AlbumPageData(
-    rows = rows,
-    totalRowCount = totalRowCount,
-)
 
 private fun findAlbum(albumService: AlbumService, id: Long, fetcher: Fetcher<Album>): Album =
     try {

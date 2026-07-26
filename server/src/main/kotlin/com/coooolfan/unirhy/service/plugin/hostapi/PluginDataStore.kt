@@ -19,6 +19,11 @@ internal class PluginDataStore(
         MapSqlParameterSource("pluginId", pluginId),
     ) { rs, _ -> rs.getString(1) }.firstOrNull()
 
+    fun exists(pluginId: String): Boolean = jdbc.query(
+        "SELECT 1 FROM public.plugin WHERE id = :pluginId",
+        MapSqlParameterSource("pluginId", pluginId),
+    ) { _, _ -> true }.isNotEmpty()
+
     fun find(pluginId: String, key: String): StoredPluginData? = jdbc.query(
         """
         SELECT key, value::text, encrypted_value

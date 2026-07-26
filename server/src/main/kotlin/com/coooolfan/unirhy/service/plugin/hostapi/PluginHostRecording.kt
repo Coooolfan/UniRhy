@@ -4,12 +4,14 @@ import com.coooolfan.unirhy.model.Recording
 import com.coooolfan.unirhy.model.by
 import com.coooolfan.unirhy.model.dto.RecordingMergeReq
 import com.coooolfan.unirhy.service.RecordingService
-import org.babyfish.jimmer.Page
 import org.babyfish.jimmer.sql.fetcher.Fetcher
 import org.babyfish.jimmer.sql.kt.fetcher.newFetcher
 import run.endive.runtime.HostFunction
 import run.endive.runtime.Instance
 import tools.jackson.databind.ObjectMapper
+
+/** Id-only fetcher for existence checks that discard the loaded entity. */
+private val HOST_RECORDING_ID_FETCHER: Fetcher<Recording> = newFetcher(Recording::class).by { }
 
 private val HOST_RECORDING_SUMMARY_FETCHER: Fetcher<Recording> = newFetcher(Recording::class).by {
     allScalarFields()
@@ -49,11 +51,6 @@ private val HOST_RECORDING_DETAIL_FETCHER: Fetcher<Recording> = newFetcher(Recor
     }
 }
 
-private data class RecordingPageData(
-    val rows: List<Recording>,
-    val totalRowCount: Long,
-)
-
 internal fun buildRecordingHostFunctions(
     recordingService: RecordingService,
     objectMapper: ObjectMapper,
@@ -74,7 +71,7 @@ internal fun buildRecordingHostFunctions(
             ids = request.optionalLongList("ids"),
             workId = request.optionalLong("workId"),
             fetcher = HOST_RECORDING_SUMMARY_FETCHER,
-        ).toHostData()
+        ).toHostPage()
     }
 
     val hostRecordingCreate = support.jsonFunction("host_recording_create") { request ->
@@ -117,7 +114,7 @@ internal fun buildRecordingHostFunctions(
 
     val hostRecordingUpdate = support.jsonFunction("host_recording_update") { request ->
         val id = request.requiredLong("id")
-        recordingService.getRecording(id, HOST_RECORDING_SUMMARY_FETCHER)
+        recordingService.getRecording(id, HOST_RECORDING_ID_FETCHER)
         recordingService.updateRecording(
             Recording {
                 this.id = id
@@ -139,7 +136,7 @@ internal fun buildRecordingHostFunctions(
             needMergeIds = request.requiredLongList("needMergeIds").toSet(),
         )
         for (id in merge.needMergeIds + merge.targetId) {
-            recordingService.getRecording(id, HOST_RECORDING_SUMMARY_FETCHER)
+            recordingService.getRecording(id, HOST_RECORDING_ID_FETCHER)
         }
         recordingService.mergeRecording(merge)
         null
@@ -154,7 +151,3 @@ internal fun buildRecordingHostFunctions(
     )
 }
 
-private fun Page<Recording>.toHostData(): RecordingPageData = RecordingPageData(
-    rows = rows,
-    totalRowCount = totalRowCount,
-)

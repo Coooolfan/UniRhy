@@ -83,14 +83,10 @@ internal fun buildStorageHostFunctions(
         },
         support.jsonFunction("host_storage_object_list") { request ->
             val node = resolveHostStorageNode(request.requiredObject("node"), storageObjects)
-            val pageSize = request.optionalInt("pageSize") ?: HOST_DEFAULT_PAGE_SIZE
-            if (pageSize !in 1..HOST_MAX_PAGE_SIZE) {
-                invalidArgument("pageSize must be between 1 and $HOST_MAX_PAGE_SIZE")
-            }
             val page = storageObjects.list(
                 node = node,
                 prefix = request.optionalText("prefix") ?: "",
-                pageSize = pageSize,
+                pageSize = support.pageSize(request),
                 cursor = request.optionalText("cursor"),
             )
             linkedMapOf<String, Any>("objects" to page.objects).apply {

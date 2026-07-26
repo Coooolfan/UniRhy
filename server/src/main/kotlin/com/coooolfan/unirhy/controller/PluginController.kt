@@ -82,6 +82,7 @@ class PluginController(
      */
     @GetMapping("/plugins")
     fun listPlugins(): List<PluginInfoResponse> {
+        val tasksByPlugin = pluginService.listPluginTasksByPlugin()
         return pluginService.listPlugins().map { plugin ->
             PluginInfoResponse(
                 id = plugin.id,
@@ -89,7 +90,7 @@ class PluginController(
                 version = plugin.version,
                 isAvailable = pluginTaskService.isLoaded(plugin.id),
                 enabled = plugin.enabled,
-                tasks = pluginService.listPluginTasks(plugin.id).map { task ->
+                tasks = tasksByPlugin[plugin.id].orEmpty().map { task ->
                     PluginTaskResponse(
                         taskType = task.taskType,
                         concurrency = task.concurrency,

@@ -6,6 +6,7 @@ import com.coooolfan.unirhy.model.Artist
 import com.coooolfan.unirhy.model.Recording
 import com.coooolfan.unirhy.model.alias
 import com.coooolfan.unirhy.model.artists
+import com.coooolfan.unirhy.model.by
 import com.coooolfan.unirhy.model.displayName
 import com.coooolfan.unirhy.model.id
 import com.coooolfan.unirhy.model.dto.ArtistMergeReq
@@ -14,6 +15,7 @@ import org.babyfish.jimmer.Page
 import org.babyfish.jimmer.sql.ast.mutation.SaveMode
 import org.babyfish.jimmer.sql.fetcher.Fetcher
 import org.babyfish.jimmer.sql.kt.KSqlClient
+import org.babyfish.jimmer.sql.kt.fetcher.newFetcher
 import org.babyfish.jimmer.sql.kt.ast.expression.eq
 import org.babyfish.jimmer.sql.kt.ast.expression.ilike
 import org.babyfish.jimmer.sql.kt.ast.expression.or
@@ -179,5 +181,37 @@ class ArtistService(
 
     fun updateArtist(input: Artist, fetcher: Fetcher<Artist>): Artist {
         return sql.saveCommand(input, SaveMode.UPDATE_ONLY).execute(fetcher).modifiedEntity
+    }
+
+    /**
+     * 将一位艺术家拆分为多位同名关联的艺术家。
+     *
+     * [names] 的首项用于重命名源艺术家，其余各项创建为新艺术家并复制源艺术家的作品与录音关联。
+     */
+    @Transactional
+    fun splitArtist(sourceArtistId: Long, names: List<String>) {
+        require(names.size >= 2) { "names must contain at least two entries" }
+        if (sql.findById(Artist::class, sourceArtistId) == null) throw CommonException.NotFound()
+
+        val idOnly = newFetcher(Artist::class).by { }
+        updateArtist(
+            Artist {
+                id = sourceArtistId
+                displayName = names.first()
+                alias = emptyList()
+            },
+            idOnly,
+        )
+        for (name in names.drop(1)) {
+            createArtist(
+                Artist {
+                    displayName = name
+                    alias = emptyList()
+                    comment = ""
+                },
+                idOnly,
+                sourceArtistId,
+            )
+        }
     }
 }

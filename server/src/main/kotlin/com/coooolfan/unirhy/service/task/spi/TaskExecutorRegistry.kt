@@ -27,6 +27,4 @@ class TaskExecutorRegistry {
     }
 
     fun find(key: TaskKey): TaskExecutor? = executors[key]
-
-    fun snapshot(): Map<TaskKey, TaskExecutor> = HashMap(executors)
 }
