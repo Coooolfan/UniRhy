@@ -26,14 +26,6 @@ private val PLUGIN_TASK_FETCHER: Fetcher<PluginTask> = newFetcher(PluginTask::cl
 }
 
 /** 附带插件展示名，供任务定义列表使用 */
-private val ENABLED_PLUGIN_TASK_FETCHER: Fetcher<PluginTask> = newFetcher(PluginTask::class).by {
-    allScalarFields()
-    pluginId()
-    plugin {
-        name()
-    }
-}
-
 /** `plugin_task` 的数据库访问 */
 @Repository
 class PluginTaskStore(
@@ -60,12 +52,12 @@ class PluginTaskStore(
             select(table.fetch(PLUGIN_TASK_FETCHER))
         }.execute()
 
-    /** 仅已启用插件的任务定义，附带插件展示名 */
+    /** 仅已启用插件的任务定义 */
     fun findEnabled(): List<PluginTask> =
         sql.createQuery(PluginTask::class) {
             where(table.plugin.enabled eq true)
             orderBy(table.pluginId, table.taskType)
-            select(table.fetch(ENABLED_PLUGIN_TASK_FETCHER))
+            select(table.fetch(PLUGIN_TASK_FETCHER))
         }.execute()
 
     /**

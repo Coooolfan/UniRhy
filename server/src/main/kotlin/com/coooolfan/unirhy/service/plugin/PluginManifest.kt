@@ -90,6 +90,8 @@ data class PluginRuntime(
 
 data class PluginTaskSpec(
     val type: String,
+    /** 任务显示名；未声明时回退到 [type] */
+    val name: String? = null,
     /** 首次安装时的任务执行并发初始值 */
     val concurrency: Int,
     /** 能否被用户直接从表单投递；false 表示只能由上游 Executor 产出 */

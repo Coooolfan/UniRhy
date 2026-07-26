@@ -156,6 +156,7 @@ class PluginService(
                     PluginTask {
                         pluginId = manifest.id
                         taskType = task.type
+                        name = task.name
                         concurrency = existingConcurrency[task.type] ?: task.concurrency
                         userSubmittable = task.userSubmittable
                         formDefinition = manifest.formDefinition(task)
