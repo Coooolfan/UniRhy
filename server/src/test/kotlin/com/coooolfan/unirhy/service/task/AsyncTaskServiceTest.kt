@@ -80,7 +80,6 @@ class AsyncTaskServiceTest {
         taskStore: AsyncTaskStore,
         definitionService: TaskDefinitionService = mock(TaskDefinitionService::class.java),
     ): AsyncTaskService = AsyncTaskService(
-        objectMapper = jacksonObjectMapper(),
         taskStore = taskStore,
         pluginStore = mock(PluginStore::class.java),
         pluginTaskStore = mock(PluginTaskStore::class.java),

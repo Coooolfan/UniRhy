@@ -4,7 +4,7 @@
 
 - 迁移文件位于 `server/src/main/resources/db/migration/`，由 Flyway 在服务启动时执行。
 - **已随版本发布的迁移文件不可再修改或重命名**，对已发布模式的任何变更都必须新增迁移文件。
-- `server/src/main/resources` 整体被 gitignore，新增迁移文件需要 `git add -f` 强制加入。
+- `server/src/main/resources` 整体被 gitignore，但 `db/migration/*.sql` 已显式放行，新增迁移文件直接 `git add` 即可。
 
 ## 版本号命名
 

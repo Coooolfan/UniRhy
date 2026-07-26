@@ -7,8 +7,8 @@ import tools.jackson.databind.JsonNode
 import java.time.Instant
 
 /**
- * 已安装插件。任务身份、并发与表单定义都是"每任务一份"的属性，
- * 保存在 `plugin_task`（由 `PluginTaskStore` 直接访问，不建实体）。
+ * 已安装插件。任务身份、并发与表单定义都是"每任务一份"的属性，建模为 [PluginTask]；
+ * 插件持久化数据与配置值建模为 [PluginData]。
  */
 @Entity
 interface Plugin {
@@ -23,7 +23,7 @@ interface Plugin {
 
     val abi: String
 
-    /** 插件级配置声明 `{schema, order}`；实际配置值保存在 `plugin_data` */
+    /** 插件级配置声明 `{schema, order}`；实际配置值保存为 [PluginData] */
     @Serialized
     val configDefinition: JsonNode
 

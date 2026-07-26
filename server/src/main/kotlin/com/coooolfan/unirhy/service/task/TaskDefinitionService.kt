@@ -2,9 +2,9 @@ package com.coooolfan.unirhy.service.task
 
 import com.coooolfan.unirhy.error.TaskException
 import com.coooolfan.unirhy.service.plugin.PluginTaskStore
+import com.coooolfan.unirhy.service.plugin.key
 import com.coooolfan.unirhy.service.task.common.TaskKey
 import tools.jackson.databind.JsonNode
-import tools.jackson.databind.ObjectMapper
 import org.springframework.stereotype.Service
 
 /**
@@ -24,7 +24,6 @@ data class TaskDefinitionView(
 
 @Service
 class TaskDefinitionService(
-    private val objectMapper: ObjectMapper,
     private val pluginTaskStore: PluginTaskStore,
 ) {
 
@@ -73,13 +72,13 @@ class TaskDefinitionService(
     )
 
     private fun enabledPluginDefinitions(): List<TaskDefinitionView> =
-        pluginTaskStore.findEnabled().map { row ->
+        pluginTaskStore.findEnabled().map { task ->
             TaskDefinitionView(
-                namespace = row.task.pluginId,
-                taskType = row.task.taskType,
-                name = row.pluginName,
-                userSubmittable = row.task.userSubmittable,
-                formDefinition = objectMapper.readTree(row.task.formDefinitionJson),
+                namespace = task.pluginId,
+                taskType = task.taskType,
+                name = task.plugin.name,
+                userSubmittable = task.userSubmittable,
+                formDefinition = task.formDefinition,
             )
         }
 }

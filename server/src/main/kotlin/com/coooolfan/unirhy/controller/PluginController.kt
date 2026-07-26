@@ -10,7 +10,6 @@ import com.coooolfan.unirhy.service.plugin.hostapi.PluginDataService
 import com.coooolfan.unirhy.service.task.PluginTaskService
 import jakarta.servlet.http.HttpServletResponse
 import tools.jackson.databind.JsonNode
-import tools.jackson.databind.ObjectMapper
 import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
@@ -66,7 +65,6 @@ class PluginController(
     private val pluginService: PluginService,
     private val pluginTaskService: PluginTaskService,
     private val pluginDataService: PluginDataService,
-    private val objectMapper: ObjectMapper,
 ) {
     /**
      * 获取插件列表
@@ -95,7 +93,7 @@ class PluginController(
                         taskType = task.taskType,
                         concurrency = task.concurrency,
                         userSubmittable = task.userSubmittable,
-                        formDefinition = objectMapper.readTree(task.formDefinitionJson),
+                        formDefinition = task.formDefinition,
                     )
                 },
                 configDefinition = plugin.configDefinition,
