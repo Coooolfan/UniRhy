@@ -24,11 +24,7 @@ data class TaskCreateRequest(
     val payload: JsonNode,
 )
 
-data class TaskCreatedResponse(val taskId: Long)
-
 data class TaskStatusPatchRequest(val status: TaskStatus)
-
-data class TaskStatusBatchPatchRequest(val ids: List<Long>, val status: TaskStatus)
 
 data class TaskStatusTransitionRequest(
     val namespace: String,
@@ -55,13 +51,25 @@ class TaskController(
     @PostMapping
     @SaCheckRole(ROLE_ADMIN)
     @ResponseStatus(HttpStatus.ACCEPTED)
+    @Throws(
+        CommonException.Forbidden::class,
+        TaskException.InvalidTaskKey::class,
+        TaskException.InvalidParams::class,
+        TaskException.DefinitionNotFound::class,
+        TaskException.PluginUnavailable::class,
+    )
     fun createTask(
         @RequestBody request: TaskCreateRequest,
         response: HttpServletResponse,
-    ): TaskCreatedResponse {
-        val id = taskService.create(request.namespace, request.taskType, request.payload)
-        response.setHeader("Location", "/api/tasks/$id")
-        return TaskCreatedResponse(id)
+    ): @FetchBy("DEFAULT_TASK_FETCHER") AsyncTask {
+        val task = taskService.create(
+            request.namespace,
+            request.taskType,
+            request.payload,
+            DEFAULT_TASK_FETCHER,
+        )
+        response.setHeader("Location", "/api/tasks/${task.id}")
+        return task
     }
 
     @GetMapping
@@ -86,17 +94,25 @@ class TaskController(
         )
 
     @GetMapping("/{id}")
+    @Throws(TaskException.TaskNotFound::class)
     fun getTask(@PathVariable id: Long): TaskDetailResponse = TaskDetailResponse(
         task = taskService.get(id, DEFAULT_TASK_FETCHER),
         childTaskCounts = TaskStatusCounts.from(taskService.childStatusCounts(id)),
     )
 
     @GetMapping("/{id}/tree")
+    @Throws(TaskException.TaskNotFound::class)
     fun getTaskTree(@PathVariable id: Long): @FetchBy("TASK_TREE_FETCHER") AsyncTask =
         taskService.get(id, TASK_TREE_FETCHER)
 
     @PostMapping("/status-transitions")
     @SaCheckRole(ROLE_ADMIN)
+    @Throws(
+        CommonException.Forbidden::class,
+        TaskException.InvalidTaskKey::class,
+        TaskException.PluginUnavailable::class,
+        TaskException.StatusConflict::class,
+    )
     fun transitionTaskStatuses(
         @RequestBody request: TaskStatusTransitionRequest,
     ): TaskStatusTransitionResponse = TaskStatusTransitionResponse(
@@ -108,18 +124,20 @@ class TaskController(
         ),
     )
 
+    /** 仅接受 [TaskStatus.PENDING]（重排队）与 [TaskStatus.CANCELLED]（取消），其余返回 `TASK:STATUS_CONFLICT` */
     @PatchMapping("/{id}")
     @SaCheckRole(ROLE_ADMIN)
+    @Throws(
+        CommonException.Forbidden::class,
+        TaskException.TaskNotFound::class,
+        TaskException.PluginUnavailable::class,
+        TaskException.StatusConflict::class,
+    )
     fun patchTask(
         @PathVariable id: Long,
         @RequestBody request: TaskStatusPatchRequest,
     ): @FetchBy("DEFAULT_TASK_FETCHER") AsyncTask =
         taskService.patchStatus(id, request.status, DEFAULT_TASK_FETCHER)
-
-    @PatchMapping
-    @SaCheckRole(ROLE_ADMIN)
-    fun patchTasks(@RequestBody request: TaskStatusBatchPatchRequest): Int =
-        taskService.patchStatusBatch(request.ids, request.status)
 
     companion object {
         val DEFAULT_TASK_FETCHER = newFetcher(AsyncTask::class).by {

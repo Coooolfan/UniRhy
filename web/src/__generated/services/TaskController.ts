@@ -4,9 +4,7 @@ import type {TaskStatus} from '../model/enums/';
 import type {
     Page, 
     TaskCreateRequest, 
-    TaskCreatedResponse, 
     TaskDetailResponse, 
-    TaskStatusBatchPatchRequest, 
     TaskStatusPatchRequest, 
     TaskStatusTransitionRequest, 
     TaskStatusTransitionResponse
@@ -23,10 +21,10 @@ export class TaskController {
      * 创建一个根任务。
      */
     readonly createTask: (options: TaskControllerOptions['createTask']) => Promise<
-        TaskCreatedResponse
+        AsyncTaskDto['TaskController/DEFAULT_TASK_FETCHER']
     > = async(options) => {
         let _uri = '/api/tasks';
-        return (await this.executor({uri: _uri, method: 'POST', body: options.body})) as Promise<TaskCreatedResponse>;
+        return (await this.executor({uri: _uri, method: 'POST', body: options.body})) as Promise<AsyncTaskDto['TaskController/DEFAULT_TASK_FETCHER']>;
     }
     
     readonly getTask: (options: TaskControllerOptions['getTask']) => Promise<
@@ -106,19 +104,15 @@ export class TaskController {
         return (await this.executor({uri: _uri, method: 'GET'})) as Promise<Page<AsyncTaskDto['TaskController/DEFAULT_TASK_FETCHER']>>;
     }
     
+    /**
+     * 仅接受 [TaskStatus.PENDING]（重排队）与 [TaskStatus.CANCELLED]（取消），其余返回 `TASK:STATUS_CONFLICT`
+     */
     readonly patchTask: (options: TaskControllerOptions['patchTask']) => Promise<
         AsyncTaskDto['TaskController/DEFAULT_TASK_FETCHER']
     > = async(options) => {
         let _uri = '/api/tasks/';
         _uri += encodeURIComponent(options.id);
         return (await this.executor({uri: _uri, method: 'PATCH', body: options.body})) as Promise<AsyncTaskDto['TaskController/DEFAULT_TASK_FETCHER']>;
-    }
-    
-    readonly patchTasks: (options: TaskControllerOptions['patchTasks']) => Promise<
-        number
-    > = async(options) => {
-        let _uri = '/api/tasks';
-        return (await this.executor({uri: _uri, method: 'PATCH', body: options.body})) as Promise<number>;
     }
     
     readonly transitionTaskStatuses: (options: TaskControllerOptions['transitionTaskStatuses']) => Promise<
@@ -154,8 +148,5 @@ export type TaskControllerOptions = {
     'patchTask': {
         readonly id: number, 
         readonly body: TaskStatusPatchRequest
-    }, 
-    'patchTasks': {
-        readonly body: TaskStatusBatchPatchRequest
     }
 }

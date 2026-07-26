@@ -245,7 +245,14 @@ describe('TasksView', () => {
     it('shows submit feedback on the action button for two seconds after a successful submission', async () => {
         vi.useFakeTimers()
         getTaskStatisticsMock.mockResolvedValue(emptyBuiltInStats())
-        createSubmissionMock.mockResolvedValue({ taskId: 1 })
+        createSubmissionMock.mockResolvedValue({
+            id: 1,
+            namespace: 'builtin',
+            taskType: 'metadata-parse',
+            payload: {},
+            status: 'PENDING',
+            createdAt: '2024-01-01T00:00:00Z',
+        })
         listFileSystemStorageMock.mockResolvedValue([
             {
                 id: 1,

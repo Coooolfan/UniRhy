@@ -112,7 +112,6 @@ enum class PluginErrorCode {
 
 @ErrorFamily
 enum class TaskErrorCode {
-    SUBMISSION_NOT_FOUND,
     TASK_NOT_FOUND,
     DEFINITION_NOT_FOUND,
 

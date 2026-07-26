@@ -27,7 +27,6 @@ class GlobalExceptionHandler {
             "RECORDING:TARGET_NOT_FOUND",
             "PLAYBACK_QUEUE:INDEX_NOT_FOUND",
             "PLUGIN:NOT_FOUND",
-            "TASK:SUBMISSION_NOT_FOUND",
             "TASK:TASK_NOT_FOUND",
             "TASK:DEFINITION_NOT_FOUND",
             -> 404
