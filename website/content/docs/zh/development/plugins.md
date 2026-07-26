@@ -126,6 +126,7 @@ runtime:
 
 tasks:
   - type: SCAN_ARTISTS
+    name: 扫描艺术家
     concurrency: 1
     userSubmittable: true
     form:
@@ -147,6 +148,7 @@ tasks:
         - batchSize
 
   - type: ENRICH_ARTIST
+    name: 补全艺术家
     concurrency: 4
     form:
       schema:
@@ -198,6 +200,7 @@ config:
 
 - `id` 同时是任务命名空间，须为至少两段的小写反向域名；`app.unirhy` 前缀保留给内置任务。
 - `tasks[].type` 必须是大写标识符，且在插件内唯一。`id` 与 `tasks[].type` 共同构成稳定的任务身份。
+- `tasks[].name` 是任务在任务列表与筛选器中的显示名，可省略；省略时回退为 `tasks[].type`。
 - 至少要有一个任务声明 `userSubmittable: true`。只有这类任务能从界面或 `host_task_create` 投递，其余任务只能作为后继出现。
 - `tasks[].concurrency` 是该任务类型首次安装时的并发初始值。管理员之后可以调整，同 id 覆盖升级会保留当前值。
 - `version` 仅用于展示，服务端不比较版本，也不做依赖解析。

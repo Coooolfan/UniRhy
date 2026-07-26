@@ -126,6 +126,7 @@ runtime:
 
 tasks:
   - type: SCAN_ARTISTS
+    name: Scan artists
     concurrency: 1
     userSubmittable: true
     form:
@@ -147,6 +148,7 @@ tasks:
         - batchSize
 
   - type: ENRICH_ARTIST
+    name: Enrich artist
     concurrency: 4
     form:
       schema:
@@ -198,6 +200,7 @@ The important constraints are:
 
 - `id` is also the task namespace. Use a lowercase reverse-domain name with at least two segments; the `app.unirhy` prefix is reserved for built-in tasks.
 - `tasks[].type` must be an uppercase identifier and unique within the plugin. Together, `id` and `tasks[].type` form the stable task identity.
+- `tasks[].name` is the display name shown in task lists and filters. It is optional and falls back to `tasks[].type`.
 - At least one task must set `userSubmittable: true`. Only such a task can be submitted from the UI or through `host_task_create`; every other task can only appear as a successor.
 - `tasks[].concurrency` is the initial concurrency of that task type on first install. An administrator may change it later, and an upgrade with the same id preserves the current value.
 - `version` is display-only. The server does not compare versions or resolve dependencies.
