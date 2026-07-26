@@ -2,6 +2,7 @@ package com.coooolfan.unirhy.service
 
 import com.coooolfan.unirhy.error.PluginException
 import com.coooolfan.unirhy.model.Plugin
+import com.coooolfan.unirhy.model.by
 import com.coooolfan.unirhy.model.id
 import com.coooolfan.unirhy.service.plugin.PluginManifest
 import com.coooolfan.unirhy.service.plugin.PluginTaskRow
@@ -16,7 +17,9 @@ import tools.jackson.databind.ObjectMapper
 import tools.jackson.dataformat.yaml.YAMLMapper
 import tools.jackson.module.kotlin.kotlinModule
 import org.babyfish.jimmer.sql.ast.mutation.SaveMode
+import org.babyfish.jimmer.sql.fetcher.Fetcher
 import org.babyfish.jimmer.sql.kt.KSqlClient
+import org.babyfish.jimmer.sql.kt.fetcher.newFetcher
 import org.slf4j.LoggerFactory
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate
@@ -34,6 +37,11 @@ import kotlin.text.Charsets
 private const val MAX_ZIP_BYTES = 10L * 1024 * 1024
 private const val MAX_WASM_BYTES = 20L * 1024 * 1024
 
+private val PLUGIN_SUMMARY_FETCHER: Fetcher<Plugin> = newFetcher(Plugin::class).by {
+    allScalarFields()
+    wasm(false)
+}
+
 @Service
 class PluginService(
     private val sql: KSqlClient,
@@ -47,10 +55,11 @@ class PluginService(
     private val logger = LoggerFactory.getLogger(PluginService::class.java)
     private val yamlMapper: ObjectMapper = YAMLMapper.builder().addModule(kotlinModule()).build()
 
+    /** 列表视图不需要 WASM 字节码（每个插件最大 20MB），显式排除避免整库读入堆内存 */
     fun listPlugins(): List<Plugin> =
         sql.createQuery(Plugin::class) {
             orderBy(table.id)
-            select(table)
+            select(table.fetch(PLUGIN_SUMMARY_FETCHER))
         }.execute()
 
     fun getPlugin(id: String): Plugin =
@@ -59,6 +68,10 @@ class PluginService(
 
     /** 某插件声明的全部任务定义 */
     fun listPluginTasks(id: String): List<PluginTaskRow> = pluginTaskStore.findByPlugin(id)
+
+    /** 全部插件的任务定义，按插件 ID 分组。列表视图用，避免逐插件查询 */
+    fun listPluginTasksByPlugin(): Map<String, List<PluginTaskRow>> =
+        pluginTaskStore.findAll().groupBy { it.pluginId }
 
     /**
      * 上传插件包。同 id 上传即覆盖升级：保留已有的 `concurrency` 与 `created_at`，
@@ -114,10 +127,11 @@ class PluginService(
             throw PluginException.invalidManifest(reason = ex.message ?: "invalid wasm module", cause = ex)
         }
 
-        val existing = sql.findById(Plugin::class, manifest.id)
+        val existingTasks = pluginTaskStore.findByPlugin(manifest.id)
+        val existing = sql.findById(PLUGIN_SUMMARY_FETCHER, manifest.id)
         if (existing != null) {
             val declared = manifest.tasks.map { it.type }.toSet()
-            val removed = pluginTaskStore.findByPlugin(manifest.id).map { it.taskType }.filterNot { it in declared }
+            val removed = existingTasks.map { it.taskType }.filterNot { it in declared }
             if (removed.isNotEmpty()) {
                 throw PluginException.invalidManifest(
                     reason = "task types ${removed.sorted()} must stay declared for plugin ${manifest.id}; " +
@@ -129,8 +143,7 @@ class PluginService(
         val now = Instant.now()
         val configDefinition = manifest.configDefinition()
         // 覆盖升级保留管理员已调整过的并发值
-        val existingConcurrency = pluginTaskStore.findByPlugin(manifest.id)
-            .associate { it.taskType to it.concurrency }
+        val existingConcurrency = existingTasks.associate { it.taskType to it.concurrency }
         transactionTemplate.executeWithoutResult {
             sql.saveCommand(Plugin {
                 id = manifest.id
@@ -185,7 +198,7 @@ class PluginService(
             this.updatedAt = Instant.now()
         }, SaveMode.UPDATE_ONLY).execute()
         if (enabled) {
-            pluginTaskService.install(getPlugin(id))
+            pluginTaskService.install(plugin)
         } else {
             pluginTaskService.uninstall(id)
         }

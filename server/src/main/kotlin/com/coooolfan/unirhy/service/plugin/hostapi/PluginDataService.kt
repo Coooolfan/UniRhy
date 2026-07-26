@@ -29,7 +29,7 @@ class PluginDataService internal constructor(
     private val objectMapper: ObjectMapper,
 ) {
     fun getData(pluginId: String, key: String): JsonNode? {
-        definition(pluginId)
+        if (!store.exists(pluginId)) throw PluginException.notFound()
         return store.find(pluginId, key)?.let { decode(pluginId, it) }
     }
 
@@ -71,8 +71,9 @@ class PluginDataService internal constructor(
         val definition = definition(pluginId)
         val values = objectMapper.createObjectNode()
         val configuredSecrets = mutableListOf<String>()
-        val stored = store.find(pluginId, propertyNames(definition))
-        for (name in propertyNames(definition)) {
+        val names = propertyNames(definition)
+        val stored = store.find(pluginId, names)
+        for (name in names) {
             val item = stored[name] ?: continue
             if (TaskFormSchema.isWriteOnly(definition, name)) {
                 configuredSecrets += name

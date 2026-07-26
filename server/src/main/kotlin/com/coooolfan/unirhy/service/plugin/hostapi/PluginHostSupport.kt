@@ -1,6 +1,7 @@
 package com.coooolfan.unirhy.service.plugin.hostapi
 
 import com.coooolfan.unirhy.service.plugin.WasmPluginException
+import org.babyfish.jimmer.Page
 import org.babyfish.jimmer.error.CodeBasedRuntimeException
 import org.babyfish.jimmer.sql.exception.SaveException
 import org.slf4j.LoggerFactory
@@ -139,6 +140,10 @@ internal data class HostPageRequest(
     val pageSize: Int,
 )
 
+internal data class HostPage<T>(val rows: List<T>, val totalRowCount: Long)
+
+internal fun <T> Page<T>.toHostPage(): HostPage<T> = HostPage(rows, totalRowCount)
+
 internal interface PluginHostCallExecutor {
     fun <T> execute(block: () -> T): T
 }
@@ -168,14 +173,7 @@ internal class PluginHostSupport(
         handler: (ObjectNode) -> Any?,
     ): HostFunction = HostFunction("env", name, HOST_JSON_FUNCTION_TYPE) { _: Instance, args: LongArray ->
         val request = readRequest(args[0].toInt(), args[1].toInt())
-        val response = try {
-            callExecutor.execute { success(handler(request)) }
-        } catch (ex: Exception) {
-            val error = mapError(ex)
-            logInternalError(name, error, ex)
-            failure(error)
-        }
-        writeJson(response)
+        writeJson(envelope(name) { handler(request) })
     }
 
     fun binaryWriteFunction(
@@ -184,14 +182,16 @@ internal class PluginHostSupport(
     ): HostFunction = HostFunction("env", name, HOST_BINARY_WRITE_FUNCTION_TYPE) { _: Instance, args: LongArray ->
         val meta = readRequest(args[0].toInt(), args[1].toInt())
         val data = readBytes(args[2].toInt(), args[3].toInt())
-        val response = try {
-            callExecutor.execute { success(handler(meta, data)) }
-        } catch (ex: Exception) {
-            val error = mapError(ex)
-            logInternalError(name, error, ex)
-            failure(error)
-        }
-        writeJson(response)
+        writeJson(envelope(name) { handler(meta, data) })
+    }
+
+    /** Runs [handler] inside the call executor and wraps its result (or failure) into the response envelope. */
+    private fun envelope(name: String, handler: () -> Any?): ObjectNode = try {
+        callExecutor.execute { success(handler()) }
+    } catch (ex: Exception) {
+        val error = mapError(ex)
+        logInternalError(name, error, ex)
+        failure(error)
     }
 
     fun rawReadFunction(
@@ -237,12 +237,16 @@ internal class PluginHostSupport(
 
     fun page(request: ObjectNode): HostPageRequest {
         val pageIndex = request.optionalInt("pageIndex") ?: 0
-        val pageSize = request.optionalInt("pageSize") ?: HOST_DEFAULT_PAGE_SIZE
         if (pageIndex < 0) invalidArgument("pageIndex must be greater than or equal to 0")
+        return HostPageRequest(pageIndex, pageSize(request))
+    }
+
+    fun pageSize(request: ObjectNode): Int {
+        val pageSize = request.optionalInt("pageSize") ?: HOST_DEFAULT_PAGE_SIZE
         if (pageSize !in 1..HOST_MAX_PAGE_SIZE) {
             invalidArgument("pageSize must be between 1 and $HOST_MAX_PAGE_SIZE")
         }
-        return HostPageRequest(pageIndex, pageSize)
+        return pageSize
     }
 
     private fun success(data: Any?): ObjectNode = objectMapper.createObjectNode().apply {
@@ -262,48 +266,41 @@ internal class PluginHostSupport(
         })
     }
 
-    private fun mapError(ex: Exception): PluginHostException {
-        if (ex is PluginHostException) return ex
-        if (ex is InvalidPluginConfigurationException) {
-            return PluginHostException(PluginHostErrorCode.CONFLICT, ex.message ?: "Plugin configuration is invalid", ex)
-        }
-        if (ex is DataIntegrityViolationException) {
-            return PluginHostException(PluginHostErrorCode.CONFLICT, "The operation conflicts with existing data", ex)
-        }
-        if (ex is SaveException.NotUnique) {
-            return PluginHostException(PluginHostErrorCode.CONFLICT, "The operation conflicts with existing data", ex)
-        }
-        if (ex is java.nio.file.FileAlreadyExistsException) {
-            return PluginHostException(PluginHostErrorCode.CONFLICT, "The storage object already exists", ex)
-        }
-        if (ex is java.io.FileNotFoundException || ex is java.nio.file.NoSuchFileException ||
-            ex is NoSuchElementException
-        ) {
-            return PluginHostException(PluginHostErrorCode.NOT_FOUND, "The requested resource was not found", ex)
-        }
-        if (ex is CodeBasedRuntimeException) {
+    private fun mapError(ex: Exception): PluginHostException = when (ex) {
+        is PluginHostException -> ex
+        is InvalidPluginConfigurationException ->
+            PluginHostException(PluginHostErrorCode.CONFLICT, ex.message ?: "Plugin configuration is invalid", ex)
+
+        is DataIntegrityViolationException, is SaveException.NotUnique ->
+            PluginHostException(PluginHostErrorCode.CONFLICT, "The operation conflicts with existing data", ex)
+
+        is java.nio.file.FileAlreadyExistsException ->
+            PluginHostException(PluginHostErrorCode.CONFLICT, "The storage object already exists", ex)
+
+        is java.io.FileNotFoundException, is java.nio.file.NoSuchFileException, is NoSuchElementException ->
+            PluginHostException(PluginHostErrorCode.NOT_FOUND, "The requested resource was not found", ex)
+
+        is CodeBasedRuntimeException -> {
             val qualifiedCode = "${ex.family}:${ex.code}"
-            val code = when {
-                ex.code.contains("NOT_FOUND") -> PluginHostErrorCode.NOT_FOUND
-                ex.code.contains("CONFLICT") || ex.code.contains("MISMATCH") ||
-                    ex.code.contains("DUPLICATE") || ex.code.contains("NOT_UNIQUE") ||
-                    ex.code.contains("OPTIMISTIC_LOCK") || qualifiedCode == "RECORDING:WORK_MISMATCH" ->
-                    PluginHostErrorCode.CONFLICT
-                qualifiedCode == "TASK:PLUGIN_UNAVAILABLE" -> PluginHostErrorCode.CONFLICT
-                ex.code.contains("INVALID") || ex.code.contains("REQUIRED") ||
-                    ex.code.contains("UNSUPPORTED") -> PluginHostErrorCode.INVALID_ARGUMENT
-                else -> PluginHostErrorCode.INTERNAL
-            }
-            return PluginHostException(code, ex.message ?: qualifiedCode, ex)
+            PluginHostException(mapErrorCode(ex.code, qualifiedCode), ex.message ?: qualifiedCode, ex)
         }
-        if (ex is IllegalArgumentException) {
-            return PluginHostException(
-                PluginHostErrorCode.INVALID_ARGUMENT,
-                ex.message ?: "Invalid argument",
-                ex,
-            )
-        }
-        return PluginHostException(PluginHostErrorCode.INTERNAL, "Internal Host API error", ex)
+
+        is IllegalArgumentException ->
+            PluginHostException(PluginHostErrorCode.INVALID_ARGUMENT, ex.message ?: "Invalid argument", ex)
+
+        else -> PluginHostException(PluginHostErrorCode.INTERNAL, "Internal Host API error", ex)
+    }
+
+    private fun mapErrorCode(code: String, qualifiedCode: String): PluginHostErrorCode = when {
+        code.contains("NOT_FOUND") -> PluginHostErrorCode.NOT_FOUND
+        code.contains("CONFLICT") || code.contains("MISMATCH") || code.contains("DUPLICATE") ||
+            code.contains("NOT_UNIQUE") || code.contains("OPTIMISTIC_LOCK") ||
+            qualifiedCode == "TASK:PLUGIN_UNAVAILABLE" -> PluginHostErrorCode.CONFLICT
+
+        code.contains("INVALID") || code.contains("REQUIRED") || code.contains("UNSUPPORTED") ->
+            PluginHostErrorCode.INVALID_ARGUMENT
+
+        else -> PluginHostErrorCode.INTERNAL
     }
 
     private fun logInternalError(name: String, error: PluginHostException, original: Exception) {
@@ -329,8 +326,7 @@ internal fun ObjectNode.requiredNode(name: String): JsonNode =
     get(name) ?: invalidArgument("Missing required field: $name")
 
 internal fun ObjectNode.requiredObject(name: String): ObjectNode =
-    requiredNode(name).takeIf { it is ObjectNode } as? ObjectNode
-        ?: invalidArgument("Field '$name' must be an object")
+    requiredNode(name) as? ObjectNode ?: invalidArgument("Field '$name' must be an object")
 
 internal fun ObjectNode.requiredText(name: String): String {
     val value = requiredNode(name)

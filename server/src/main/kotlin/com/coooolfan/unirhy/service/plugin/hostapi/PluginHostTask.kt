@@ -6,7 +6,6 @@ import com.coooolfan.unirhy.service.task.AsyncTaskService
 import com.coooolfan.unirhy.service.task.TaskDefinitionService
 import com.coooolfan.unirhy.service.task.TaskStatisticsService
 import com.coooolfan.unirhy.service.task.common.TaskStatus
-import org.babyfish.jimmer.Page
 import org.babyfish.jimmer.sql.fetcher.Fetcher
 import org.babyfish.jimmer.sql.kt.fetcher.newFetcher
 import run.endive.runtime.HostFunction
@@ -14,7 +13,6 @@ import run.endive.runtime.Instance
 import tools.jackson.databind.ObjectMapper
 import tools.jackson.databind.node.ObjectNode
 
-private data class HostPage<T>(val rows: List<T>, val totalRowCount: Long)
 private data class HostTaskCreated(val taskId: Long)
 
 private val HOST_TASK_FETCHER: Fetcher<AsyncTask> = newFetcher(AsyncTask::class).by {
@@ -87,5 +85,3 @@ private fun <T : Enum<T>> ObjectNode.optionalEnumFilter(name: String, entries: L
 private fun ObjectNode.requiredTaskStatus(): TaskStatus =
     TaskStatus.entries.firstOrNull { it.name == requiredText("status") }
         ?: invalidArgument("Unknown task status")
-
-private fun <T> Page<T>.toHostPage(): HostPage<T> = HostPage(rows, totalRowCount)
