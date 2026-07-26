@@ -73,16 +73,15 @@ class AsyncTaskStore(
 
     /** 按 TaskKey 统计待执行任务数；入口任务与工作任务是不同的 key，无需分列。 */
     fun discoverPendingCounts(): Map<TaskKey, Long> {
-        val querySql = """
-            SELECT namespace, task_type, count(*)
-            FROM public.async_task
-            WHERE status = 'PENDING'
-            GROUP BY namespace, task_type
-        """.trimIndent()
+        val rows = sql.createQuery(AsyncTask::class) {
+            where(table.status eq TaskStatus.PENDING)
+            groupBy(table.namespace, table.taskType)
+            select(table.namespace, table.taskType, count(table.id))
+        }.execute()
         val result = mutableMapOf<TaskKey, Long>()
-        jdbc.query(querySql) { rs ->
-            val key = TaskKey.ofOrNull(rs.getString(1), rs.getString(2)) ?: return@query
-            result[key] = rs.getLong(3)
+        for (row in rows) {
+            val key = TaskKey.ofOrNull(row._1, row._2) ?: continue
+            result[key] = row._3
         }
         return result
     }
@@ -198,16 +197,10 @@ class AsyncTaskStore(
     }
 
     fun hasActiveByNamespace(namespace: String): Boolean =
-        jdbc.queryForObject(
-            """
-            SELECT EXISTS (
-                SELECT 1 FROM public.async_task
-                WHERE namespace = :namespace AND status IN ('PENDING', 'RUNNING')
-            )
-            """.trimIndent(),
-            MapSqlParameterSource("namespace", namespace),
-            Boolean::class.java,
-        ) == true
+        sql.createQuery(AsyncTask::class) {
+            where(table.namespace eq namespace, table.status valueIn ACTIVE_STATUSES)
+            select(table.id)
+        }.exists()
 
     fun countByKeyAndStatus(): Map<TaskKey, Map<TaskStatus, Long>> {
         val rows = sql.createQuery(AsyncTask::class) {
@@ -222,6 +215,9 @@ class AsyncTaskStore(
         return result
     }
 }
+
+/** 未进入终态的任务状态 */
+private val ACTIVE_STATUSES = listOf(TaskStatus.PENDING, TaskStatus.RUNNING)
 
 /** 按 id 集合选取待迁移的任务 */
 private const val SELECTOR_BY_IDS = "id IN (:ids)"
