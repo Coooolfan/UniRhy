@@ -2,10 +2,10 @@ package com.coooolfan.unirhy.service
 
 import com.coooolfan.unirhy.error.PluginException
 import com.coooolfan.unirhy.model.Plugin
+import com.coooolfan.unirhy.model.PluginTask
 import com.coooolfan.unirhy.model.by
 import com.coooolfan.unirhy.model.id
 import com.coooolfan.unirhy.service.plugin.PluginManifest
-import com.coooolfan.unirhy.service.plugin.PluginTaskRow
 import com.coooolfan.unirhy.service.plugin.PluginTaskStore
 import com.coooolfan.unirhy.service.plugin.UNIRHY_WASM_ABI_V1
 import com.coooolfan.unirhy.service.plugin.WasmPlugin
@@ -45,7 +45,6 @@ private val PLUGIN_SUMMARY_FETCHER: Fetcher<Plugin> = newFetcher(Plugin::class).
 @Service
 class PluginService(
     private val sql: KSqlClient,
-    private val objectMapper: ObjectMapper,
     private val jdbc: NamedParameterJdbcTemplate,
     private val pluginTaskService: PluginTaskService,
     private val pluginDataService: PluginDataService,
@@ -66,11 +65,8 @@ class PluginService(
         sql.findById(Plugin::class, id)
             ?: throw PluginException.notFound()
 
-    /** 某插件声明的全部任务定义 */
-    fun listPluginTasks(id: String): List<PluginTaskRow> = pluginTaskStore.findByPlugin(id)
-
     /** 全部插件的任务定义，按插件 ID 分组。列表视图用，避免逐插件查询 */
-    fun listPluginTasksByPlugin(): Map<String, List<PluginTaskRow>> =
+    fun listPluginTasksByPlugin(): Map<String, List<PluginTask>> =
         pluginTaskStore.findAll().groupBy { it.pluginId }
 
     /**
@@ -159,13 +155,13 @@ class PluginService(
             pluginTaskStore.replaceAll(
                 manifest.id,
                 manifest.tasks.map { task ->
-                    PluginTaskRow(
-                        pluginId = manifest.id,
-                        taskType = task.type,
-                        concurrency = existingConcurrency[task.type] ?: task.concurrency,
-                        userSubmittable = task.userSubmittable,
-                        formDefinitionJson = manifest.formDefinition(task).toString(),
-                    )
+                    PluginTask {
+                        pluginId = manifest.id
+                        taskType = task.type
+                        concurrency = existingConcurrency[task.type] ?: task.concurrency
+                        userSubmittable = task.userSubmittable
+                        formDefinition = manifest.formDefinition(task)
+                    }
                 },
             )
             pluginDataService.reconcileConfigEncryption(manifest.id, configDefinition)
@@ -272,7 +268,7 @@ class PluginService(
         return baos.toByteArray()
     }
 
-    private fun reconstructManifestYaml(plugin: Plugin, tasks: List<PluginTaskRow>): String {
+    private fun reconstructManifestYaml(plugin: Plugin, tasks: List<PluginTask>): String {
         val data = mapOf(
             "id" to plugin.id,
             "name" to plugin.name,
@@ -282,7 +278,7 @@ class PluginService(
                 "abi" to plugin.abi,
             ),
             "tasks" to tasks.map { task ->
-                val formDefinition = objectMapper.readTree(task.formDefinitionJson)
+                val formDefinition = task.formDefinition
                 mapOf(
                     "type" to task.taskType,
                     "concurrency" to task.concurrency,

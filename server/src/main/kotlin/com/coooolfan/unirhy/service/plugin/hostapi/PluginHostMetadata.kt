@@ -66,7 +66,7 @@ internal fun buildMetadataHostFunctions(
                 taskType = task.taskType,
                 concurrency = task.concurrency,
                 userSubmittable = task.userSubmittable,
-                formDefinition = objectMapper.readTree(task.formDefinitionJson),
+                formDefinition = task.formDefinition,
             )
         }
 

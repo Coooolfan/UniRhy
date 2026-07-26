@@ -2,6 +2,7 @@ package com.coooolfan.unirhy.service.plugin.hostapi
 
 import com.coooolfan.unirhy.error.PluginException
 import com.coooolfan.unirhy.model.Plugin
+import com.coooolfan.unirhy.model.PluginData
 import com.coooolfan.unirhy.model.by
 import com.coooolfan.unirhy.service.task.common.TaskFormSchema
 import org.babyfish.jimmer.sql.fetcher.Fetcher
@@ -163,7 +164,7 @@ class PluginDataService internal constructor(
         val stored = store.find(pluginId, propertyNames(configDefinition))
         for ((name, item) in stored) {
             val shouldEncrypt = TaskFormSchema.isWriteOnly(configDefinition, name)
-            if (shouldEncrypt == (item.encrypted != null)) continue
+            if (shouldEncrypt == (item.encryptedValue != null)) continue
             writeValue(pluginId, name, decode(pluginId, item), shouldEncrypt)
         }
     }
@@ -177,18 +178,21 @@ class PluginDataService internal constructor(
     }
 
     private fun writeValue(pluginId: String, key: String, value: JsonNode, encrypted: Boolean) {
-        val bytes = objectMapper.writeValueAsBytes(value)
         if (encrypted) {
+            val bytes = objectMapper.writeValueAsBytes(value)
             store.upsertEncrypted(pluginId, key, cipher.encrypt(pluginId, key, bytes))
         } else {
-            store.upsertJson(pluginId, key, bytes.toString(Charsets.UTF_8))
+            store.upsertJson(pluginId, key, value)
         }
     }
 
-    private fun decode(pluginId: String, stored: StoredPluginData): JsonNode = when {
-        stored.encrypted != null -> objectMapper.readTree(cipher.decrypt(pluginId, stored.key, stored.encrypted))
-        stored.json != null -> objectMapper.readTree(stored.json)
-        else -> error("Plugin data row has neither a plain nor encrypted value")
+    private fun decode(pluginId: String, stored: PluginData): JsonNode {
+        // stored.key 参与密钥派生，不能省
+        val encrypted = stored.encryptedValue
+        if (encrypted != null) {
+            return objectMapper.readTree(cipher.decrypt(pluginId, stored.key, encrypted))
+        }
+        return stored.value ?: error("Plugin data row has neither a plain nor encrypted value")
     }
 
     private fun definition(pluginId: String): JsonNode =

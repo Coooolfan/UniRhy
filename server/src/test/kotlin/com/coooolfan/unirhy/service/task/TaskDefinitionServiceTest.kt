@@ -4,7 +4,6 @@ import com.coooolfan.unirhy.service.plugin.PluginTaskStore
 import com.coooolfan.unirhy.service.task.common.TaskKey
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.`when`
-import tools.jackson.module.kotlin.jacksonObjectMapper
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -14,7 +13,7 @@ class TaskDefinitionServiceTest {
     fun `list returns entry and worker definitions with backend names`() {
         val pluginTaskStore = mock(PluginTaskStore::class.java)
         `when`(pluginTaskStore.findEnabled()).thenReturn(emptyList())
-        val service = TaskDefinitionService(jacksonObjectMapper(), pluginTaskStore)
+        val service = TaskDefinitionService(pluginTaskStore)
 
         val definitions = service.list()
 

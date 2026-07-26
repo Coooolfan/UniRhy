@@ -12,6 +12,7 @@ import com.coooolfan.unirhy.service.RecordingService
 import com.coooolfan.unirhy.service.SystemConfigService
 import com.coooolfan.unirhy.service.WorkService
 import com.coooolfan.unirhy.service.plugin.PluginTaskStore
+import com.coooolfan.unirhy.service.plugin.key
 import com.coooolfan.unirhy.service.plugin.WasmPlugin
 import com.coooolfan.unirhy.service.plugin.hostapi.NestedPluginHostCallExecutor
 import com.coooolfan.unirhy.service.plugin.hostapi.PluginMediaService

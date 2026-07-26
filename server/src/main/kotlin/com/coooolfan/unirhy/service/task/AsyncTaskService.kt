@@ -15,12 +15,10 @@ import org.babyfish.jimmer.sql.kt.fetcher.newFetcher
 import org.springframework.stereotype.Service
 import org.springframework.transaction.support.TransactionTemplate
 import tools.jackson.databind.JsonNode
-import tools.jackson.databind.ObjectMapper
 
 /** 统一任务的创建、查询和状态管理。 */
 @Service
 class AsyncTaskService(
-    private val objectMapper: ObjectMapper,
     private val taskStore: AsyncTaskStore,
     private val pluginStore: PluginStore,
     private val pluginTaskStore: PluginTaskStore,
@@ -56,7 +54,7 @@ class AsyncTaskService(
         val task = pluginTaskStore.find(key) ?: throw TaskException.definitionNotFound()
         if (!task.userSubmittable) throw TaskException.definitionNotFound()
         if (!plugin.enabled) throw TaskException.pluginUnavailable()
-        return objectMapper.readTree(task.formDefinitionJson)
+        return task.formDefinition
     }
 
     fun list(
