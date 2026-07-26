@@ -1,7 +1,12 @@
 package com.coooolfan.unirhy.service.plugin.hostapi
 
 import com.coooolfan.unirhy.error.PluginException
+import com.coooolfan.unirhy.model.Plugin
+import com.coooolfan.unirhy.model.by
 import com.coooolfan.unirhy.service.task.common.TaskFormSchema
+import org.babyfish.jimmer.sql.fetcher.Fetcher
+import org.babyfish.jimmer.sql.kt.KSqlClient
+import org.babyfish.jimmer.sql.kt.fetcher.newFetcher
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import tools.jackson.databind.JsonNode
@@ -22,14 +27,22 @@ data class PluginDataKeyPage(
     val totalRowCount: Long,
 )
 
+/** 判断插件是否存在，不读取任何 payload 列 */
+private val PLUGIN_EXISTS_FETCHER: Fetcher<Plugin> = newFetcher(Plugin::class).by { }
+
+private val PLUGIN_CONFIG_DEFINITION_FETCHER: Fetcher<Plugin> = newFetcher(Plugin::class).by {
+    configDefinition()
+}
+
 @Service
 class PluginDataService internal constructor(
+    private val sql: KSqlClient,
     private val store: PluginDataStore,
     private val cipher: PluginDataCipher,
     private val objectMapper: ObjectMapper,
 ) {
     fun getData(pluginId: String, key: String): JsonNode? {
-        if (!store.exists(pluginId)) throw PluginException.notFound()
+        if (sql.findById(PLUGIN_EXISTS_FETCHER, pluginId) == null) throw PluginException.notFound()
         return store.find(pluginId, key)?.let { decode(pluginId, it) }
     }
 
@@ -178,10 +191,9 @@ class PluginDataService internal constructor(
         else -> error("Plugin data row has neither a plain nor encrypted value")
     }
 
-    private fun definition(pluginId: String): JsonNode {
-        val json = store.configDefinition(pluginId) ?: throw PluginException.notFound()
-        return objectMapper.readTree(json)
-    }
+    private fun definition(pluginId: String): JsonNode =
+        sql.findById(PLUGIN_CONFIG_DEFINITION_FETCHER, pluginId)?.configDefinition
+            ?: throw PluginException.notFound()
 
     private fun properties(definition: JsonNode): JsonNode = definition.path("schema").path("properties")
 
