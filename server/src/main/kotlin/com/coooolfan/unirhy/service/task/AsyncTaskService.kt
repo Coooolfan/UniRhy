@@ -39,8 +39,12 @@ class AsyncTaskService(
             val errors = TaskFormSchema.validateParams(definition, payload)
             if (errors.isNotEmpty()) throw TaskException.invalidParams(reason = errors.joinToString("; "))
             taskStore.enqueueRoot(key, payload.toString())
-        }
+        }!!
     }
+
+    /** 创建入口任务并按 [fetcher] 读回，供需要立即回显任务行的调用方使用。 */
+    fun create(namespace: String, taskType: String, payload: JsonNode, fetcher: Fetcher<AsyncTask>): AsyncTask =
+        get(create(namespace, taskType, payload), fetcher)
 
     private fun resolveFormDefinitionLocked(key: TaskKey): JsonNode {
         if (key.namespace == TaskKey.BUILT_IN_NAMESPACE) {
@@ -87,15 +91,6 @@ class AsyncTaskService(
         val current = taskStore.findById(id, fetcher) ?: throw TaskException.taskNotFound()
         if (updated.isEmpty() && current.status != target) throw TaskException.statusConflict()
         return current
-    }
-
-    fun patchStatusBatch(ids: List<Long>, target: TaskStatus): Int {
-        val distinctIds = ids.distinct()
-        return when (target) {
-            TaskStatus.CANCELLED -> taskStore.cancelPending(distinctIds, CANCELLED_BY_ADMIN_REASON).size
-            TaskStatus.PENDING -> requeueTerminal(distinctIds).size
-            else -> throw TaskException.statusConflict()
-        }
     }
 
     fun transitionStatuses(

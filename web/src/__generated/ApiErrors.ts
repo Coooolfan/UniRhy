@@ -120,11 +120,24 @@ export type AllErrors = {
         code: 'SYSTEM_STORAGE_PROVIDER_CANNOT_BE_READONLY'
     } | {
         family: 'TASK', 
+        code: 'INVALID_TASK_KEY', 
+        reason: string
+    } | {
+        family: 'TASK', 
+        code: 'INVALID_PARAMS', 
+        reason: string
+    } | {
+        family: 'TASK', 
         code: 'DEFINITION_NOT_FOUND'
     } | {
         family: 'TASK', 
-        code: 'INVALID_TASK_KEY', 
-        reason: string
+        code: 'PLUGIN_UNAVAILABLE'
+    } | {
+        family: 'TASK', 
+        code: 'TASK_NOT_FOUND'
+    } | {
+        family: 'TASK', 
+        code: 'STATUS_CONFLICT'
     } | {
         family: 'WORK', 
         code: 'INVALID_RANDOM_LENGTH'
@@ -539,6 +552,71 @@ export type ApiErrors = {
             })
     }, 
     'taskController': {
+        'createTask': AllErrors & ({
+                family: 'COMMON', 
+                code: 'FORBIDDEN', 
+                readonly [key:string]: any
+            } | {
+                family: 'TASK', 
+                code: 'INVALID_TASK_KEY', 
+                readonly [key:string]: any
+            } | {
+                family: 'TASK', 
+                code: 'INVALID_PARAMS', 
+                readonly [key:string]: any
+            } | {
+                family: 'TASK', 
+                code: 'DEFINITION_NOT_FOUND', 
+                readonly [key:string]: any
+            } | {
+                family: 'TASK', 
+                code: 'PLUGIN_UNAVAILABLE', 
+                readonly [key:string]: any
+            }), 
+        'getTask': AllErrors & ({
+                family: 'TASK', 
+                code: 'TASK_NOT_FOUND', 
+                readonly [key:string]: any
+            }), 
+        'getTaskTree': AllErrors & ({
+                family: 'TASK', 
+                code: 'TASK_NOT_FOUND', 
+                readonly [key:string]: any
+            }), 
+        'transitionTaskStatuses': AllErrors & ({
+                family: 'COMMON', 
+                code: 'FORBIDDEN', 
+                readonly [key:string]: any
+            } | {
+                family: 'TASK', 
+                code: 'INVALID_TASK_KEY', 
+                readonly [key:string]: any
+            } | {
+                family: 'TASK', 
+                code: 'PLUGIN_UNAVAILABLE', 
+                readonly [key:string]: any
+            } | {
+                family: 'TASK', 
+                code: 'STATUS_CONFLICT', 
+                readonly [key:string]: any
+            }), 
+        'patchTask': AllErrors & ({
+                family: 'COMMON', 
+                code: 'FORBIDDEN', 
+                readonly [key:string]: any
+            } | {
+                family: 'TASK', 
+                code: 'TASK_NOT_FOUND', 
+                readonly [key:string]: any
+            } | {
+                family: 'TASK', 
+                code: 'PLUGIN_UNAVAILABLE', 
+                readonly [key:string]: any
+            } | {
+                family: 'TASK', 
+                code: 'STATUS_CONFLICT', 
+                readonly [key:string]: any
+            })
     }, 
     'taskDefinitionController': {
         'getTaskDefinition': AllErrors & ({
