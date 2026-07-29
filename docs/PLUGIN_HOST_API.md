@@ -2,11 +2,11 @@
 
 本文档说明 UniRhy WASM 插件可导入的 Host API，包括调用协议、错误处理、事务语义、权限边界和完整函数目录。插件运行时、任务模型和 Instance 生命周期见 [PLUGIN_API.md](./PLUGIN_API.md)。
 
-服务端向每个已启用插件提供 71 个 Host imports，全部位于 `env` 模块。除 `host_log` 和二进制存储函数外，函数统一通过 JSON 请求与响应信封交换数据。
+服务端向每个已启用插件提供 66 个 Host imports，全部位于 `env` 模块。除 `host_log` 和二进制存储函数外，函数统一通过 JSON 请求与响应信封交换数据。
 
 ## ABI 与调用约定
 
-插件使用 `unirhy-wasm-abi-v1`，并导出 `alloc`、`dealloc`、`plan` 和 `run`。Host 函数使用 `host_<domain>_<action>` 命名，例如 `host_artist_list` 和 `host_storage_object_read`。
+插件使用 `unirhy-wasm-abi-v1`，并导出 `alloc`、`dealloc` 和 `execute`。Host 函数使用 `host_<domain>_<action>` 命名，例如 `host_artist_list` 和 `host_storage_object_read`。
 
 Host 函数目录不属于 ABI 稳定性承诺。插件应当与安装它的 UniRhy 服务端版本匹配。
 
@@ -52,7 +52,7 @@ JSON Host 函数的签名为：
 | `RESPONSE_TOO_LARGE` | HTTP 响应超过允许的字节数 |
 | `INTERNAL` | Host 内部、网络或存储操作失败 |
 
-无效指针、越界长度、非法 JSON 或非 Object 根节点属于协议错误，会直接 trap，并按当前 `plan()` 或 `run()` 调用失败处理。
+无效指针、越界长度、非法 JSON 或非 Object 根节点属于协议错误，会直接 trap，并按当前 `execute()` 调用失败处理。
 
 ### 分页
 
@@ -83,10 +83,10 @@ JSON Host 函数的签名为：
 
 ## 事务与执行语义
 
-- `plan()` 与 `run()` 可以调用同一组 Host functions。
+- 每次 `execute()` 调用都可以使用同一组 Host functions。
 - 所有已启用插件获得相同的 Host functions，不配置插件级 capability。
 - JSON Host 调用在当前 Worker 事务中建立嵌套 savepoint。业务失败会先回滚本次 Host 调用，再返回错误信封。
-- Host 调用成功后释放 savepoint，其数据库写入仍随外层 Planner 或 Handler 事务提交或回滚。
+- Host 调用成功后释放 savepoint，其数据库写入仍随当前 `execute()` 的外层任务事务提交或回滚。
 - HTTP、文件系统和对象存储操作属于外部副作用，不随数据库事务或 savepoint 回滚。
 - Host 不提供隐式当前用户。创建歌单等需要属主的操作必须显式传入 `ownerId`，插件可以通过账号只读 API 查询账号 ID。
 
@@ -138,7 +138,7 @@ JSON Host 函数的签名为：
 
 ## Host API 目录
 
-共 71 个函数，以下表格中的响应均指成功信封的 `data` 字段，专用签名除外。
+共 66 个函数，以下表格中的响应均指成功信封的 `data` 字段，专用签名除外。
 
 ### 基础（3）
 
@@ -240,18 +240,19 @@ JSON Host 函数的签名为：
 | `host_playlist_remove_recording` | `{id, recordingId}` -> `null` | 从歌单移除录音 |
 | `host_playlist_reorder_recordings` | `{id, recordingIds: number[]}` -> `null` | 设置歌单内完整曲目顺序 |
 
-### 任务系统（12）
+### 任务系统（7）
 
 | 函数 | 请求 -> 响应 | 说明 |
 |---|---|---|
 | `host_task_definition_list` | `{}` -> `TaskDefinition[]` | 列出插件任务和内建任务定义 |
 | `host_task_definition_get` | `{namespace, taskType}` -> `TaskDefinition` | 按 TaskKey 查询任务定义 |
 | `host_task_create` | `{namespace, taskType, payload}` -> `{taskId}` | 创建根任务；`payload` 必须是 JSON Object |
-| `host_task_enqueue` | `{namespace?, taskType?, payloads}` -> `{enqueued}` | 在当前插件任务下批量创建子任务；默认沿用当前 TaskKey，最多 1000 个 payload |
 | `host_task_list` | 分页 + `{parentId?, rootsOnly?, namespace?, taskType?, status?}` -> `{rows: AsyncTask[], totalRowCount}` | 筛选并分页列出任务 |
 | `host_task_get` | `{id}` -> `AsyncTask` | 查询任务详情 |
 | `host_task_patch` | `{id, status}` -> `null` | 允许 `PENDING -> CANCELLED`，以及 `FAILED` / `CANCELLED -> PENDING` |
 | `host_task_statistics` | `{taskKeys?: string[]}` -> `TaskStatistics` | 查询全部或指定 TaskKey 的任务统计 |
+
+插件通过 `execute()` 成功响应中的 `successors` 声明当前任务的子任务，不提供 Host 侧的子任务入队函数。
 
 ### 插件元数据（2，只读）
 
