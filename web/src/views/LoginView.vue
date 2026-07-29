@@ -51,9 +51,7 @@
                     v-else
                     class="flex h-full items-center justify-center opacity-40 transition-opacity md:group-hover:opacity-60"
                 >
-                    <h2
-                        class="writing-vertical-rl select-none text-2xl font-bold tracking-widest sm:text-3xl"
-                    >
+                    <h2 class="writing-vertical-rl text-2xl font-bold tracking-widest sm:text-3xl">
                         {{ t('login.login') }}
                     </h2>
                 </div>
@@ -203,9 +201,7 @@
                 </div>
 
                 <div v-else class="h-full flex items-center justify-center opacity-40">
-                    <h2
-                        class="writing-vertical-rl select-none text-2xl font-bold tracking-widest sm:text-3xl"
-                    >
+                    <h2 class="writing-vertical-rl text-2xl font-bold tracking-widest sm:text-3xl">
                         {{ t('login.register') }}
                     </h2>
                 </div>

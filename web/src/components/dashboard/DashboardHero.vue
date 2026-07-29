@@ -226,7 +226,7 @@ watch(
                 >
                     <!-- Background Decoration -->
                     <div
-                        class="pointer-events-none absolute -right-32 top-1/2 hidden h-96 w-96 -translate-y-1/2 select-none opacity-[0.06] md:block"
+                        class="pointer-events-none absolute -right-32 top-1/2 hidden h-96 w-96 -translate-y-1/2 opacity-[0.06] md:block"
                     >
                         <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
                             <circle

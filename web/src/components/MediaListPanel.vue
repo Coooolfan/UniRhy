@@ -220,7 +220,7 @@ const handleDrop = (itemId: number, event: DragEvent) => {
 
                 <div
                     data-testid="media-list-drag-handle"
-                    class="relative z-10 flex w-5 shrink-0 flex-col items-center justify-center select-none text-center font-serif text-base text-[#DCD6CC] group-hover:text-[#8C857B] sm:w-6 sm:text-lg"
+                    class="relative z-10 flex w-5 shrink-0 flex-col items-center justify-center text-center font-serif text-base text-[#DCD6CC] group-hover:text-[#8C857B] sm:w-6 sm:text-lg"
                     :draggable="enableReorder && !reorderDisabled"
                     :class="{
                         'cursor-pointer': enableMultiSelect,

@@ -143,7 +143,7 @@ onMounted(() => {
         >
             <div class="flex h-full min-h-0 flex-col md:pl-10 md:pr-6 md:pt-12">
                 <div class="mb-10 flex items-center justify-between md:mb-12">
-                    <div class="flex select-none items-center gap-3">
+                    <div class="flex items-center gap-3">
                         <BrandWatermark class="text-3xl font-serif tracking-tight text-[#2C2C2C]" />
                     </div>
                     <button
@@ -162,7 +162,7 @@ onMounted(() => {
                             v-for="item in navItems"
                             :key="item.label"
                             type="button"
-                            class="block w-full select-none text-left text-base transition-colors duration-300 md:text-sm"
+                            class="block w-full text-left text-base transition-colors duration-300 md:text-sm"
                             :class="
                                 isActive(item)
                                     ? 'font-medium text-[#C27E46]'
@@ -181,7 +181,7 @@ onMounted(() => {
                         <button
                             v-if="!isLoadingPlaylists && !playlistError && playlists.length === 0"
                             type="button"
-                            class="inline-flex select-none items-center gap-2 text-sm text-[#8A857D] transition-colors hover:text-[#C27E46]"
+                            class="inline-flex items-center gap-2 text-sm text-[#8A857D] transition-colors hover:text-[#C27E46]"
                             @click="openCreatePlaylistModal"
                         >
                             <span>{{ t('dashboardNav.createPlaylistLabel') }}</span>
@@ -192,7 +192,7 @@ onMounted(() => {
                                 class="mb-4 flex items-center justify-between border-b border-[#D6D1C7] pb-2"
                             >
                                 <span
-                                    class="select-none text-sm uppercase tracking-[0.24em] text-[#9C968B] md:text-xs"
+                                    class="text-sm uppercase tracking-[0.24em] text-[#9C968B] md:text-xs"
                                     >{{ t('dashboardNav.myPlaylists') }}</span
                                 >
                                 <button
@@ -222,7 +222,7 @@ onMounted(() => {
                                 <li
                                     v-for="playlist in playlists"
                                     :key="playlist.id"
-                                    class="cursor-pointer select-none transition-colors"
+                                    class="cursor-pointer transition-colors"
                                     :class="
                                         route.name === 'playlist-detail' &&
                                         Number(route.params.id) === playlist.id

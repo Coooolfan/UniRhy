@@ -74,8 +74,7 @@ const emit = defineEmits<{
                     </g>
 
                     <text
-                        class="pointer-events-none select-none"
-                        style="user-select: none"
+                        class="pointer-events-none"
                         font-family="ui-sans-serif, system-ui, -apple-system, sans-serif"
                         font-size="11"
                         font-weight="600"

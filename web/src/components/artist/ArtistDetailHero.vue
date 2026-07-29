@@ -29,7 +29,7 @@ const emit = defineEmits<{
         class="group mb-7 mt-5 flex flex-col items-center gap-4 sm:mb-12 sm:mt-6 sm:gap-8 md:mb-16 md:mt-8 md:flex-row md:items-end md:gap-12"
     >
         <div
-            class="relative h-44 w-44 shrink-0 select-none overflow-hidden rounded-full bg-[#EFEAE2] shadow-xl sm:h-56 sm:w-56 md:h-64 md:w-64"
+            class="relative h-44 w-44 shrink-0 overflow-hidden rounded-full bg-[#EFEAE2] shadow-xl sm:h-56 sm:w-56 md:h-64 md:w-64"
         >
             <img
                 v-if="artistData.avatar"

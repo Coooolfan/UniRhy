@@ -31,7 +31,7 @@ const emit = defineEmits<{
         class="group mb-7 mt-5 flex flex-col items-center gap-4 sm:mb-12 sm:mt-6 sm:gap-8 md:mb-16 md:mt-8 md:flex-row md:items-end md:gap-12"
     >
         <div
-            class="group perspective-1000 relative z-0 h-44 w-44 shrink-0 select-none sm:h-64 sm:w-64 md:h-80 md:w-80"
+            class="group perspective-1000 relative z-0 h-44 w-44 shrink-0 sm:h-64 sm:w-64 md:h-80 md:w-80"
         >
             <div
                 class="absolute top-2 right-2 bottom-2 left-2 bg-linear-to-tr from-gray-200 to-gray-100 rounded-full shadow-lg flex items-center justify-center transition-transform duration-2000 ease-out z-0"

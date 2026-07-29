@@ -8,6 +8,16 @@
     text-autospace: normal;
 }
 
+body {
+    user-select: none;
+}
+
+input,
+textarea,
+[contenteditable]:not([contenteditable='false']) {
+    user-select: text;
+}
+
 button:not(:disabled) {
     cursor: pointer;
 }

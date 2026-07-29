@@ -53,7 +53,7 @@ const getStackStyle = (index: number, total: number) => {
 </script>
 
 <template>
-    <div class="relative z-0 group shrink-0 w-full h-full select-none perspective-1000">
+    <div class="relative z-0 group shrink-0 w-full h-full perspective-1000">
         <div
             v-for="(item, index) in displayCovers"
             :key="item.id"
