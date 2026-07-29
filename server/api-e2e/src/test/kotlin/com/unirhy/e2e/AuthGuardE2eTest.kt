@@ -150,7 +150,6 @@ class AuthGuardE2eTest {
             ProtectedEndpoint("GET", "/api/tasks/1/tree"),
             ProtectedEndpoint("POST", "/api/tasks/status-transitions"),
             ProtectedEndpoint("PATCH", "/api/tasks/1"),
-            ProtectedEndpoint("PATCH", "/api/tasks"),
             // storage (fs)
             ProtectedEndpoint("GET", "/api/storage/file-system-nodes"),
             ProtectedEndpoint("POST", "/api/storage/file-system-nodes"),
@@ -169,7 +168,7 @@ class AuthGuardE2eTest {
             // 不带该 header 时会直接返回 415，鉴权拦截器不会执行。
             ProtectedEndpoint("POST", "/api/plugins", headers = mapOf("Content-Type" to "multipart/form-data; boundary=test")),
             ProtectedEndpoint("PUT", "/api/plugins/1/enabled-state"),
-            ProtectedEndpoint("PUT", "/api/plugins/1/concurrency"),
+            ProtectedEndpoint("PUT", "/api/plugins/1/tasks/E2E_TASK/concurrency"),
             ProtectedEndpoint("GET", "/api/plugins/1/configuration"),
             ProtectedEndpoint("PUT", "/api/plugins/1/configuration"),
             ProtectedEndpoint("DELETE", "/api/plugins/1"),
