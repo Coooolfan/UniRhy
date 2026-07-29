@@ -63,7 +63,7 @@ type Recording = RecordingPreview &
     }
 
 type ArtistRecordingDto = Awaited<
-    ReturnType<typeof api.artistController.listArtistRecordings>
+    ReturnType<typeof api.recordingController.listRecordings>
 >['rows'][number]
 
 type ArtistDetailDto = Awaited<ReturnType<typeof api.artistController.getArtistById>>
@@ -121,8 +121,8 @@ const fetchRecordings = async (id: number) => {
         isRecordingsLoading.value = true
         recordingsError.value = ''
 
-        const page = await api.artistController.listArtistRecordings({
-            id,
+        const page = await api.recordingController.listRecordings({
+            artistId: id,
             pageIndex: pageIndex.value,
             pageSize: PAGE_SIZE,
         })

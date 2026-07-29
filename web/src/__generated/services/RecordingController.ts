@@ -1,6 +1,6 @@
 import type {Executor} from '../';
 import type {RecordingDto} from '../model/dto/';
-import type {RecordingMergeReq, RecordingUpdate} from '../model/static/';
+import type {Page, RecordingMergeReq, RecordingUpdate} from '../model/static/';
 
 /**
  * 录音管理接口
@@ -28,6 +28,44 @@ export class RecordingController {
         let _uri = '/api/recordings/';
         _uri += encodeURIComponent(options.id);
         return (await this.executor({uri: _uri, method: 'GET'})) as Promise<RecordingDto['RecordingController/PLAYBACK_RECORDING_FETCHER']>;
+    }
+    
+    /**
+     * 分页查询指定艺术家的录音
+     * 
+     * @parameter {RecordingControllerOptions['listRecordings']} options
+     * - artistId 艺术家 ID
+     * - pageIndex 页码（从 0 开始）
+     * - pageSize 每页条数
+     * @return Page<Recording> 返回录音分页列表
+     * 
+     */
+    readonly listRecordings: (options: RecordingControllerOptions['listRecordings']) => Promise<
+        Page<RecordingDto['RecordingController/RECORDING_LIST_FETCHER']>
+    > = async(options) => {
+        let _uri = '/api/recordings';
+        let _separator = _uri.indexOf('?') === -1 ? '?' : '&';
+        let _value: any = undefined;
+        _value = options.artistId;
+        _uri += _separator
+        _uri += 'artistId='
+        _uri += encodeURIComponent(_value);
+        _separator = '&';
+        _value = options.pageIndex;
+        if (_value !== undefined && _value !== null) {
+            _uri += _separator
+            _uri += 'pageIndex='
+            _uri += encodeURIComponent(_value);
+            _separator = '&';
+        }
+        _value = options.pageSize;
+        if (_value !== undefined && _value !== null) {
+            _uri += _separator
+            _uri += 'pageSize='
+            _uri += encodeURIComponent(_value);
+            _separator = '&';
+        }
+        return (await this.executor({uri: _uri, method: 'GET'})) as Promise<Page<RecordingDto['RecordingController/RECORDING_LIST_FETCHER']>>;
     }
     
     /**
@@ -68,6 +106,20 @@ export class RecordingController {
 }
 
 export type RecordingControllerOptions = {
+    'listRecordings': {
+        /**
+         * 艺术家 ID
+         */
+        readonly artistId: number, 
+        /**
+         * 页码（从 0 开始）
+         */
+        readonly pageIndex?: number | undefined, 
+        /**
+         * 每页条数
+         */
+        readonly pageSize?: number | undefined
+    }, 
     'getRecording': {
         /**
          * Recording ID

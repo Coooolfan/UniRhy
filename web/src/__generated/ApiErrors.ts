@@ -198,11 +198,6 @@ export type ApiErrors = {
                 code: 'NOT_FOUND', 
                 readonly [key:string]: any
             }), 
-        'listArtistRecordings': AllErrors & ({
-                family: 'COMMON', 
-                code: 'NOT_FOUND', 
-                readonly [key:string]: any
-            }), 
         'createArtist': AllErrors & ({
                 family: 'COMMON', 
                 code: 'FORBIDDEN', 

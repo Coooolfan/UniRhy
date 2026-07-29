@@ -122,6 +122,12 @@ object ApiCoverageRegistry {
         ),
         full(
             "GET",
+            "/api/recordings",
+            testRef = CONTENT_SEARCH_UPDATE_MERGE_CASE,
+            note = "filter: artistId; unknown artist returns empty page",
+        ),
+        full(
+            "GET",
             "/api/playlists",
             testRef = PLAYLIST_OWNER_SCOPE_CASE,
             note = "auth: $AUTH_GUARD_CASE",

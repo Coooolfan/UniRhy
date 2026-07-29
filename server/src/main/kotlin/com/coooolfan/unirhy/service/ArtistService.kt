@@ -3,7 +3,6 @@ package com.coooolfan.unirhy.service
 import com.coooolfan.unirhy.error.ArtistException
 import com.coooolfan.unirhy.error.CommonException
 import com.coooolfan.unirhy.model.Artist
-import com.coooolfan.unirhy.model.Recording
 import com.coooolfan.unirhy.model.alias
 import com.coooolfan.unirhy.model.artists
 import com.coooolfan.unirhy.model.by
@@ -16,7 +15,6 @@ import org.babyfish.jimmer.sql.ast.mutation.SaveMode
 import org.babyfish.jimmer.sql.fetcher.Fetcher
 import org.babyfish.jimmer.sql.kt.KSqlClient
 import org.babyfish.jimmer.sql.kt.fetcher.newFetcher
-import org.babyfish.jimmer.sql.kt.ast.expression.eq
 import org.babyfish.jimmer.sql.kt.ast.expression.ilike
 import org.babyfish.jimmer.sql.kt.ast.expression.or
 import org.babyfish.jimmer.sql.kt.ast.expression.valueIn
@@ -38,22 +36,6 @@ class ArtistService(
 
     fun getArtistById(id: Long, fetcher: Fetcher<Artist>): Artist {
         return sql.findById(fetcher, id) ?: throw CommonException.NotFound()
-    }
-
-    fun listArtistRecordings(
-        artistId: Long,
-        pageIndex: Int,
-        pageSize: Int,
-        fetcher: Fetcher<Recording>,
-    ): Page<Recording> {
-        if (sql.findById(Artist::class, artistId) == null) {
-            throw CommonException.NotFound()
-        }
-        return sql.createQuery(Recording::class) {
-            where(table.artists { id eq artistId })
-            orderBy(table.id)
-            select(table.fetch(fetcher))
-        }.fetchPage(pageIndex, pageSize)
     }
 
     fun getArtistsByIds(ids: List<Long>, fetcher: Fetcher<Artist>): List<Artist> {
