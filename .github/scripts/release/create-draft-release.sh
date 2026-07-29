@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+NOTES_FILE="docs/release_notes/${VERSION}.md"
+if [[ ! -f "$NOTES_FILE" ]]; then
+  echo "::error::Release notes 文件不存在: $NOTES_FILE"
+  exit 1
+fi
+
 git fetch --force --tags origin
 EXISTING_TAG_SHA="$(git rev-parse --verify --quiet "refs/tags/$VERSION^{}" || true)"
 if [[ -n "$EXISTING_TAG_SHA" ]]; then
@@ -14,12 +20,6 @@ else
   git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
   git tag -a "$VERSION" "$TARGET_SHA" -m "Release $VERSION"
   git push origin "$VERSION"
-fi
-
-NOTES_FILE="docs/release_notes/${VERSION}.md"
-if [[ ! -f "$NOTES_FILE" ]]; then
-  echo "::error::Release notes 文件不存在: $NOTES_FILE"
-  exit 1
 fi
 
 if RELEASE_JSON="$(gh release view "$VERSION" --json isDraft,isPrerelease 2>/dev/null)"; then

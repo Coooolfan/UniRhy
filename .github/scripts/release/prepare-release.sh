@@ -20,6 +20,12 @@ case "$INPUT_LATEST" in
     ;;
 esac
 
+NOTES_FILE="docs/release_notes/${INPUT_VERSION}.md"
+if [[ ! -f "$NOTES_FILE" ]]; then
+  echo "::error::Release notes 文件不存在: $NOTES_FILE"
+  exit 1
+fi
+
 git fetch --force --tags origin
 TARGET_SHA="$(git rev-parse --verify HEAD)"
 if [[ "$INPUT_VERSION" == *-* ]]; then
