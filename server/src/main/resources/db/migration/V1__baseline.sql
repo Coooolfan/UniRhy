@@ -239,6 +239,7 @@ CREATE TABLE plugin_task
     id               BIGSERIAL PRIMARY KEY,
     plugin_id        TEXT    NOT NULL REFERENCES plugin (id) ON DELETE CASCADE,
     task_type        TEXT    NOT NULL,
+    name             TEXT,
     concurrency      INTEGER NOT NULL,
     user_submittable BOOLEAN NOT NULL,
     form_definition  JSONB   NOT NULL,
