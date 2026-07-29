@@ -3,39 +3,37 @@
 ## 基本规则
 
 - 迁移文件位于 `server/src/main/resources/db/migration/`，由 Flyway 在服务启动时执行。
-- **已随版本发布的迁移文件不可再修改或重命名**，对已发布模式的任何变更都必须新增迁移文件。
+- 文件名格式固定为：
+
+  ```
+  V{数字}__{描述}.sql
+  ```
+
+- `{数字}` 是从 `1` 开始严格递增的迁移序号，只表示数据库迁移顺序，与应用版本号无关。
+- `{描述}` 使用简短的英文 snake_case，例如 `V2__add_account_last_login.sql`。
+- 每次数据库结构或基础数据发生变化时新增一个迁移文件，不跳号、不复用序号。
+- 已提交到共享分支或已在任何环境执行的迁移文件不可修改、删除或重命名；后续修正必须新增迁移。
 - `server/src/main/resources` 整体被 gitignore，但 `db/migration/*.sql` 已显式放行，新增迁移文件直接 `git add` 即可。
+- 迁移 SQL 使用未限定的对象名，不得写死 `public.` 或其他 schema 前缀。
 
-## 版本号命名
+## Schema
 
-Flyway 只支持数字段版本号（按 `.` 分段逐段数值比较，短版本缺失段按 0 补齐），无法直接表达 `0.1.0-beta.8` 这类预发布版本。因此约定：
+- `DB_SCHEMA` 同时控制 PostgreSQL JDBC `currentSchema` 和 Flyway `default-schema`，默认值为 `public`。
+- Flyway history、迁移创建的对象和 Jimmer 运行时查询必须位于同一个 schema。
+- 自定义 schema 应使用小写 snake_case 标识符，例如 `unirhy` 或 `music_server`。
+- Flyway 默认会尝试创建不存在的 schema；若迁移用户没有创建权限，部署前必须由数据库管理员创建并授权。
 
+## 基线
+
+- `V1__baseline.sql` 是当前数据库结构的新基线。
+- 基线只负责在空数据库中直接创建当前所需的最终结构，不包含针对旧结构的 `ALTER`、数据搬迁或兼容逻辑。
+- 使用旧迁移链创建的开发数据库不能直接切换到该基线，需要删除并重新创建数据库。
+- 基线之后的第一个迁移文件为 `V2__{描述}.sql`，后续数字依次递增。
+
+## 示例
+
+```text
+V1__baseline.sql
+V2__add_account_last_login.sql
+V3__create_listening_history.sql
 ```
-V<MAJOR>.<MINOR>.<PATCH>.<STAGE>.<N>__<描述>.sql
-```
-
-- 前三段对应迁移所属的发行版本线（如 `0.1.0`）。
-- `STAGE` 为发布阶段编码：
-
-  | 阶段   | 编码 |
-  |--------|------|
-  | alpha  | 1    |
-  | beta   | 2    |
-  | rc     | 3    |
-  | stable | 4    |
-
-- `N` 为该阶段内的发布序号；stable 阶段如需多个迁移，从 1 递增。
-
-示例：
-
-- `0.1.0-beta.8` 发布的迁移 → `V0.1.0.2.8__allow_radio_playback_strategy.sql`
-- `0.1.0-rc.1` 发布的迁移 → `V0.1.0.3.1__xxx.sql`
-- 正式版 `0.1.0` 发布的迁移 → `V0.1.0.4.1__xxx.sql`
-
-该编码保证同一版本线内 alpha < beta < rc < stable 的执行顺序与发布顺序一致，且始终排在下一版本线（如 `V0.1.1.x`）之前。
-
-注意：**不要使用裸的 `V<MAJOR>.<MINOR>.<PATCH>`**（如 `V0.1.0`），它会排在同版本线所有带阶段编码的迁移之前。
-
-## 历史例外
-
-- `V0.0.1__init.sql` 为初始化脚本，早于本规范，保持原名不变。

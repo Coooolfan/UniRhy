@@ -21,10 +21,15 @@ object E2eRuntime {
 
     fun registerDatasource(registry: DynamicPropertyRegistry) {
         val current = context
-        registry.add("spring.datasource.url") { current.database.jdbcUrl }
+        val schema = System.getenv("DB_SCHEMA")
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
+            ?: "public"
+        val jdbcUrl = "${current.database.jdbcUrl}?currentSchema=$schema"
+        registry.add("spring.datasource.url") { jdbcUrl }
         registry.add("spring.datasource.username") { current.database.user }
         registry.add("spring.datasource.password") { current.database.password }
-        registry.add("spring.flyway.url") { current.database.jdbcUrl }
+        registry.add("spring.flyway.url") { jdbcUrl }
         registry.add("spring.flyway.user") { current.database.user }
         registry.add("spring.flyway.password") { current.database.password }
     }
