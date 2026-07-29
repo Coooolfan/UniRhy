@@ -341,7 +341,7 @@ class PluginE2eTest {
         E2eAssert.status(submitResponse, 202, "[plugin-host] root task should be accepted")
         val taskId = E2eJson.mapper.readTree(submitResponse.body()).path("id").longValue()
 
-        awaitSingleChildTaskCompleted(state, taskId)
+        awaitRootTaskTerminal(state, taskId)
 
         val artistResponse = state.api.get(
             path = "/api/artists/search-results",
@@ -518,46 +518,6 @@ class PluginE2eTest {
             Thread.sleep(200L)
         }
         fail("[plugins] root task $taskId did not reach terminal state, last=$lastStatus")
-    }
-
-    private fun awaitSingleChildTaskCompleted(state: com.unirhy.e2e.support.E2eAdminSession, taskId: Long) {
-        val deadline = System.currentTimeMillis() + SUBMISSION_WAIT_TIMEOUT_MILLIS
-        var lastState = "<none>"
-        while (System.currentTimeMillis() <= deadline) {
-            val detailResponse = state.api.get("/api/tasks/$taskId")
-            E2eAssert.status(detailResponse, 200, "[plugin-host] root task detail should succeed")
-            val detail = E2eJson.mapper.readTree(detailResponse.body())
-            val rootStatus = detail.path("task").path("status").asString()
-            val childCounts = detail.path("childTaskCounts")
-            val active = childCounts.path("active").longValue()
-            val completed = childCounts.path("completed").longValue()
-            val failed = childCounts.path("failed").longValue()
-            val cancelled = childCounts.path("cancelled").longValue()
-            val total = childCounts.path("total").longValue()
-            lastState = "root=$rootStatus, active=$active, completed=$completed, " +
-                "failed=$failed, cancelled=$cancelled, total=$total"
-
-            if (rootStatus in setOf("FAILED", "CANCELLED")) {
-                fail("[plugin-host] root task did not complete: $lastState")
-            }
-            if (rootStatus == "COMPLETED" && total == 1L && active == 0L) {
-                assertEquals(1L, completed, "[plugin-host] the guest task should complete")
-                assertEquals(0L, failed, "[plugin-host] the guest task should not fail")
-                assertEquals(0L, cancelled, "[plugin-host] the guest task should not be cancelled")
-
-                val tasksResponse = state.api.get(
-                    path = "/api/tasks",
-                    query = mapOf("parentId" to taskId, "pageSize" to 20),
-                )
-                E2eAssert.status(tasksResponse, 200, "[plugin-host] child task list should succeed")
-                val rows = E2eJson.mapper.readTree(tasksResponse.body()).path("rows")
-                assertEquals(1, rows.size(), "[plugin-host] plan should enqueue exactly one child task")
-                assertEquals("COMPLETED", rows[0].path("status").asString(), "[plugin-host] child task should be completed")
-                return
-            }
-            Thread.sleep(200L)
-        }
-        fail("[plugin-host] root task $taskId did not finish its child task, last=$lastState")
     }
 
     private fun pluginArchive(
