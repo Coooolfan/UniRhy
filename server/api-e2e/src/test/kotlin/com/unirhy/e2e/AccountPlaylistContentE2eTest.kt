@@ -682,6 +682,36 @@ class AccountPlaylistContentE2eTest {
             E2eJson.mapper.readTree(getRecordingResponse.body()).path("artists").isArray,
             "[content] recording detail artists should be an array",
         )
+        val recordingArtists = E2eJson.mapper.readTree(getRecordingResponse.body()).path("artists")
+        assertTrue(recordingArtists.size() > 0, "[content] recording detail should contain an artist")
+        val recordingArtistId = readIdFromNode(
+            recordingArtists.first().path("id"),
+            "[content] recording artist id should be integral",
+        )
+
+        val artistRecordingsResponse = state.api.get(
+            path = "/api/recordings",
+            query = mapOf("artistId" to recordingArtistId, "pageIndex" to 0, "pageSize" to 10),
+        )
+        E2eAssert.status(artistRecordingsResponse, 200, "[content] recordings filtered by artist should succeed")
+        assertTrue(
+            pageContainsId(artistRecordingsResponse.body(), sourceRecordingId),
+            "[content] artist recording list should contain the source recording",
+        )
+
+        val missingArtistRecordingsResponse = state.api.get(
+            path = "/api/recordings",
+            query = mapOf("artistId" to Long.MAX_VALUE, "pageIndex" to 0, "pageSize" to 10),
+        )
+        E2eAssert.status(
+            missingArtistRecordingsResponse,
+            200,
+            "[content] recordings filtered by a missing artist should succeed",
+        )
+        assertTrue(
+            pageRows(missingArtistRecordingsResponse.body(), "[content] missing artist recording list").isEmpty(),
+            "[content] missing artist recording list should return an empty page",
+        )
 
         val sourceDetailAfterRecordingUpdateResponse = state.api.get("/api/works/$sourceWorkId")
         E2eAssert.status(sourceDetailAfterRecordingUpdateResponse, 200, "[content] source work detail should succeed")

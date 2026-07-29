@@ -10,6 +10,7 @@ import com.coooolfan.unirhy.model.by
 import com.coooolfan.unirhy.model.dto.RecordingMergeReq
 import com.coooolfan.unirhy.model.dto.RecordingUpdate
 import com.coooolfan.unirhy.service.RecordingService
+import org.babyfish.jimmer.Page
 import org.babyfish.jimmer.client.FetchBy
 import org.babyfish.jimmer.sql.kt.fetcher.newFetcher
 import org.springframework.http.HttpStatus
@@ -24,6 +25,35 @@ import org.springframework.web.bind.annotation.*
 @RestController
 @RequestMapping("/api/recordings")
 class RecordingController(private val service: RecordingService) {
+
+    /**
+     * 分页查询指定艺术家的录音
+     *
+     * @param artistId 艺术家 ID
+     * @param pageIndex 页码（从 0 开始）
+     * @param pageSize 每页条数
+     * @return Page<Recording> 返回录音分页列表
+     *
+     * @api GET /api/recordings
+     * @permission 需要登录认证
+     * @description 按艺术家 ID 筛选录音；艺术家不存在时返回空分页
+     */
+    @GetMapping
+    @ResponseStatus(HttpStatus.OK)
+    fun listRecordings(
+        @RequestParam artistId: Long,
+        @RequestParam(required = false) pageIndex: Int?,
+        @RequestParam(required = false) pageSize: Int?,
+    ): Page<@FetchBy("RECORDING_LIST_FETCHER") Recording> {
+        return service.listRecordings(
+            pageIndex = pageIndex ?: 0,
+            pageSize = pageSize ?: 10,
+            ids = null,
+            workId = null,
+            artistId = artistId,
+            fetcher = RECORDING_LIST_FETCHER,
+        )
+    }
 
     /**
      * 获取指定录音
@@ -97,6 +127,27 @@ class RecordingController(private val service: RecordingService) {
     }
 
     companion object {
+        val RECORDING_LIST_FETCHER = newFetcher(Recording::class).by {
+            allScalarFields()
+            work {
+                allScalarFields()
+            }
+            artists {
+                allScalarFields()
+            }
+            cover {
+                allScalarFields()
+                url()
+            }
+            assets {
+                allScalarFields()
+                mediaFile {
+                    allScalarFields()
+                    url()
+                }
+            }
+        }
+
         val PLAYBACK_RECORDING_FETCHER = newFetcher(Recording::class).by {
             allScalarFields()
             work {

@@ -29,6 +29,7 @@ class RecordingService(
         pageSize: Int,
         ids: List<Long>?,
         workId: Long?,
+        artistId: Long? = null,
         fetcher: Fetcher<Recording>,
     ): Page<Recording> {
         return sql.createQuery(Recording::class) {
@@ -37,6 +38,9 @@ class RecordingService(
             }
             if (workId != null) {
                 where(table.workId eq workId)
+            }
+            if (artistId != null) {
+                where(table.artists { id eq artistId })
             }
             orderBy(table.id)
             select(table.fetch(fetcher))

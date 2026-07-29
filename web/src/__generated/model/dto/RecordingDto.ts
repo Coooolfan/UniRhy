@@ -1,5 +1,5 @@
 export type RecordingDto = {
-    'ArtistController/ARTIST_RECORDING_FETCHER': {
+    'RecordingController/PLAYBACK_RECORDING_FETCHER': {
         readonly id: number;
         readonly label: ReadonlyArray<string>;
         readonly title?: string | undefined;
@@ -39,7 +39,7 @@ export type RecordingDto = {
             };
         }>;
     }, 
-    'RecordingController/PLAYBACK_RECORDING_FETCHER': {
+    'RecordingController/RECORDING_LIST_FETCHER': {
         readonly id: number;
         readonly label: ReadonlyArray<string>;
         readonly title?: string | undefined;
