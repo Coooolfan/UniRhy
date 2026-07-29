@@ -24,6 +24,8 @@ const props = defineProps<{
     /** 列表中选中的任务 id；面板会解析到其所在树的根并展示整棵树 */
     taskId: number | null
     selectedId?: number | null
+    /** 任务类型显示名解析；未提供时节点回退展示 taskType */
+    resolveLabel?: (namespace: string, taskType: string) => string
 }>()
 
 const { t } = useI18n()
@@ -55,7 +57,7 @@ const treeStats = computed(() => {
 
 // ── 布局：经典 tidy 树（叶子递增 y，父节点取子节点 y 中心）──
 const NODE_WIDTH = 208 // w-52
-const NODE_HEIGHT = 84
+const NODE_HEIGHT = 108
 const GAP_X = 64
 const GAP_Y = 16
 
@@ -87,6 +89,7 @@ const buildFlow = (rootNode: TreeNode): { nodes: Node<TaskFlowNodeData>[]; edges
             position: { x: depth * (NODE_WIDTH + GAP_X), y: centerY },
             data: {
                 taskId: node.id,
+                taskLabel: props.resolveLabel?.(node.namespace, node.taskType) ?? node.taskType,
                 status: node.status,
                 startedAt: node.startedAt,
                 completedAt: node.completedAt,

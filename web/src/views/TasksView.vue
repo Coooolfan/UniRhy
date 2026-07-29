@@ -679,6 +679,7 @@ const onTaskActionSuccess = () => {
                     ref="treePanel"
                     :task-id="selectedTask?.id ?? null"
                     :selected-id="selectedTask?.id ?? null"
+                    :resolve-label="resolveTaskLabel"
                     class="min-w-0 flex-1"
                 />
             </div>

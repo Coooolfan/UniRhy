@@ -8,6 +8,8 @@ import type { TaskStatus } from '@/__generated/model/enums/TaskStatus'
 /** Vue Flow 自定义任务节点的 data 载荷 */
 export type TaskFlowNodeData = {
     taskId: number
+    /** 任务类型显示名（来自任务定义，未命中时回退为 taskType） */
+    taskLabel: string
     status: TaskStatus
     startedAt?: string
     completedAt?: string
@@ -29,6 +31,23 @@ const STATUS_CARD_CLASS: Record<TaskStatus, string> = {
     FAILED: 'border-rose-300 bg-rose-50/60',
     CANCELLED: 'border-[#EAE6DE] bg-[#F8F5EE]/70',
 }
+
+/** 节点卡片内的紧凑时间格式：`MM-DD HH:mm`，非法值返回原文 */
+const pad2 = (n: number) => String(n).padStart(2, '0')
+
+const formatNodeTime = (value: string) => {
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return value
+    return `${pad2(date.getMonth() + 1)}-${pad2(date.getDate())} ${pad2(date.getHours())}:${pad2(date.getMinutes())}`
+}
+
+/** 起止时间标注；未开始时不展示，进行中以 … 表示尚无结束时间 */
+const timeRangeText = computed(() => {
+    if (!props.data.startedAt) return ''
+    const start = formatNodeTime(props.data.startedAt)
+    const end = props.data.completedAt ? formatNodeTime(props.data.completedAt) : '…'
+    return `${start} → ${end}`
+})
 
 const durationText = computed(() => {
     if (!props.data.startedAt) return ''
@@ -56,6 +75,12 @@ const durationText = computed(() => {
 
         <div class="flex items-center">
             <span class="font-mono text-xs font-semibold text-[#2B221B]">#{{ data.taskId }}</span>
+            <span
+                class="ml-2 truncate text-[11px] font-medium text-[#5A524A]"
+                :title="data.taskLabel"
+            >
+                {{ data.taskLabel }}
+            </span>
         </div>
         <div class="mt-1.5 flex items-center gap-1.5">
             <span
@@ -66,6 +91,9 @@ const durationText = computed(() => {
             <span v-if="durationText" class="ml-auto font-mono text-[10px] text-[#B29A84]">
                 {{ durationText }}
             </span>
+        </div>
+        <div v-if="timeRangeText" class="mt-1 font-mono text-[10px] text-[#B29A84]">
+            {{ timeRangeText }}
         </div>
         <div
             v-if="data.childCount > 0"
