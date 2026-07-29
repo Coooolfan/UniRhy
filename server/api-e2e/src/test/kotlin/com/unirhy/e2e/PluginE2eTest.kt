@@ -145,8 +145,8 @@ class PluginE2eTest {
             ),
         )
         E2eAssert.status(submitResponse, 202, "[plugins] submit should accept homogeneous array params")
-        val taskId = E2eJson.mapper.readTree(submitResponse.body()).path("taskId").longValue()
-        assertTrue(taskId > 0, "[plugins] submit should return taskId")
+        val taskId = E2eJson.mapper.readTree(submitResponse.body()).path("id").longValue()
+        assertTrue(taskId > 0, "[plugins] submit should return task id")
 
         awaitRootTaskTerminal(state, taskId)
 
@@ -339,7 +339,7 @@ class PluginE2eTest {
             ),
         )
         E2eAssert.status(submitResponse, 202, "[plugin-host] root task should be accepted")
-        val taskId = E2eJson.mapper.readTree(submitResponse.body()).path("taskId").longValue()
+        val taskId = E2eJson.mapper.readTree(submitResponse.body()).path("id").longValue()
 
         awaitSingleChildTaskCompleted(state, taskId)
 
