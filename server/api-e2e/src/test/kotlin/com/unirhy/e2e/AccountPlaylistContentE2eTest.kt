@@ -1513,9 +1513,10 @@ class AccountPlaylistContentE2eTest {
 
     private fun submitScanAndAwaitCompletion(state: E2eAdminSession, expectedTaskCount: Int) {
         val baselineStats = fetchTaskStats(state, "[scan-helper] baseline task stats")
-        val baselineActive = taskCount(baselineStats, "METADATA_PARSE", "active")
-        val baselineCompleted = taskCount(baselineStats, "METADATA_PARSE", "completed")
-        val baselineFailed = taskCount(baselineStats, "METADATA_PARSE", "failed")
+        val baselineEntryActive = taskCount(baselineStats, "METADATA_PARSE", "active")
+        val baselineEntryFailed = taskCount(baselineStats, "METADATA_PARSE", "failed")
+        val baselineItemCompleted = taskCount(baselineStats, "METADATA_PARSE_ITEM", "completed")
+        val baselineItemFailed = taskCount(baselineStats, "METADATA_PARSE_ITEM", "failed")
 
         val submitResponse = state.api.post(
             path = "/api/tasks",
@@ -1532,17 +1533,29 @@ class AccountPlaylistContentE2eTest {
 
         while (System.currentTimeMillis() <= deadline) {
             val statsRows = fetchTaskStats(state, "[scan-helper] task stats")
-            val active = taskCount(statsRows, "METADATA_PARSE", "active")
-            val completed = taskCount(statsRows, "METADATA_PARSE", "completed")
-            val failed = taskCount(statsRows, "METADATA_PARSE", "failed")
-            val terminalDelta = (completed - baselineCompleted) + (failed - baselineFailed)
+            val entryActive = taskCount(statsRows, "METADATA_PARSE", "active")
+            val entryFailed = taskCount(statsRows, "METADATA_PARSE", "failed")
+            val itemActive = taskCount(statsRows, "METADATA_PARSE_ITEM", "active")
+            val itemCompleted = taskCount(statsRows, "METADATA_PARSE_ITEM", "completed")
+            val itemFailed = taskCount(statsRows, "METADATA_PARSE_ITEM", "failed")
+            val terminalDelta =
+                (itemCompleted - baselineItemCompleted) + (itemFailed - baselineItemFailed)
             lastStatsBody = statsRows.joinToString(prefix = "[", postfix = "]") { it.toString() }
 
-            if (active <= baselineActive && terminalDelta >= expectedTaskCount) {
+            if (
+                entryActive <= baselineEntryActive &&
+                itemActive == 0L &&
+                terminalDelta >= expectedTaskCount
+            ) {
                 assertEquals(
-                    0L,
-                    failed - baselineFailed,
-                    "[scan-helper] scan should not introduce failed tasks, last=$lastStatsBody",
+                    baselineEntryFailed,
+                    entryFailed,
+                    "[scan-helper] scan entry task should not fail, last=$lastStatsBody",
+                )
+                assertEquals(
+                    baselineItemFailed,
+                    itemFailed,
+                    "[scan-helper] scan item tasks should not fail, last=$lastStatsBody",
                 )
                 return
             }

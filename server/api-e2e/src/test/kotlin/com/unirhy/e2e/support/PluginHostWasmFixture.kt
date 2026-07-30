@@ -100,6 +100,43 @@ object PluginHostWasmFixture {
         "host_account_get",
     )
 
+    /** Builds the smallest valid plugin whose execute call completes without successors. */
+    fun buildNoop(): ByteArray {
+        val executeResult = """{"ok":true}""".toByteArray()
+
+        return ByteArrayOutputStream().apply {
+            write(byteArrayOf(0x00, 0x61, 0x73, 0x6D, 0x01, 0x00, 0x00, 0x00))
+            writeSection(
+                1,
+                vector(
+                    functionType(listOf(I32), listOf(I32)),
+                    functionType(listOf(I32, I32), emptyList()),
+                    functionType(listOf(I32, I32), listOf(I64)),
+                ),
+            )
+            writeSection(3, vector(unsignedLeb128(0), unsignedLeb128(1), unsignedLeb128(2)))
+            writeSection(5, vector(bytes(byteArrayOf(0x00), unsignedLeb128(1))))
+            writeSection(
+                7,
+                vector(
+                    export("alloc", FUNCTION_EXPORT, 0),
+                    export("dealloc", FUNCTION_EXPORT, 1),
+                    export("execute", FUNCTION_EXPORT, 2),
+                    export("memory", MEMORY_EXPORT, 0),
+                ),
+            )
+            writeSection(
+                10,
+                vector(
+                    functionBody(i32Const(ALLOC_PTR), END),
+                    functionBody(END),
+                    functionBody(i64Const(pack(EXECUTE_RESULT_PTR, executeResult.size)), END),
+                ),
+            )
+            writeSection(11, vector(dataSegment(EXECUTE_RESULT_PTR, executeResult)))
+        }.toByteArray()
+    }
+
     fun build(
         artistName: String,
         workTitle: String,

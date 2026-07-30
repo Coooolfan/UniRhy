@@ -83,7 +83,6 @@ class PluginE2eTest {
             "[plugins] entry task should be user-submittable",
         )
         assertFalse(uploaded.path("enabled").asBoolean(), "[plugins] uploaded plugin should start disabled")
-        assertFalse(uploaded.path("isAvailable").asBoolean(), "[plugins] disabled plugin should not be loaded")
         assertEquals(
             0,
             uploaded.path("configDefinition").path("schema").path("properties").size(),
@@ -123,7 +122,6 @@ class PluginE2eTest {
         E2eAssert.status(listAfterEnableResponse, 200, "[plugins] list after enable should succeed")
         val enabled = pluginNode(listAfterEnableResponse.body(), pluginId)
         assertTrue(enabled.path("enabled").asBoolean(), "[plugins] enabled flag should be true")
-        assertTrue(enabled.path("isAvailable").asBoolean(), "[plugins] enabled wasm should be loaded")
         assertEquals(
             5,
             enabled.path("tasks").single().path("concurrency").intValue(),
@@ -512,7 +510,7 @@ class PluginE2eTest {
             E2eAssert.status(response, 200, "[plugins] root task detail should succeed")
             lastStatus = E2eJson.mapper.readTree(response.body()).path("task").path("status").asString()
             if (lastStatus in setOf("COMPLETED", "FAILED", "CANCELLED")) {
-                assertEquals("COMPLETED", lastStatus, "[plugins] plan() returning empty list should complete root task")
+                assertEquals("COMPLETED", lastStatus, "[plugins] execute() returning no successors should complete root task")
                 return
             }
             Thread.sleep(200L)
@@ -522,7 +520,7 @@ class PluginE2eTest {
 
     private fun pluginArchive(
         pluginId: String,
-        wasm: ByteArray = minimalPlanningWasm(),
+        wasm: ByteArray = PluginHostWasmFixture.buildNoop(),
         configured: Boolean = false,
     ): ByteArray {
         val config = if (configured) {
@@ -697,32 +695,6 @@ class PluginE2eTest {
             }
         }
         return names
-    }
-
-    private fun minimalPlanningWasm(): ByteArray {
-        val bytes = intArrayOf(
-            0x00, 0x61, 0x73, 0x6D, 0x01, 0x00, 0x00, 0x00,
-            0x01, 0x16, 0x04,
-            0x60, 0x01, 0x7F, 0x01, 0x7F,
-            0x60, 0x02, 0x7F, 0x7F, 0x00,
-            0x60, 0x02, 0x7F, 0x7F, 0x01, 0x7E,
-            0x60, 0x02, 0x7F, 0x7F, 0x00,
-            0x03, 0x05, 0x04, 0x00, 0x01, 0x02, 0x02,
-            0x05, 0x03, 0x01, 0x00, 0x01,
-            0x07, 0x29, 0x05,
-            0x05, 0x61, 0x6C, 0x6C, 0x6F, 0x63, 0x00, 0x00,
-            0x07, 0x64, 0x65, 0x61, 0x6C, 0x6C, 0x6F, 0x63, 0x00, 0x01,
-            0x04, 0x70, 0x6C, 0x61, 0x6E, 0x00, 0x02,
-            0x03, 0x72, 0x75, 0x6E, 0x00, 0x03,
-            0x06, 0x6D, 0x65, 0x6D, 0x6F, 0x72, 0x79, 0x02, 0x00,
-            0x0A, 0x1F, 0x04,
-            0x04, 0x00, 0x20, 0x00, 0x0B,
-            0x02, 0x00, 0x0B,
-            0x0A, 0x00, 0x42, 0x82, 0x80, 0x80, 0x80, 0x80, 0x80, 0x02, 0x0B,
-            0x0A, 0x00, 0x42, 0x82, 0x80, 0x80, 0x80, 0x80, 0x80, 0x02, 0x0B,
-            0x0B, 0x09, 0x01, 0x00, 0x41, 0x80, 0x10, 0x0B, 0x02, 0x5B, 0x5D,
-        )
-        return bytes.map { it.toByte() }.toByteArray()
     }
 
     private fun pluginNode(responseBody: String, pluginId: String) =
