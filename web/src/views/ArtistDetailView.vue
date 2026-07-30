@@ -20,6 +20,7 @@ import RecordingEditModal, {
     type RecordingPreview,
 } from '@/components/recording/RecordingEditModal.vue'
 import {
+    formatDistinctAliases,
     formatDurationMs,
     formatLabels,
     normalizeRecordings,
@@ -72,7 +73,7 @@ const artist = ref<ArtistDetailDto | null>(null)
 
 const artistData = computed<ArtistHeroData>(() => ({
     name: artist.value?.displayName ?? '',
-    aliases: artist.value?.alias.join(' / ') ?? '',
+    aliases: formatDistinctAliases(artist.value?.displayName ?? '', artist.value?.alias),
     comment: artist.value?.comment ?? '',
     avatar: resolveCover(artist.value?.avatar),
 }))

@@ -36,6 +36,8 @@ web/node_modules
 
 scripts/.dev/
 
+dogfood-output/
+
 **/.yarn/*
 !**/.yarn/patches
 !**/.yarn/plugins

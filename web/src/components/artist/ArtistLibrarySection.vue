@@ -9,6 +9,7 @@ import ArtistEditModal, { type ArtistEditForm } from '@/components/artist/Artist
 import MediaGrid from '@/components/media/MediaGrid.vue'
 import LibraryEmptyHint from '@/components/dashboard/LibraryEmptyHint.vue'
 import { useModal } from '@/composables/useModal'
+import { formatDistinctAliases } from '@/composables/recordingMedia'
 import { useUserStore } from '@/stores/user'
 
 type ArtistItem = {
@@ -39,7 +40,7 @@ const artists = ref<ArtistItem[]>([])
 const hasResults = computed(() => artists.value.length > 0)
 
 const subtitleOf = (artist: ArtistItem) =>
-    artist.alias.length > 0 ? artist.alias.join(' / ') : t('artistLibrary.fallback')
+    formatDistinctAliases(artist.displayName, artist.alias) || t('artistLibrary.fallback')
 
 const toArtistItem = (raw: {
     id: number

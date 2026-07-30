@@ -11,7 +11,11 @@ import WorkGridCard from '@/components/media/WorkGridCard.vue'
 import { useModal } from '@/composables/useModal'
 import MergeSelectModal from '@/components/modals/MergeSelectModal.vue'
 import { api } from '@/ApiInstance'
-import { resolveArtistName, resolveCover } from '@/composables/recordingMedia'
+import {
+    formatDistinctAliases,
+    resolveArtistName,
+    resolveCover,
+} from '@/composables/recordingMedia'
 import {
     peekResolvedPlayableTrack,
     resolveAlbumPlayableTrack,
@@ -176,7 +180,9 @@ async function performSearch(query: string) {
             id: artist.id,
             type: 'artist',
             title: artist.displayName || 'Unknown Artist',
-            subtitle: artist.alias.length > 0 ? artist.alias.join(' / ') : t('artists.fallback'),
+            subtitle:
+                formatDistinctAliases(artist.displayName || '', artist.alias) ||
+                t('artists.fallback'),
             cover: '',
         }))
     } catch (error) {
@@ -391,7 +397,7 @@ const playItem = async (item: SearchResultItem) => {
                         {{ t('search.title') }}
                     </h2>
                     <p class="text-[#8C857B] font-serif italic">
-                        Search results for "{{ searchedQuery }}"
+                        {{ t('search.resultsFor', { q: searchedQuery }) }}
                     </p>
                 </div>
                 <div class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">

@@ -120,6 +120,15 @@ export const normalizeLabels = (labels?: readonly string[] | null) => {
     return labels?.map((label) => label.trim()).filter(Boolean) ?? []
 }
 
+export const resolveDistinctAliases = (displayName: string, alias?: readonly string[] | null) => {
+    const normalizedName = displayName.trim()
+    return normalizeLabels(alias).filter((item) => item !== normalizedName)
+}
+
+export const formatDistinctAliases = (displayName: string, alias?: readonly string[] | null) => {
+    return resolveDistinctAliases(displayName, alias).join(' / ')
+}
+
 export const formatLabels = (labels?: readonly string[] | null) => {
     return normalizeLabels(labels).join(', ')
 }

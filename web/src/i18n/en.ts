@@ -199,6 +199,7 @@ export default {
     },
     search: {
         title: 'Search Results',
+        resultsFor: 'Search results for "{q}"',
         searching: 'Searching...',
         noResults: 'No results found',
         tryAdjustKeywords: 'Try adjusting search keywords',

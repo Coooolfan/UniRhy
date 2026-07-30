@@ -377,8 +377,12 @@ const playItem = async (item: DisplayItem) => {
                     <div
                         v-for="(item, idx) in displayItems"
                         :key="item.id"
-                        class="group flex items-center gap-3 rounded-sm px-3 py-3 transition-colors hover:bg-[#EFEAE2]/60 sm:px-4 md:grid md:grid-cols-12"
+                        role="button"
+                        tabindex="0"
+                        class="group flex cursor-pointer items-center gap-3 rounded-sm px-3 py-3 transition-colors hover:bg-[#EFEAE2]/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#C27E46] sm:px-4 md:grid md:grid-cols-12"
                         @click="navigateToDetail(item.id)"
+                        @keydown.enter="navigateToDetail(item.id)"
+                        @keydown.space.prevent="navigateToDetail(item.id)"
                     >
                         <div
                             class="w-6 shrink-0 text-sm font-serif text-[#8C857B] group-hover:text-[#2C2420] md:col-span-1"
@@ -410,7 +414,7 @@ const playItem = async (item: DisplayItem) => {
                                 <img
                                     v-if="item.cover"
                                     :src="item.cover"
-                                    :alt="item.title"
+                                    alt=""
                                     class="w-full h-full object-cover"
                                 />
                             </div>

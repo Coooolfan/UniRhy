@@ -196,6 +196,7 @@ export default {
     },
     search: {
         title: '搜索结果',
+        resultsFor: '“{q}” 的搜索结果',
         searching: '搜索中...',
         noResults: '没有找到相关结果',
         tryAdjustKeywords: '尝试调整搜索关键词',
