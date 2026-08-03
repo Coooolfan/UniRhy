@@ -63,3 +63,7 @@ unirhy:
   media:
     signing-key: ${UNIRHY_MEDIA_SIGNING_KEY:${UNIRHY_SECRET_KEY:}}
     url-ttl-seconds: ${UNIRHY_MEDIA_URL_TTL_SECONDS:7200}
+  login-transfer:
+    ttl-seconds: ${UNIRHY_LOGIN_TRANSFER_TTL_SECONDS:120}
+    terminal-retention-hours: ${UNIRHY_LOGIN_TRANSFER_TERMINAL_RETENTION_HOURS:24}
+    cleanup-interval-ms: ${UNIRHY_LOGIN_TRANSFER_CLEANUP_INTERVAL_MS:60000}

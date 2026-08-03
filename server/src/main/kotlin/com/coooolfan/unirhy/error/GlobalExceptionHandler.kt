@@ -29,6 +29,7 @@ class GlobalExceptionHandler {
             "PLUGIN:NOT_FOUND",
             "TASK:TASK_NOT_FOUND",
             "TASK:DEFINITION_NOT_FOUND",
+            "LOGIN_TRANSFER:NOT_FOUND",
             -> 404
             "COMMON:AUTHENTICATION_FAILED" -> 401
             "COMMON:FORBIDDEN",
@@ -50,7 +51,9 @@ class GlobalExceptionHandler {
             "TASK:PLUGIN_UNAVAILABLE",
             "TASK:STATUS_CONFLICT",
             "TASK:DELETE_CONFLICT",
+            "LOGIN_TRANSFER:STATUS_CONFLICT",
             -> 409
+            "LOGIN_TRANSFER:EXPIRED" -> 410
             "COMMON:INVALID_REQUEST",
             "ACCOUNT:CREDENTIAL_UPDATE_REQUIRED",
             "ALBUM:RECORDING_IDS_CONTAIN_DUPLICATES",
