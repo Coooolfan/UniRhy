@@ -33,7 +33,17 @@ class AccountService(
             throw CommonException.AuthenticationFailed()
         }
 
-        StpUtil.login(account.id, SaLoginParameter().setExtra(ROLE_ADMIN, account.admin))
+        startSession(account.id, account.admin)
+    }
+
+    /**
+     * 为账号建立登录会话并返回会话令牌。
+     *
+     * 密码登录与扫码登录共用此入口，保证两条路径写入会话的声明始终一致。
+     */
+    fun startSession(accountId: Long, admin: Boolean): String {
+        StpUtil.login(accountId, SaLoginParameter().setExtra(ROLE_ADMIN, admin))
+        return StpUtil.getTokenValue()
     }
 
     fun logout() = try {

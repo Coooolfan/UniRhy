@@ -27,6 +27,13 @@ enum class AccountErrorCode {
 }
 
 @ErrorFamily
+enum class LoginTransferErrorCode {
+    NOT_FOUND,
+    STATUS_CONFLICT,
+    EXPIRED,
+}
+
+@ErrorFamily
 enum class AlbumErrorCode {
     NOT_FOUND,
     RECORDING_IDS_CONTAIN_DUPLICATES,

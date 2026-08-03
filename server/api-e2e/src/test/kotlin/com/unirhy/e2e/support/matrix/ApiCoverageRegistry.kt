@@ -46,6 +46,8 @@ object ApiCoverageRegistry {
         "com.unirhy.e2e.PluginE2eTest#wasm plugin should link the complete host catalog and execute host calls"
     private const val PLAYBACK_QUEUE_FLOW_CASE =
         "com.unirhy.e2e.PlaybackQueueE2eTest#playback queue should support full mutation flow and stable conflict branches"
+    private const val LOGIN_TRANSFER_FLOW_CASE =
+        "com.unirhy.e2e.LoginTransferE2eTest#login transfer should require approval and issue a one-time device token"
 
     val coverageByKey: Map<ApiEndpointKey, CoverageMark> = listOf(
         full(
@@ -378,6 +380,11 @@ object ApiCoverageRegistry {
         full("PUT", "/api/system-config", testRef = SYSTEM_AUTH_FLOW_CASE),
         full("POST", "/api/tokens", testRef = DUPLICATE_INIT_AND_WRONG_LOGIN_CASE),
         full("DELETE", "/api/tokens/current", testRef = SYSTEM_AUTH_FLOW_CASE),
+        full("POST", "/api/login-transfers", testRef = LOGIN_TRANSFER_FLOW_CASE),
+        full("GET", "/api/login-transfers/{id}", testRef = LOGIN_TRANSFER_FLOW_CASE),
+        full("PATCH", "/api/login-transfers/{id}", testRef = LOGIN_TRANSFER_FLOW_CASE),
+        full("DELETE", "/api/login-transfers/{id}", testRef = LOGIN_TRANSFER_FLOW_CASE),
+        full("POST", "/api/login-transfers/{id}/tokens", testRef = LOGIN_TRANSFER_FLOW_CASE),
         full(
             "GET",
             "/api/task-statistics",
