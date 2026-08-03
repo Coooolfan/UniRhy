@@ -4,6 +4,7 @@ import {
     AlbumController, 
     ArtistController, 
     FileSystemStorageController, 
+    LoginTransferController, 
     MediaFileController, 
     OssStorageController, 
     PlaybackQueueController, 
@@ -25,6 +26,8 @@ export class Api {
     readonly albumController: AlbumController
     
     readonly artistController: ArtistController
+    
+    readonly loginTransferController: LoginTransferController
     
     readonly mediaFileController: MediaFileController
     
@@ -56,6 +59,7 @@ export class Api {
         this.accountController = new AccountController(executor);
         this.albumController = new AlbumController(executor);
         this.artistController = new ArtistController(executor);
+        this.loginTransferController = new LoginTransferController(executor);
         this.mediaFileController = new MediaFileController(executor);
         this.playbackQueueController = new PlaybackQueueController(executor);
         this.playlistController = new PlaylistController(executor);

@@ -26,6 +26,18 @@ export type AllErrors = {
         family: 'ARTIST', 
         code: 'SOURCE_NOT_FOUND'
     } | {
+        family: 'LOGIN_TRANSFER', 
+        code: 'NOT_FOUND'
+    } | {
+        family: 'COMMON', 
+        code: 'INVALID_REQUEST'
+    } | {
+        family: 'LOGIN_TRANSFER', 
+        code: 'STATUS_CONFLICT'
+    } | {
+        family: 'LOGIN_TRANSFER', 
+        code: 'EXPIRED'
+    } | {
         family: 'PLAYBACK_QUEUE', 
         code: 'EMPTY_QUEUE_INDEX_INVALID'
     } | {
@@ -232,6 +244,46 @@ export type ApiErrors = {
             } | {
                 family: 'ARTIST', 
                 code: 'SOURCE_NOT_FOUND', 
+                readonly [key:string]: any
+            })
+    }, 
+    'loginTransferController': {
+        'get': AllErrors & ({
+                family: 'COMMON', 
+                code: 'AUTHENTICATION_FAILED', 
+                readonly [key:string]: any
+            } | {
+                family: 'COMMON', 
+                code: 'FORBIDDEN', 
+                readonly [key:string]: any
+            } | {
+                family: 'LOGIN_TRANSFER', 
+                code: 'NOT_FOUND', 
+                readonly [key:string]: any
+            }), 
+        'update': AllErrors & ({
+                family: 'COMMON', 
+                code: 'AUTHENTICATION_FAILED', 
+                readonly [key:string]: any
+            } | {
+                family: 'COMMON', 
+                code: 'FORBIDDEN', 
+                readonly [key:string]: any
+            } | {
+                family: 'COMMON', 
+                code: 'INVALID_REQUEST', 
+                readonly [key:string]: any
+            } | {
+                family: 'LOGIN_TRANSFER', 
+                code: 'NOT_FOUND', 
+                readonly [key:string]: any
+            } | {
+                family: 'LOGIN_TRANSFER', 
+                code: 'STATUS_CONFLICT', 
+                readonly [key:string]: any
+            } | {
+                family: 'LOGIN_TRANSFER', 
+                code: 'EXPIRED', 
                 readonly [key:string]: any
             })
     }, 

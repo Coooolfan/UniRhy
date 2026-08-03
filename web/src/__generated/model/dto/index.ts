@@ -4,6 +4,7 @@ export type {ArtistDto} from './ArtistDto';
 export type {AsyncTaskDto} from './AsyncTaskDto';
 export type {FileProviderFileSystemDto} from './FileProviderFileSystemDto';
 export type {FileProviderOssDto} from './FileProviderOssDto';
+export type {LoginTransferDto} from './LoginTransferDto';
 export type {PlaylistDto} from './PlaylistDto';
 export type {RecordingDto} from './RecordingDto';
 export type {SystemConfigDto} from './SystemConfigDto';
