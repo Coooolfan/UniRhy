@@ -1,3 +1,7 @@
+export type {LoginTransferPlatform} from './LoginTransferPlatform';
+export {LoginTransferPlatform_CONSTANTS} from './LoginTransferPlatform';
+export type {LoginTransferStatus} from './LoginTransferStatus';
+export {LoginTransferStatus_CONSTANTS} from './LoginTransferStatus';
 export type {PlaybackStatus} from './PlaybackStatus';
 export {PlaybackStatus_CONSTANTS} from './PlaybackStatus';
 export type {PlaybackStrategy} from './PlaybackStrategy';
