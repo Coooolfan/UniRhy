@@ -35,9 +35,6 @@ export async function ensureCameraPermission(): Promise<void> {
     }
 }
 
-/** windowed 扫码期间挂在 `<html>` 上的样式类，全局样式据此隐藏应用内容（见 style/main.css）。 */
-const WINDOWED_SCAN_CLASS = 'qr-scan-windowed'
-
 /**
  * 页面内扫码并返回识别到的二维码内容；用户主动取消时返回 `null`。
  *
@@ -49,7 +46,6 @@ const WINDOWED_SCAN_CLASS = 'qr-scan-windowed'
 export async function scanQrCodeWindowed(): Promise<string | null> {
     await ensureCameraPermission()
     const { scan, Format } = await loadScanner()
-    document.documentElement.classList.add(WINDOWED_SCAN_CLASS)
     try {
         const scanned = await scan({ windowed: true, formats: [Format.QRCode] })
         return scanned.content.length > 0 ? scanned.content : null
@@ -57,8 +53,6 @@ export async function scanQrCodeWindowed(): Promise<string | null> {
         // 插件的 cancel() 会以 "cancelled" 拒绝挂起的 scan()，统一按用户取消处理
         if (error instanceof Error && error.message.includes('cancelled')) return null
         throw error
-    } finally {
-        document.documentElement.classList.remove(WINDOWED_SCAN_CLASS)
     }
 }
 

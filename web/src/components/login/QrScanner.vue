@@ -1,15 +1,13 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted } from 'vue'
-import { X } from 'lucide-vue-next'
-import { useI18n } from 'vue-i18n'
+import { onBeforeUnmount, onMounted, useTemplateRef } from 'vue'
 import { cancelQrScan, scanQrCodeWindowed } from '@/runtime/barcodeScanner'
 
 /**
- * 页面内扫码取景层。
+ * 页面内扫码取景框，随所在容器内联布局。
  *
  * 插件以 windowed 模式把相机预览铺在 WebView 后方并把 WebView 设为透明，
- * 本组件 Teleport 到 body：box-shadow 背板遮住全屏，中央透明镂空露出相机。
- * 扫码期间 html.qr-scan-windowed 隐藏 #app（见 style/main.css），镂空处因此只剩相机画面。
+ * 页面自身即遮罩：本组件把取景框的位置尺寸写入 CSS 变量，全局样式据此把同一块
+ * 矩形从应用的合成结果中挖空（见 style/main.css），相机因此只在框内可见。
  */
 defineProps<{ hint: string }>()
 const emit = defineEmits<{
@@ -18,11 +16,45 @@ const emit = defineEmits<{
     failed: [error: unknown]
 }>()
 
-const { t } = useI18n()
+/** 扫码期间挂在 `<html>` 上的样式类，全局样式据此挖出取景镂空。 */
+const WINDOWED_SCAN_CLASS = 'qr-scan-windowed'
+
+const viewfinder = useTemplateRef<HTMLElement>('viewfinder')
 
 let stopped = false
+let frameObserver: ResizeObserver | null = null
+
+/** 镂空矩形的位置与尺寸，取值由取景框实测得出。 */
+const CUTOUT_VARIABLES = [
+    '--qr-cutout-x',
+    '--qr-cutout-y',
+    '--qr-cutout-width',
+    '--qr-cutout-height',
+] as const
+
+/** 把取景框相对 `#app` 的位置写入 CSS 变量，使镂空始终与取景框对齐。 */
+const syncCutout = () => {
+    const app = document.querySelector('#app')
+    if (!viewfinder.value || !app) return
+    const frame = viewfinder.value.getBoundingClientRect()
+    const origin = app.getBoundingClientRect()
+    const { style } = document.documentElement
+    style.setProperty('--qr-cutout-x', `${frame.left - origin.left}px`)
+    style.setProperty('--qr-cutout-y', `${frame.top - origin.top}px`)
+    style.setProperty('--qr-cutout-width', `${frame.width}px`)
+    style.setProperty('--qr-cutout-height', `${frame.height}px`)
+}
 
 onMounted(async () => {
+    syncCutout()
+    // 卡片切换与字体加载可能微调布局，下一帧再对齐一次
+    requestAnimationFrame(syncCutout)
+    document.documentElement.classList.add(WINDOWED_SCAN_CLASS)
+    frameObserver = new ResizeObserver(syncCutout)
+    frameObserver.observe(document.documentElement)
+    if (viewfinder.value) frameObserver.observe(viewfinder.value)
+    window.addEventListener('scroll', syncCutout, true)
+
     try {
         const content = await scanQrCodeWindowed()
         if (stopped) return
@@ -38,35 +70,24 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
     stopped = true
+    frameObserver?.disconnect()
+    frameObserver = null
+    window.removeEventListener('scroll', syncCutout, true)
+    document.documentElement.classList.remove(WINDOWED_SCAN_CLASS)
+    for (const variable of CUTOUT_VARIABLES) {
+        document.documentElement.style.removeProperty(variable)
+    }
     void cancelQrScan()
 })
 </script>
 
 <template>
-    <Teleport to="body">
-        <div class="fixed inset-0 z-50 flex flex-col items-center justify-center">
-            <div class="relative aspect-square w-[min(72vw,300px)] shadow-[0_0_0_200vmax_#f9f7f2]">
-                <span
-                    class="absolute top-0 left-0 h-5 w-5 rounded-tl-xs border-t-2 border-l-2 border-[#f9f7f2] outline-1 outline-[#2c2825]/40"
-                ></span>
-                <span
-                    class="absolute top-0 right-0 h-5 w-5 rounded-tr-xs border-t-2 border-r-2 border-[#f9f7f2] outline-1 outline-[#2c2825]/40"
-                ></span>
-                <span
-                    class="absolute bottom-0 left-0 h-5 w-5 rounded-bl-xs border-b-2 border-l-2 border-[#f9f7f2] outline-1 outline-[#2c2825]/40"
-                ></span>
-                <span
-                    class="absolute right-0 bottom-0 h-5 w-5 rounded-br-xs border-r-2 border-b-2 border-[#f9f7f2] outline-1 outline-[#2c2825]/40"
-                ></span>
-            </div>
-            <p class="mt-6 px-8 text-center text-sm leading-6 text-[#5a534d]">{{ hint }}</p>
-            <button
-                type="button"
-                class="mt-4 flex items-center gap-2 px-4 py-2 text-sm text-[#8a817c]"
-                @click="cancelQrScan"
-            >
-                <X :size="16" /> {{ t('common.cancel') }}
-            </button>
-        </div>
-    </Teleport>
+    <div class="flex w-full flex-col items-center">
+        <!-- 边框用 outline 画在 border-box 外侧，避免与镂空区域重叠而被一并挖掉 -->
+        <div
+            ref="viewfinder"
+            class="aspect-square w-[min(100%,15rem)] outline-2 outline-[#d98c28]/70"
+        ></div>
+        <p class="mt-4 px-2 text-center text-sm leading-6 text-[#5a534d]">{{ hint }}</p>
+    </div>
 </template>

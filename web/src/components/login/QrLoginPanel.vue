@@ -163,7 +163,7 @@ onUnmounted(() => {
                 @cancelled="emit('cancel')"
                 @failed="onScanFailed"
             />
-            <div v-else class="flex aspect-square w-full items-center justify-center">
+            <div v-else class="flex aspect-square w-[min(100%,15rem)] items-center justify-center">
                 <ScanLine :size="36" class="text-[#8A817C]" />
             </div>
         </div>
