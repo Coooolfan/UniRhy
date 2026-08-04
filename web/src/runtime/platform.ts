@@ -35,6 +35,16 @@ export function setPlatformApiBaseUrl(apiBaseUrl: string): void {
     })
 }
 
+/**
+ * 持久化后端地址：写入 Tauri 侧配置，并用其返回的规范化值刷新运行时，返回规范化后的地址。
+ */
+export async function persistApiBaseUrl(apiBaseUrl: string): Promise<string> {
+    const { invoke } = await import('@tauri-apps/api/core')
+    const normalized = await invoke<string>('set_backend_url', { url: apiBaseUrl })
+    setPlatformApiBaseUrl(normalized)
+    return normalized
+}
+
 export function buildApiUrl(path: string): string {
     return `${getPlatformRuntime().apiBaseUrl}${path}`
 }

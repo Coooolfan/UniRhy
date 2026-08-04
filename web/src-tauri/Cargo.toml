@@ -20,3 +20,7 @@ tauri-plugin-websocket = "2"
 tauri-plugin-notification = "2.3.3"
 tauri-plugin-unirhy-playback = { path = "vendor/tauri-plugin-unirhy-playback" }
 tauri-plugin-android-battery-optimization = "0.1.4"
+
+# 条码扫描仅支持 iOS/Android，桌面端不引入
+[target.'cfg(any(target_os = "android", target_os = "ios"))'.dependencies]
+tauri-plugin-barcode-scanner = "2"

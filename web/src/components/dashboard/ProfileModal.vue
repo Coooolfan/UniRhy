@@ -1,19 +1,32 @@
 <script setup lang="ts">
-import { computed, ref, reactive, nextTick, onUnmounted } from 'vue'
+import { computed, defineAsyncComponent, ref, reactive, nextTick, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { LogOut, User, Mail, Lock, Edit2, Eye, EyeOff, SlidersHorizontal } from 'lucide-vue-next'
+import {
+    LogOut,
+    User,
+    Mail,
+    Lock,
+    Edit2,
+    Eye,
+    EyeOff,
+    SlidersHorizontal,
+    QrCode,
+} from 'lucide-vue-next'
 import { useModalContext } from '@/components/modals/modalContext'
 import { useUserStore } from '@/stores/user'
 import { resolveErrorMessage } from '@/i18n/errors'
 import { useI18n } from 'vue-i18n'
 import avatarPlaceholderUrl from '@/assets/avatar-placeholder.svg'
 
+// 二维码生成器体积较大且仅在“登录新设备”时用到，按需加载
+const LoginTransferPanel = defineAsyncComponent(() => import('./LoginTransferPanel.vue'))
+
 const { t } = useI18n()
 const router = useRouter()
 const modal = useModalContext<undefined>()
 const userStore = useUserStore()
 
-type Mode = 'view' | 'edit' | 'logout_confirm'
+type Mode = 'view' | 'edit' | 'login_transfer' | 'logout_confirm'
 const mode = ref<Mode>('view')
 const showPassword = ref(false)
 const isSubmitting = ref(false)
@@ -35,6 +48,7 @@ let successResetTimer: ReturnType<typeof setTimeout> | null = null
 const contentWidthClass = computed(() => {
     switch (mode.value) {
         case 'edit':
+        case 'login_transfer':
             return 'w-[368px] max-w-full'
         case 'logout_confirm':
             return 'w-[320px] max-w-full'
@@ -125,6 +139,11 @@ const openPreferences = () => {
     router.push({ name: 'preferences' })
 }
 
+const openLoginTransfer = () => {
+    mode.value = 'login_transfer'
+    errorMessage.value = ''
+}
+
 const requestLogout = () => {
     mode.value = 'logout_confirm'
 }
@@ -205,6 +224,16 @@ onUnmounted(() => {
                             class="text-[#8C857B] transition-colors group-hover:text-[#2B221B]"
                         />
                         {{ t('profile.preferences') }}
+                    </button>
+                    <button
+                        @click="openLoginTransfer"
+                        class="group flex w-full items-center justify-center gap-2 border border-[#D6D1C4] py-3 text-sm uppercase tracking-wide text-[#2B221B] transition-colors hover:bg-[#F7F5F0]"
+                    >
+                        <QrCode
+                            :size="16"
+                            class="text-[#8C857B] transition-colors group-hover:text-[#2B221B]"
+                        />
+                        {{ t('profile.loginNewDevice') }}
                     </button>
                 </div>
 
@@ -338,6 +367,8 @@ onUnmounted(() => {
                     </button>
                 </div>
             </form>
+
+            <LoginTransferPanel v-else-if="mode === 'login_transfer'" @close="mode = 'view'" />
 
             <div
                 v-else-if="mode === 'logout_confirm'"

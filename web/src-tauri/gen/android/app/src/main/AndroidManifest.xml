@@ -5,6 +5,7 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.CAMERA" />
     <!-- 电池优化插件声明了直接弹窗授权的权限，产品侧只走设置页引导，压制该声明 -->
     <uses-permission
         android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"
@@ -12,6 +13,11 @@
 
     <!-- AndroidTV support -->
     <uses-feature android:name="android.software.leanback" android:required="false" />
+    <!-- 扫码插件会声明需要摄像头，此处强制改回可选，保证无摄像头的 TV 设备仍可安装 -->
+    <uses-feature
+        android:name="android.hardware.camera"
+        android:required="false"
+        tools:replace="android:required" />
 
     <application
         android:icon="@mipmap/ic_launcher"

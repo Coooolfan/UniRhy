@@ -103,8 +103,8 @@ export const api = new Api(async ({ uri, method, headers, body }) => {
         ...(method === 'GET' ? {} : { body: isFormData ? body : JSON.stringify(body) }),
     })
 
-    // 401处理：排除登录接口，避免循环
-    if (response.status === 401 && !isLoginRequest(uri, method)) {
+    // 401处理：排除登录接口，避免循环；未持有会话令牌时（如扫码登录流程）不触发全局过期跳转
+    if (response.status === 401 && token && !isLoginRequest(uri, method)) {
         handleAuthExpiry()
     }
 
