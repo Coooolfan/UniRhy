@@ -16,7 +16,9 @@ import com.coooolfan.unirhy.model.deviceName
 import com.coooolfan.unirhy.model.expiresAt
 import com.coooolfan.unirhy.model.id
 import com.coooolfan.unirhy.model.platform
+import com.coooolfan.unirhy.model.qrSecretHash
 import com.coooolfan.unirhy.model.status
+import com.coooolfan.unirhy.model.dto.LoginTransferClaimRequest
 import com.coooolfan.unirhy.model.dto.LoginTransferCreateResponse
 import com.coooolfan.unirhy.model.dto.LoginTransferUpdateRequest
 import com.coooolfan.unirhy.model.dto.LoginTransferUpdateResponse
@@ -73,11 +75,11 @@ class LoginTransferService(
         val now = Instant.now()
         closePreviousTransfers(accountId, now)
 
-        val secret = newCredential()
+        val secret = newCredential(QR_SECRET_BYTES)
         val transfer = LoginTransfer {
             id = UUID.randomUUID()
             this.accountId = accountId
-            qrSecretHash = hashCredential(secret)
+            qrSecretHash = hashCredential(secret, QR_SECRET_BYTES)
             claimTokenHash = null
             deviceName = null
             platform = null
@@ -115,39 +117,56 @@ class LoginTransferService(
     }
 
     /**
-     * PATCH 的唯一入口：由目标状态与所出示的凭据共同决定允许的状态转换。
+     * 新设备按二维码密钥认领交接。
      *
-     * 认领响应使用 [claimFetcher]，审批响应使用 [sourceFetcher]。
+     * 密钥同时是查询索引与凭据，因此不需要交接 id；查不到与密钥错误返回同一个
+     * [LoginTransferException.NotFound]，避免暴露交接是否存在。
      */
+    @Transactional(noRollbackFor = [LoginTransferException.Expired::class])
+    fun claimBySecret(
+        request: LoginTransferClaimRequest,
+        fetcher: Fetcher<LoginTransfer>,
+    ): LoginTransferUpdateResponse {
+        val secretHash = runCatching { hashCredential(request.secret, QR_SECRET_BYTES) }.getOrNull()
+            ?: throw LoginTransferException.NotFound()
+        val normalizedDeviceName = normalizeText(request.deviceName, MAX_DEVICE_NAME_LENGTH)
+            ?: throw CommonException.InvalidRequest()
+        val normalizedClientVersion = normalizeText(request.clientVersion, MAX_CLIENT_VERSION_LENGTH)
+
+        val transfer = findLockedBySecretHash(secretHash) ?: throw LoginTransferException.NotFound()
+        expireIfNeeded(transfer)
+        if (transfer.status != LoginTransferStatus.WAITING) {
+            throw LoginTransferException.StatusConflict()
+        }
+
+        val now = Instant.now()
+        val claimToken = newCredential(CLAIM_TOKEN_BYTES)
+        update(transfer.id) {
+            set(table.status, LoginTransferStatus.CLAIMED)
+            set(table.claimTokenHash, hashCredential(claimToken, CLAIM_TOKEN_BYTES))
+            set(table.deviceName, normalizedDeviceName)
+            set(table.platform, request.platform)
+            set(table.clientVersion, normalizedClientVersion)
+            set(table.claimedAt, now)
+        }
+        val claimed = sql.findById(fetcher, transfer.id) ?: throw LoginTransferException.NotFound()
+        return LoginTransferUpdateResponse(transfer = claimed, claimAccessToken = claimToken)
+    }
+
+    /** 原设备审批：把已认领的交接置为 AUTHORIZED 或 REJECTED。 */
     @Transactional(noRollbackFor = [LoginTransferException.Expired::class])
     fun applyUpdate(
         id: UUID,
         auth: LoginTransferAuthorization,
         request: LoginTransferUpdateRequest,
-        sourceFetcher: Fetcher<LoginTransfer>,
-        claimFetcher: Fetcher<LoginTransfer>,
-    ): LoginTransferUpdateResponse = when (request.status) {
-        LoginTransferStatus.CLAIMED -> {
-            // 认领只能由尚未持有任何凭据的新设备发起，其身份由二维码密钥证明
-            if (auth !is LoginTransferAuthorization.None) throw CommonException.InvalidRequest()
-            claim(id, request, claimFetcher)
-        }
-
-        LoginTransferStatus.AUTHORIZED,
-        LoginTransferStatus.REJECTED,
-        -> {
-            val account = auth as? LoginTransferAuthorization.Account
-                ?: throw CommonException.AuthenticationFailed()
-            // 审批请求只允许携带目标状态，任何认领侧字段都视为非法请求
-            if (request != LoginTransferUpdateRequest(status = request.status)) {
-                throw CommonException.InvalidRequest()
-            }
-            LoginTransferUpdateResponse(
-                decide(id, account.accountId, request.status, sourceFetcher),
-            )
-        }
-
-        else -> throw CommonException.InvalidRequest()
+        fetcher: Fetcher<LoginTransfer>,
+    ): LoginTransferUpdateResponse {
+        val account = auth as? LoginTransferAuthorization.Account
+            ?: throw CommonException.AuthenticationFailed()
+        if (request.status !in DECISION_STATUSES) throw CommonException.InvalidRequest()
+        return LoginTransferUpdateResponse(
+            decide(id, account.accountId, request.status, fetcher),
+        )
     }
 
     @Transactional(noRollbackFor = [LoginTransferException.Expired::class])
@@ -196,41 +215,6 @@ class LoginTransferService(
             where(table.status valueIn TERMINAL_STATUSES)
             where(table.closedAt le now.minus(terminalRetention))
         }.execute()
-    }
-
-    private fun claim(
-        id: UUID,
-        request: LoginTransferUpdateRequest,
-        fetcher: Fetcher<LoginTransfer>,
-    ): LoginTransferUpdateResponse {
-        val secret = request.secret?.takeIf { it.isNotBlank() }
-            ?: throw CommonException.InvalidRequest()
-        val normalizedDeviceName = normalizeText(request.deviceName, MAX_DEVICE_NAME_LENGTH)
-            ?: throw CommonException.InvalidRequest()
-        val platform = request.platform ?: throw CommonException.InvalidRequest()
-        val normalizedClientVersion = normalizeText(request.clientVersion, MAX_CLIENT_VERSION_LENGTH)
-
-        val transfer = findLocked(id) ?: throw LoginTransferException.NotFound()
-        if (!credentialMatches(secret, transfer.qrSecretHash)) {
-            throw LoginTransferException.NotFound()
-        }
-        expireIfNeeded(transfer)
-        if (transfer.status != LoginTransferStatus.WAITING) {
-            throw LoginTransferException.StatusConflict()
-        }
-
-        val now = Instant.now()
-        val claimToken = newCredential()
-        update(id) {
-            set(table.status, LoginTransferStatus.CLAIMED)
-            set(table.claimTokenHash, hashCredential(claimToken))
-            set(table.deviceName, normalizedDeviceName)
-            set(table.platform, platform)
-            set(table.clientVersion, normalizedClientVersion)
-            set(table.claimedAt, now)
-        }
-        val claimed = sql.findById(fetcher, id) ?: throw LoginTransferException.NotFound()
-        return LoginTransferUpdateResponse(transfer = claimed, claimAccessToken = claimToken)
     }
 
     private fun decide(
@@ -286,6 +270,13 @@ class LoginTransferService(
             select(table)
         }.forUpdate().execute().firstOrNull()
 
+    /** 按二维码密钥摘要定位交接；`qr_secret_hash` 上有唯一索引。 */
+    private fun findLockedBySecretHash(secretHash: ByteArray): LoginTransfer? =
+        sql.createQuery(LoginTransfer::class) {
+            where(table.qrSecretHash eq secretHash)
+            select(table)
+        }.forUpdate().execute().firstOrNull()
+
     private fun update(id: UUID, block: KMutableUpdate<LoginTransfer>.() -> Unit) {
         sql.createUpdate(LoginTransfer::class) {
             block()
@@ -331,7 +322,7 @@ class LoginTransferService(
     }
 
     private fun requireClaimToken(expectedHash: ByteArray?, claimToken: String) {
-        if (expectedHash == null || !credentialMatches(claimToken, expectedHash)) {
+        if (expectedHash == null || !credentialMatches(claimToken, expectedHash, CLAIM_TOKEN_BYTES)) {
             throw CommonException.AuthenticationFailed()
         }
     }
@@ -340,25 +331,34 @@ class LoginTransferService(
         raw?.trim()?.takeIf { it.isNotEmpty() }
             ?.also { if (it.length > maxLength) throw CommonException.InvalidRequest() }
 
-    private fun newCredential(): String {
-        val bytes = ByteArray(CREDENTIAL_BYTES)
+    private fun newCredential(size: Int): String {
+        val bytes = ByteArray(size)
         secureRandom.nextBytes(bytes)
         return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes)
     }
 
-    private fun hashCredential(raw: String): ByteArray {
+    private fun hashCredential(raw: String, expectedSize: Int): ByteArray {
         val decoded = Base64.getUrlDecoder().decode(raw)
-        require(decoded.size == CREDENTIAL_BYTES)
+        require(decoded.size == expectedSize)
         return MessageDigest.getInstance("SHA-256").digest(decoded)
     }
 
-    private fun credentialMatches(raw: String, expectedHash: ByteArray): Boolean {
-        val actualHash = runCatching { hashCredential(raw) }.getOrNull() ?: return false
+    private fun credentialMatches(
+        raw: String,
+        expectedHash: ByteArray,
+        expectedSize: Int,
+    ): Boolean {
+        val actualHash = runCatching { hashCredential(raw, expectedSize) }.getOrNull() ?: return false
         return MessageDigest.isEqual(expectedHash, actualHash)
     }
 
     companion object {
-        private const val CREDENTIAL_BYTES = 32
+        /** 二维码密钥：进入二维码，故取较短的 80 bit；一次性使用且有效期以分钟计，足够安全。 */
+        private const val QR_SECRET_BYTES = 10
+
+        /** 认领访问令牌：只在 HTTP 头中传输，不受二维码长度约束。 */
+        private const val CLAIM_TOKEN_BYTES = 32
+
         private const val MAX_DEVICE_NAME_LENGTH = 100
         private const val MAX_CLIENT_VERSION_LENGTH = 100
         private val ACTIVE_STATUSES = listOf(
@@ -371,6 +371,12 @@ class LoginTransferService(
             LoginTransferStatus.REJECTED,
             LoginTransferStatus.CANCELLED,
             LoginTransferStatus.EXPIRED,
+        )
+
+        /** 原设备审批可以选择的目标状态。 */
+        private val DECISION_STATUSES = setOf(
+            LoginTransferStatus.AUTHORIZED,
+            LoginTransferStatus.REJECTED,
         )
     }
 }

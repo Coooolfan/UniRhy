@@ -381,6 +381,7 @@ object ApiCoverageRegistry {
         full("POST", "/api/tokens", testRef = DUPLICATE_INIT_AND_WRONG_LOGIN_CASE),
         full("DELETE", "/api/tokens/current", testRef = SYSTEM_AUTH_FLOW_CASE),
         full("POST", "/api/login-transfers", testRef = LOGIN_TRANSFER_FLOW_CASE),
+        full("POST", "/api/login-transfers/claims", testRef = LOGIN_TRANSFER_FLOW_CASE),
         full("GET", "/api/login-transfers/{id}", testRef = LOGIN_TRANSFER_FLOW_CASE),
         full("PATCH", "/api/login-transfers/{id}", testRef = LOGIN_TRANSFER_FLOW_CASE),
         full("DELETE", "/api/login-transfers/{id}", testRef = LOGIN_TRANSFER_FLOW_CASE),
