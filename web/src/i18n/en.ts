@@ -85,7 +85,6 @@ export default {
             albumLoad: 'Failed to load albums',
             workLoad: 'Failed to load works',
             backendUrlSave: 'Failed to save',
-            backendUrlScan: 'No server address found in the QR code',
             loginFailed: 'Login failed, please check the server connection and try again',
         },
     },
@@ -112,8 +111,6 @@ export default {
         contactAdmin: 'Please contact the administrator to create an account',
         backendUrl: 'Server Address',
         connectedTo: 'Connected to:',
-        scanQrToFill: 'Scan QR code to fill in',
-        scanQrHint: 'Point a QR code with the server address at the frame',
     },
     loginTransfer: {
         mobileTitle: 'Scan to Sign In',

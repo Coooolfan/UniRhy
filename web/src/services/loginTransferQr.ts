@@ -259,22 +259,3 @@ export const decodeLoginTransferScan = (content: string): LoginTransferTarget =>
     }
     return decodeLoginTransferDigits(content)
 }
-
-/**
- * 从扫码内容中提取服务端地址。
- *
- * 本应用生成的二维码（URI 或数字形式）取其实例地址，其余内容按纯 http(s) URL
- * 解析，因此只包含地址的普通二维码同样可用。
- */
-export const parseServerUrlFromScan = (content: string): string => {
-    try {
-        return decodeLoginTransferScan(content).serverUrl
-    } catch {
-        // 不是交接载荷则按纯 URL 处理
-    }
-    try {
-        return normalizeServerUrl(content.trim())
-    } catch {
-        throw new UnsupportedPayloadError('no server address in scanned content')
-    }
-}

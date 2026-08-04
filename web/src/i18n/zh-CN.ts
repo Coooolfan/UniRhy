@@ -83,7 +83,6 @@ export default {
             albumLoad: '专辑加载失败',
             workLoad: '作品加载失败',
             backendUrlSave: '保存失败',
-            backendUrlScan: '二维码中未找到服务端地址',
             loginFailed: '登录失败，请检查服务端连接后重试',
         },
     },
@@ -110,7 +109,6 @@ export default {
         contactAdmin: '请联系管理员创建账号',
         backendUrl: '服务端地址',
         connectedTo: '已连接至：',
-        scanQrToFill: '扫码识别服务端地址',
     },
     loginTransfer: {
         mobileTitle: '扫码登录',
