@@ -4,6 +4,26 @@
     --color-dashboard-main: #f2efe9;
 }
 
+:root {
+    --primary-gold: #d98c28;
+    --primary-gold-hover: #b8721b;
+}
+
+/* 登录、扫码等流程共用的描边按钮，需在 LoginView 之外的组件中同样可用 */
+.outline-button {
+    border: 1px solid var(--primary-gold);
+    color: var(--primary-gold);
+    background: transparent;
+    box-shadow: 0 4px 15px rgba(217, 140, 40, 0.2);
+}
+
+.outline-button:hover {
+    background: var(--primary-gold-hover);
+    border-color: var(--primary-gold-hover);
+    color: #ffffff;
+    box-shadow: 0 4px 15px rgba(217, 140, 40, 0.35);
+}
+
 * {
     text-autospace: normal;
 }

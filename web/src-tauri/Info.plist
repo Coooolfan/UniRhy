@@ -4,6 +4,8 @@
 <dict>
   <key>NSLocalNetworkUsageDescription</key>
   <string>UniRhy needs local network access to connect to your private music server.</string>
+  <key>NSCameraUsageDescription</key>
+  <string>UniRhy uses the camera to scan a login QR code from another signed-in device.</string>
   <key>NSAppTransportSecurity</key>
   <dict>
     <key>NSAllowsArbitraryLoads</key>

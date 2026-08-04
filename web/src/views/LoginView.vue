@@ -75,129 +75,147 @@
                     <h1
                         class="mb-8 border-b-2 border-[#2c2825] pb-4 text-left text-3xl tracking-widest sm:mb-10"
                     >
-                        {{ t('login.title') }}
+                        {{ showQrLogin ? t('loginTransfer.mobileTitle') : t('login.title') }}
                     </h1>
 
-                    <form
-                        v-if="!isEditingBackendUrl"
-                        @submit.prevent="handleLogin"
-                        class="flex-1 flex flex-col justify-center space-y-6 sm:space-y-8"
-                    >
-                        <div class="group relative">
-                            <input
-                                id="login-email"
-                                v-model="loginForm.email"
-                                type="text"
-                                name="email"
-                                autocomplete="email"
-                                autocapitalize="off"
-                                inputmode="email"
-                                required
-                                class="peer w-full bg-transparent border-b border-[#d6d0c4] focus:border-[#d98c28] outline-none py-2 text-[#2c2825] placeholder-transparent transition-colors"
-                                placeholder="Email"
-                                data-i18n-ignore
-                                @input="clearLoginError"
-                            />
-                            <label
-                                for="login-email"
-                                class="absolute left-0 -top-3.5 text-[#8a817c] text-sm transition-all peer-placeholder-shown:text-base peer-placeholder-shown:text-[#b0a8a0] peer-placeholder-shown:top-2 peer-focus:-top-3.5 peer-focus:text-[#2c2825] peer-focus:text-sm cursor-text"
-                            >
-                                {{ t('login.email') }}
-                            </label>
-                        </div>
+                    <QrLoginPanel
+                        v-if="showQrLogin"
+                        @cancel="showQrLogin = false"
+                        @logged-in="goHome"
+                    />
 
-                        <div class="group relative">
-                            <input
-                                id="login-password"
-                                v-model="loginForm.password"
-                                type="password"
-                                name="password"
-                                autocomplete="current-password"
-                                required
-                                class="peer w-full bg-transparent border-b border-[#d6d0c4] focus:border-[#d98c28] outline-none py-2 text-[#2c2825] placeholder-transparent transition-colors"
-                                placeholder="Password"
-                                data-i18n-ignore
-                                @input="clearLoginError"
-                            />
-                            <label
-                                for="login-password"
-                                class="absolute left-0 -top-3.5 text-[#8a817c] text-sm transition-all peer-placeholder-shown:text-base peer-placeholder-shown:text-[#b0a8a0] peer-placeholder-shown:top-2 peer-focus:-top-3.5 peer-focus:text-[#2c2825] peer-focus:text-sm cursor-text"
-                            >
-                                {{ t('login.password') }}
-                            </label>
-                        </div>
+                    <template v-else>
+                        <form
+                            v-if="!isEditingBackendUrl"
+                            @submit.prevent="handleLogin"
+                            class="flex-1 flex flex-col justify-center space-y-6 sm:space-y-8"
+                        >
+                            <div class="group relative">
+                                <input
+                                    id="login-email"
+                                    v-model="loginForm.email"
+                                    type="text"
+                                    name="email"
+                                    autocomplete="email"
+                                    autocapitalize="off"
+                                    inputmode="email"
+                                    required
+                                    class="peer w-full bg-transparent border-b border-[#d6d0c4] focus:border-[#d98c28] outline-none py-2 text-[#2c2825] placeholder-transparent transition-colors"
+                                    placeholder="Email"
+                                    data-i18n-ignore
+                                    @input="clearLoginError"
+                                />
+                                <label
+                                    for="login-email"
+                                    class="absolute left-0 -top-3.5 text-[#8a817c] text-sm transition-all peer-placeholder-shown:text-base peer-placeholder-shown:text-[#b0a8a0] peer-placeholder-shown:top-2 peer-focus:-top-3.5 peer-focus:text-[#2c2825] peer-focus:text-sm cursor-text"
+                                >
+                                    {{ t('login.email') }}
+                                </label>
+                            </div>
 
-                        <div class="min-h-5 text-center text-sm text-[#c4563a]">
-                            {{ loginError }}
-                        </div>
+                            <div class="group relative">
+                                <input
+                                    id="login-password"
+                                    v-model="loginForm.password"
+                                    type="password"
+                                    name="password"
+                                    autocomplete="current-password"
+                                    required
+                                    class="peer w-full bg-transparent border-b border-[#d6d0c4] focus:border-[#d98c28] outline-none py-2 text-[#2c2825] placeholder-transparent transition-colors"
+                                    placeholder="Password"
+                                    data-i18n-ignore
+                                    @input="clearLoginError"
+                                />
+                                <label
+                                    for="login-password"
+                                    class="absolute left-0 -top-3.5 text-[#8a817c] text-sm transition-all peer-placeholder-shown:text-base peer-placeholder-shown:text-[#b0a8a0] peer-placeholder-shown:top-2 peer-focus:-top-3.5 peer-focus:text-[#2c2825] peer-focus:text-sm cursor-text"
+                                >
+                                    {{ t('login.password') }}
+                                </label>
+                            </div>
 
-                        <div class="text-center">
+                            <div class="min-h-5 text-center text-sm text-[#c4563a]">
+                                {{ loginError }}
+                            </div>
+
+                            <div class="text-center">
+                                <button
+                                    type="submit"
+                                    class="outline-button px-8 py-2 font-bold tracking-widest transition-all duration-300 transform active:scale-95"
+                                >
+                                    {{ t('login.enter') }}
+                                </button>
+                            </div>
+
+                            <div v-if="canScanQr" class="text-center">
+                                <button
+                                    type="button"
+                                    class="text-sm text-[#8a817c] underline decoration-dotted underline-offset-4 transition-colors hover:text-[#d98c28]"
+                                    @click="showQrLogin = true"
+                                >
+                                    {{ t('loginTransfer.scanToLogin') }}
+                                </button>
+                            </div>
+                        </form>
+
+                        <form
+                            v-else
+                            class="flex-1 flex flex-col justify-center space-y-8"
+                            @submit.prevent="saveBackendUrl"
+                        >
+                            <div class="group relative">
+                                <input
+                                    id="backend-url"
+                                    v-model="backendUrl"
+                                    type="text"
+                                    placeholder="http://localhost:8654"
+                                    class="peer w-full bg-transparent border-b border-[#d6d0c4] focus:border-[#d98c28] outline-none py-2 text-[#2c2825] placeholder-transparent transition-colors"
+                                />
+                                <label
+                                    for="backend-url"
+                                    class="absolute left-0 -top-3.5 text-[#8a817c] text-sm transition-all peer-placeholder-shown:text-base peer-placeholder-shown:text-[#b0a8a0] peer-placeholder-shown:top-2 peer-focus:-top-3.5 peer-focus:text-[#2c2825] peer-focus:text-sm cursor-text"
+                                >
+                                    {{ t('login.backendUrl') }}
+                                </label>
+                            </div>
+
+                            <p v-if="backendUrlError" class="text-center text-sm text-[#c4563a]">
+                                {{ backendUrlError }}
+                            </p>
+
+                            <div class="text-center">
+                                <button
+                                    type="submit"
+                                    class="outline-button px-8 py-2 font-bold tracking-widest transition-all duration-300 transform active:scale-95"
+                                >
+                                    {{ t('login.save') }}
+                                </button>
+                            </div>
+                        </form>
+
+                        <div v-if="!isEditingBackendUrl" class="text-center mt-6 px-2">
                             <button
-                                type="submit"
-                                class="outline-button px-8 py-2 font-bold tracking-widest transition-all duration-300 transform active:scale-95"
+                                @click.stop="switchToRegister"
+                                class="text-sm text-[#8a817c] hover:text-[#d98c28] decoration-dotted hover:underline underline-offset-4 transition-colors"
                             >
-                                {{ t('login.enter') }}
+                                {{ t('login.registerAccount') }}
                             </button>
                         </div>
-                    </form>
 
-                    <form
-                        v-else
-                        class="flex-1 flex flex-col justify-center space-y-8"
-                        @submit.prevent="saveBackendUrl"
-                    >
-                        <div class="group relative">
-                            <input
-                                id="backend-url"
-                                v-model="backendUrl"
-                                type="text"
-                                placeholder="http://localhost:8654"
-                                class="peer w-full bg-transparent border-b border-[#d6d0c4] focus:border-[#d98c28] outline-none py-2 text-[#2c2825] placeholder-transparent transition-colors"
-                            />
-                            <label
-                                for="backend-url"
-                                class="absolute left-0 -top-3.5 text-[#8a817c] text-sm transition-all peer-placeholder-shown:text-base peer-placeholder-shown:text-[#b0a8a0] peer-placeholder-shown:top-2 peer-focus:-top-3.5 peer-focus:text-[#2c2825] peer-focus:text-sm cursor-text"
-                            >
-                                {{ t('login.backendUrl') }}
-                            </label>
-                        </div>
-
-                        <p v-if="backendUrlError" class="text-center text-sm text-[#c4563a]">
-                            {{ backendUrlError }}
-                        </p>
-
-                        <div class="text-center">
+                        <div
+                            v-if="showBackendEndpoint && !isEditingBackendUrl"
+                            class="mt-4 border-t border-[#e6dcc8] pt-3 text-left text-xs text-[#8a817c]"
+                        >
+                            <span>{{ t('login.connectedTo') }}</span>
                             <button
-                                type="submit"
-                                class="outline-button px-8 py-2 font-bold tracking-widest transition-all duration-300 transform active:scale-95"
+                                type="button"
+                                class="break-all text-[#2c2825] underline decoration-dotted underline-offset-4 transition-colors hover:text-[#d98c28]"
+                                @click="startEditingBackendUrl"
                             >
-                                {{ t('login.save') }}
+                                {{ backendUrl }}
                             </button>
                         </div>
-                    </form>
-
-                    <div v-if="!isEditingBackendUrl" class="text-center mt-6 px-2">
-                        <button
-                            @click.stop="switchToRegister"
-                            class="text-sm text-[#8a817c] hover:text-[#d98c28] decoration-dotted hover:underline underline-offset-4 transition-colors"
-                        >
-                            {{ t('login.registerAccount') }}
-                        </button>
-                    </div>
-
-                    <div
-                        v-if="showBackendEndpoint && !isEditingBackendUrl"
-                        class="mt-4 border-t border-[#e6dcc8] pt-3 text-left text-xs text-[#8a817c]"
-                    >
-                        <span>{{ t('login.connectedTo') }}</span>
-                        <button
-                            type="button"
-                            class="break-all text-[#2c2825] underline decoration-dotted underline-offset-4 transition-colors hover:text-[#d98c28]"
-                            @click="startEditingBackendUrl"
-                        >
-                            {{ backendUrl }}
-                        </button>
-                    </div>
+                    </template>
                 </div>
 
                 <div v-else class="h-full flex items-center justify-center opacity-40">
@@ -211,18 +229,24 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { defineAsyncComponent, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { api, saveAuthToken } from '@/ApiInstance'
 import { resolveErrorMessage } from '@/i18n/errors'
-import { getPlatformRuntime, setPlatformApiBaseUrl } from '@/runtime/platform'
+import { getPlatformRuntime, persistApiBaseUrl } from '@/runtime/platform'
+import { isMobilePlatform } from '@/runtime/platform.shared'
 import { getInitializationStatus, resetInitializationStatus } from '@/services/systemInitialization'
+
+// 扫码面板体积较大（二维码解码器），仅移动端会用到，按需加载
+const QrLoginPanel = defineAsyncComponent(() => import('@/components/login/QrLoginPanel.vue'))
 
 const { t } = useI18n()
 
 const router = useRouter()
 const isLoginMode = ref(true)
+const showQrLogin = ref(false)
+const canScanQr = isMobilePlatform(getPlatformRuntime().platform)
 const showBackendEndpoint = getPlatformRuntime().platform !== 'web'
 const backendUrl = ref('')
 const isEditingBackendUrl = ref(false)
@@ -244,10 +268,7 @@ onMounted(async () => {
 const saveBackendUrl = async () => {
     backendUrlError.value = ''
     try {
-        const { invoke } = await import('@tauri-apps/api/core')
-        const normalized = await invoke<string>('set_backend_url', { url: backendUrl.value })
-        backendUrl.value = normalized
-        setPlatformApiBaseUrl(normalized)
+        backendUrl.value = await persistApiBaseUrl(backendUrl.value)
         resetInitializationStatus()
         const status = await getInitializationStatus()
         if (!status.initialized) {
@@ -286,6 +307,9 @@ const clearLoginError = () => {
 const getLoginErrorMessage = (error: unknown) =>
     resolveErrorMessage(error, 'errors.fallback.loginFailed')
 
+/** 登录成功后整页跳转，以便重新初始化依赖会话的运行时状态。 */
+const goHome = () => window.location.assign(router.resolve('/').href)
+
 const handleLogin = async () => {
     loginError.value = ''
     try {
@@ -300,14 +324,12 @@ const handleLogin = async () => {
         loginError.value = getLoginErrorMessage(error)
         return
     }
-    window.location.assign(router.resolve('/').href)
+    goHome()
 }
 </script>
 
 <style scoped>
 .auth-shell {
-    --primary-gold: #d98c28;
-    --primary-gold-hover: #b8721b;
     --paper-bg: #f9f7f2;
     --text-dark: #2c2825;
     --text-light: #8a817c;
@@ -344,20 +366,6 @@ const handleLogin = async () => {
     background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100' height='100' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
     box-shadow: var(--shadow-deep);
     border: 1px solid rgba(255, 255, 255, 0.6);
-}
-
-.outline-button {
-    border: 1px solid var(--primary-gold);
-    color: var(--primary-gold);
-    background: transparent;
-    box-shadow: 0 4px 15px rgba(217, 140, 40, 0.2);
-}
-
-.outline-button:hover {
-    background: var(--primary-gold-hover);
-    border-color: var(--primary-gold-hover);
-    color: #ffffff;
-    box-shadow: 0 4px 15px rgba(217, 140, 40, 0.35);
 }
 
 .writing-vertical-rl {

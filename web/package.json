@@ -28,6 +28,7 @@
   "dependencies": {
     "@tailwindcss/vite": "^4.3.1",
     "@tauri-apps/api": "^2.11.1",
+    "@tauri-apps/plugin-barcode-scanner": "^2.4.5",
     "@tauri-apps/plugin-http": "^2.5.9",
     "@tauri-apps/plugin-notification": "2.3.3",
     "@tauri-apps/plugin-websocket": "^2.4.2",
@@ -38,6 +39,7 @@
     "echarts": "^6.1.0",
     "lucide-vue-next": "^1.0.0",
     "pinia": "^3.0.4",
+    "qrcode": "^1.5.4",
     "tailwindcss": "^4.3.1",
     "tauri-plugin-android-battery-optimization-api": "0.1.0",
     "vue": "^3.5.38",
@@ -50,6 +52,7 @@
     "@tsconfig/node24": "^24.0.4",
     "@types/jsdom": "^28.0.3",
     "@types/node": "^24.13.2",
+    "@types/qrcode": "^1.5.6",
     "@vitejs/plugin-vue": "^6.0.7",
     "@vue/test-utils": "^2.4.11",
     "@vue/tsconfig": "^0.9.1",

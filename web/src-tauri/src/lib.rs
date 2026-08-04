@@ -60,12 +60,18 @@ async fn set_backend_url(
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let builder = tauri::Builder::default()
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_websocket::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_android_battery_optimization::init())
-        .plugin(tauri_plugin_unirhy_playback::init())
+        .plugin(tauri_plugin_unirhy_playback::init());
+
+    // 扫码登录只在移动端提供，条码扫描插件亦仅支持 iOS/Android
+    #[cfg(mobile)]
+    let builder = builder.plugin(tauri_plugin_barcode_scanner::init());
+
+    builder
         .setup(|app| {
             let backend_url = Arc::new(RwLock::new(config::load_backend_url(app.handle())));
             app.manage(AppState { backend_url });
