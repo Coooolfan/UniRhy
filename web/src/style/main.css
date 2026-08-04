@@ -33,11 +33,29 @@ body {
 }
 
 /*
- * windowed 扫码期间：相机预览位于 WebView 后方，
- * 隐藏应用内容使取景镂空处只露出相机（见 components/login/QrScanner.vue）。
+ * windowed 扫码期间：相机预览位于 WebView 后方，页面自身即遮罩，
+ * 只把取景框所在的矩形从应用的合成结果中挖空，相机因此仅在框内可见。
+ * 镂空的位置与尺寸由取景框写入 CSS 变量（见 components/login/QrScanner.vue）。
  */
 html.qr-scan-windowed #app {
-    visibility: hidden;
+    -webkit-mask-image: linear-gradient(#000 0 0), linear-gradient(#000 0 0);
+    mask-image: linear-gradient(#000 0 0), linear-gradient(#000 0 0);
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    -webkit-mask-position:
+        0 0,
+        var(--qr-cutout-x, 0) var(--qr-cutout-y, 0);
+    mask-position:
+        0 0,
+        var(--qr-cutout-x, 0) var(--qr-cutout-y, 0);
+    -webkit-mask-size:
+        100% 100%,
+        var(--qr-cutout-width, 0) var(--qr-cutout-height, 0);
+    mask-size:
+        100% 100%,
+        var(--qr-cutout-width, 0) var(--qr-cutout-height, 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
 }
 
 input,
