@@ -8,8 +8,9 @@
  * ```
  *
  * flags 的 bit0-2 是协议版本，bit3 是 scheme（0=http，1=https），bit4-5 是地址类型。
- * 各呈现介质按自身特点选择编码：二维码用数字模式（QR 数字模式 3.32 bit/字符，
- * 几乎无浪费，比 Base64 的字节模式省一档版本），深链接与 NFC 用 Base64URL，
+ * 各呈现介质按自身特点选择编码：二维码与深链接用 `unirhy://t/<base64url>`
+ * （标准 URI，系统扫码组件可识别并拉起 App）；数字编码是载荷最紧凑的
+ * 文本形式（3.32 bit/字符），预留给 NFC、音频等超低带宽介质；
  * 蓝牙广播直接发原始字节。
  */
 export type LoginTransferTarget = {
@@ -222,17 +223,22 @@ export const unpackLoginTransferPayload = (bytes: Uint8Array): LoginTransferTarg
     }
 }
 
-/** 二维码编码：纯数字，命中 QR 数字模式。 */
-export const encodeLoginTransferQr = (target: LoginTransferTarget): string =>
+/**
+ * 数字编码：载荷最紧凑的文本形式，预留给 NFC、音频等超低带宽介质。
+ *
+ * 二维码不用它：标准 URI 才能被系统扫码组件识别为链接并拉起 App，
+ * 屏幕展示场景对码密度不敏感，为此牺牲通用性不值得。
+ */
+export const encodeLoginTransferDigits = (target: LoginTransferTarget): string =>
     bytesToDigits(packLoginTransferPayload(target))
 
-export const decodeLoginTransferQr = (payload: string): LoginTransferTarget => {
+export const decodeLoginTransferDigits = (payload: string): LoginTransferTarget => {
     const digits = payload.trim()
     if (!DIGITS_PATTERN.test(digits)) throw new UnsupportedPayloadError('not a numeric payload')
     return unpackLoginTransferPayload(digitsToBytes(digits))
 }
 
-/** 深链接与 NFC 编码：保留可识别的 scheme，便于系统层分发。 */
+/** 深链接与二维码编码：保留可识别的 scheme，系统扫码组件可拉起 App。 */
 export const encodeLoginTransferUri = (target: LoginTransferTarget): string =>
     `unirhy://t/${bytesToBase64Url(packLoginTransferPayload(target))}`
 
@@ -244,15 +250,25 @@ export const decodeLoginTransferUri = (uri: string): LoginTransferTarget => {
     return unpackLoginTransferPayload(base64UrlToBytes(url.pathname.replace(/^\//u, '')))
 }
 
+/** 扫码入口的解码：本应用生成的二维码是 URI 形式，数字形式为预留介质保留兼容。 */
+export const decodeLoginTransferScan = (content: string): LoginTransferTarget => {
+    try {
+        return decodeLoginTransferUri(content)
+    } catch {
+        // 不是 URI 则按数字形式处理
+    }
+    return decodeLoginTransferDigits(content)
+}
+
 /**
  * 从扫码内容中提取服务端地址。
  *
- * 登录交接载荷取其实例地址，其余内容按纯 http(s) URL 解析，
- * 因此既兼容本应用生成的登录二维码，也兼容只包含地址的普通二维码。
+ * 本应用生成的二维码（URI 或数字形式）取其实例地址，其余内容按纯 http(s) URL
+ * 解析，因此只包含地址的普通二维码同样可用。
  */
 export const parseServerUrlFromScan = (content: string): string => {
     try {
-        return decodeLoginTransferQr(content).serverUrl
+        return decodeLoginTransferScan(content).serverUrl
     } catch {
         // 不是交接载荷则按纯 URL 处理
     }

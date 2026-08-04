@@ -3,5 +3,5 @@
   "description": "Mobile-only capabilities for UniRhy",
   "platforms": ["android", "iOS"],
   "windows": ["main"],
-  "permissions": ["barcode-scanner:default"]
+  "permissions": ["barcode-scanner:default", "deep-link:default"]
 }

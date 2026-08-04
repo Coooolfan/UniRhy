@@ -80,7 +80,9 @@
 
                     <QrLoginPanel
                         v-if="showQrLogin"
-                        @cancel="showQrLogin = false"
+                        :key="qrPanelKey"
+                        :prefilled-payload="prefilledTransferLink"
+                        @cancel="closeQrLogin"
                         @logged-in="goHome"
                     />
 
@@ -151,7 +153,7 @@
                                 <button
                                     type="button"
                                     class="text-sm text-[#8a817c] underline decoration-dotted underline-offset-4 transition-colors hover:text-[#d98c28]"
-                                    @click="showQrLogin = true"
+                                    @click="openQrLogin"
                                 >
                                     {{ t('loginTransfer.scanToLogin') }}
                                 </button>
@@ -276,7 +278,7 @@
 </template>
 
 <script setup lang="ts">
-import { defineAsyncComponent, onMounted, reactive, ref } from 'vue'
+import { defineAsyncComponent, onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { X } from 'lucide-vue-next'
@@ -285,6 +287,7 @@ import { resolveErrorMessage } from '@/i18n/errors'
 import { getPlatformRuntime, persistApiBaseUrl } from '@/runtime/platform'
 import { isMobilePlatform } from '@/runtime/platform.shared'
 import { parseServerUrlFromScan } from '@/services/loginTransferQr'
+import { pendingLoginTransferLink } from '@/services/loginTransferDeepLink'
 import { getInitializationStatus, resetInitializationStatus } from '@/services/systemInitialization'
 
 // 扫码面板与取景组件体积较大（二维码解码器），仅移动端会用到，按需加载
@@ -296,6 +299,8 @@ const { t } = useI18n()
 const router = useRouter()
 const isLoginMode = ref(true)
 const showQrLogin = ref(false)
+const prefilledTransferLink = ref<string | undefined>(undefined)
+const qrPanelKey = ref(0)
 const canScanQr = isMobilePlatform(getPlatformRuntime().platform)
 const showBackendEndpoint = getPlatformRuntime().platform !== 'web'
 const backendUrl = ref('')
@@ -362,6 +367,30 @@ const onBackendScanFailed = (error: unknown) => {
     backendUrlError.value = resolveErrorMessage(error, 'loginTransfer.cameraFailed')
     backendScanFailed.value = true
 }
+
+const openQrLogin = () => {
+    prefilledTransferLink.value = undefined
+    qrPanelKey.value += 1
+    showQrLogin.value = true
+}
+
+const closeQrLogin = () => {
+    prefilledTransferLink.value = undefined
+    showQrLogin.value = false
+}
+
+// 系统扫码组件以深链接拉起 App：拿到交接链接后跳过扫码，直接进入认领流程
+watch(
+    pendingLoginTransferLink,
+    (link) => {
+        if (!link) return
+        pendingLoginTransferLink.value = null
+        prefilledTransferLink.value = link
+        qrPanelKey.value += 1
+        showQrLogin.value = true
+    },
+    { immediate: true },
+)
 
 const switchToRegister = () => {
     if (isLoginMode.value) {

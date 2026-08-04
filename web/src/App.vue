@@ -4,6 +4,7 @@ import { RouterView, useRoute } from 'vue-router'
 import AudioPlayer from '@/components/AudioPlayer.vue'
 import AppModalHost from '@/components/modals/AppModalHost.vue'
 import { getPlatformRuntime } from '@/runtime/platform'
+import { initLoginTransferDeepLink } from '@/services/loginTransferDeepLink'
 
 const route = useRoute()
 const desktopPlatform = getPlatformRuntime().platform
@@ -39,6 +40,7 @@ const startWindowDrag = async (event: MouseEvent) => {
 
 onMounted(() => {
     window.addEventListener('mousedown', startWindowDrag)
+    void initLoginTransferDeepLink()
 })
 
 onUnmounted(() => {

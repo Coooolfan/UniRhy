@@ -9,8 +9,13 @@ import QrScanner from '@/components/login/QrScanner.vue'
 import { CameraPermissionDeniedError, openCameraSettings } from '@/runtime/barcodeScanner'
 import { getClientVersion, getPlatformRuntime, persistApiBaseUrl } from '@/runtime/platform'
 import { isMobilePlatform, type MobilePlatformKind } from '@/runtime/platform.shared'
-import { decodeLoginTransferQr } from '@/services/loginTransferQr'
+import { decodeLoginTransferScan } from '@/services/loginTransferQr'
 import { ACTIVE_LOGIN_TRANSFER_STATUSES } from '@/services/loginTransferStatus'
+
+const props = defineProps<{
+    /** 深链接进入时已有的载荷：跳过扫码直接认领。 */
+    prefilledPayload?: string
+}>()
 
 const emit = defineEmits<{ cancel: []; loggedIn: [] }>()
 const { t } = useI18n()
@@ -85,7 +90,7 @@ const claimTransfer = async (rawPayload: string) => {
     errorMessage.value = ''
     const previousServerUrl = getPlatformRuntime().apiBaseUrl
     try {
-        const payload = decodeLoginTransferQr(rawPayload)
+        const payload = decodeLoginTransferScan(rawPayload)
         targetServer.value = payload.serverUrl
         const platform = getPlatformRuntime().platform
         if (!isMobilePlatform(platform)) {
@@ -133,7 +138,13 @@ const onScanFailed = (error: unknown) => {
     errorMessage.value = resolveErrorMessage(error, 'loginTransfer.cameraFailed')
 }
 
-onMounted(() => startScanner())
+onMounted(() => {
+    if (props.prefilledPayload) {
+        void claimTransfer(props.prefilledPayload)
+    } else {
+        startScanner()
+    }
+})
 
 onUnmounted(() => {
     stopped = true

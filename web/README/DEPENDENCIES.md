@@ -8,6 +8,7 @@
 | --------------------------------------------- | -------- | ----------------- | -------------------------- |
 | @tailwindcss/vite                             | ^4.1.18  | MIT               | Tailwind CSS Vite 插件     |
 | @tauri-apps/plugin-barcode-scanner            | ^2.4.5   | MIT OR Apache-2.0 | 移动端二维码扫描与相机权限 |
+| @tauri-apps/plugin-deep-link                  | ^2.4.9   | MIT OR Apache-2.0 | 深链接接收，系统扫码拉起   |
 | @tauri-apps/plugin-notification               | 2.3.3    | MIT OR Apache-2.0 | 系统通知与通知权限         |
 | @vue-flow/background                          | ^1.3.2   | MIT               | Vue Flow 画布背景组件      |
 | @vue-flow/controls                            | ^1.1.3   | MIT               | Vue Flow 缩放控制组件      |

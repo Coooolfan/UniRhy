@@ -39,15 +39,13 @@ flags(1B) | 地址 | port(2B) | secret(10B)
 
 ### 各介质的编码
 
-| 介质        | 编码                     | 入口                                                      |
-| ----------- | ------------------------ | --------------------------------------------------------- |
-| 二维码      | 纯十进制数字             | `encodeLoginTransferQr` / `decodeLoginTransferQr`         |
-| 深链接、NFC | `unirhy://t/<base64url>` | `encodeLoginTransferUri` / `decodeLoginTransferUri`       |
-| 蓝牙广播    | 原始字节                 | `packLoginTransferPayload` / `unpackLoginTransferPayload` |
+| 介质              | 编码                     | 入口                                                      |
+| ----------------- | ------------------------ | --------------------------------------------------------- |
+| 二维码、深链接    | `unirhy://t/<base64url>` | `encodeLoginTransferUri` / `decodeLoginTransferUri`       |
+| NFC、音频（预留） | 纯十进制数字             | `encodeLoginTransferDigits` / `decodeLoginTransferDigits` |
+| 蓝牙广播          | 原始字节                 | `packLoginTransferPayload` / `unpackLoginTransferPayload` |
 
-二维码用数字而非 Base64，是因为 QR 按模式计费：数字模式 3.32 bit/字符、字母数字 5.5、字节 8。Base64 每字符只装 6 bit 熵却占 8 bit 槽位，白扔 25%，实测会多占一档版本。字符数最少的编码在这里反而产生更大的码。
-
-深链接保留可识别的 scheme，便于系统层分发；这条路径不追求最短。17 字节的原始形式可直接放进 BLE 广播包的 31 字节限额。
+二维码用 URI 而非更紧凑的数字编码，是因为只有标准 URI 才能被系统扫码组件识别为链接并拉起 App（见「深链接接收」）；屏幕展示、近距离扫描的场景对码密度不敏感，为此牺牲通用性不值得。数字编码（3.32 bit/字符，几乎无浪费）是载荷最紧凑的文本形式，预留给 NFC、音频这类超低带宽介质，扫码入口对它保留兼容（`decodeLoginTransferScan`）。17 字节的原始形式可直接放进 BLE 广播包的 31 字节限额。
 
 ### 域名后缀字典
 
@@ -57,17 +55,9 @@ flags(1B) | 地址 | port(2B) | secret(10B)
 
 ### 尺寸
 
-以 EC-L（屏幕显示、近距离扫描，无印刷污损风险）实测：
+URI 形式为 `unirhy://t/`（11 字符）加 Base64URL 载荷（17–28B → 23–38 字符），共 34–49 字符，字节模式 EC-L 下统一落在 **v3 29×29**（容量 53 字符）。比数字码大约一到两档版本，屏幕展示无影响。
 
-| 服务端地址                   | 载荷        | 二维码       |
-| ---------------------------- | ----------- | ------------ |
-| `http://192.168.0.145:8655`  | 17B / 41 位 | v1 **21×21** |
-| `https://nas.duckdns.org`    | 18B / 44 位 | v2 25×25     |
-| `https://host.tailscale.net` | 19B / 46 位 | v2 25×25     |
-| `http://unirhy.local:8654`   | 21B / 51 位 | v2 25×25     |
-| `https://music.example.com`  | 28B / 68 位 | v2 25×25     |
-
-只有裸 IPv4 能进 v1：v1 在 EC-L 数字模式下上限约 136 bit，任何域名至少还要索引、标签长度与标签本身。
+数字编码仍是密度参照：以 EC-L 实测，裸 IPv4 地址（17B / 41 位）可进 v1 21×21——v1 数字模式上限约 136 bit，任何域名至少还要索引、标签长度与标签本身。这也是把它留给超低带宽介质的原因。
 
 ### 回环地址
 
@@ -100,6 +90,16 @@ grep -oE '<uses-feature[^>]*>' \
 
 - 登录表单的「扫描二维码快速登录」进入完整交接流程（`QrLoginPanel.vue`）；
 - 服务端地址表单的「扫码识别服务端地址」只从码中取出实例地址填入输入框（`parseServerUrlFromScan`），登录交接载荷与纯 http(s) 地址两种内容都接受。
+
+## 深链接接收
+
+二维码内容是 `unirhy://t/...` 标准 URI，因此系统相机、扫码组件扫到后可直接拉起 App，不必先打开 App 再找扫码入口。接收端由 `@tauri-apps/plugin-deep-link` 实现：
+
+- scheme 在 `tauri.conf.json` 的 `plugins.deep-link.mobile` 声明（`unirhy` + host `t`），插件构建期据此生成 Android intent-filter；权限在 `src-tauri/capabilities/mobile.json` 声明，插件与条码扫描一样仅移动端注册。
+- `services/loginTransferDeepLink.ts` 在 App 启动时挂监听：热启动走 `onOpenUrl` 事件，冷启动的链接在 launch intent 里、用 `getCurrent()` 取。无法识别或已登录（那通常是把码扫回了原设备）的链接直接忽略。
+- 合法链接暂存在 `pendingLoginTransferLink`，`LoginView` 侦听到后跳过扫码，把链接作为 `prefilledPayload` 交给 `QrLoginPanel` 直接进入认领流程，后续与扫码路径完全一致。
+
+不追求 Android App Links / Universal Links：它们要求 https 域名与服务端验证文件，自建实例多为 `http://IP:端口`，不满足条件。
 
 ## 状态与轮询
 
