@@ -160,43 +160,6 @@
                             </div>
                         </form>
 
-                        <div
-                            v-else-if="isScanningBackendUrl"
-                            class="flex-1 flex flex-col justify-center"
-                        >
-                            <QrScanner
-                                v-if="!backendScanFailed"
-                                :key="backendScanAttempt"
-                                :hint="t('login.scanQrHint')"
-                                @scanned="onBackendUrlScanned"
-                                @cancelled="isScanningBackendUrl = false"
-                                @failed="onBackendScanFailed"
-                            />
-                            <p
-                                v-if="backendUrlError"
-                                class="mt-3 text-center text-sm text-[#c4563a]"
-                            >
-                                {{ backendUrlError }}
-                            </p>
-                            <div class="mt-5 flex flex-wrap items-center justify-center gap-4">
-                                <button
-                                    v-if="backendScanFailed"
-                                    type="button"
-                                    class="outline-button px-5 py-2 text-sm"
-                                    @click="startBackendScan"
-                                >
-                                    {{ t('common.retry') }}
-                                </button>
-                                <button
-                                    type="button"
-                                    class="flex items-center gap-2 px-4 py-2 text-sm text-[#8a817c]"
-                                    @click="isScanningBackendUrl = false"
-                                >
-                                    <X :size="16" /> {{ t('common.cancel') }}
-                                </button>
-                            </div>
-                        </div>
-
                         <form
                             v-else
                             class="flex-1 flex flex-col justify-center space-y-8"
@@ -235,9 +198,9 @@
                                 <button
                                     type="button"
                                     class="text-sm text-[#8a817c] underline decoration-dotted underline-offset-4 transition-colors hover:text-[#d98c28]"
-                                    @click="startBackendScan"
+                                    @click="openQrLogin"
                                 >
-                                    {{ t('login.scanQrToFill') }}
+                                    {{ t('loginTransfer.scanToLogin') }}
                                 </button>
                             </div>
                         </form>
@@ -281,18 +244,15 @@
 import { defineAsyncComponent, onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { X } from 'lucide-vue-next'
 import { api, saveAuthToken } from '@/ApiInstance'
 import { resolveErrorMessage } from '@/i18n/errors'
 import { getPlatformRuntime, persistApiBaseUrl } from '@/runtime/platform'
 import { isMobilePlatform } from '@/runtime/platform.shared'
-import { parseServerUrlFromScan } from '@/services/loginTransferQr'
 import { pendingLoginTransferLink } from '@/services/loginTransferDeepLink'
 import { getInitializationStatus, resetInitializationStatus } from '@/services/systemInitialization'
 
-// 扫码面板与取景组件体积较大（二维码解码器），仅移动端会用到，按需加载
+// 扫码面板体积较大（二维码解码器），仅移动端会用到，按需加载
 const QrLoginPanel = defineAsyncComponent(() => import('@/components/login/QrLoginPanel.vue'))
-const QrScanner = defineAsyncComponent(() => import('@/components/login/QrScanner.vue'))
 
 const { t } = useI18n()
 
@@ -306,9 +266,6 @@ const showBackendEndpoint = getPlatformRuntime().platform !== 'web'
 const backendUrl = ref('')
 const isEditingBackendUrl = ref(false)
 const backendUrlError = ref('')
-const isScanningBackendUrl = ref(false)
-const backendScanFailed = ref(false)
-const backendScanAttempt = ref(0)
 const loginError = ref('')
 
 const loginForm = reactive({
@@ -341,31 +298,7 @@ const saveBackendUrl = async () => {
 
 const startEditingBackendUrl = () => {
     backendUrlError.value = ''
-    isScanningBackendUrl.value = false
     isEditingBackendUrl.value = true
-}
-
-const startBackendScan = () => {
-    backendUrlError.value = ''
-    backendScanFailed.value = false
-    backendScanAttempt.value += 1
-    isScanningBackendUrl.value = true
-}
-
-const onBackendUrlScanned = (content: string) => {
-    try {
-        backendUrl.value = parseServerUrlFromScan(content)
-        isScanningBackendUrl.value = false
-    } catch (error) {
-        // 扫到的内容不含服务端地址：提示后重建扫码组件，继续扫描
-        backendUrlError.value = resolveErrorMessage(error, 'errors.fallback.backendUrlScan')
-        backendScanAttempt.value += 1
-    }
-}
-
-const onBackendScanFailed = (error: unknown) => {
-    backendUrlError.value = resolveErrorMessage(error, 'loginTransfer.cameraFailed')
-    backendScanFailed.value = true
 }
 
 const openQrLogin = () => {

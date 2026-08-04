@@ -9,7 +9,6 @@ import {
     encodeLoginTransferUri,
     LoopbackServerUrlError,
     packLoginTransferPayload,
-    parseServerUrlFromScan,
     UnsupportedPayloadError,
 } from '@/services/loginTransferQr'
 
@@ -99,30 +98,5 @@ describe('login transfer payload codec', () => {
         expect(decodeLoginTransferScan(encodeLoginTransferUri(target))).toEqual(target)
         expect(decodeLoginTransferScan(encodeLoginTransferDigits(target))).toEqual(target)
         expect(() => decodeLoginTransferScan('neither-form')).toThrow(UnsupportedPayloadError)
-    })
-})
-
-describe('parseServerUrlFromScan', () => {
-    it('extracts the instance address from a login transfer payload', () => {
-        const content = encodeLoginTransferUri({
-            serverUrl: 'http://192.168.0.145:8655',
-            secret: SECRET,
-        })
-        expect(parseServerUrlFromScan(content)).toBe('http://192.168.0.145:8655')
-    })
-
-    it('accepts a plain server URL and normalizes it', () => {
-        expect(parseServerUrlFromScan('http://192.168.0.145:8655/')).toBe(
-            'http://192.168.0.145:8655',
-        )
-        expect(parseServerUrlFromScan(' https://music.example.com ')).toBe(
-            'https://music.example.com',
-        )
-    })
-
-    it('rejects content without a server address', () => {
-        expect(() => parseServerUrlFromScan('hello world')).toThrow(UnsupportedPayloadError)
-        expect(() => parseServerUrlFromScan('ftp://example.com')).toThrow(UnsupportedPayloadError)
-        expect(() => parseServerUrlFromScan('123')).toThrow(UnsupportedPayloadError)
     })
 })
