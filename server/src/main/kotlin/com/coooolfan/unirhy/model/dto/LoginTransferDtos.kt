@@ -8,11 +8,20 @@ import org.babyfish.jimmer.client.FetchBy
 import java.time.Instant
 import java.util.UUID
 
+/** 原设备的审批请求，只允许携带目标状态。 */
 data class LoginTransferUpdateRequest(
     val status: LoginTransferStatus,
-    val secret: String? = null,
-    val deviceName: String? = null,
-    val platform: LoginTransferPlatform? = null,
+)
+
+/**
+ * 新设备的认领请求。
+ *
+ * 二维码密钥同时充当查询索引与凭据，因此请求里不需要交接 id。
+ */
+data class LoginTransferClaimRequest(
+    val secret: String,
+    val deviceName: String,
+    val platform: LoginTransferPlatform,
     val clientVersion: String? = null,
 )
 
@@ -25,7 +34,7 @@ data class LoginTransferCreateResponse(
 )
 
 /**
- * PATCH 的统一响应。
+ * 认领与审批的统一响应。
  *
  * [claimAccessToken] 仅在新设备认领成功时下发一次，审批响应不含该字段；
  * 认领响应按新设备投影裁剪，原设备专属字段缺省。

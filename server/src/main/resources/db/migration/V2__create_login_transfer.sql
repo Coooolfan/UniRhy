@@ -28,6 +28,9 @@ CREATE TABLE login_transfer
     CHECK (expires_at > created_at)
 );
 
+CREATE UNIQUE INDEX login_transfer_qr_secret_hash_uniq
+    ON login_transfer (qr_secret_hash);
+
 CREATE UNIQUE INDEX login_transfer_account_active_uniq
     ON login_transfer (account_id)
     WHERE status IN ('WAITING', 'CLAIMED', 'AUTHORIZED');

@@ -23,24 +23,26 @@
 
 ## 二维码载荷
 
-二维码使用带版本号的自定义 URI：
+载荷的规范形式是一段紧凑二进制，各呈现介质按自身特点选择编码：二维码用数字模式（最省），深链接与 NFC 用 Base64URL，蓝牙广播直接发原始字节。
 
 ```text
-unirhy://login-transfer?v=1&server=<percent-encoded-server-url>&transfer=<uuid>&secret=<base64url-secret>
+flags(1B) | 地址 | port(2B) | secret(10B)
 ```
-
-字段说明：
 
 | 字段 | 说明 |
 | --- | --- |
-| `v` | 协议版本，第一版固定为 `1` |
-| `server` | 当前客户端实际连接的服务端根 URL |
-| `transfer` | 登录交接 UUID |
-| `secret` | 32 字节安全随机数的 Base64URL 无填充编码 |
+| `flags` | bit0-2 协议版本（当前为 1），bit3 scheme（0=http，1=https），bit4-5 地址类型 |
+| 地址 | 类型 0：IPv4 四字节；类型 1：后缀字典索引 1B + 标签长度 1B + 标签；类型 2：IPv6 十六字节 |
+| `port` | 大端无符号 16 位 |
+| `secret` | 10 字节安全随机数 |
+
+地址类型 1 用一张追加式的域名后缀字典（`.com`、`.duckdns.org`、`.tailscale.net` 等）把常见后缀压成一个索引，索引 `0` 表示未命中字典、标签即完整主机名。字典只允许在末尾追加，不得重排或删除；扫描端遇到未知索引应提示升级客户端。
+
+交接 UUID 不进入载荷：`secret` 的摘要在 `qr_secret_hash` 上有唯一索引，同时充当查询键与凭据。
 
 二维码不得包含邮箱、密码、账号 ID、当前设备 JWT 或管理员标记。
 
-二维码由已登录客户端根据服务端创建响应和当前有效服务端 URL 组装。若当前地址为 `localhost`、`127.0.0.1` 或 `[::1]`，客户端应阻止展示二维码，并提示用户配置手机可访问的局域网或公网地址。
+载荷由已登录客户端根据服务端创建响应和当前有效服务端 URL 组装。若当前地址为回环地址（`localhost`、`127.x.x.x`、`0.0.0.0`、`[::1]`），客户端应阻止生成二维码，并提示用户配置手机可访问的局域网或公网地址。
 
 新设备扫描后应先展示目标实例的协议、主机和端口。用户继续后，客户端保存该实例 URL，并向该实例认领登录交接。
 
@@ -178,7 +180,7 @@ Cache-Control: no-store
 ```json
 {
   "id": "018f3cf4-2e9a-7d92-8ae4-5d3f640a69bc",
-  "secret": "Q0W5wYI3US6oxCLyY7XB7qfwePzP0W8B3Gxmpc6x7hs",
+  "secret": "q6urq6urq6urqw",
   "status": "WAITING",
   "createdAt": "2026-08-02T08:00:00Z",
   "expiresAt": "2026-08-02T08:02:00Z"
@@ -241,28 +243,25 @@ Authorization: Bearer <claim-access-token>
 
 ### 更新登录交接
 
+### 新设备认领
+
+新设备从二维码取得密钥，将交接从 `WAITING` 更新为 `CLAIMED`。该请求不要求账号登录，也不需要交接 id——密钥本身就是查询键。
+
 ```http
-PATCH /api/login-transfers/{transferId}
+POST /api/login-transfers/claims
 Content-Type: application/json
 ```
 
-该接口按照目标状态及所用凭据执行有限的状态转换，不接受任意字段更新。
-
-#### 新设备认领
-
-新设备从二维码取得密钥，将交接从 `WAITING` 更新为 `CLAIMED`。该请求不要求账号登录。
-
 ```json
 {
-  "status": "CLAIMED",
-  "secret": "Q0W5wYI3US6oxCLyY7XB7qfwePzP0W8B3Gxmpc6x7hs",
+  "secret": "q6urq6urq6urqw",
   "deviceName": "Pixel 9",
   "platform": "ANDROID",
   "clientVersion": "0.1.0"
 }
 ```
 
-响应：`200 OK`
+响应：`201 Created`
 
 ```http
 Cache-Control: no-store
@@ -270,19 +269,22 @@ Cache-Control: no-store
 
 ```json
 {
-  "id": "018f3cf4-2e9a-7d92-8ae4-5d3f640a69bc",
-  "status": "CLAIMED",
-  "claimAccessToken": "mRBq9BwQByUvtCSmH-_QKXpQQXLsYFeMJlWFNGAaXu0",
-  "claimedAt": "2026-08-02T08:00:20Z",
-  "expiresAt": "2026-08-02T08:02:00Z"
+  "transfer": {
+    "id": "018f3cf4-2e9a-7d92-8ae4-5d3f640a69bc",
+    "status": "CLAIMED",
+    "createdAt": "2026-08-02T08:00:00Z",
+    "expiresAt": "2026-08-02T08:02:00Z",
+    "closedAt": null
+  },
+  "claimAccessToken": "mRBq9BwQByUvtCSmH-_QKXpQQXLsYFeMJlWFNGAaXu0"
 }
 ```
 
-服务端必须在事务中锁定登录交接，验证其存在、状态为 `WAITING`、尚未过期且二维码密钥摘要匹配，再保存设备信息和认领访问令牌摘要。
+服务端必须在事务中按密钥摘要锁定登录交接，验证其存在、状态为 `WAITING` 且尚未过期，再保存设备信息和认领访问令牌摘要。
 
 二维码密钥错误与交接不存在统一返回 `404 Not Found`，避免枚举有效交接。已经被认领或进入其他非过期状态返回 `409 Conflict`，已过期返回 `410 Gone`。
 
-#### 原设备允许或拒绝
+### 原设备允许或拒绝
 
 原设备使用账号 JWT，将交接从 `CLAIMED` 更新为 `AUTHORIZED` 或 `REJECTED`：
 
@@ -291,6 +293,8 @@ PATCH /api/login-transfers/{transferId}
 unirhy-token: <current-jwt>
 Content-Type: application/json
 ```
+
+该接口只接受目标状态，不接受任意字段更新。
 
 允许登录：
 

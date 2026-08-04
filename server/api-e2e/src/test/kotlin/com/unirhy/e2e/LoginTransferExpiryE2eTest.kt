@@ -53,10 +53,9 @@ class LoginTransferExpiryE2eTest {
         E2eAssert.status(expiredRead, 200, "[poll] expired transfer should still be readable")
         E2eAssert.jsonAt(expiredRead.body(), "/status", "EXPIRED", "[poll] read should surface the real terminal state")
 
-        val claimAfterExpiry = phone.patch(
-            path = "/api/login-transfers/$transferId",
+        val claimAfterExpiry = phone.post(
+            path = "/api/login-transfers/claims",
             json = mapOf(
-                "status" to "CLAIMED",
                 "secret" to secret,
                 "deviceName" to "E2E Phone",
                 "platform" to "ANDROID",

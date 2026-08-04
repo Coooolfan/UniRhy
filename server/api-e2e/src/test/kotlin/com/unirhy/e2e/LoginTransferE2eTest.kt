@@ -45,9 +45,9 @@ class LoginTransferE2eTest {
         val secret = created.path("secret").asString()
         E2eAssert.jsonAt(createResponse.body(), "/status", "WAITING", "[create] transfer should wait for claim")
 
-        val badClaimResponse = phone.patch(
-            path = "/api/login-transfers/$transferId",
-            json = claimBody("invalid-secret"),
+        val badClaimResponse = phone.post(
+            path = "/api/login-transfers/claims",
+            json = claimBody("AAAAAAAAAAAAAA"),
         )
         E2eAssert.apiError(
             badClaimResponse,
@@ -57,11 +57,11 @@ class LoginTransferE2eTest {
             step = "[claim] wrong QR secret should not reveal transfer",
         )
 
-        val claimResponse = phone.patch(
-            path = "/api/login-transfers/$transferId",
+        val claimResponse = phone.post(
+            path = "/api/login-transfers/claims",
             json = claimBody(secret),
         )
-        E2eAssert.status(claimResponse, 200, "[claim] phone should claim transfer")
+        E2eAssert.status(claimResponse, 201, "[claim] phone should claim transfer")
         E2eAssert.jsonAt(claimResponse.body(), "/transfer/status", "CLAIMED", "[claim] transfer should await approval")
         E2eAssert.jsonMissing(
             claimResponse.body(),
@@ -151,7 +151,6 @@ class LoginTransferE2eTest {
     }
 
     private fun claimBody(secret: String): Map<String, String> = mapOf(
-        "status" to "CLAIMED",
         "secret" to secret,
         "deviceName" to "E2E Phone",
         "platform" to "ANDROID",

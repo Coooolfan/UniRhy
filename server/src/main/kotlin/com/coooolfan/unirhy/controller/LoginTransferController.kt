@@ -6,6 +6,7 @@ import com.coooolfan.unirhy.error.CommonException
 import com.coooolfan.unirhy.error.LoginTransferException
 import com.coooolfan.unirhy.model.LoginTransfer
 import com.coooolfan.unirhy.model.by
+import com.coooolfan.unirhy.model.dto.LoginTransferClaimRequest
 import com.coooolfan.unirhy.model.dto.LoginTransferCreateResponse
 import com.coooolfan.unirhy.model.dto.LoginTransferUpdateRequest
 import com.coooolfan.unirhy.model.dto.LoginTransferUpdateResponse
@@ -73,6 +74,28 @@ class LoginTransferController(
         }
     }
 
+    /**
+     * 新设备认领登录交接
+     *
+     * 二维码密钥同时是查询索引与凭据，因此不需要路径参数；成功后一次性下发认领访问令牌。
+     */
+    @PostMapping("/claims")
+    @ResponseStatus(HttpStatus.CREATED)
+    @Throws(
+        CommonException.InvalidRequest::class,
+        LoginTransferException.NotFound::class,
+        LoginTransferException.StatusConflict::class,
+        LoginTransferException.Expired::class,
+    )
+    fun claim(
+        @RequestBody request: LoginTransferClaimRequest,
+        response: HttpServletResponse,
+    ): LoginTransferUpdateResponse {
+        response.setHeader(HttpHeaders.CACHE_CONTROL, NO_STORE)
+        return service.claimBySecret(request, CLAIM_TRANSFER_FETCHER)
+    }
+
+    /** 原设备审批：把已认领的交接置为 AUTHORIZED 或 REJECTED。 */
     @PatchMapping("/{id}")
     @Throws(
         CommonException.AuthenticationFailed::class,
@@ -93,8 +116,7 @@ class LoginTransferController(
             id = id,
             auth = resolveAuthorization(authorization),
             request = request,
-            sourceFetcher = SOURCE_TRANSFER_FETCHER,
-            claimFetcher = CLAIM_TRANSFER_FETCHER,
+            fetcher = SOURCE_TRANSFER_FETCHER,
         )
     }
 
