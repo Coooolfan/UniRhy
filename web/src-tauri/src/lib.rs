@@ -67,9 +67,11 @@ pub fn run() {
         .plugin(tauri_plugin_android_battery_optimization::init())
         .plugin(tauri_plugin_unirhy_playback::init());
 
-    // 扫码登录只在移动端提供，条码扫描插件亦仅支持 iOS/Android
+    // 扫码登录只在移动端提供，条码扫描与深链接插件亦仅支持 iOS/Android
     #[cfg(mobile)]
-    let builder = builder.plugin(tauri_plugin_barcode_scanner::init());
+    let builder = builder
+        .plugin(tauri_plugin_barcode_scanner::init())
+        .plugin(tauri_plugin_deep_link::init());
 
     builder
         .setup(|app| {

@@ -10,7 +10,7 @@ import { resolveErrorMessage } from '@/i18n/errors'
 import { getPlatformRuntime } from '@/runtime/platform'
 import {
     assertReachableServerUrl,
-    encodeLoginTransferQr,
+    encodeLoginTransferUri,
     LoopbackServerUrlError,
 } from '@/services/loginTransferQr'
 import { ACTIVE_LOGIN_TRANSFER_STATUSES } from '@/services/loginTransferStatus'
@@ -102,7 +102,7 @@ const initialize = async () => {
             expiresAt: result.expiresAt,
         }
         qrDataUrl.value = await QRCodeGenerator.toDataURL(
-            encodeLoginTransferQr({ serverUrl, secret: result.secret }),
+            encodeLoginTransferUri({ serverUrl, secret: result.secret }),
             {
                 // 屏幕显示、近距离扫描，不存在印刷污损风险，用最低纠错换更少的模块数
                 errorCorrectionLevel: 'L',

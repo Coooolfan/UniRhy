@@ -2,9 +2,10 @@
 import { describe, expect, it } from 'vitest'
 import {
     assertReachableServerUrl,
-    decodeLoginTransferQr,
+    decodeLoginTransferDigits,
+    decodeLoginTransferScan,
     decodeLoginTransferUri,
-    encodeLoginTransferQr,
+    encodeLoginTransferDigits,
     encodeLoginTransferUri,
     LoopbackServerUrlError,
     packLoginTransferPayload,
@@ -25,30 +26,30 @@ describe('login transfer payload codec', () => {
         ['http://10.0.0.2', '默认端口省略'],
     ])('round trips %s (%s)', (serverUrl) => {
         const target = { serverUrl, secret: SECRET }
-        expect(decodeLoginTransferQr(encodeLoginTransferQr(target))).toEqual(target)
+        expect(decodeLoginTransferDigits(encodeLoginTransferDigits(target))).toEqual(target)
         expect(decodeLoginTransferUri(encodeLoginTransferUri(target))).toEqual(target)
     })
 
     it('encodes IPv4 targets into 17 bytes / 41 digits', () => {
         const target = { serverUrl: 'http://192.168.0.145:8655', secret: SECRET }
         expect(packLoginTransferPayload(target)).toHaveLength(17)
-        expect(encodeLoginTransferQr(target)).toHaveLength(41)
+        expect(encodeLoginTransferDigits(target)).toHaveLength(41)
     })
 
     it('keeps dictionary hits shorter than raw suffixes', () => {
-        const withDict = encodeLoginTransferQr({
+        const withDict = encodeLoginTransferDigits({
             serverUrl: 'https://nas.duckdns.org',
             secret: SECRET,
         })
-        const withoutDict = encodeLoginTransferQr({
+        const withoutDict = encodeLoginTransferDigits({
             serverUrl: 'https://nas.unusual-tld-xyzzy',
             secret: SECRET,
         })
         expect(withDict.length).toBeLessThan(withoutDict.length)
     })
 
-    it('emits only digits for the QR form', () => {
-        expect(encodeLoginTransferQr({ serverUrl: 'http://10.0.0.2', secret: SECRET })).toMatch(
+    it('emits only digits for the digits form', () => {
+        expect(encodeLoginTransferDigits({ serverUrl: 'http://10.0.0.2', secret: SECRET })).toMatch(
             /^\d+$/u,
         )
     })
@@ -61,7 +62,7 @@ describe('login transfer payload codec', () => {
             'http://0.0.0.0:8654',
         ]) {
             expect(() => assertReachableServerUrl(url)).toThrow(LoopbackServerUrlError)
-            expect(() => encodeLoginTransferQr({ serverUrl: url, secret: SECRET })).toThrow(
+            expect(() => encodeLoginTransferDigits({ serverUrl: url, secret: SECRET })).toThrow(
                 LoopbackServerUrlError,
             )
         }
@@ -71,8 +72,8 @@ describe('login transfer payload codec', () => {
     })
 
     it('rejects malformed payloads', () => {
-        expect(() => decodeLoginTransferQr('not-digits')).toThrow(UnsupportedPayloadError)
-        expect(() => decodeLoginTransferQr('123')).toThrow(UnsupportedPayloadError)
+        expect(() => decodeLoginTransferDigits('not-digits')).toThrow(UnsupportedPayloadError)
+        expect(() => decodeLoginTransferDigits('123')).toThrow(UnsupportedPayloadError)
         expect(() => decodeLoginTransferUri('https://example.com/t/abc')).toThrow(
             UnsupportedPayloadError,
         )
@@ -92,11 +93,18 @@ describe('login transfer payload codec', () => {
             .replace(/=+$/u, '')}`
         expect(() => decodeLoginTransferUri(tampered)).toThrow(UnsupportedPayloadError)
     })
+
+    it('decodes both URI and digits forms at the scan entry', () => {
+        const target = { serverUrl: 'http://192.168.0.145:8655', secret: SECRET }
+        expect(decodeLoginTransferScan(encodeLoginTransferUri(target))).toEqual(target)
+        expect(decodeLoginTransferScan(encodeLoginTransferDigits(target))).toEqual(target)
+        expect(() => decodeLoginTransferScan('neither-form')).toThrow(UnsupportedPayloadError)
+    })
 })
 
 describe('parseServerUrlFromScan', () => {
     it('extracts the instance address from a login transfer payload', () => {
-        const content = encodeLoginTransferQr({
+        const content = encodeLoginTransferUri({
             serverUrl: 'http://192.168.0.145:8655',
             secret: SECRET,
         })
