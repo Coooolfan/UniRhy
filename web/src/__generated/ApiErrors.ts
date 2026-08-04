@@ -261,6 +261,23 @@ export type ApiErrors = {
                 code: 'NOT_FOUND', 
                 readonly [key:string]: any
             }), 
+        'claim': AllErrors & ({
+                family: 'COMMON', 
+                code: 'INVALID_REQUEST', 
+                readonly [key:string]: any
+            } | {
+                family: 'LOGIN_TRANSFER', 
+                code: 'NOT_FOUND', 
+                readonly [key:string]: any
+            } | {
+                family: 'LOGIN_TRANSFER', 
+                code: 'STATUS_CONFLICT', 
+                readonly [key:string]: any
+            } | {
+                family: 'LOGIN_TRANSFER', 
+                code: 'EXPIRED', 
+                readonly [key:string]: any
+            }), 
         'update': AllErrors & ({
                 family: 'COMMON', 
                 code: 'AUTHENTICATION_FAILED', 

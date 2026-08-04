@@ -19,6 +19,7 @@ export type {FileProviderFileSystemCreate} from './FileProviderFileSystemCreate'
 export type {FileProviderFileSystemUpdate} from './FileProviderFileSystemUpdate';
 export type {FileProviderOssCreate} from './FileProviderOssCreate';
 export type {FileProviderOssUpdate} from './FileProviderOssUpdate';
+export type {LoginTransferClaimRequest} from './LoginTransferClaimRequest';
 export type {LoginTransferCreateResponse} from './LoginTransferCreateResponse';
 export type {LoginTransferUpdateRequest} from './LoginTransferUpdateRequest';
 export type {LoginTransferUpdateResponse} from './LoginTransferUpdateResponse';
