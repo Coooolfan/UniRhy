@@ -32,7 +32,8 @@ export default defineConfig({
     },
     server: {
         port: 8655,
-        host: isTauri ? '0.0.0.0' : undefined,
+        // 临时：浏览器开发也监听所有网卡，便于用手机访问局域网地址联调扫码登录
+        host: '0.0.0.0',
         ...(!isTauri && {
             proxy: {
                 '/api': {

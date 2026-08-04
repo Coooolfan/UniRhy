@@ -7,6 +7,7 @@
 | 依赖库                                        | 版本     | 开源协议          | 描述                       |
 | --------------------------------------------- | -------- | ----------------- | -------------------------- |
 | @tailwindcss/vite                             | ^4.1.18  | MIT               | Tailwind CSS Vite 插件     |
+| @tauri-apps/plugin-barcode-scanner            | ^2.4.5   | MIT OR Apache-2.0 | 移动端二维码扫描与相机权限 |
 | @tauri-apps/plugin-notification               | 2.3.3    | MIT OR Apache-2.0 | 系统通知与通知权限         |
 | @vue-flow/background                          | ^1.3.2   | MIT               | Vue Flow 画布背景组件      |
 | @vue-flow/controls                            | ^1.1.3   | MIT               | Vue Flow 缩放控制组件      |
@@ -14,6 +15,7 @@
 | @vue-flow/minimap                             | ^1.5.4   | MIT               | Vue Flow 小地图组件        |
 | lucide-vue-next                               | ^0.562.0 | ISC               | 图标库 Vue 组件            |
 | pinia                                         | ^3.0.4   | MIT               | Vue 状态管理库             |
+| qrcode                                        | ^1.5.4   | MIT               | 二维码生成                 |
 | tailwindcss                                   | ^4.1.18  | MIT               | 原子化 CSS 框架            |
 | tauri-plugin-android-battery-optimization-api | 0.1.0    | MIT               | Android 电池优化设置 API   |
 | tauri-plugin-background-service               | 0.7.1    | MIT OR Apache-2.0 | Tauri 后台服务生命周期 API |
@@ -27,6 +29,7 @@
 | @tsconfig/node24         | ^24.0.3  | MIT        | Node.js 24 TypeScript 配置 |
 | @types/jsdom             | ^27.0.0  | MIT        | JSDOM 类型定义             |
 | @types/node              | ^24.10.4 | MIT        | Node.js 类型定义           |
+| @types/qrcode            | ^1.5.6   | MIT        | qrcode 类型定义            |
 | @vitejs/plugin-vue       | ^6.0.3   | MIT        | Vite Vue 插件              |
 | @vue/test-utils          | ^2.4.6   | MIT        | Vue 测试工具库             |
 | @vue/tsconfig            | ^0.8.1   | MIT        | Vue TypeScript 配置        |

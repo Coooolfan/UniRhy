@@ -16,30 +16,53 @@ export class CameraPermissionDeniedError extends Error {
 const loadScanner = () => import('@tauri-apps/plugin-barcode-scanner')
 
 /**
- * 调起原生扫码界面并返回识别到的二维码内容；用户主动取消时返回 `null`。
+ * 确保相机权限已授予。
  *
- * 仅在移动端 Tauri 壳中可用：条码扫描由官方插件实现，浏览器与桌面端不提供。
+ * 先 `checkPermissions`，仅在用户尚未表态（prompt / prompt-with-rationale）时才
+ * `requestPermissions`；已被拒绝则不再重复打扰，直接抛 [CameraPermissionDeniedError]。
  */
-export async function scanQrCode(): Promise<string | null> {
+export async function ensureCameraPermission(): Promise<void> {
     if (!isTauri()) {
         throw new Error('Barcode scanning requires the UniRhy mobile app')
     }
-    const { scan, Format, checkPermissions, requestPermissions } = await loadScanner()
-
+    const { checkPermissions, requestPermissions } = await loadScanner()
     let permission = await checkPermissions()
-    // 尚未表态（prompt / prompt-with-rationale）时才弹窗，已被拒绝则不再打扰
     if (permission !== 'granted' && permission !== 'denied') {
         permission = await requestPermissions()
     }
     if (permission !== 'granted') {
         throw new CameraPermissionDeniedError()
     }
-
-    const scanned = await scan({ windowed: false, formats: [Format.QRCode] })
-    return scanned.content.length > 0 ? scanned.content : null
 }
 
-/** 中止仍在进行的扫码，用于离开界面时释放相机。 */
+/** windowed 扫码期间挂在 `<html>` 上的样式类，全局样式据此隐藏应用内容（见 style/main.css）。 */
+const WINDOWED_SCAN_CLASS = 'qr-scan-windowed'
+
+/**
+ * 页面内扫码并返回识别到的二维码内容；用户主动取消时返回 `null`。
+ *
+ * windowed 模式把相机预览铺在 WebView 后方并把 WebView 设为透明，
+ * 相机的可见区域由界面用透明镂空决定（见 components/login/QrScanner.vue）。
+ *
+ * 仅在移动端 Tauri 壳中可用：条码扫描由官方插件实现，浏览器与桌面端不提供。
+ */
+export async function scanQrCodeWindowed(): Promise<string | null> {
+    await ensureCameraPermission()
+    const { scan, Format } = await loadScanner()
+    document.documentElement.classList.add(WINDOWED_SCAN_CLASS)
+    try {
+        const scanned = await scan({ windowed: true, formats: [Format.QRCode] })
+        return scanned.content.length > 0 ? scanned.content : null
+    } catch (error) {
+        // 插件的 cancel() 会以 "cancelled" 拒绝挂起的 scan()，统一按用户取消处理
+        if (error instanceof Error && error.message.includes('cancelled')) return null
+        throw error
+    } finally {
+        document.documentElement.classList.remove(WINDOWED_SCAN_CLASS)
+    }
+}
+
+/** 中止仍在进行的扫码：插件销毁相机并拒绝挂起的 scan()，后者按用户取消返回。 */
 export async function cancelQrScan(): Promise<void> {
     if (!isTauri()) return
     const { cancel } = await loadScanner()

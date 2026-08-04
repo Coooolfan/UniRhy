@@ -32,6 +32,14 @@ body {
     user-select: none;
 }
 
+/*
+ * windowed 扫码期间：相机预览位于 WebView 后方，
+ * 隐藏应用内容使取景镂空处只露出相机（见 components/login/QrScanner.vue）。
+ */
+html.qr-scan-windowed #app {
+    visibility: hidden;
+}
+
 input,
 textarea,
 [contenteditable]:not([contenteditable='false']) {

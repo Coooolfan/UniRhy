@@ -13,9 +13,14 @@
 
     <!-- AndroidTV support -->
     <uses-feature android:name="android.software.leanback" android:required="false" />
-    <!-- 扫码插件会声明需要摄像头，此处强制改回可选，保证无摄像头的 TV 设备仍可安装 -->
+    <!-- 扫码插件声明 camera 与 camera.any 且后者缺省 required=true，此处一并改回可选，
+         保证无摄像头的 TV 设备仍能安装 -->
     <uses-feature
         android:name="android.hardware.camera"
+        android:required="false"
+        tools:replace="android:required" />
+    <uses-feature
+        android:name="android.hardware.camera.any"
         android:required="false"
         tools:replace="android:required" />
 

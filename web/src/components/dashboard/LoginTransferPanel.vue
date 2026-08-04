@@ -10,7 +10,7 @@ import { resolveErrorMessage } from '@/i18n/errors'
 import { getPlatformRuntime } from '@/runtime/platform'
 import {
     assertReachableServerUrl,
-    buildLoginTransferQrPayload,
+    encodeLoginTransferQr,
     LoopbackServerUrlError,
 } from '@/services/loginTransferQr'
 import { ACTIVE_LOGIN_TRANSFER_STATUSES } from '@/services/loginTransferStatus'
@@ -21,6 +21,10 @@ const { t } = useI18n()
 type LoginTransfer = LoginTransferDto['LoginTransferController/SOURCE_TRANSFER_FETCHER']
 
 const POLL_INTERVAL_MS = 1000
+/** 交接完成后成功状态的展示时长，随后自动退回个人资料页 */
+const AUTO_CLOSE_DELAY_MS = 1500
+/** 已授权的交接进入新设备换票阶段，此时关闭弹窗不应再打断登录 */
+const CANCELLABLE_STATUSES: ReadonlySet<LoginTransferStatus> = new Set(['WAITING', 'CLAIMED'])
 
 const transfer = ref<LoginTransfer | null>(null)
 const qrDataUrl = ref('')
@@ -31,6 +35,7 @@ const now = ref(Date.now())
 
 let pollTimer: ReturnType<typeof setTimeout> | null = null
 let countdownTimer: ReturnType<typeof setInterval> | null = null
+let closeTimer: ReturnType<typeof setTimeout> | null = null
 let stopped = false
 
 const status = computed<LoginTransferStatus>(() => transfer.value?.status ?? 'WAITING')
@@ -97,12 +102,10 @@ const initialize = async () => {
             expiresAt: result.expiresAt,
         }
         qrDataUrl.value = await QRCodeGenerator.toDataURL(
-            buildLoginTransferQrPayload({
-                serverUrl,
-                transferId: result.id,
-                secret: result.secret,
-            }),
+            encodeLoginTransferQr({ serverUrl, secret: result.secret }),
             {
+                // 屏幕显示、近距离扫描，不存在印刷污损风险，用最低纠错换更少的模块数
+                errorCorrectionLevel: 'L',
                 width: 280,
                 margin: 2,
                 color: { dark: '#2C2825', light: '#FFFFFF' },
@@ -131,9 +134,23 @@ const stopCountdown = () => {
 
 const cancelIfActive = () => {
     const id = transfer.value?.id
-    if (id && isActive.value) {
+    if (id && CANCELLABLE_STATUSES.has(status.value)) {
         void api.loginTransferController.cancel({ id }).catch(() => undefined)
     }
+}
+
+/** 终态（过期/被拒/取消）后原地重新创建交接，不必关掉面板再走一遍入口。 */
+const regenerate = () => {
+    if (pollTimer) {
+        clearTimeout(pollTimer)
+        pollTimer = null
+    }
+    stopCountdown()
+    transfer.value = null
+    qrDataUrl.value = ''
+    errorMessage.value = ''
+    isLoading.value = true
+    void initialize()
 }
 
 // 进入终态后倒计时不再展示，停掉定时器而不是空转到弹窗关闭
@@ -141,11 +158,18 @@ watch(isActive, (active) => {
     if (!active) stopCountdown()
 })
 
+watch(status, (next) => {
+    if (next === 'COMPLETED' && !closeTimer) {
+        closeTimer = setTimeout(() => emit('close'), AUTO_CLOSE_DELAY_MS)
+    }
+})
+
 onMounted(() => void initialize())
 
 onUnmounted(() => {
     stopped = true
     if (pollTimer) clearTimeout(pollTimer)
+    if (closeTimer) clearTimeout(closeTimer)
     stopCountdown()
     cancelIfActive()
 })
@@ -166,7 +190,10 @@ onUnmounted(() => {
         </template>
 
         <template v-else>
-            <div v-if="qrDataUrl" class="mb-4 rounded bg-white p-3 shadow-sm">
+            <div
+                v-if="qrDataUrl && status === 'WAITING'"
+                class="mb-4 rounded bg-white p-3 shadow-sm"
+            >
                 <img :src="qrDataUrl" :alt="t('loginTransfer.qrAlt')" class="h-56 w-56" />
             </div>
 
@@ -225,6 +252,13 @@ onUnmounted(() => {
                 <h3 class="text-lg font-medium text-[#2B221B]">
                     {{ t(`loginTransfer.status.${status.toLowerCase()}`) }}
                 </h3>
+                <button
+                    type="button"
+                    class="outline-button mt-5 px-6 py-2 text-sm"
+                    @click="regenerate"
+                >
+                    {{ t('loginTransfer.regenerate') }}
+                </button>
             </template>
 
             <p v-if="isActive" class="mt-4 text-xs text-[#AAA299]">
