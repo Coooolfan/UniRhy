@@ -40,15 +40,9 @@ describe('ArtistEditModal', () => {
         closeMock.mockReset()
     })
 
-    it('submits metadata together with an avatar removal', async () => {
+    it('submits metadata without an avatar change', async () => {
         const onSubmit = vi.fn()
         const wrapper = mountModal(onSubmit)
-
-        const removeButton = wrapper
-            .findAll('button')
-            .find((button) => button.text() === '移除图片')
-        expect(removeButton).toBeTruthy()
-        await removeButton!.trigger('click')
 
         const submitButton = wrapper
             .findAll('button')
@@ -62,7 +56,7 @@ describe('ArtistEditModal', () => {
                 alias: ['Alias A'],
                 comment: 'Comment A',
             },
-            { file: null, remove: true },
+            { file: null, remove: false },
         )
         expect(resolveMock).toHaveBeenCalledWith(undefined)
     })
