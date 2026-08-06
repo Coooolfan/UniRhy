@@ -20,6 +20,11 @@ import RecordingEditModal, {
     type RecordingPreview,
 } from '@/components/recording/RecordingEditModal.vue'
 import {
+    type ArtworkEditValue,
+    updateArtistArtwork,
+    updateRecordingArtwork,
+} from '@/composables/artwork'
+import {
     formatDistinctAliases,
     formatDurationMs,
     formatLabels,
@@ -204,7 +209,8 @@ const openEditArtistModal = async () => {
             initialForm: { ...artistEditInitial.value, alias: [...artistEditInitial.value.alias] },
             submitText: t('common.saveChanges'),
             submittingText: t('common.saving'),
-            onSubmit: async (form: ArtistEditForm) => {
+            currentAvatar: artistData.value.avatar,
+            onSubmit: async (form: ArtistEditForm, avatarEdit: ArtworkEditValue) => {
                 await api.artistController.updateArtist({
                     id,
                     body: {
@@ -213,6 +219,7 @@ const openEditArtistModal = async () => {
                         comment: form.comment,
                     },
                 })
+                await updateArtistArtwork(id, avatarEdit)
                 await fetchArtist(id)
             },
         },
@@ -231,7 +238,10 @@ const openEditRecordingModal = async (recording: Recording) => {
                 isDefault: recording.isDefault,
             } satisfies RecordingEditForm,
             showDefaultToggle: false,
-            onSubmit: async ({ title, label, comment }: RecordingEditForm) => {
+            onSubmit: async (
+                { title, label, comment }: RecordingEditForm,
+                coverEdit: ArtworkEditValue,
+            ) => {
                 await api.recordingController.updateRecording({
                     id: recording.id,
                     body: {
@@ -240,6 +250,7 @@ const openEditRecordingModal = async (recording: Recording) => {
                         comment,
                     },
                 })
+                const updatedCover = await updateRecordingArtwork(recording.id, coverEdit)
                 invalidateResolvedPlayableTracksByRecording(recording.id)
 
                 const index = recordings.value.findIndex((item) => item.id === recording.id)
@@ -251,6 +262,7 @@ const openEditRecordingModal = async (recording: Recording) => {
                             title,
                             labels: label,
                             comment,
+                            cover: updatedCover ?? current.cover,
                         }
                     }
                 }

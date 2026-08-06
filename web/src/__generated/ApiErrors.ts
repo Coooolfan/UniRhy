@@ -20,6 +20,12 @@ export type AllErrors = {
         family: 'COMMON', 
         code: 'NOT_FOUND'
     } | {
+        family: 'MEDIA_FILE', 
+        code: 'IMAGE_TOO_LARGE'
+    } | {
+        family: 'MEDIA_FILE', 
+        code: 'INVALID_IMAGE'
+    } | {
         family: 'ARTIST', 
         code: 'TARGET_NOT_FOUND'
     } | {
@@ -231,6 +237,32 @@ export type ApiErrors = {
         'updateArtist': AllErrors & ({
                 family: 'COMMON', 
                 code: 'FORBIDDEN', 
+                readonly [key:string]: any
+            }), 
+        'updateArtistAvatar': AllErrors & ({
+                family: 'COMMON', 
+                code: 'FORBIDDEN', 
+                readonly [key:string]: any
+            } | {
+                family: 'COMMON', 
+                code: 'NOT_FOUND', 
+                readonly [key:string]: any
+            } | {
+                family: 'MEDIA_FILE', 
+                code: 'IMAGE_TOO_LARGE', 
+                readonly [key:string]: any
+            } | {
+                family: 'MEDIA_FILE', 
+                code: 'INVALID_IMAGE', 
+                readonly [key:string]: any
+            }), 
+        'removeArtistAvatar': AllErrors & ({
+                family: 'COMMON', 
+                code: 'FORBIDDEN', 
+                readonly [key:string]: any
+            } | {
+                family: 'COMMON', 
+                code: 'NOT_FOUND', 
                 readonly [key:string]: any
             }), 
         'mergeArtists': AllErrors & ({
@@ -579,6 +611,32 @@ export type ApiErrors = {
         'updateRecording': AllErrors & ({
                 family: 'COMMON', 
                 code: 'FORBIDDEN', 
+                readonly [key:string]: any
+            }), 
+        'updateRecordingCover': AllErrors & ({
+                family: 'COMMON', 
+                code: 'FORBIDDEN', 
+                readonly [key:string]: any
+            } | {
+                family: 'RECORDING', 
+                code: 'NOT_FOUND', 
+                readonly [key:string]: any
+            } | {
+                family: 'MEDIA_FILE', 
+                code: 'IMAGE_TOO_LARGE', 
+                readonly [key:string]: any
+            } | {
+                family: 'MEDIA_FILE', 
+                code: 'INVALID_IMAGE', 
+                readonly [key:string]: any
+            }), 
+        'removeRecordingCover': AllErrors & ({
+                family: 'COMMON', 
+                code: 'FORBIDDEN', 
+                readonly [key:string]: any
+            } | {
+                family: 'RECORDING', 
+                code: 'NOT_FOUND', 
                 readonly [key:string]: any
             }), 
         'mergeRecording': AllErrors & ({

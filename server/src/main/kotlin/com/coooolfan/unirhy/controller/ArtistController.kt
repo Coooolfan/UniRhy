@@ -5,16 +5,19 @@ import cn.dev33.satoken.annotation.SaCheckRole
 import com.coooolfan.unirhy.config.ROLE_ADMIN
 import com.coooolfan.unirhy.error.ArtistException
 import com.coooolfan.unirhy.error.CommonException
+import com.coooolfan.unirhy.error.MediaFileException
 import com.coooolfan.unirhy.model.Artist
 import com.coooolfan.unirhy.model.by
 import com.coooolfan.unirhy.model.dto.ArtistCreate
 import com.coooolfan.unirhy.model.dto.ArtistMergeReq
 import com.coooolfan.unirhy.model.dto.ArtistUpdate
 import com.coooolfan.unirhy.service.ArtistService
+import com.coooolfan.unirhy.service.ArtworkService
 import org.babyfish.jimmer.Page
 import org.babyfish.jimmer.client.FetchBy
 import org.babyfish.jimmer.sql.kt.fetcher.newFetcher
 import org.springframework.http.HttpStatus
+import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
@@ -24,6 +27,7 @@ import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
+import org.springframework.web.multipart.MultipartFile
 
 /**
  * 艺术家管理接口
@@ -33,7 +37,10 @@ import org.springframework.web.bind.annotation.RestController
 @RestController
 @RequestMapping("/api/artists")
 @SaCheckLogin
-class ArtistController(private val service: ArtistService) {
+class ArtistController(
+    private val artistService: ArtistService,
+    private val artworkService: ArtworkService,
+) {
     /**
      * 获取艺术家分页列表
      *
@@ -51,7 +58,7 @@ class ArtistController(private val service: ArtistService) {
         @RequestParam(required = false) pageIndex: Int?,
         @RequestParam(required = false) pageSize: Int?,
     ): Page<@FetchBy("DEFAULT_ARTIST_FETCHER") Artist> {
-        return service.listArtist(pageIndex ?: 0, pageSize ?: 10, DEFAULT_ARTIST_FETCHER)
+        return artistService.listArtist(pageIndex ?: 0, pageSize ?: 10, DEFAULT_ARTIST_FETCHER)
     }
 
     /**
@@ -70,7 +77,7 @@ class ArtistController(private val service: ArtistService) {
     fun getArtistById(
         @PathVariable id: Long,
     ): @FetchBy("ARTIST_DETAIL_FETCHER") Artist {
-        return service.getArtistById(id, ARTIST_DETAIL_FETCHER)
+        return artistService.getArtistById(id, ARTIST_DETAIL_FETCHER)
     }
 
     /**
@@ -85,7 +92,7 @@ class ArtistController(private val service: ArtistService) {
      */
     @GetMapping("/search-results")
     fun getArtistByName(@RequestParam name: String): List<@FetchBy("DEFAULT_ARTIST_FETCHER") Artist> {
-        return service.getArtistByName(name, DEFAULT_ARTIST_FETCHER)
+        return artistService.getArtistByName(name, DEFAULT_ARTIST_FETCHER)
     }
 
     /**
@@ -106,7 +113,7 @@ class ArtistController(private val service: ArtistService) {
         @RequestBody input: ArtistCreate,
         @RequestParam(required = false) copyAssociationsFrom: Long?,
     ): @FetchBy("DEFAULT_ARTIST_FETCHER") Artist {
-        return service.createArtist(input.toEntity(), DEFAULT_ARTIST_FETCHER, copyAssociationsFrom)
+        return artistService.createArtist(input.toEntity(), DEFAULT_ARTIST_FETCHER, copyAssociationsFrom)
     }
 
     /**
@@ -130,7 +137,33 @@ class ArtistController(private val service: ArtistService) {
         @PathVariable id: Long,
         @RequestBody input: ArtistUpdate,
     ): @FetchBy("DEFAULT_ARTIST_FETCHER") Artist {
-        return service.updateArtist(input.toEntity { this.id = id }, DEFAULT_ARTIST_FETCHER)
+        return artistService.updateArtist(input.toEntity { this.id = id }, DEFAULT_ARTIST_FETCHER)
+    }
+
+    @PutMapping("/{id}/avatar", consumes = ["multipart/form-data"])
+    @SaCheckRole(ROLE_ADMIN)
+    @ResponseStatus(HttpStatus.OK)
+    @Throws(
+        CommonException.Forbidden::class,
+        CommonException.NotFound::class,
+        MediaFileException.ImageTooLarge::class,
+        MediaFileException.InvalidImage::class,
+    )
+    fun updateArtistAvatar(
+        @PathVariable id: Long,
+        @RequestParam("file") file: MultipartFile,
+    ): @FetchBy("ARTIST_DETAIL_FETCHER") Artist {
+        return artworkService.updateArtistAvatar(id, file, ARTIST_DETAIL_FETCHER)
+    }
+
+    @DeleteMapping("/{id}/avatar")
+    @SaCheckRole(ROLE_ADMIN)
+    @ResponseStatus(HttpStatus.OK)
+    @Throws(CommonException.Forbidden::class, CommonException.NotFound::class)
+    fun removeArtistAvatar(
+        @PathVariable id: Long,
+    ): @FetchBy("ARTIST_DETAIL_FETCHER") Artist {
+        return artworkService.removeArtistAvatar(id, ARTIST_DETAIL_FETCHER)
     }
 
     /**
@@ -151,12 +184,16 @@ class ArtistController(private val service: ArtistService) {
         ArtistException.SourceNotFound::class,
     )
     fun mergeArtists(@RequestBody input: ArtistMergeReq) {
-        service.mergeArtists(input)
+        artistService.mergeArtists(input)
     }
 
     companion object {
         val DEFAULT_ARTIST_FETCHER = newFetcher(Artist::class).by {
             allScalarFields()
+            avatar {
+                allScalarFields()
+                url()
+            }
         }
 
         val ARTIST_DETAIL_FETCHER = newFetcher(Artist::class).by {

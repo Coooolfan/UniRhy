@@ -37,6 +37,7 @@ class GlobalExceptionHandler {
             -> 403
             "PLUGIN:PACKAGE_TOO_LARGE",
             "PLUGIN:WASM_TOO_LARGE",
+            "MEDIA_FILE:IMAGE_TOO_LARGE",
             -> 413
             "SYSTEM:SYSTEM_UNINITIALIZED",
             "SYSTEM:SYSTEM_ALREADY_INITIALIZED",
@@ -55,6 +56,7 @@ class GlobalExceptionHandler {
             -> 409
             "LOGIN_TRANSFER:EXPIRED" -> 410
             "COMMON:INVALID_REQUEST",
+            "MEDIA_FILE:INVALID_IMAGE",
             "ACCOUNT:CREDENTIAL_UPDATE_REQUIRED",
             "ALBUM:RECORDING_IDS_CONTAIN_DUPLICATES",
             "ALBUM:RECORDING_IDS_MISMATCH",

@@ -104,12 +104,15 @@ describe('RecordingEditModal', () => {
 
         await submitButton!.trigger('click')
 
-        expect(onSubmit).toHaveBeenCalledWith({
-            title: 'Updated Title',
-            label: ['Updated Label'],
-            comment: 'Updated Comment',
-            isDefault: false,
-        })
+        expect(onSubmit).toHaveBeenCalledWith(
+            {
+                title: 'Updated Title',
+                label: ['Updated Label'],
+                comment: 'Updated Comment',
+                isDefault: false,
+            },
+            { file: null, remove: false },
+        )
         expect(resolveMock).toHaveBeenCalledWith(undefined)
     })
 

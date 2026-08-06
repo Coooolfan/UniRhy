@@ -9,6 +9,7 @@ const props = withDefaults(
         id: number | string
         title: string
         subtitle: string
+        avatar?: string
         selectable?: boolean
         selected?: boolean
         openable?: boolean
@@ -19,6 +20,7 @@ const props = withDefaults(
         selected: false,
         openable: true,
         editable: false,
+        avatar: '',
     },
 )
 
@@ -44,7 +46,9 @@ const emit = defineEmits<{
                         : ''
                 "
             >
+                <img v-if="avatar" :src="avatar" :alt="title" class="h-full w-full object-cover" />
                 <svg
+                    v-else
                     xmlns="http://www.w3.org/2000/svg"
                     viewBox="0 0 400 400"
                     class="h-full w-full rounded-sm"

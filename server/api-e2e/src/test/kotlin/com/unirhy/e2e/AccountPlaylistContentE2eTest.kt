@@ -1218,6 +1218,80 @@ class AccountPlaylistContentE2eTest {
         )
     }
 
+    @Test
+    @Order(12)
+    fun `artwork endpoints should upload and remove recording covers and artist avatars`() {
+        val state = bootstrapAdminSession(baseUrl())
+        val suffix = suffix()
+        val artistId = jdbc.queryForObject(
+            "INSERT INTO artist(display_name, alias, comment) VALUES (:name, '{}', '') RETURNING id",
+            MapSqlParameterSource("name", "artwork-artist-$suffix"),
+            Long::class.java,
+        ) ?: error("[artwork] artist id should be returned")
+        val workId = jdbc.queryForObject(
+            "INSERT INTO work(title) VALUES (:title) RETURNING id",
+            MapSqlParameterSource("title", "artwork-work-$suffix"),
+            Long::class.java,
+        ) ?: error("[artwork] work id should be returned")
+        val recordingId = jdbc.queryForObject(
+            """
+                INSERT INTO recording(work_id, label, title, comment, duration_ms, default_in_work)
+                VALUES (:workId, '{}', :title, '', 1000, false)
+                RETURNING id
+            """.trimIndent(),
+            MapSqlParameterSource()
+                .addValue("workId", workId)
+                .addValue("title", "artwork-recording-$suffix"),
+            Long::class.java,
+        ) ?: error("[artwork] recording id should be returned")
+        val imageBytes = java.util.Base64.getDecoder().decode(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+        )
+
+        val coverUploadResponse = state.api.putMultipartFile(
+            path = "/api/recordings/$recordingId/cover",
+            fieldName = "file",
+            fileName = "cover.png",
+            fileBytes = imageBytes,
+            contentType = "image/png",
+        )
+        E2eAssert.status(coverUploadResponse, 200, "[artwork] recording cover upload should succeed")
+        val coverNode = E2eJson.mapper.readTree(coverUploadResponse.body()).path("cover")
+        val coverId = readIdFromNode(coverNode.path("id"), "[artwork] uploaded cover should expose an id")
+        assertEquals("image/png", coverNode.path("mimeType").asString(), "[artwork] cover mime type should match")
+        val coverMediaResponse = state.api.getBytes("/api/media-files/$coverId")
+        E2eAssert.status(coverMediaResponse, 200, "[artwork] uploaded cover should be readable")
+        assertTrue(coverMediaResponse.body().contentEquals(imageBytes), "[artwork] cover bytes should match upload")
+
+        val avatarUploadResponse = state.api.putMultipartFile(
+            path = "/api/artists/$artistId/avatar",
+            fieldName = "file",
+            fileName = "avatar.png",
+            fileBytes = imageBytes,
+            contentType = "image/png",
+        )
+        E2eAssert.status(avatarUploadResponse, 200, "[artwork] artist avatar upload should succeed")
+        val avatarNode = E2eJson.mapper.readTree(avatarUploadResponse.body()).path("avatar")
+        assertTrue(avatarNode.path("id").canConvertToLong(), "[artwork] uploaded avatar should expose an id")
+        assertTrue(avatarNode.path("url").asString().isNotBlank(), "[artwork] uploaded avatar should expose a URL")
+
+        val removeCoverResponse = state.api.delete("/api/recordings/$recordingId/cover")
+        E2eAssert.status(removeCoverResponse, 200, "[artwork] recording cover removal should succeed")
+        val removedCoverNode = E2eJson.mapper.readTree(removeCoverResponse.body()).path("cover")
+        assertTrue(
+            removedCoverNode.isMissingNode || removedCoverNode.isNull,
+            "[artwork] removed recording cover should be empty",
+        )
+
+        val removeAvatarResponse = state.api.delete("/api/artists/$artistId/avatar")
+        E2eAssert.status(removeAvatarResponse, 200, "[artwork] artist avatar removal should succeed")
+        val removedAvatarNode = E2eJson.mapper.readTree(removeAvatarResponse.body()).path("avatar")
+        assertTrue(
+            removedAvatarNode.isMissingNode || removedAvatarNode.isNull,
+            "[artwork] removed artist avatar should be empty",
+        )
+    }
+
     private fun createAccountByAdmin(
         state: E2eAdminSession,
         name: String,

@@ -4,17 +4,20 @@ import cn.dev33.satoken.annotation.SaCheckLogin
 import cn.dev33.satoken.annotation.SaCheckRole
 import com.coooolfan.unirhy.config.ROLE_ADMIN
 import com.coooolfan.unirhy.error.CommonException
+import com.coooolfan.unirhy.error.MediaFileException
 import com.coooolfan.unirhy.error.RecordingException
 import com.coooolfan.unirhy.model.Recording
 import com.coooolfan.unirhy.model.by
 import com.coooolfan.unirhy.model.dto.RecordingMergeReq
 import com.coooolfan.unirhy.model.dto.RecordingUpdate
+import com.coooolfan.unirhy.service.ArtworkService
 import com.coooolfan.unirhy.service.RecordingService
 import org.babyfish.jimmer.Page
 import org.babyfish.jimmer.client.FetchBy
 import org.babyfish.jimmer.sql.kt.fetcher.newFetcher
 import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.*
+import org.springframework.web.multipart.MultipartFile
 
 /**
  * 录音管理接口
@@ -24,7 +27,10 @@ import org.springframework.web.bind.annotation.*
 @SaCheckLogin
 @RestController
 @RequestMapping("/api/recordings")
-class RecordingController(private val service: RecordingService) {
+class RecordingController(
+    private val recordingService: RecordingService,
+    private val artworkService: ArtworkService,
+) {
 
     /**
      * 分页查询指定艺术家的录音
@@ -45,7 +51,7 @@ class RecordingController(private val service: RecordingService) {
         @RequestParam(required = false) pageIndex: Int?,
         @RequestParam(required = false) pageSize: Int?,
     ): Page<@FetchBy("RECORDING_LIST_FETCHER") Recording> {
-        return service.listRecordings(
+        return recordingService.listRecordings(
             pageIndex = pageIndex ?: 0,
             pageSize = pageSize ?: 10,
             ids = null,
@@ -74,7 +80,7 @@ class RecordingController(private val service: RecordingService) {
     fun getRecording(
         @PathVariable id: Long,
     ): @FetchBy("PLAYBACK_RECORDING_FETCHER") Recording {
-        return service.getRecording(id, PLAYBACK_RECORDING_FETCHER)
+        return recordingService.getRecording(id, PLAYBACK_RECORDING_FETCHER)
     }
 
     /**
@@ -98,7 +104,33 @@ class RecordingController(private val service: RecordingService) {
         @PathVariable id: Long,
         @RequestBody input: RecordingUpdate,
     ) {
-        service.updateRecording(input.toEntity { this.id = id })
+        recordingService.updateRecording(input.toEntity { this.id = id })
+    }
+
+    @PutMapping("/{id}/cover", consumes = ["multipart/form-data"])
+    @SaCheckRole(ROLE_ADMIN)
+    @ResponseStatus(HttpStatus.OK)
+    @Throws(
+        CommonException.Forbidden::class,
+        RecordingException.NotFound::class,
+        MediaFileException.ImageTooLarge::class,
+        MediaFileException.InvalidImage::class,
+    )
+    fun updateRecordingCover(
+        @PathVariable id: Long,
+        @RequestParam("file") file: MultipartFile,
+    ): @FetchBy("PLAYBACK_RECORDING_FETCHER") Recording {
+        return artworkService.updateRecordingCover(id, file, PLAYBACK_RECORDING_FETCHER)
+    }
+
+    @DeleteMapping("/{id}/cover")
+    @SaCheckRole(ROLE_ADMIN)
+    @ResponseStatus(HttpStatus.OK)
+    @Throws(CommonException.Forbidden::class, RecordingException.NotFound::class)
+    fun removeRecordingCover(
+        @PathVariable id: Long,
+    ): @FetchBy("PLAYBACK_RECORDING_FETCHER") Recording {
+        return artworkService.removeRecordingCover(id, PLAYBACK_RECORDING_FETCHER)
     }
 
 
@@ -123,7 +155,7 @@ class RecordingController(private val service: RecordingService) {
         RecordingException.WorkMismatch::class,
     )
     fun mergeRecording(@RequestBody input: RecordingMergeReq) {
-        service.mergeRecording(input)
+        recordingService.mergeRecording(input)
     }
 
     companion object {

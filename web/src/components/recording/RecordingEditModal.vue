@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Disc, FileAudio, Image as ImageIcon, Pencil, Plus, Trash2 } from 'lucide-vue-next'
+import { Disc, FileAudio, Pencil, Plus, Trash2 } from 'lucide-vue-next'
 import { resolveErrorMessage } from '@/i18n/errors'
+import ArtworkField from '@/components/common/ArtworkField.vue'
+import { emptyArtworkEdit, type ArtworkEditValue } from '@/composables/artwork'
 import { useModalContext } from '@/components/modals/modalContext'
 import { normalizeLabels } from '@/composables/recordingMedia'
 
@@ -34,7 +36,7 @@ const props = withDefaults(
     defineProps<{
         recording: RecordingPreview | null
         initialForm: RecordingEditForm
-        onSubmit: (value: RecordingEditForm) => Promise<void> | void
+        onSubmit: (value: RecordingEditForm, cover: ArtworkEditValue) => Promise<void> | void
         showDefaultToggle?: boolean
     }>(),
     {
@@ -53,6 +55,7 @@ const form = reactive<RecordingEditForm>({
 })
 const error = ref('')
 const isSaving = ref(false)
+const coverEdit = ref<ArtworkEditValue>(emptyArtworkEdit())
 const editingLabelIndex = ref<number | null>(null)
 
 const closeModal = () => {
@@ -101,12 +104,15 @@ const submit = async () => {
 
     try {
         const labels = normalizeLabels(form.label)
-        await props.onSubmit({
-            title: form.title.trim(),
-            label: labels,
-            comment: form.comment.trim(),
-            isDefault: form.isDefault,
-        })
+        await props.onSubmit(
+            {
+                title: form.title.trim(),
+                label: labels,
+                comment: form.comment.trim(),
+                isDefault: form.isDefault,
+            },
+            coverEdit.value,
+        )
         modal.resolve(undefined)
     } catch (submitError) {
         error.value = resolveErrorMessage(submitError, 'errors.fallback.recordingUpdate')
@@ -123,23 +129,15 @@ const submit = async () => {
                 v-if="recording"
                 class="flex h-full flex-col rounded-sm border border-[#D6D1C4] bg-[#F7F5F0] p-5"
             >
-                <div class="flex gap-5">
-                    <div
-                        class="h-24 w-24 shrink-0 overflow-hidden rounded-sm bg-[#EAE6DE] shadow-sm"
-                    >
-                        <img
-                            v-if="recording.cover"
-                            :src="recording.cover"
-                            class="h-full w-full object-cover"
-                        />
-                        <div
-                            v-else
-                            class="flex h-full w-full items-center justify-center text-[#8C857B]"
-                        >
-                            <ImageIcon :size="24" />
-                        </div>
-                    </div>
-                    <div class="min-w-0 flex-1 space-y-3 py-1">
+                <div class="flex flex-col gap-5 sm:flex-row sm:items-start">
+                    <ArtworkField
+                        v-model="coverEdit"
+                        :current-url="recording.cover"
+                        :label="t('recording.cover')"
+                        :disabled="isSaving"
+                        class="shrink-0"
+                    />
+                    <div class="min-w-0 flex-1 space-y-3 sm:pt-6">
                         <div>
                             <div class="mb-1 text-xs uppercase tracking-wider text-[#8C857B]">
                                 {{ t('recording.trackId') }}

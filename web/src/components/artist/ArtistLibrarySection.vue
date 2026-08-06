@@ -9,7 +9,8 @@ import ArtistEditModal, { type ArtistEditForm } from '@/components/artist/Artist
 import MediaGrid from '@/components/media/MediaGrid.vue'
 import LibraryEmptyHint from '@/components/dashboard/LibraryEmptyHint.vue'
 import { useModal } from '@/composables/useModal'
-import { formatDistinctAliases } from '@/composables/recordingMedia'
+import { type ArtworkEditValue, updateArtistArtwork } from '@/composables/artwork'
+import { formatDistinctAliases, resolveCover } from '@/composables/recordingMedia'
 import { useUserStore } from '@/stores/user'
 
 type ArtistItem = {
@@ -17,6 +18,7 @@ type ArtistItem = {
     displayName: string
     alias: string[]
     comment: string
+    avatar: string
 }
 
 const props = defineProps<{
@@ -47,11 +49,13 @@ const toArtistItem = (raw: {
     displayName: string
     alias: ReadonlyArray<string>
     comment: string
+    avatar?: { url?: string } | null
 }): ArtistItem => ({
     id: raw.id,
     displayName: raw.displayName,
     alias: [...raw.alias],
     comment: raw.comment,
+    avatar: resolveCover(raw.avatar),
 })
 
 const fetchArtists = async () => {
@@ -102,7 +106,8 @@ const openEditModal = async (artist: ArtistItem) => {
             },
             submitText: t('common.saveChanges'),
             submittingText: t('common.saving'),
-            onSubmit: async (form: ArtistEditForm) => {
+            currentAvatar: artist.avatar,
+            onSubmit: async (form: ArtistEditForm, avatarEdit: ArtworkEditValue) => {
                 await api.artistController.updateArtist({
                     id: artist.id,
                     body: {
@@ -111,6 +116,7 @@ const openEditModal = async (artist: ArtistItem) => {
                         comment: form.comment,
                     },
                 })
+                await updateArtistArtwork(artist.id, avatarEdit)
             },
         },
     })
@@ -145,6 +151,7 @@ const openEditModal = async (artist: ArtistItem) => {
                     :id="artist.id"
                     :title="artist.displayName"
                     :subtitle="subtitleOf(artist)"
+                    :avatar="artist.avatar"
                     :editable="userStore.isAdmin"
                     @open="openArtistDetail(artist)"
                     @edit="openEditModal(artist)"

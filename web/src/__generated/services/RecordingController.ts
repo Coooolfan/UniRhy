@@ -85,6 +85,15 @@ export class RecordingController {
         return (await this.executor({uri: _uri, method: 'POST', body: options.body})) as Promise<void>;
     }
     
+    readonly removeRecordingCover: (options: RecordingControllerOptions['removeRecordingCover']) => Promise<
+        RecordingDto['RecordingController/PLAYBACK_RECORDING_FETCHER']
+    > = async(options) => {
+        let _uri = '/api/recordings/';
+        _uri += encodeURIComponent(options.id);
+        _uri += '/cover';
+        return (await this.executor({uri: _uri, method: 'DELETE'})) as Promise<RecordingDto['RecordingController/PLAYBACK_RECORDING_FETCHER']>;
+    }
+    
     /**
      * 更新录音信息
      * 
@@ -102,6 +111,18 @@ export class RecordingController {
         let _uri = '/api/recordings/';
         _uri += encodeURIComponent(options.id);
         return (await this.executor({uri: _uri, method: 'PUT', body: options.body})) as Promise<void>;
+    }
+    
+    readonly updateRecordingCover: (options: RecordingControllerOptions['updateRecordingCover']) => Promise<
+        RecordingDto['RecordingController/PLAYBACK_RECORDING_FETCHER']
+    > = async(options) => {
+        let _uri = '/api/recordings/';
+        _uri += encodeURIComponent(options.id);
+        _uri += '/cover';
+        const _formData = new FormData();
+        const _body = options.body;
+        _formData.append("file", _body.file);
+        return (await this.executor({uri: _uri, method: 'PUT', body: _formData})) as Promise<RecordingDto['RecordingController/PLAYBACK_RECORDING_FETCHER']>;
     }
 }
 
@@ -136,6 +157,15 @@ export type RecordingControllerOptions = {
          * 
          */
         readonly body: RecordingUpdate
+    }, 
+    'updateRecordingCover': {
+        readonly id: number, 
+        readonly body: {
+            readonly file: File
+        }
+    }, 
+    'removeRecordingCover': {
+        readonly id: number
     }, 
     'mergeRecording': {
         /**
