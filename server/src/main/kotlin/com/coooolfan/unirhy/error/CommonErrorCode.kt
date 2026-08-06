@@ -51,6 +51,8 @@ enum class MediaFileErrorCode {
     NOT_FOUND,
     INVALID_STORAGE_PROVIDER,
     FILE_NOT_FOUND,
+    IMAGE_TOO_LARGE,
+    INVALID_IMAGE,
 }
 
 @ErrorFamily

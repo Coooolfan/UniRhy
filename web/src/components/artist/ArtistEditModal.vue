@@ -2,6 +2,8 @@
 import { Pencil, Plus, Trash2 } from 'lucide-vue-next'
 import { reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import ArtworkField from '@/components/common/ArtworkField.vue'
+import { emptyArtworkEdit, type ArtworkEditValue } from '@/composables/artwork'
 import { resolveErrorMessage } from '@/i18n/errors'
 import { useModalContext } from '@/components/modals/modalContext'
 import { normalizeLabels } from '@/composables/recordingMedia'
@@ -17,7 +19,8 @@ export type ArtistEditForm = {
 const props = withDefaults(
     defineProps<{
         initialForm: ArtistEditForm
-        onSubmit: (form: ArtistEditForm) => Promise<void> | void
+        currentAvatar?: string
+        onSubmit: (form: ArtistEditForm, avatar: ArtworkEditValue) => Promise<void> | void
         submitText?: string
         submittingText?: string
         nameFailureMessage?: string
@@ -26,6 +29,7 @@ const props = withDefaults(
         submitText: '',
         submittingText: '',
         nameFailureMessage: 'errors.fallback.artistUpdate',
+        currentAvatar: '',
     },
 )
 
@@ -38,6 +42,7 @@ const form = reactive<ArtistEditForm>({
 })
 const error = ref('')
 const isSaving = ref(false)
+const avatarEdit = ref<ArtworkEditValue>(emptyArtworkEdit())
 const editingAliasIndex = ref<number | null>(null)
 
 const closeModal = () => {
@@ -83,11 +88,14 @@ const submit = async () => {
 
     try {
         const aliases = Array.from(new Set(normalizeLabels(form.alias)))
-        await props.onSubmit({
-            displayName: form.displayName.trim(),
-            alias: aliases,
-            comment: form.comment.trim(),
-        })
+        await props.onSubmit(
+            {
+                displayName: form.displayName.trim(),
+                alias: aliases,
+                comment: form.comment.trim(),
+            },
+            avatarEdit.value,
+        )
         modal.resolve(undefined)
     } catch (submitError) {
         error.value = resolveErrorMessage(submitError, props.nameFailureMessage)
@@ -99,6 +107,14 @@ const submit = async () => {
 
 <template>
     <div class="flex flex-col space-y-5">
+        <ArtworkField
+            v-model="avatarEdit"
+            :current-url="currentAvatar"
+            :label="t('artistEdit.avatar')"
+            :disabled="isSaving"
+            round
+        />
+
         <label class="block">
             <span class="mb-2 block font-serif text-xs uppercase tracking-wider text-[#8A8A8A]">
                 {{ t('artistEdit.name') }}

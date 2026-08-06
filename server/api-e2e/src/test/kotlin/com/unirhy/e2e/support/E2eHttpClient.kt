@@ -118,6 +118,45 @@ class E2eHttpClient(private val baseUrl: String) {
         contentType: String = "application/octet-stream",
         query: Map<String, Any?> = emptyMap(),
         headers: Map<String, String> = emptyMap(),
+    ): HttpResponse<String> = multipartFile(
+        method = HttpMethod.POST,
+        path = path,
+        fieldName = fieldName,
+        fileName = fileName,
+        fileBytes = fileBytes,
+        contentType = contentType,
+        query = query,
+        headers = headers,
+    )
+
+    fun putMultipartFile(
+        path: String,
+        fieldName: String,
+        fileName: String,
+        fileBytes: ByteArray,
+        contentType: String = "application/octet-stream",
+        query: Map<String, Any?> = emptyMap(),
+        headers: Map<String, String> = emptyMap(),
+    ): HttpResponse<String> = multipartFile(
+        method = HttpMethod.PUT,
+        path = path,
+        fieldName = fieldName,
+        fileName = fileName,
+        fileBytes = fileBytes,
+        contentType = contentType,
+        query = query,
+        headers = headers,
+    )
+
+    private fun multipartFile(
+        method: HttpMethod,
+        path: String,
+        fieldName: String,
+        fileName: String,
+        fileBytes: ByteArray,
+        contentType: String,
+        query: Map<String, Any?>,
+        headers: Map<String, String>,
     ): HttpResponse<String> {
         val boundary = "unirhy-e2e-${UUID.randomUUID()}"
         val body = ByteArrayOutputStream()
@@ -133,7 +172,7 @@ class E2eHttpClient(private val baseUrl: String) {
 
         return requestText(
             E2eRequest(
-                method = HttpMethod.POST,
+                method = method,
                 path = path,
                 query = query,
                 headers = headers + ("Content-Type" to "multipart/form-data; boundary=$boundary"),

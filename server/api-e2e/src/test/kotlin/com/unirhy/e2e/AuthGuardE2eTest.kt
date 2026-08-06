@@ -106,6 +106,12 @@ class AuthGuardE2eTest {
             ProtectedEndpoint("GET", "/api/artists/search-results"),
             ProtectedEndpoint("POST", "/api/artists"),
             ProtectedEndpoint("PUT", "/api/artists/1"),
+            ProtectedEndpoint(
+                "PUT",
+                "/api/artists/1/avatar",
+                mapOf("Content-Type" to "multipart/form-data; boundary=test"),
+            ),
+            ProtectedEndpoint("DELETE", "/api/artists/1/avatar"),
             ProtectedEndpoint("POST", "/api/artists/merge-requests"),
             // works
             ProtectedEndpoint("GET", "/api/works"),
@@ -124,6 +130,12 @@ class AuthGuardE2eTest {
             // recordings
             ProtectedEndpoint("GET", "/api/recordings/1"),
             ProtectedEndpoint("PUT", "/api/recordings/1"),
+            ProtectedEndpoint(
+                "PUT",
+                "/api/recordings/1/cover",
+                mapOf("Content-Type" to "multipart/form-data; boundary=test"),
+            ),
+            ProtectedEndpoint("DELETE", "/api/recordings/1/cover"),
             ProtectedEndpoint("POST", "/api/recordings/merge-requests"),
             // media
             ProtectedEndpoint("GET", "/api/media-files/1"),

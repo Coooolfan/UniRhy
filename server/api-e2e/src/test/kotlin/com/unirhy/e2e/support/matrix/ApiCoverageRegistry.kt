@@ -38,6 +38,8 @@ object ApiCoverageRegistry {
         "com.unirhy.e2e.AccountPlaylistContentE2eTest#playlist reorder should update sort order and validate input"
     private const val ARTIST_FLOW_CASE =
         "com.unirhy.e2e.AccountPlaylistContentE2eTest#artists should support list search create update and merge flow"
+    private const val ARTWORK_FLOW_CASE =
+        "com.unirhy.e2e.AccountPlaylistContentE2eTest#artwork endpoints should upload and remove recording covers and artist avatars"
     private const val PLUGIN_LIFECYCLE_CASE =
         "com.unirhy.e2e.PluginE2eTest#plugin lifecycle should support upload list download enable submit disable and delete"
     private const val PLUGIN_UPLOAD_INVALID_CASE =
@@ -117,6 +119,18 @@ object ApiCoverageRegistry {
             note = "validation: malformed id returns 400",
         ),
         full(
+            "PUT",
+            "/api/artists/{id}/avatar",
+            testRef = ARTWORK_FLOW_CASE,
+            note = "auth: $AUTH_GUARD_CASE; validation: empty image returns 400",
+        ),
+        full(
+            "DELETE",
+            "/api/artists/{id}/avatar",
+            testRef = ARTWORK_FLOW_CASE,
+            note = "auth: $AUTH_GUARD_CASE",
+        ),
+        full(
             "POST",
             "/api/artists/merge-requests",
             testRef = ARTIST_FLOW_CASE,
@@ -127,6 +141,18 @@ object ApiCoverageRegistry {
             "/api/recordings",
             testRef = CONTENT_SEARCH_UPDATE_MERGE_CASE,
             note = "filter: artistId; unknown artist returns empty page",
+        ),
+        full(
+            "PUT",
+            "/api/recordings/{id}/cover",
+            testRef = ARTWORK_FLOW_CASE,
+            note = "auth: $AUTH_GUARD_CASE; validation: empty image returns 400",
+        ),
+        full(
+            "DELETE",
+            "/api/recordings/{id}/cover",
+            testRef = ARTWORK_FLOW_CASE,
+            note = "auth: $AUTH_GUARD_CASE",
         ),
         full(
             "GET",

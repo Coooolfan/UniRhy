@@ -15,6 +15,7 @@ import RecordingEditModal, {
     type RecordingEditForm,
     type RecordingPreview,
 } from '@/components/recording/RecordingEditModal.vue'
+import { type ArtworkEditValue, updateRecordingArtwork } from '@/composables/artwork'
 import {
     formatDurationMs,
     formatLabels,
@@ -261,7 +262,10 @@ const openEditRecordingModal = async (recording: Recording) => {
                 isDefault: recording.isDefault,
             } satisfies RecordingEditForm,
             showDefaultToggle: false,
-            onSubmit: async ({ title, label, comment }: RecordingEditForm) => {
+            onSubmit: async (
+                { title, label, comment }: RecordingEditForm,
+                coverEdit: ArtworkEditValue,
+            ) => {
                 await api.recordingController.updateRecording({
                     id: recording.id,
                     body: {
@@ -270,6 +274,7 @@ const openEditRecordingModal = async (recording: Recording) => {
                         comment,
                     },
                 })
+                const updatedCover = await updateRecordingArtwork(recording.id, coverEdit)
                 invalidateAlbumPlaybackCache(recording.id)
 
                 const index = recordings.value.findIndex((item) => item.id === recording.id)
@@ -282,6 +287,7 @@ const openEditRecordingModal = async (recording: Recording) => {
                             label: formatLabels(label),
                             labels: label,
                             comment,
+                            cover: updatedCover ?? current.cover,
                         }
                     }
                 }

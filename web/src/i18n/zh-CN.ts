@@ -26,6 +26,11 @@ export default {
         savingInProgress: '已有保存操作正在执行',
         untitledPlaylist: '未命名歌单',
     },
+    artwork: {
+        select: '选择图片',
+        replace: '替换图片',
+        tooLarge: '图片不能超过 10 MiB',
+    },
     errors: {
         requestFailed: '请求失败：',
         COMMON: {
@@ -33,6 +38,10 @@ export default {
             AUTHENTICATION_FAILED: '邮箱或密码不正确',
             FORBIDDEN: '没有权限执行此操作',
             INTERNAL_ERROR: '服务器发生未知错误，请稍后重试',
+        },
+        MEDIA_FILE: {
+            IMAGE_TOO_LARGE: '图片不能超过 10 MiB',
+            INVALID_IMAGE: '图片文件无效',
         },
         SYSTEM: {
             SYSTEM_UNINITIALIZED: '系统尚未初始化',
@@ -342,6 +351,7 @@ export default {
         description: '描述',
         descriptionPlaceholder: '在此添加曲目描述',
         defaultRecording: '作品默认曲目',
+        cover: '曲目封面',
     },
     modalMessage: {
         confirm: '确认',
@@ -395,6 +405,7 @@ export default {
         descriptionPlaceholder: '添加描述...',
     },
     artistEdit: {
+        avatar: '艺术家头像',
         nameEmpty: '艺术家名称不能为空',
         name: '艺术家名称',
         alias: '别名',

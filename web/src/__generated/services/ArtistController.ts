@@ -124,6 +124,15 @@ export class ArtistController {
         return (await this.executor({uri: _uri, method: 'POST', body: options.body})) as Promise<void>;
     }
     
+    readonly removeArtistAvatar: (options: ArtistControllerOptions['removeArtistAvatar']) => Promise<
+        ArtistDto['ArtistController/ARTIST_DETAIL_FETCHER']
+    > = async(options) => {
+        let _uri = '/api/artists/';
+        _uri += encodeURIComponent(options.id);
+        _uri += '/avatar';
+        return (await this.executor({uri: _uri, method: 'DELETE'})) as Promise<ArtistDto['ArtistController/ARTIST_DETAIL_FETCHER']>;
+    }
+    
     /**
      * 更新艺术家
      * 
@@ -141,6 +150,18 @@ export class ArtistController {
         let _uri = '/api/artists/';
         _uri += encodeURIComponent(options.id);
         return (await this.executor({uri: _uri, method: 'PUT', body: options.body})) as Promise<ArtistDto['ArtistController/DEFAULT_ARTIST_FETCHER']>;
+    }
+    
+    readonly updateArtistAvatar: (options: ArtistControllerOptions['updateArtistAvatar']) => Promise<
+        ArtistDto['ArtistController/ARTIST_DETAIL_FETCHER']
+    > = async(options) => {
+        let _uri = '/api/artists/';
+        _uri += encodeURIComponent(options.id);
+        _uri += '/avatar';
+        const _formData = new FormData();
+        const _body = options.body;
+        _formData.append("file", _body.file);
+        return (await this.executor({uri: _uri, method: 'PUT', body: _formData})) as Promise<ArtistDto['ArtistController/ARTIST_DETAIL_FETCHER']>;
     }
 }
 
@@ -183,6 +204,15 @@ export type ArtistControllerOptions = {
          * 艺术家更新参数
          */
         readonly body: ArtistUpdate
+    }, 
+    'updateArtistAvatar': {
+        readonly id: number, 
+        readonly body: {
+            readonly file: File
+        }
+    }, 
+    'removeArtistAvatar': {
+        readonly id: number
     }, 
     'mergeArtists': {
         /**

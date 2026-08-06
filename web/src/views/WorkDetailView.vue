@@ -16,6 +16,7 @@ import RecordingEditModal, {
 } from '@/components/recording/RecordingEditModal.vue'
 import WorkDetailHero from '@/components/work/WorkDetailHero.vue'
 import WorkTitleEditModal from '@/components/work/WorkTitleEditModal.vue'
+import { type ArtworkEditValue, updateRecordingArtwork } from '@/composables/artwork'
 import {
     formatDurationMs,
     formatLabels,
@@ -243,7 +244,10 @@ const openEditRecordingModal = async (recording: Recording) => {
                 isDefault: recording.isDefault,
             } satisfies RecordingEditForm,
             showDefaultToggle: true,
-            onSubmit: async ({ title, label, comment, isDefault }: RecordingEditForm) => {
+            onSubmit: async (
+                { title, label, comment, isDefault }: RecordingEditForm,
+                coverEdit: ArtworkEditValue,
+            ) => {
                 await api.recordingController.updateRecording({
                     id: recording.id,
                     body: {
@@ -253,6 +257,7 @@ const openEditRecordingModal = async (recording: Recording) => {
                         defaultInWork: isDefault,
                     },
                 })
+                const updatedCover = await updateRecordingArtwork(recording.id, coverEdit)
                 invalidateWorkPlaybackCache([recording.id])
 
                 const index = recordings.value.findIndex((item) => item.id === recording.id)
@@ -266,8 +271,13 @@ const openEditRecordingModal = async (recording: Recording) => {
                             labels: label,
                             comment,
                             isDefault,
+                            cover: updatedCover ?? current.cover,
                         }
                     }
+                }
+
+                if (updatedCover !== undefined && isDefault) {
+                    workData.value.cover = updatedCover
                 }
 
                 if (isDefault) {

@@ -26,6 +26,11 @@ export default {
         savingInProgress: 'A save operation is already in progress',
         untitledPlaylist: 'Untitled Playlist',
     },
+    artwork: {
+        select: 'Choose Image',
+        replace: 'Replace Image',
+        tooLarge: 'Images cannot exceed 10 MiB',
+    },
     errors: {
         requestFailed: 'Request failed: ',
         COMMON: {
@@ -33,6 +38,10 @@ export default {
             AUTHENTICATION_FAILED: 'Incorrect email or password',
             FORBIDDEN: 'You do not have permission to perform this action',
             INTERNAL_ERROR: 'An unexpected server error occurred, please try again later',
+        },
+        MEDIA_FILE: {
+            IMAGE_TOO_LARGE: 'Images cannot exceed 10 MiB',
+            INVALID_IMAGE: 'The image file is invalid',
         },
         SYSTEM: {
             SYSTEM_UNINITIALIZED: 'The system has not been initialized yet',
@@ -352,6 +361,7 @@ export default {
         description: 'Description',
         descriptionPlaceholder: 'Add a recording description here',
         defaultRecording: 'Default recording of work',
+        cover: 'Recording Cover',
     },
     modalMessage: {
         confirm: 'Confirm',
@@ -406,6 +416,7 @@ export default {
         descriptionPlaceholder: 'Add description...',
     },
     artistEdit: {
+        avatar: 'Artist Avatar',
         nameEmpty: 'Artist name cannot be empty',
         name: 'Artist Name',
         alias: 'Alias',
