@@ -80,3 +80,8 @@ yarn dev
 ## 许可证
 
 本项目许可证见 [LICENSE](../LICENSE)。
+
+## 链接
+
+- [官网](https://unirhy.app)
+- [linux.do](https://linux.do)

@@ -80,3 +80,8 @@ yarn dev
 ## License
 
 See [LICENSE](LICENSE).
+
+## Links
+
+- [Website](https://unirhy.app)
+- [linux.do](https://linux.do)
