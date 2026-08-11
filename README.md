@@ -45,31 +45,25 @@ English | [简体中文](docs/README.zh-CN.md)
 - JDK 25
 - Node.js 24
 - Yarn 4.12+
-- PostgreSQL
+- Docker
+- tmux
 
 ## Quick Start
 
-### Backend
-
 ```sh
-cd server
-./gradlew bootRun
-```
+# 1. 启动 PostgreSQL
+docker run -d --name unirhy-pg \
+  -e POSTGRES_DB=unirhy -e POSTGRES_USER=pgroot -e POSTGRES_PASSWORD=pgroot \
+  -p 5432:5432 postgres:17
 
-### Frontend Client
+# 2. 配置 server/.env（参考 server/.env.example）
+cp server/.env.example server/.env
 
-```sh
-cd web
-yarn
-yarn dev
-```
+# 3. 启动全部服务（server + web + website）
+scripts/dev.sh start
 
-### Website
-
-```sh
-cd website
-yarn
-yarn dev
+# 查看状态
+scripts/dev.sh status
 ```
 
 ## Documentation

@@ -45,31 +45,25 @@ UniRhy（独一律）是一个私有化的音乐流媒体平台，采用 monorep
 - JDK 25
 - Node.js 24
 - Yarn 4.12+
-- PostgreSQL
+- Docker
+- tmux
 
 ## 快速开始
 
-### 后端
-
 ```sh
-cd server
-./gradlew bootRun
-```
+# 1. 启动 PostgreSQL
+docker run -d --name unirhy-pg \
+  -e POSTGRES_DB=unirhy -e POSTGRES_USER=pgroot -e POSTGRES_PASSWORD=pgroot \
+  -p 5432:5432 postgres:17
 
-### 前端客户端
+# 2. 配置 server/.env（参考 server/.env.example）
+cp server/.env.example server/.env
 
-```sh
-cd web
-yarn
-yarn dev
-```
+# 3. 启动全部服务（server + web + website）
+scripts/dev.sh start
 
-### 官网
-
-```sh
-cd website
-yarn
-yarn dev
+# 查看状态
+scripts/dev.sh status
 ```
 
 ## 文档索引
