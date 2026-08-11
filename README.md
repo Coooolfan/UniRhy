@@ -26,6 +26,9 @@ English | [简体中文](docs/README.zh-CN.md)
 - Playback state synchronization.
 - Plugin-based extension support.
 
+> [!TIP]
+> The macOS build is unsigned. If macOS reports the app as damaged, run `xattr -cr /Applications/UniRhy.app` to remove the quarantine attribute.
+
 ## Project Structure
 
 - `server/`: Backend service based on Spring Boot, Kotlin, Gradle, and Jimmer ORM.

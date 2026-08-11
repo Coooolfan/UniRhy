@@ -26,6 +26,9 @@ UniRhy（独一律）是一个私有化的音乐流媒体平台，采用 monorep
 - 播放状态同步。
 - 插件化扩展。
 
+> [!TIP]
+> macOS 安装包未签名，若提示应用已损坏，执行 `xattr -cr /Applications/UniRhy.app` 移除隔离属性即可
+
 ## 项目结构
 
 - `server/`：后端服务，基于 Spring Boot、Kotlin、Gradle 与 Jimmer ORM。
