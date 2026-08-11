@@ -17,10 +17,10 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer
 
 @Configuration
 class SaTokenConfig(
-    @Value("\${unirhy.cors.allowed-origins:http://localhost:5173,http://127.0.0.1:5173}")
+    @Value(AllowedOrigins.VALUE_EXPRESSION)
     allowedOriginsRaw: String,
 ) : WebMvcConfigurer {
-    private val allowedOrigins = parseAllowedOrigins(allowedOriginsRaw)
+    private val allowedOrigins = AllowedOrigins.parse(allowedOriginsRaw)
 
     override fun addInterceptors(registry: InterceptorRegistry) {
         // 注册 Sa-Token 拦截器，打开注解式鉴权功能
@@ -70,13 +70,6 @@ class SaTokenConfig(
         res.addHeader(VARY_HEADER, ORIGIN_HEADER)
         res.addHeader(VARY_HEADER, ACCESS_CONTROL_REQUEST_METHOD)
         res.addHeader(VARY_HEADER, ACCESS_CONTROL_REQUEST_HEADERS)
-    }
-
-    private fun parseAllowedOrigins(raw: String): Set<String> {
-        return raw.split(',')
-            .map { it.trim() }
-            .filter { it.isNotEmpty() }
-            .toSet()
     }
 
     companion object {

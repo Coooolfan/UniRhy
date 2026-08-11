@@ -16,6 +16,8 @@ class PlaybackSyncWebSocketConfig(
     override fun registerWebSocketHandlers(registry: WebSocketHandlerRegistry) {
         registry.addHandler(playbackSyncWebSocketHandler, PLAYBACK_SYNC_PATH)
             .addInterceptors(playbackSyncHandshakeInterceptor)
+            // Origin 校验在 PlaybackSyncHandshakeInterceptor 中实施（白名单 + 同主机名）；
+            // 此处不能用 Spring 默认的同源校验，它严格比较协议与端口，会在 TLS 终止代理后误拒。
             .setAllowedOriginPatterns("*")
     }
 

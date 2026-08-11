@@ -10,6 +10,7 @@ import org.springframework.web.socket.handler.TextWebSocketHandler
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class PlaybackSyncHandshakeInterceptorTest {
@@ -17,6 +18,7 @@ class PlaybackSyncHandshakeInterceptorTest {
     private val interceptor = PlaybackSyncHandshakeInterceptor(
         authenticator = FakePlaybackSyncAuthenticator(mapOf("valid-token" to 42L)),
         tokenName = "unirhy-token",
+        allowedOriginsRaw = "http://localhost:5173,http://127.0.0.1:5173",
     )
 
     @Test
@@ -64,6 +66,83 @@ class PlaybackSyncHandshakeInterceptorTest {
 
         assertFalse(accepted)
         assertEquals(HttpStatus.UNAUTHORIZED.value(), response.status)
+    }
+
+    @Test
+    fun `beforeHandshake rejects cross-site origin carrying cookie credentials`() {
+        val attributes = mutableMapOf<String, Any>()
+        val response = MockHttpServletResponse()
+        val request = MockHttpServletRequest("GET", "/ws/playback-sync").apply {
+            addHeader("Origin", "https://evil.example")
+            addHeader("Cookie", "unirhy-token=valid-token")
+        }
+        val accepted = interceptor.beforeHandshake(
+            request = ServletServerHttpRequest(request),
+            response = ServletServerHttpResponse(response),
+            wsHandler = TextWebSocketHandler(),
+            attributes = attributes,
+        )
+
+        assertFalse(accepted)
+        assertEquals(HttpStatus.FORBIDDEN.value(), response.status)
+        assertNull(attributes[PlaybackSyncSessionAttributes.ACCOUNT_ID])
+    }
+
+    @Test
+    fun `beforeHandshake rejects opaque null origin`() {
+        val attributes = mutableMapOf<String, Any>()
+        val response = MockHttpServletResponse()
+        val request = MockHttpServletRequest("GET", "/ws/playback-sync").apply {
+            addHeader("Origin", "null")
+        }
+        val accepted = interceptor.beforeHandshake(
+            request = ServletServerHttpRequest(request),
+            response = ServletServerHttpResponse(response),
+            wsHandler = TextWebSocketHandler(),
+            attributes = attributes,
+        )
+
+        assertFalse(accepted)
+        assertEquals(HttpStatus.FORBIDDEN.value(), response.status)
+    }
+
+    @Test
+    fun `beforeHandshake accepts whitelisted origin with cookie credentials`() {
+        val attributes = mutableMapOf<String, Any>()
+        val response = MockHttpServletResponse()
+        val request = MockHttpServletRequest("GET", "/ws/playback-sync").apply {
+            addHeader("Origin", "http://127.0.0.1:5173")
+            addHeader("Cookie", "unirhy-token=valid-token")
+        }
+        val accepted = interceptor.beforeHandshake(
+            request = ServletServerHttpRequest(request),
+            response = ServletServerHttpResponse(response),
+            wsHandler = TextWebSocketHandler(),
+            attributes = attributes,
+        )
+
+        assertTrue(accepted)
+        assertEquals(42L, attributes[PlaybackSyncSessionAttributes.ACCOUNT_ID])
+    }
+
+    @Test
+    fun `beforeHandshake accepts same-host origin regardless of port and scheme`() {
+        val attributes = mutableMapOf<String, Any>()
+        val response = MockHttpServletResponse()
+        val request = MockHttpServletRequest("GET", "/ws/playback-sync").apply {
+            serverName = "music.example.com"
+            addHeader("Origin", "https://music.example.com")
+            addHeader("Cookie", "unirhy-token=valid-token")
+        }
+        val accepted = interceptor.beforeHandshake(
+            request = ServletServerHttpRequest(request),
+            response = ServletServerHttpResponse(response),
+            wsHandler = TextWebSocketHandler(),
+            attributes = attributes,
+        )
+
+        assertTrue(accepted)
+        assertEquals(42L, attributes[PlaybackSyncSessionAttributes.ACCOUNT_ID])
     }
 
     private fun servletRequest(token: String?): ServletServerHttpRequest {
