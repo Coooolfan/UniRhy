@@ -7,6 +7,9 @@ English | [简体中文](docs/README.zh-CN.md)
 > [!NOTE]
 > This project is still in a very early stage. Feedback and contributions of all kinds are welcome, and existing features may still change significantly.
 
+> [!TIP]
+> QQ 群：678087094 | Discord：https://discord.gg/CqTpmpmzWv
+
 ## Screenshots
 
 <table align="center">
