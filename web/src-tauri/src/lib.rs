@@ -1,12 +1,11 @@
 mod config;
 
 use serde::Serialize;
-use std::sync::Arc;
+use std::sync::RwLock;
 use tauri::Manager;
-use tokio::sync::RwLock;
 
 struct AppState {
-    backend_url: Arc<RwLock<String>>,
+    backend_url: RwLock<String>,
 }
 
 #[derive(Serialize)]
@@ -16,23 +15,12 @@ struct RuntimeConfig {
 }
 
 fn detect_platform() -> String {
-    if cfg!(target_os = "macos") {
-        "macos".to_string()
-    } else if cfg!(target_os = "ios") {
-        "ios".to_string()
-    } else if cfg!(target_os = "windows") {
-        "windows".to_string()
-    } else if cfg!(target_os = "android") {
-        "android".to_string()
-    } else {
-        "linux".to_string()
-    }
+    std::env::consts::OS.to_string()
 }
 
 #[tauri::command]
 fn get_runtime_config(state: tauri::State<'_, AppState>) -> RuntimeConfig {
-    let backend_url =
-        tauri::async_runtime::block_on(async { state.backend_url.read().await.clone() });
+    let backend_url = state.backend_url.read().expect("backend URL lock poisoned").clone();
     RuntimeConfig {
         backend_url,
         platform: detect_platform(),
@@ -40,20 +28,19 @@ fn get_runtime_config(state: tauri::State<'_, AppState>) -> RuntimeConfig {
 }
 
 #[tauri::command]
-async fn get_backend_url(state: tauri::State<'_, AppState>) -> Result<String, String> {
-    let url = state.backend_url.read().await.clone();
-    Ok(url)
+fn get_backend_url(state: tauri::State<'_, AppState>) -> String {
+    state.backend_url.read().expect("backend URL lock poisoned").clone()
 }
 
 #[tauri::command]
-async fn set_backend_url(
+fn set_backend_url(
     app: tauri::AppHandle,
     state: tauri::State<'_, AppState>,
     url: String,
 ) -> Result<String, String> {
     let normalized = config::normalize_backend_url(&url)?;
     config::save_backend_url(&app, &normalized)?;
-    let mut backend = state.backend_url.write().await;
+    let mut backend = state.backend_url.write().expect("backend URL lock poisoned");
     *backend = normalized.clone();
     Ok(normalized)
 }
@@ -75,7 +62,7 @@ pub fn run() {
 
     builder
         .setup(|app| {
-            let backend_url = Arc::new(RwLock::new(config::load_backend_url(app.handle())));
+            let backend_url = RwLock::new(config::load_backend_url(app.handle()));
             app.manage(AppState { backend_url });
 
             Ok(())

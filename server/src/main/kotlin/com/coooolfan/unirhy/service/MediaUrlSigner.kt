@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
 import java.security.MessageDigest
 import java.security.SecureRandom
+import java.util.HexFormat
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
 
@@ -38,7 +39,7 @@ class MediaUrlSigner(
         val message = "GET\n${MediaFileRoutes.mediaFilePath(id)}\n$expiresAt"
         val mac = Mac.getInstance(ALGORITHM)
         mac.init(SecretKeySpec(secretKey, ALGORITHM))
-        return mac.doFinal(message.toByteArray(Charsets.UTF_8)).toHexString()
+        return HexFormat.of().formatHex(mac.doFinal(message.toByteArray(Charsets.UTF_8)))
     }
 
     fun verify(id: Long, sig: String, expiresAt: Long): Boolean {
@@ -57,9 +58,6 @@ class MediaUrlSigner(
         val sig = sign(id, expiresAt)
         return "${MediaFileRoutes.mediaFilePath(id)}?_sig=$sig&_exp=$expiresAt"
     }
-
-    private fun ByteArray.toHexString(): String =
-        joinToString("") { "%02x".format(it) }
 
     companion object {
         private const val ALGORITHM = "HmacSHA256"

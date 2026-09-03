@@ -436,5 +436,3 @@ export const useAudioNativeSession = (options: UseAudioNativeSessionOptions) => 
         localSeek: nativeLocalSeek,
     }
 }
-
-export type AudioNativeSession = ReturnType<typeof useAudioNativeSession>

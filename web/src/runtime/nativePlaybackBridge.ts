@@ -146,9 +146,6 @@ export const installNativeErrorReporting = () => {
 export const configureNativePlayback = (config: NativePlaybackConfig) =>
     invokeCommand('configure', { request: config })
 
-export const updateNativePlaybackAuth = (token: string | null) =>
-    invokeCommand('update_auth', { request: { token } })
-
 export const connectNativeSync = () => invokeCommand('connect_sync')
 
 export const disconnectNativeSync = () => invokeCommand('disconnect_sync')

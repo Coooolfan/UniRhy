@@ -8,7 +8,6 @@ import {
   type CSSProperties,
 } from 'vue'
 import LightPillarWebGL from '@/components/LightPillarWebGL.vue'
-import { DEFAULT_HDR_TONE_CURVE, type HdrToneCurve } from '@/components/hdrToneCurve'
 
 interface LightPillarProps {
   topColor?: string
@@ -23,7 +22,6 @@ interface LightPillarProps {
   noiseIntensity?: number
   mixBlendMode?: CSSProperties['mixBlendMode']
   pillarRotation?: number
-  toneCurve?: HdrToneCurve
 }
 
 type HdrPreference = 'auto' | 'on' | 'off'
@@ -42,7 +40,6 @@ const props = withDefaults(defineProps<LightPillarProps>(), {
   noiseIntensity: 0.5,
   mixBlendMode: 'screen',
   pillarRotation: 0,
-  toneCurve: () => ({ ...DEFAULT_HDR_TONE_CURVE }),
 })
 
 const LightPillarWebGPU = defineAsyncComponent(() => import('@/components/LightPillarWebGPU.vue'))
@@ -50,11 +47,6 @@ const LightPillarWebGPU = defineAsyncComponent(() => import('@/components/LightP
 const renderMode = ref<RenderMode>('sdr-webgl')
 const hdrPreference = ref<HdrPreference>('auto')
 const useHdrComponent = computed(() => renderMode.value !== 'sdr-webgl')
-const rendererProps = computed(() => {
-  const { toneCurve: _toneCurve, ...rendererOptions } = props
-  return rendererOptions
-})
-
 let hdrMediaQuery: MediaQueryList | null = null
 
 function readHdrPreference(): HdrPreference {
@@ -108,11 +100,10 @@ onBeforeUnmount(() => {
     :data-render-mode="renderMode"
     :style="{ mixBlendMode }"
   >
-    <LightPillarWebGL v-if="!useHdrComponent" v-bind="rendererProps" mixBlendMode="normal" />
+    <LightPillarWebGL v-if="!useHdrComponent" v-bind="props" mixBlendMode="normal" />
     <LightPillarWebGPU
       v-else
-      v-bind="rendererProps"
-      :toneCurve="toneCurve"
+      v-bind="props"
       @ready="handleHdrReady"
       @unavailable="handleHdrUnavailable"
     />

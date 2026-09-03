@@ -7,11 +7,6 @@ export type AndroidPlaybackSystemStatus = {
 
 export const isAndroidRuntime = () => getPlatformRuntime().platform === 'android'
 
-export const getAndroidNotificationPermission = async () => {
-    const { isPermissionGranted } = await import('@tauri-apps/plugin-notification')
-    return isPermissionGranted()
-}
-
 export const requestAndroidNotificationPermission = async () => {
     const { requestPermission } = await import('@tauri-apps/plugin-notification')
     return requestPermission()

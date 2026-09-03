@@ -9,7 +9,7 @@ import {
 } from 'vue'
 import * as THREE from 'three/webgpu'
 import { positionGeometry, screenSize, screenUV, uniform, vec4, wgslFn } from 'three/tsl'
-import { DEFAULT_HDR_TONE_CURVE, type HdrToneCurve } from '@/components/hdrToneCurve'
+import { DEFAULT_HDR_TONE_CURVE } from '@/components/hdrToneCurve'
 
 interface LightPillarProps {
   topColor?: string
@@ -24,7 +24,6 @@ interface LightPillarProps {
   noiseIntensity?: number
   pillarRotation?: number
   mixBlendMode?: CSSProperties['mixBlendMode']
-  toneCurve?: HdrToneCurve
 }
 
 const props = withDefaults(defineProps<LightPillarProps>(), {
@@ -40,7 +39,6 @@ const props = withDefaults(defineProps<LightPillarProps>(), {
   noiseIntensity: 0.5,
   pillarRotation: 0,
   mixBlendMode: 'normal',
-  toneCurve: () => ({ ...DEFAULT_HDR_TONE_CURVE }),
 })
 
 const emit = defineEmits<{
@@ -49,7 +47,6 @@ const emit = defineEmits<{
 }>()
 
 const MACBOOK_PRO_XDR_HEADROOM = 3.2
-const MACBOOK_PRO_XDR_CORE_THRESHOLD = 3.1
 
 const containerRef = useTemplateRef('containerRef')
 const rendererRef = shallowRef<THREE.WebGPURenderer | null>(null)
@@ -76,11 +73,11 @@ function createUniforms() {
     pillarHeight: uniform(props.pillarHeight),
     noiseIntensity: uniform(props.noiseIntensity),
     pillarRotation: uniform(props.pillarRotation),
-    toneBase: uniform(props.toneCurve.base),
-    toneGamma: uniform(props.toneCurve.gamma),
-    toneHighlightStart: uniform(props.toneCurve.highlightStart),
-    toneHighlightGain: uniform(props.toneCurve.highlightGain),
-    toneHighlightBias: uniform(props.toneCurve.highlightBias),
+    toneBase: uniform(DEFAULT_HDR_TONE_CURVE.base),
+    toneGamma: uniform(DEFAULT_HDR_TONE_CURVE.gamma),
+    toneHighlightStart: uniform(DEFAULT_HDR_TONE_CURVE.highlightStart),
+    toneHighlightGain: uniform(DEFAULT_HDR_TONE_CURVE.highlightGain),
+    toneHighlightBias: uniform(DEFAULT_HDR_TONE_CURVE.highlightBias),
   }
 }
 
@@ -88,66 +85,6 @@ function emitUnavailable() {
   if (didEmitUnavailable) return
   didEmitUnavailable = true
   emit('unavailable')
-}
-
-async function recordHdrDiagnostics({
-  renderer,
-  scene,
-  camera,
-  container,
-}: {
-  renderer: THREE.WebGPURenderer
-  scene: THREE.Scene
-  camera: THREE.OrthographicCamera
-  container: HTMLElement
-}) {
-  if (!new URLSearchParams(window.location.search).has('hdrDebug')) return
-
-  const width = 160
-  const height = 100
-  const renderTarget = new THREE.RenderTarget(width, height, {
-    type: THREE.HalfFloatType,
-    depthBuffer: false,
-  })
-
-  renderer.setRenderTarget(renderTarget)
-  renderer.render(scene, camera)
-  await renderer.backend.device!.queue.onSubmittedWorkDone()
-
-  const pixels = await renderer.readRenderTargetPixelsAsync(renderTarget, 0, 0, width, height)
-  let peak = 0
-  let highlightPixels = 0
-  let xdrCorePixels = 0
-
-  for (let pixel = 0; pixel < width * height; pixel += 1) {
-    const offset = pixel * 4
-    const red =
-      pixels instanceof Uint16Array
-        ? THREE.DataUtils.fromHalfFloat(pixels[offset]!)
-        : Number(pixels[offset])
-    const green =
-      pixels instanceof Uint16Array
-        ? THREE.DataUtils.fromHalfFloat(pixels[offset + 1]!)
-        : Number(pixels[offset + 1])
-    const blue =
-      pixels instanceof Uint16Array
-        ? THREE.DataUtils.fromHalfFloat(pixels[offset + 2]!)
-        : Number(pixels[offset + 2])
-    const pixelPeak = Math.max(red, green, blue)
-
-    peak = Math.max(peak, pixelPeak)
-    if (pixelPeak > 1) highlightPixels += 1
-    if (pixelPeak >= MACBOOK_PRO_XDR_CORE_THRESHOLD) xdrCorePixels += 1
-  }
-
-  container.dataset.hdrPeak = peak.toFixed(3)
-  container.dataset.hdrHighlightRatio = (highlightPixels / (width * height)).toFixed(4)
-  container.dataset.hdrXdrCoreRatio = (xdrCorePixels / (width * height)).toFixed(4)
-
-  renderer.setRenderTarget(null)
-  renderTarget.dispose()
-  renderer.render(scene, camera)
-  await renderer.backend.device!.queue.onSubmittedWorkDone()
 }
 
 async function setup() {
@@ -459,7 +396,6 @@ async function setup() {
       return
     }
 
-    await recordHdrDiagnostics({ renderer, scene, camera, container })
     emit('ready')
   } catch {
     disposeAttempt()
@@ -547,11 +483,6 @@ watch(
     props.pillarHeight,
     props.noiseIntensity,
     props.pillarRotation,
-    props.toneCurve.base,
-    props.toneCurve.gamma,
-    props.toneCurve.highlightStart,
-    props.toneCurve.highlightGain,
-    props.toneCurve.highlightBias,
   ],
   () => {
     const uniforms = uniformsRef.value
@@ -565,11 +496,6 @@ watch(
     uniforms.pillarHeight.value = props.pillarHeight
     uniforms.noiseIntensity.value = props.noiseIntensity
     uniforms.pillarRotation.value = props.pillarRotation
-    uniforms.toneBase.value = props.toneCurve.base
-    uniforms.toneGamma.value = props.toneCurve.gamma
-    uniforms.toneHighlightStart.value = props.toneCurve.highlightStart
-    uniforms.toneHighlightGain.value = props.toneCurve.highlightGain
-    uniforms.toneHighlightBias.value = props.toneCurve.highlightBias
 
     const renderer = rendererRef.value
     const scene = sceneRef.value

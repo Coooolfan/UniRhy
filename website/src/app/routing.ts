@@ -58,7 +58,3 @@ export function listPrerenderPaths(): PrerenderPath[] {
   }
   return paths
 }
-
-export function slugExistsForLang(slug: string, lang: 'zh' | 'en'): boolean {
-  return listBlogSlugs(lang).includes(slug)
-}

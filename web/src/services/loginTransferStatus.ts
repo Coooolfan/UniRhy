@@ -6,6 +6,3 @@ export const ACTIVE_LOGIN_TRANSFER_STATUSES: ReadonlySet<LoginTransferStatus> = 
     'CLAIMED',
     'AUTHORIZED',
 ])
-
-export const isActiveLoginTransfer = (status: LoginTransferStatus): boolean =>
-    ACTIVE_LOGIN_TRANSFER_STATUSES.has(status)

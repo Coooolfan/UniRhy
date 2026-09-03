@@ -4637,7 +4637,6 @@ dependencies = [
  "tauri-plugin-notification",
  "tauri-plugin-unirhy-playback",
  "tauri-plugin-websocket",
- "tokio",
 ]
 
 [[package]]

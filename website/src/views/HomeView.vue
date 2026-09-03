@@ -1,24 +1,15 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed } from 'vue'
 import { useHead } from '@unhead/vue'
 import LightPillar from '@/components/LightPillar.vue'
 import BrandLogo from '@/components/BrandLogo.vue'
 import HeroSubtitle from '@/components/HeroSubtitle.vue'
-import HdrToneCurvePanel from '@/components/HdrToneCurvePanel.vue'
-import { DEFAULT_HDR_TONE_CURVE } from '@/components/hdrToneCurve'
 import { useLang } from '@/composables/useLang'
 
 const { lang, setLang } = useLang()
 const isChinese = computed(() => lang.value === 'zh')
 const blogPath = computed(() => `/${lang.value}/blog`)
 const docsPath = computed(() => `/${lang.value}/docs`)
-const showHdrToneCurve = ref(false)
-const hdrToneCurve = ref({ ...DEFAULT_HDR_TONE_CURVE })
-
-onMounted(() => {
-  showHdrToneCurve.value = new URLSearchParams(window.location.search).has('hdrControls')
-})
-
 useHead(() => ({
   title: 'UniRhy · 独一律',
   htmlAttrs: { lang: lang.value === 'zh' ? 'zh-CN' : 'en' },
@@ -48,10 +39,8 @@ useHead(() => ({
       :noiseIntensity="0.5"
       :pillarRotation="90"
       :interactive="false"
-      :toneCurve="hdrToneCurve"
       mixBlendMode="normal"
     />
-    <HdrToneCurvePanel v-if="showHdrToneCurve" v-model="hdrToneCurve" />
     <div
       class="home-hero-content pointer-events-none absolute top-1/2 left-1/2 z-10 -translate-x-1/2 -translate-y-1/2 pb-24 text-center font-brand-sans text-white"
     >

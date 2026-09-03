@@ -20,7 +20,7 @@ import {
     peekResolvedPlayableTrack,
     resolveAlbumPlayableTrack,
     resolveWorkPlayableTrack,
-} from '@/services/playableTrackResolver'
+} from '@/services/recordingPlaybackResolver'
 import { useAudioStore } from '@/stores/audio'
 import { useUserStore } from '@/stores/user'
 

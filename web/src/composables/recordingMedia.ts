@@ -232,17 +232,6 @@ export const pickPlayableRecordingEntry = <TRecording extends PlayableRecordingC
     return firstPlayableEntry
 }
 
-export const formatYear = (releaseDate?: string) => {
-    if (!releaseDate) {
-        return ''
-    }
-    const date = new Date(releaseDate)
-    if (Number.isNaN(date.getTime())) {
-        return ''
-    }
-    return date.getFullYear().toString()
-}
-
 export const formatDurationMs = (durationMs?: number) => {
     if (durationMs === undefined || !Number.isFinite(durationMs) || durationMs < 0) {
         return ''
