@@ -67,7 +67,7 @@ const playlistSectionTransitionStyle = computed(() => {
 const sidebarWrapperClass = computed(() => (isDesktopSidebarCollapsed.value ? 'md:w-0' : 'md:w-64'))
 
 const sidebarPanelClass = computed(() => [
-    isMobileSidebarOpen.value ? 'translate-x-0' : '-translate-x-full',
+    isMobileSidebarOpen.value ? 'translate-x-0' : '-translate-x-[calc(100%_+_96px)]',
     isDesktopSidebarCollapsed.value ? 'md:-translate-x-full' : 'md:translate-x-0',
 ])
 
