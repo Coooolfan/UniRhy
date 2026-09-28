@@ -339,7 +339,7 @@ jobs:
           distribution: temurin
 
       - name: 设置 Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
 
       - name: 设置 Rust 工具链
         uses: dtolnay/rust-toolchain@stable
